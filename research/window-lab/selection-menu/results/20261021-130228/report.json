@@ -1,0 +1,30 @@
+{
+  "status": "blocked",
+  "page_ready": false,
+  "guard": [
+    0,
+    "alex: untouched by the sandbox (foreground, focus, cursor and input desktop polled every 20 ms: no sandbox window became his foreground, none showed on his desktop, the input desktop stayed Default, the cursor never moved without real input)"
+  ],
+  "full_lenses": {
+    "home-board": "!! since your last look: 32 changes by house, jeff, worker-a8420, worker-a5659 (e18566..e18597; history lists them)\n   house: 2 prop in Usage, 2 edit in Log world: is it in step with the live world?, 2 prop in Juniper's corner, edit in Usage, +2 more kinds\n   jeff: edit in Conversation, prop in JEFF's corner, create in JEFF's corner, promise in Promises\n   worker-a8420: 6 edit in Home base, 5 create in Explicit menu fixtures, create in Home, prop in Design fixture, +2 more kinds\n   worker-a5659: 4 create in Alex's notices\nlens home-board compiles: 240 of 5000 nodes · style home-style · painted sizes: none reported since the house started (13:02) (no viewer has it open with a painter that reports them)",
+    "waiting-on-me": "lens waiting-on-me compiles: 46 of 5000 nodes · style home-style · painted sizes: none reported since the house started (13:02) (no viewer has it open with a painter that reports them)"
+  },
+  "copy_review_acceptance": {
+    "waiting-on-me": {
+      "tag_menu": true,
+      "design_only_menu": false,
+      "dual_remains_design": true,
+      "stale_refused": true,
+      "undo_restores_tag": true,
+      "underlying_delete": false
+    },
+    "home-board": {
+      "tag_menu": true,
+      "design_only_menu": false,
+      "dual_remains_design": true,
+      "stale_refused": true,
+      "undo_restores_tag": true,
+      "underlying_delete": false
+    }
+  }
+}

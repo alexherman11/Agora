@@ -125,6 +125,21 @@ the one form. The words:
     $selected                    in an edit's or a button's command: the words last highlighted in a text (one with
                                  `marks`) of the same thing, in quotation marks with a space after; empty when none were. A comment box beside a paragraph
                                  can quote what was highlighted in it
+    $quoted, $quoted_in          a7625, in an `on menu` entry opened on selected words: the words exactly as the source
+                                 has them (a Markdown text's own slice; another text's words only when its source holds
+                                 them as drawn) and the thing they are in. The entry is refused when that thing changed
+                                 since the words were selected. Comment is an explicit world-authored prepare entry,
+                                 Copy, and Cut where they are being written; text in a carried part gets "Select text"
+    on menu "<label>" prepare <exact composer key> [context=<read item> destination=<read item>]
+    on edit quoted do <command>  with commit explicit, picks the quoted action only
+                                 when this composer's private draft has a quote; otherwise plain on edit. Evaluated
+                                 after guards offer exactly one plain and at most one quoted action. Full command
+                                 batches are preserved; quoted consumes $quote_text, plain has no quote bindings.
+                                 attach a validated source snapshot to the existing explicit composer, privately in
+                                 this page, keeping its words and native action. Never executes on-select or sends.
+    $quote_item/rev/field/start/end/text/before/after/context/destination
+                                 explicit composer's attached snapshot facts, substituted in one pass at Send.
+                                 Source/context revisions are checked again atomically by /api/do source_quote.
     on click press <key>         the button presses Ctrl+B, Ctrl+I or Ctrl+K in the text the caret is in
     on click host <verb> [words] the button asks the program the page is painted in (the home base) to do <verb>, one of
                                  the rows it publishes as witnessed:host; $fields fill as in any command. Never a desk
@@ -171,10 +186,9 @@ GESTURES = ("click", "edit", "drag", "menu", "key", "open", "select", "end", "li
 # base, whose voice (research/window-lab/voice.py) made them; a desk command goes with a gesture id made from the
 # filled line, so the door refuses a repeat from another page or a reload ('already done')
 DROP_SIDES = ("left", "right", "top", "bottom")
-# 14 Oct (Alex: the words highlighted should stay highlighted while he writes about them, and agents should highlight
-# too): `on select do <command>` is sent when the viewer finishes highlighting words in the part's text, with $value
-# the words, and again with $value empty when they click in such a text without highlighting. Where a highlight is
-# kept is the lens's word (a prop on the viewer's own desk, a line, a thing), so it is world data anyone can read.
+# Legacy on-select syntax is retained for reading old lenses, but the painter
+# never executes it: Alex's 21 Oct rule makes highlighting local selection only.
+# World owners replace old handlers with explicit menu prepare actions.
 KEYS = ("Enter", "Tab", "Shift+Tab", "Backspace", "Delete")      # boundary deletion is authored in either direction
 PRESSES = ("Ctrl+B", "Ctrl+I", "Ctrl+K", "Ctrl+E", "Ctrl+S")   # the keys a button may press in the text the caret is in (E, S: a `markdown` text's source and save, a5820)      # `drop` was admitted and never painted (Astra). A gesture exists when the painter can do it.
 # Alex, 29 Sep ("native right click behavior"): `on menu "<label>" do ...` puts an entry in the part's own menu, which the
@@ -1100,13 +1114,18 @@ def _w_grid(node, p, val, n, env):
     """`grid 1 3 3 1`, `grid 1fr fit 2fr`: tracks in fr (a bare number is fr) or fit (as wide as the widest cell).
     a10637 (Alex's Board, Pike m10626): `grid fill <min>` fits as many equal columns as the panel's width allows, each
     at least <min> wide (18ch, 12gap, or pixels: 240 or 240px), its children flowing into rows; the painter counts the
-    columns from the width it has, so a resize writes nothing."""
+    columns from the width it has, so a resize writes nothing.
+    Optional `pack` fits measured items into gaps,
+    retaining their DOM/keyboard order; intrinsic wide items span columns."""
     toks = val.split()
     if toks[:1] == ["fill"]:
-        m = re.fullmatch(r"(\d+(?:\.\d+)?)(ch|gap|px)?", " ".join(toks[1:]))
+        pack = toks[-1:] == ["pack"]
+        minimum = " ".join(toks[1:-1] if pack else toks[1:])
+        m = re.fullmatch(r"(\d+(?:\.\d+)?)(ch|gap|px)?", minimum)
         if not m or float(m[1]) <= 0:
             raise LensRefusal(f"line {n}: `grid fill <min>`: the least width of a column, in ch (18ch), steps of the style's gap (12gap) or pixels (240); got {p!r}")
-        node["layout"], node["tracks"] = "grid", [f"fill {m[1]}{m[2] or 'px'}"]
+        track = f"fill {m[1]}{m[2] or 'px'}" + (" pack" if pack else "")
+        node["layout"], node["tracks"] = "grid", [track]
         return
     tracks = []
     for t in toks:
@@ -1935,6 +1954,15 @@ ACT_COMMANDS = ("do", "look", "read", "examine", "find", "undo", "run", "scene",
 
 
 def _w_on(node, p, val, n, env):
+    # A local explicit handoff to an existing composer, never a desk command.
+    prep = re.fullmatch(r'menu\s+"([^"]+)"(?:\s+when\s+(.+?))?\s+prepare\s+(\S+(?:\s+(?:context|destination)=\S+)*)', val.strip())
+    if prep:
+        label, guard, target = prep.groups()
+        if guard:
+            X.parse(guard)
+        node["on"].append({"on": "menu", "label": label, "line": "prepare " + target,
+                           **({"when": guard} if guard else {})})
+        return
     # Host acts may use the same guard/menu shape as desk acts. They still
     # dispatch only to the host's closed verb table, never through desk verbs.
     host_act = re.fullmatch(r'(click|pop|spoken|menu\s+"[^"]+")(?:\s+when\s+(.+?))?\s+host\s+(.+)', val.strip())
@@ -1968,6 +1996,9 @@ def _w_on(node, p, val, n, env):
     m = re.fullmatch(r'((?:menu\s+"[^"]+")|[^"]*?)\s+when\s+(.+)', g.strip())
     if m:
         g, when = m.group(1), m.group(2)
+    # Composer-local presence branch; not a world expression or a second editor.
+    if g.strip() == "edit quoted":
+        g = "edit-quoted"
     if g.startswith("key "):
         label, g = g[4:].strip(), "key"
         if label not in KEYS:
@@ -1988,7 +2019,7 @@ def _w_on(node, p, val, n, env):
         if not m:
             raise LensRefusal(f'line {n}: `on menu "<label>" [when <test>] do <desk command>`: the entry\'s words, quoted; got {p!r}')
         label, g = m.group(1), "menu"
-    if (g not in GESTURES and g != "drop") or not do or not cmd.strip() or (g == "drop" and not drop_part) or (g == "menu" and not label):
+    if (g not in GESTURES and g not in ("drop", "edit-quoted")) or not do or not cmd.strip() or (g == "drop" and not drop_part) or (g == "menu" and not label):
         raise LensRefusal(f"line {n}: `on <click|edit|drag|select> [when <test>] do <desk command>`, `on end do <desk command>` (a `live until` at zero), `on menu \"<label>\" do <desk command>`, `on key <{'|'.join(KEYS)}> do <desk command>`, `on click press <key>`, `on click host <verb> [words]` or `on drop <part> do <desk command>`; got {p!r}")
     if when:
         try:
@@ -2010,7 +2041,7 @@ def _w_on(node, p, val, n, env):
 # word -> (shape as a reader sees it, setter). A layout word is its own name.
 WORDS = {
     **{lay: (lay, _w_layout) for lay in LAYOUTS},
-    "grid": ("grid <tracks: 1 3 3 1 | 1fr fit 2fr | fill 18ch>", _w_grid),
+    "grid": ("grid <tracks: 1 3 3 1 | 1fr fit 2fr | fill 18ch [pack]>", _w_grid),
     "gap": ("gap | gap x2 | gap /2", _w_gap),
     "scroll": ("scroll none|scroll|end|none end", _w_scroll),
     "remember": ('remember "<reading scope>"', _w_remember),
@@ -2171,6 +2202,13 @@ def parse(src, roles=None, style=None):
     for k in every:
         k["src"] = f"{k['name']} : " + ", ".join(k["words"])     # one spelling of the part's own words, whichever form it was written in
         _check_part(k, k["line"])          # after every line, since a part's words may follow its children
+        quoted = [a for a in k["on"] if a["on"] == "edit-quoted"]
+        if quoted:
+            plain = [a for a in k["on"] if a["on"] == "edit"]
+            if (k["commit"] != "explicit" or not plain
+                    or any(re.search(r"\$quote_\w+\b", a["line"]) for a in plain)
+                    or any(not re.search(r"\$quote_text\b", a["line"]) for a in quoted)):
+                raise LensRefusal(f"line {k['line']}: `on edit quoted do` needs commit explicit, plain `on edit` actions without quote bindings, and quoted actions consuming $quote_text")
         if k["caret"] and (k["text"] is None or not any(a["on"] == "edit" for a in k["on"])):
             raise LensRefusal(f"line {k['line']}: `caret` brings the caret to a text being written: this part has no `on edit`")
         for wd in ("gap", "scroll", "fold", "measure", "arrows", "remember"):
@@ -2277,7 +2315,9 @@ def to_lines(src, roles=None, style=None):
 # ---------------------------------------------------------------------------------------------------------------------
 HOST = ("me", "today", "session", "touched")
 HOST_FRAMES = ("touched", "changed")      # Juniper: $touched (last event on the thing), $touched.by, $changed.<field>; host reads, never in a fence
-GESTURE_FACTS = ("value", "x", "y", "carried", "head", "tail", "focus", "selected", "quoted", "quoted_in", "part")   # quoted, quoted_in: 13 Oct; part: a6431's pick
+GESTURE_FACTS = ("value", "x", "y", "carried", "head", "tail", "focus", "selected", "quoted", "quoted_in", "part",
+                 "quote_item", "quote_rev", "quote_field", "quote_start", "quote_end", "quote_text",
+                 "quote_before", "quote_after", "quote_context", "quote_destination")
 
 
 def _refs_of(node):
@@ -3062,6 +3102,8 @@ def emit(node):
                 paint["caret"] = list(node["caret"])
         if "click" in ons:
             paint["semantic"] = {"role": "button", "label": node.get("text") or ""}
+    if node.get("source") is not None:
+        paint["source"] = node["source"]
     if node.get("share") is not None:
         paint["share"] = node["share"]
     if node.get("resize") is not None:

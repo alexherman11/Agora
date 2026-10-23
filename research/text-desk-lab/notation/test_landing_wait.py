@@ -33,7 +33,8 @@ NOTATION = "research/text-desk-lab/notation"
 sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
 import agora_tmp
 tmp = SimpleNamespace(name=agora_tmp.directory("lw-"))
-atexit.register(shutil.rmtree, tmp.name, ignore_errors=True)
+from fixture_cleanup import cleanup_fixture
+atexit.register(cleanup_fixture, tmp.name)
 REPO = Path(tmp.name) / "live"
 os.environ["LANDING_LIVE"] = str(REPO)
 os.environ["LANDING_ROOM"] = str(Path(tmp.name) / "room")
@@ -260,5 +261,7 @@ finally:
     landing.health = fast
     WS.workers.pop(K6, None)
 
+check("private fixture cleanup", cleanup_fixture(tmp.name))
+atexit.unregister(cleanup_fixture)
 print(f"{len(fails)} FAILED" if fails else "all passed")
 sys.exit(1 if fails else 0)

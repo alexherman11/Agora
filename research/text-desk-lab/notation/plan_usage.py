@@ -147,7 +147,11 @@ class Plans:
         # resending an intent whose acknowledgement was lost.
         self.save()
         for held in entry["targets"]:
-            self.target(held, "Paused until " + time.strftime("%H:%M", time.localtime(entry["retry_at"])) + ", will resume")
+            actual = self.actual_provider(held)
+            if actual and actual != provider:
+                continue  # an old provider episode cannot label a new runtime paused
+            self.target(held, "Paused until "
+                        + time.strftime("%d %b %H:%M %Z", time.localtime(entry["retry_at"])))
         self.flush_notices()
 
     def resumed(self, provider, target):
@@ -171,8 +175,26 @@ class Plans:
         if any(target in entry["targets"] for entry in self.state["pauses"].values()):
             self.target(target, "Resuming")
 
+    def actual_provider(self, target):
+        resident = getattr(self.house, "residents", {}).get(target)
+        if resident:
+            return resident.state.get("session_provider")
+        workshop = getattr(self.house, "workshop", None)
+        if workshop and target in workshop.workers:
+            return workshop.workers[target].state.get("session_provider")
+        return None
+
+    def announce(self, key, text):
+        outbox = self.state.setdefault("announcements", {})
+        if key not in outbox:
+            outbox[key] = {"notices": [{"text": text, "sent": False}]}
+            self.save()
+        self.flush_notices()
+
     def flush_notices(self):
-        for entry in self.state["pauses"].values():
+        entries = (list(self.state["pauses"].values())
+                   + list(self.state.get("announcements", {}).values()))
+        for entry in entries:
             for notice in entry.get("notices", []):
                 if notice["sent"]:
                     continue

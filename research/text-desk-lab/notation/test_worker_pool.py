@@ -53,6 +53,9 @@ B = R.BOARD
 sys.path.insert(0, str(HERE.parents[1] / "window-lab"))
 import agora_tmp
 TMP = Path(agora_tmp.directory("worker-pool-test-"))
+import atexit
+from fixture_cleanup import cleanup_fixture
+atexit.register(cleanup_fixture, TMP)
 
 
 def say(me, *lines):
@@ -375,5 +378,7 @@ check("8. commit_for commits the worker's file to its branch, never the world co
       n == 1 and "a9: committed by the house" in log and "made.py" in log and "pickle" not in log, log)
 check("8. nothing uncommitted: nothing committed", WS.commit_for(wk, "again") == 0)
 
+check("private fixture cleanup", cleanup_fixture(TMP))
+atexit.unregister(cleanup_fixture)
 print(f"{len(fails)} FAILED" if fails else "all passed")
 sys.exit(1 if fails else 0)

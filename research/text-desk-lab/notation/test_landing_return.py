@@ -43,7 +43,8 @@ from types import SimpleNamespace
 import atexit
 import shutil
 tmp = SimpleNamespace(name=agora_tmp.directory("landing-regression-"))
-atexit.register(shutil.rmtree, tmp.name, ignore_errors=True)
+from fixture_cleanup import cleanup_fixture
+atexit.register(cleanup_fixture, tmp.name)
 TMP = Path(tmp.name)
 REPO = TMP / "live"
 os.environ["LANDING_LIVE"] = str(REPO)
@@ -414,5 +415,7 @@ check("8. its worker comes back on the branch and hears the keeper's failure, wi
 WS.step(W, CFG)
 check("8. the card is returned once", sum("keeper reverted" in text(e) for e in house_said(S8, mark)[0]) == 1)
 
+check("private fixture cleanup", cleanup_fixture(tmp.name))
+atexit.unregister(cleanup_fixture)
 print(f"{len(fails)} FAILED" if fails else "all passed")
 sys.exit(1 if fails else 0)
