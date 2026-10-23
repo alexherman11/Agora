@@ -86,6 +86,29 @@ def test_no_attachment_send_advances_generation(case):
     assert "context" not in case.w.subjects[case.chat]["lines"][-1].get("fields", {})
 
 
+def test_plain_send_no_capture_matches_ordinary_append_receipt_and_immediate_path(case):
+    """Unactivated lens Send retains main's ordinary synchronous append path."""
+    case.w.subjects[case.sid]["props"].update(context="", pending="")
+    ordinary = copy.deepcopy(case.desk)
+    observations = []
+    case.desk.hooks.append(lambda _: observations.append("append"))
+    n0 = len(case.w.events)
+    got = case.desk.cmd_do_knife("append", [case.chat], {
+        "line": "Fixture words", "to": "pike", "captures": "",
+        "context_from": case.draft,
+    })
+    expected = ordinary.cmd_do_knife("append", [case.chat], {
+        "line": "Fixture words", "to": "pike",
+    })
+    assert got == expected
+    assert observations == ["append"]
+    assert [e["verb"] for e in case.w.events[n0:]] == ["edit"]
+    assert props(case).get("capture_generation") is None
+    assert case.w.subjects[case.chat]["lines"][-1].get("fields", {}) == \
+        ordinary.world.subjects[case.chat]["lines"][-1].get("fields", {})
+    case.service.sent_copy.assert_not_called()
+
+
 def test_two_captures_and_removal_use_current_list(case):
     case.w.subjects[case.sid]["props"]["context"] = "cap-1 cap-2"
     case.service.sent_copy.side_effect = lambda s, a, cid: dict(case.capture, id=cid)
