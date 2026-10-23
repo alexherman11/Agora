@@ -811,6 +811,8 @@ class House:
         self.feeds = feeds.Feeds(world, self.dir)
         self.usage = usage.Usage(world, self.dir)
         self.plans = plan_usage.Plans(self)
+        if not fake:
+            self.plans.refresh_held_codex()
         self.scripts = scripts_mirror.Scripts(world, self.dir, allowed=None if not fake else False)
         self.charter_state = {}
         # No setting/world property can enable this; no journal/backend opened.

@@ -297,5 +297,66 @@ class TransferLifecycle(unittest.TestCase):
         self.assertIn("serialization is busy", self.subject["props"]["brings_status"])
 
 
+    def test_measured_newer_birth_closes_only_the_historical_owner(self):
+        self.lifecycle([{"at": 100, "kind": "start", "data": {"pid": 123}}, {"kind": "stop"}])
+        with (patch.object(workshop, "process_gone", return_value=False),
+              patch.object(workshop, "process_started_after", return_value=True) as birth):
+            self.assertTrue(self.pool.legacy_owner_stopped("card"))
+        birth.assert_called_once_with(123, 100)
+        self.assertTrue(self.worker.state["pending"]["delivered"])
+
+    def test_unknown_or_same_birth_still_holds_every_recorded_owner(self):
+        self.lifecycle([{"at": 100, "kind": "start", "data": {"pid": 123}},
+                        {"at": 200, "kind": "start", "data": {"pid": 124}}, {"kind": "stop"}])
+        with (patch.object(workshop, "process_gone", side_effect=lambda pid: pid == 124),
+              patch.object(workshop, "process_started_after", return_value=False)):
+            self.assertFalse(self.pool.legacy_owner_stopped("card"))
+
+    def test_newer_birth_never_substitutes_for_recorded_owner_closure(self):
+        self.lifecycle([{"at": 100, "kind": "start", "data": {"pid": 123}}])
+        with (patch.object(workshop, "process_gone", return_value=False),
+              patch.object(workshop, "process_started_after", return_value=True) as birth):
+            self.assertFalse(self.pool.legacy_owner_stopped("card"))
+        birth.assert_not_called()
+
+    def test_legacy_journal_bound_is_finite_but_accepts_observed_card_size(self):
+        self.lifecycle([{"kind": "start", "data": {"pid": 123}}, {"kind": "stop"}])
+        with (patch.object(Path, "stat", return_value=SimpleNamespace(st_size=21_380_948)),
+              patch.object(workshop, "process_gone", return_value=True)):
+            self.assertTrue(self.pool.legacy_owner_stopped("card"))
+        with patch.object(Path, "stat", return_value=SimpleNamespace(st_size=32 * 1024 * 1024 + 1)):
+            self.assertFalse(self.pool.legacy_owner_stopped("card"))
+
+    def test_process_birth_native_measurement_is_positive_and_closes_its_handle(self):
+        import ctypes
+        for born, opened, measured, expected in [
+            (102, True, True, True), (101, True, True, False),
+            (99, True, True, False), (102, False, True, False),
+            (102, True, False, False),
+        ]:
+            with self.subTest(born=born, opened=opened, measured=measured):
+                def times(handle, created, exited, kernel_time, user_time,
+                          born=born, measured=measured):
+                    ticks = int((born + 11_644_473_600) * 10_000_000)
+                    created._obj.dwHighDateTime = ticks >> 32
+                    created._obj.dwLowDateTime = ticks & 0xffffffff
+                    return measured
+                api = SimpleNamespace(OpenProcess=Mock(return_value=901 if opened else 0),
+                                      GetProcessTimes=Mock(side_effect=times), CloseHandle=Mock())
+                with (patch.object(workshop.os, "name", "nt"),
+                      patch.object(ctypes, "WinDLL", return_value=api, create=True)):
+                    self.assertEqual(workshop.process_started_after(123, 100), expected)
+                if opened:
+                    api.CloseHandle.assert_called_once_with(901)
+                else:
+                    api.CloseHandle.assert_not_called()
+
+    def test_process_birth_requires_valid_host_observation(self):
+        for at in (None, True, "100", -1, 0, float("inf"), float("nan")):
+            with self.subTest(at=at):
+                self.assertFalse(workshop.process_started_after(123, at))
+
+
+
 if __name__ == "__main__":
     unittest.main()

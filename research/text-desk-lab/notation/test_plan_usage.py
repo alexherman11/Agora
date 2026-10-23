@@ -63,6 +63,81 @@ class Quotas(unittest.TestCase):
                 self.fail(f"{part}: {result.get('error') or result.get('text')}")
         return result.get("text", "")
 
+    def codex_read(self, percent=11, reset=9000):
+        return {"type": "codex_event", "method": "account/rateLimits/read", "data": {
+            "rateLimitsByLimitId": {"codex": {"primary": {
+                "usedPercent": percent, "resetsAt": reset, "windowDurationMins": 10080}}}}}
+
+    def hold_codex(self):
+        self.p.observe(self.codex_read(100))
+        self.p.paused("codex", self.card, 9060)
+
+    def test_fresh_quota_read_reconciles_hold_without_claiming_task_recovery(self):
+        self.hold_codex()
+        before = copy.deepcopy(self.p.state["pauses"]["codex"])
+        self.p.observe(self.codex_read())
+        after = self.p.state["pauses"]["codex"]
+        self.assertEqual(self.p.wait_until("codex"), 0)
+        self.assertEqual(after["targets"], before["targets"])
+        self.assertEqual(after["notices"], before["notices"])
+        self.assertFalse(after["resumed"])
+        self.assertEqual(after["quota_reconciled"]["previous_retry_at"], 9060)
+
+    def test_incomplete_stale_notification_exhausted_or_invalid_read_stays_held(self):
+        for kind in ["partial", "stale", "notification", "exhausted", "invalid", "expired"]:
+            with self.subTest(kind=kind):
+                self.hold_codex()
+                event = self.codex_read()
+                at = self.now
+                if kind == "partial":
+                    event["data"] = {}
+                elif kind == "stale":
+                    at -= 1
+                elif kind == "notification":
+                    event["method"] = "account/rateLimits/updated"
+                elif kind == "exhausted":
+                    event = self.codex_read(100)
+                elif kind == "invalid":
+                    event = self.codex_read(-1)
+                elif kind == "expired":
+                    event = self.codex_read(reset=999)
+                self.p.observe(event, at=at)
+                self.assertEqual(self.p.wait_until("codex"), 9060)
+
+    def test_an_unreported_exhausted_window_keeps_the_hold(self):
+        self.hold_codex()
+        old = copy.deepcopy(self.p.state["windows"]["codex_codex_primary"])
+        self.p.state["windows"]["codex_other_primary"] = old
+        self.p.observe(self.codex_read())
+        self.assertEqual(self.p.wait_until("codex"), 9060)
+
+    def test_startup_read_is_bounded_once_and_only_for_a_hold(self):
+        run = Mock(return_value=SimpleNamespace(returncode=0, stdout=json.dumps(self.codex_read())))
+        self.assertFalse(self.p.refresh_held_codex(run))
+        run.assert_not_called()
+        self.hold_codex()
+        self.assertTrue(self.p.refresh_held_codex(run))
+        run.assert_called_once()
+        self.assertEqual(run.call_args.kwargs["timeout"], 15)
+        self.assertIn("read_plan_usage.py", run.call_args.args[0][-1])
+        self.assertFalse(self.p.refresh_held_codex(run))
+        run.assert_called_once()
+
+    def test_startup_read_unknown_results_preserve_hold(self):
+        import subprocess
+        cases = [SimpleNamespace(returncode=1, stdout=""),
+                 SimpleNamespace(returncode=0, stdout="bad json"),
+                 SimpleNamespace(returncode=0, stdout='{"type":"plan_usage_unavailable"}'),
+                 SimpleNamespace(returncode=0, stdout="x" * 65537),
+                 subprocess.TimeoutExpired("quota", 15), PermissionError("denied")]
+        for result in cases:
+            with self.subTest(result=type(result).__name__):
+                self.hold_codex()
+                run = (Mock(side_effect=result) if isinstance(result, Exception)
+                       else Mock(return_value=result))
+                self.assertFalse(self.p.refresh_held_codex(run))
+                self.assertEqual(self.p.wait_until("codex"), 9060)
+
     def test_threshold_crossings_and_expiry(self):
         self.p.observe(claude(69))
         cfg = {"claude_start_threshold": "70"}
