@@ -1,0 +1,38 @@
+token paper = #F5F4EF
+token card = #FFFFFF
+token ink = #203331
+token muted = #526663
+token teal = #16766C
+token blue = #3569A2
+token violet = #7961AD
+token amber = #9C681B
+token coral = #B6553B
+token line = #D9E1DB
+token soft = #E5F0E9
+token gap = 10
+token text = ui 14/1.35
+token focus = #3569A2
+role desk : on paper, ink, text
+role dashboard : pad gap x1.5, between gap
+role hero : text up 3 strong, ink
+role kicker : text down 2 tracked medium, teal
+role subtitle : text down, muted
+role section : text medium, ink
+role card : on card, pad gap x1.5, corner gap, edge line, between gap
+role ribbon : on soft, pad gap, corner gap, between gap
+role metric : text up 3 strong, ink
+role label : text down 2 tracked, muted
+role body : text down, ink
+role meta : text down 2, muted
+role tool : text down, teal, pad gap /2, corner gap /2
+role fold : text down medium, teal
+role active : teal, pulse
+role warn : amber, text down
+role cut : coral, text down
+role said : text down, muted
+role source : text down, muted
+role chart.teal : teal
+role chart.blue : blue
+role chart.violet : violet
+role chart.amber : amber
+role chart.coral : coral

@@ -662,7 +662,8 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 fr, _, fld = k.partition(".")
                 if fr in S.HOST_FRAMES:
                     continue
-                fid, a = frames.get(fr, {}).get("id"), S._aspect_of_field(fld)
+                frame = frames.get(fr, {})
+                fid, a = frame.get("id"), S._aspect_of_field(fld, frame.get("_row_fields", ()))
                 if fid and a and S._rev_of(w, fid) is not None:
                     fl.setdefault(fid, set()).add(a)
             return [[i, S._rev_of(w, i), sorted(a)] for i, a in fl.items()]
@@ -940,7 +941,10 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         if track["bad"]:
             raise S.LensRefusal(f"line {node['line']}: ${sorted(track['bad'])[0]}.field: no part above this one is named `as {sorted(track['bad'])[0]}`")
         # what this node printed whole, for the command line's seen index (jeff-2): its own fields and the frame fields
-        own = sorted({a for f in track.get("own", ()) if (a := S._aspect_of_field(f))})
+        own = sorted({
+            a for f in track.get("own", ())
+            if (a := S._aspect_of_field(f, ctx.get("_row_fields", ())))
+        })
         if own:
             out["shown"] = own
         fsh = {}
@@ -948,7 +952,8 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             fr, _, fld = k.partition(".")
             if fr in S.HOST_FRAMES:
                 continue
-            fid, a = frames.get(fr, {}).get("id"), S._aspect_of_field(fld)
+            frame = frames.get(fr, {})
+            fid, a = frame.get("id"), S._aspect_of_field(fld, frame.get("_row_fields", ()))
             if fid and a:
                 fsh.setdefault(fid, set()).add(a)
         if fsh:
@@ -963,7 +968,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
             current_node = w.nodes.get(ctx.get("item") or "") or {}
             sj = current_node.get("subject") or current_node.get("id")
             for f in track.get("own", ()):
-                a = S._aspect_of_field(f)
+                a = S._aspect_of_field(f, ctx.get("_row_fields", ()))
                 if a and sj:
                     fields.setdefault(sj, set()).add(a)
                 if f in ("before", "after") and current_node.get("parent"):
@@ -975,7 +980,7 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                 if fr in S.HOST_FRAMES:
                     continue                    # a freshness read is not fenced: a comment must not stale a card's gestures
                 fid = frames.get(fr, {}).get("id")
-                a = S._aspect_of_field(fld)
+                a = S._aspect_of_field(fld, frames.get(fr, {}).get("_row_fields", ()))
                 if fid and a:
                     fields.setdefault(fid, set()).add(a)
             ids0 += [(i, False) for i in [sj] + [frames[f].get("id") for f in track["frames"] if f in frames and f not in S.HOST_FRAMES] if i]
@@ -1011,7 +1016,9 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                         if place:
                             r = dict(r, run=place[k])
                         okey = r.get("rid") or r.get("cid") or r.get("eid") or r.get("name") or (S._slug(r["heading"]) if "heading" in r else k)
-                        out["kids"].append(instance(each, S._inst(ctx, node["ast"], {**ctx, "count": total, "index": k + 1, **r}), f"{key}/{okey}", em["layout"], chain, cb))
+                        row_ctx = {**ctx, "count": total, "index": k + 1, **r}
+                        row_ctx["_row_fields"] = set(ctx.get("_row_fields") or ()) | set(r)
+                        out["kids"].append(instance(each, S._inst(ctx, node["ast"], row_ctx), f"{key}/{okey}", em["layout"], chain, cb))
                 else:
                     named, ids = acc.select(sel_text)
                     # a6153: the keys a repeat is ordered and run by are read through the accessor (acc.props), so a

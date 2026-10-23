@@ -2487,12 +2487,14 @@ def _defpart_hash(src, path, roles, style):
 _ASPECT_NAMES = ("title", "text", "due", "tags")
 
 
-def _aspect_of_field(f):
+def _aspect_of_field(f, row_fields=()):
+    # Row vocabulary is lexical. Registering an unrelated source must not hide a
+    # world's prop (including its freshness, aggregate reads or gesture fence).
     if f in _ASPECT_NAMES:
         return f
     if f in ("in", "before", "after"):
         return "place"          # 8 Oct: where a thing is, read as a field, is a read of its place
-    if f in NAMES or f in SOURCE_FIELDS or f in ("value", "x", "y", "n", "count"):
+    if f in NAMES or f in row_fields or f in ("value", "x", "y", "n", "count"):
         return None
     return f"prop:{f}"
 
