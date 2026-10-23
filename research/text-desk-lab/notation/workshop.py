@@ -35,6 +35,7 @@ Under keeper.py the new code takes effect at once: keeper restarts deskd when HE
 restarted once no resident is mid-turn.
 """
 import json
+import math
 import os
 import queue
 import re
@@ -226,6 +227,42 @@ def process_gone(pid):
     except OSError:
         return False
     return False
+
+
+
+def process_started_after(pid, observed_at):
+    """Recognize a process born after the host observed the historical owner.
+
+    Missing timestamps, unsupported platforms, denied handles and failed native
+    measurements stay unknown. Never adopt or stop the current unrelated process.
+    """
+    if (os.name != "nt" or type(observed_at) not in (int, float)
+            or not math.isfinite(observed_at) or observed_at <= 0):
+        return False
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.GetProcessTimes.restype = wintypes.BOOL
+    kernel.GetProcessTimes.argtypes = (
+        [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4
+    )
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    handle = kernel.OpenProcess(0x1000, False, pid)
+    if not handle:
+        return False
+    try:
+        created, exited, kernel_time, user_time = (wintypes.FILETIME() for _ in range(4))
+        if not kernel.GetProcessTimes(handle, ctypes.byref(created), ctypes.byref(exited),
+                                      ctypes.byref(kernel_time), ctypes.byref(user_time)):
+            return False
+        ticks = (created.dwHighDateTime << 32) | created.dwLowDateTime
+        born = ticks / 10_000_000 - 11_644_473_600
+        # A full second keeps rounding/measurement adjacency conservative.
+        return born > observed_at + 1
+    finally:
+        kernel.CloseHandle(handle)
 
 
 def carry_conversation(session, tree, projects=None):
@@ -1161,15 +1198,18 @@ class Workshop:
 
         Read only lifecycle metadata from the host journal, never model text.
         Require a recorded stop or matching exit after the last start AND every
-        recorded PID gone. Missing/truncated evidence and PID reuse hold. The ordinary
+        recorded owner gone (absent PID or measured newer birth). Unknown PID reuse and
+        missing/truncated evidence hold. The ordinary
         worker leases,
         request recheck and landing mutex remain required by bring().
         """
         path = self.house.dir / f"worker-{cid}" / "transcript.jsonl"
-        pids, stopped, latest_pid = set(), False, None
+        pids, stopped, latest_pid = {}, False, None
         try:
             # A bounded legacy recovery; large/uncertain journals need inspection.
-            if path.stat().st_size > 8 * 1024 * 1024:
+            # Existing long-lived card journals can exceed 8 MiB. Keep a finite
+            # 32 MiB legacy bound; stream lines and retain only lifecycle metadata.
+            if path.stat().st_size > 32 * 1024 * 1024:
                 return False
             with path.open(encoding="utf-8") as stream:
                 for line in stream:
@@ -1187,7 +1227,7 @@ class Workshop:
                         pid = (event.get("data") or {}).get("pid")
                         if not isinstance(pid, int) or pid <= 0:
                             return False
-                        pids.add(pid)
+                        pids[pid] = event.get("at")
                         latest_pid, stopped = pid, False
                     elif event.get("kind") == "stop" and pids:
                         stopped = True
@@ -1197,7 +1237,9 @@ class Workshop:
                             # A naturally exited owner needs no synthetic stop record.
                             # Completion/delivery and positive absence remain separate gates.
                             stopped = True
-            return bool(pids and stopped and all(process_gone(pid) for pid in pids))
+            return bool(pids and stopped and all(
+                process_gone(pid) or process_started_after(pid, observed_at)
+                for pid, observed_at in pids.items()))
         except (OSError, ValueError, TypeError, AttributeError):
             return False
 

@@ -3,10 +3,14 @@
 No credential access, account changes, model requests or polling. Native Usage notes
 retain the last observation across house restarts; an expired reading is unknown.
 """
+import copy
 import json
 import math
+import os
 import re
+import subprocess
 import time
+from pathlib import Path
 
 
 def q(value):
@@ -65,7 +69,11 @@ class Plans:
         atomic_state(self.path, self.state)
 
     def observe(self, event, at=None):
-        rows = readings(event, self.clock() if at is None else at)
+        observed_at = self.clock() if at is None else at
+        rows = readings(event, observed_at)
+        previous = {k: v for k, v in self.state["windows"].items()
+                    if v.get("provider") == "codex" and number(v.get("resets"))
+                    and v["resets"] > self.clock()}
         changed = False
         for row in rows:
             if row["percent"] < 0 or row["percent"] > 100:
@@ -76,6 +84,24 @@ class Plans:
             if row["asof"] >= self.state["windows"].get(key, {}).get("asof", 0):
                 self.state["windows"][key] = row
                 self.dirty = changed = True
+        # A full successful account read can invalidate a cached quota pause.
+        # Partial notifications, missing windows and stale observations cannot.
+        fresh = {r["provider"] + "_" + r["window"]: r for r in rows
+                 if r["provider"] == "codex"}
+        pause = self.state["pauses"].get("codex")
+        if (event.get("type") == "codex_event"
+                and event.get("method") == "account/rateLimits/read"
+                and fresh and pause and pause.get("retry_at", 0) > self.clock()
+                and previous.keys() <= fresh.keys()
+                and all(number(r["percent"]) and 0 <= r["percent"] < 100
+                        and number(r.get("resets")) and r["resets"] > self.clock()
+                        and r["asof"] >= previous.get(k, {}).get("asof", 0)
+                        for k, r in fresh.items())):
+            pause["quota_reconciled"] = {"at": observed_at,
+                                         "previous_retry_at": pause["retry_at"]}
+            pause["retry_at"] = 0
+            # Targets and notices drain only on actual model response (resumed).
+            self.dirty = changed = True
         if event.get("type") == "plan_usage_unavailable":
             self.state.setdefault("unavailable", {})[event["provider"]] = dict(
                 at=self.clock(), reason=event.get("reason", "CLI did not report plan usage"))
@@ -83,6 +109,36 @@ class Plans:
             changed = True
         if changed:
             self.save()
+
+    def refresh_held_codex(self, run=subprocess.run):
+        """One startup metadata read for a retained hold; no model turn or polling.
+
+        Uses the existing pinned worker runtime. Unknown results retain the hold;
+        this does not clear provider cooldowns or any per-worker recovery state.
+        """
+        if self.wait_until("codex") <= self.clock():
+            return False
+        root = Path(__file__).resolve().parents[3]
+        prior = copy.deepcopy(self.state)
+        try:
+            result = run([str(root / ".venv/Scripts/python.exe"), "-B",
+                          str(root / "research/codex-residents/read_plan_usage.py")],
+                         cwd=root, capture_output=True, text=True, timeout=15,
+                         creationflags=0x08000000 if os.name == "nt" else 0)
+            if result.returncode or len(result.stdout) > 65536:
+                return False
+            events = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
+            if len(events) != 1 or not isinstance(events[0], dict):
+                return False
+            event = events[0]
+            if (event.get("type"), event.get("method")) != (
+                    "codex_event", "account/rateLimits/read"):
+                return False
+            self.observe(event)
+            return self.wait_until("codex") <= self.clock()
+        except (OSError, ValueError, TypeError, subprocess.SubprocessError):
+            self.state = prior
+            return False
 
     def current(self, provider):
         return [r for r in self.state["windows"].values() if r["provider"] == provider
