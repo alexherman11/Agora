@@ -201,6 +201,33 @@ CLAUDE_PROJECTS = Path.home() / ".claude" / "projects"
 FRESH = ("yes", "true", "1", "on")       # worker_fresh=yes: a disposable worker, never a builder (reviews, second opinions)
 
 
+def process_gone(pid):
+    """Positive absence only; access denial or an uncertain query holds recovery."""
+    if os.name == "nt":
+        import ctypes
+        from ctypes import wintypes
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.OpenProcess.restype = wintypes.HANDLE
+        kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        handle = kernel.OpenProcess(0x1000, False, pid)
+        if not handle:
+            return ctypes.get_last_error() == 87  # ERROR_INVALID_PARAMETER: PID absent
+        try:
+            code = wintypes.DWORD()
+            return bool(kernel.GetExitCodeProcess(handle, ctypes.byref(code)) and code.value != 259)
+        finally:
+            kernel.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    except OSError:
+        return False
+    return False
+
+
 def carry_conversation(session, tree, projects=None):
     """a5378: claude keeps a conversation as projects/<its working directory, each character but a letter or digit
     made '-'>/<session>.jsonl, and --resume looks only in the folder of the directory it starts in. A builder's
@@ -1129,6 +1156,44 @@ class Workshop:
                 self.bring_props(cid, prepare_status=detail)
                 self.say(cid, "Preparation " + detail, to="nobody")
 
+    def legacy_owner_stopped(self, cid):
+        """Recover existing stop evidence after House replaced its process objects.
+
+        Read only lifecycle metadata from the host journal, never model text.
+        Require a recorded stop after the last start AND every recorded PID gone.
+        Missing/truncated evidence and PID reuse hold. The ordinary worker leases,
+        request recheck and landing mutex remain required by bring().
+        """
+        path = self.house.dir / f"worker-{cid}" / "transcript.jsonl"
+        pids, stopped = set(), False
+        try:
+            # A bounded legacy recovery; large/uncertain journals need inspection.
+            if path.stat().st_size > 8 * 1024 * 1024:
+                return False
+            with path.open(encoding="utf-8") as stream:
+                for line in stream:
+                    try:
+                        event = json.loads(line)
+                    except ValueError:
+                        # Older stop/reader log writes can leave an exit tail
+                        # immediately after a complete stop. It adds no owner:
+                        # tolerate only this exact known-PID completion suffix.
+                        tail = re.fullmatch(r'e": -?\d+, "pid": (\d+)}}\s*', line)
+                        if stopped and tail and int(tail[1]) in pids:
+                            continue
+                        return False
+                    if event.get("kind") == "start":
+                        pid = (event.get("data") or {}).get("pid")
+                        if not isinstance(pid, int) or pid <= 0:
+                            return False
+                        pids.add(pid)
+                        stopped = False
+                    elif event.get("kind") == "stop" and pids:
+                        stopped = True
+            return bool(pids and stopped and all(process_gone(pid) for pid in pids))
+        except (OSError, ValueError, TypeError, AttributeError):
+            return False
+
     def drain_bring(self, cid, raw, wk):
         """Drain receiver completion; process/lease release remains a separate boundary."""
         if not wk:
@@ -1202,7 +1267,8 @@ class Workshop:
                     # Legacy Claude starts have no card process lease. An empty
                     # lease cannot certify a surviving, untracked process gone.
                     proc = getattr(worker, "proc", None)
-                    if proc is None or proc.poll() is None:
+                    if ((proc is None or proc.poll() is None)
+                            and not self.legacy_owner_stopped(card)):
                         raise pw.Held(f"{card} has an unleased saved runtime; "
                                       "a known stopped owner is required before importing")
             # The process-held card leases also cover adapters surviving a house

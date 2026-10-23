@@ -58,6 +58,7 @@ Python, once no resident is mid-turn.
 """
 
 import glob
+import hashlib
 import json
 import os
 import queue
@@ -453,6 +454,38 @@ class Resident:
             self.state.setdefault("message_contexts", []).extend(
                 pending.get("message_contexts") or [])
         self.save()
+
+    def recover_applied_relay(self):
+        """Stage a known applied receipt, never re-execute its command batch.
+
+        The running House owns this journal. Received/applying/ambiguous states
+        remain held. Moving receipt and journal in one save survives a restart
+        without staging it twice; pipe delivery retains its existing limits.
+        """
+        relay = self.state.get("relay_pending")
+        if (self.busy or hasattr(self, "cid") or not isinstance(relay, dict)
+                or relay.get("phase") != "applied" or not isinstance(relay.get("receipt"), str)
+                or any(self.state.get(k) for k in ("pending", "handoff"))):
+            return False
+        original = self.state
+        self.state = dict(original)
+        receipt = ("~ saved receipt of commands already applied; do not replay the batch. "
+                   "Follow the newest instructions before continuing.\n" + relay["receipt"])
+        self.state["undelivered"] = "\n\n".join(
+            part for part in (self.state.get("undelivered", ""), receipt) if part)
+        self.state["relay_recovered"] = dict(relay, recovered_at=now(),
+            receipt_sha256=hashlib.sha256(relay["receipt"].encode()).hexdigest())
+        self.state.pop("relay_pending")
+        self.state.pop("woke", None)
+        self.state.pop("at_rest", None)
+        try:
+            self.save()
+        except Exception:
+            self.state = original
+            raise
+        self.log("relay_receipt_recovered", {
+            "receipt_sha256": self.state["relay_recovered"]["receipt_sha256"]})
+        return True
 
     def recover_delivery(self):
         """Recover a staged inbox batch or unfinished pipe write after restart.
@@ -1271,8 +1304,9 @@ class House:
                 self.set_status(r, corner, "asleep" if actor else "unnamed")
                 continue
             if r.state.get("relay_pending") and not r.busy:
-                self.set_status(r, corner, "recovery-needed")
-                continue
+                if not r.recover_applied_relay():
+                    self.set_status(r, corner, "recovery-needed")
+                    continue
             corner = quota_policy.apply(self, r, corner)
             props = corner.get("props") or {}
             model = props.get("model") or cfg["model"]

@@ -74,6 +74,19 @@ class NextStepsTests(unittest.TestCase):
         self.assertEqual(self.record()["verified"], "no")
         self.assertEqual(self.record()["reviewed"], "no")
 
+    def test_nonlead_review_does_not_clear_due_or_replace_lead_attestation(self):
+        self.change("juniper", 'asked_by=pike review_at="2026-10-23T04:00:00Z"')
+        token = self.record()["basis"]
+        self.run_line("pike", f'task-review {self.card} {token} "Requester inspected"')
+        p = ns.props(self.w, self.card)
+        self.assertNotIn("reviewed_basis", p)
+        self.assertEqual(p["review_at"], "2026-10-23T04:00:00Z")
+        self.run_line("juniper", f'task-review {self.card} {token} "Lead accepted"')
+        self.assertEqual(self.record()["reviewed"], "yes")
+        self.run_line("pike", f'task-review {self.card} {token} "Requester inspected again"')
+        self.assertEqual(self.record()["reviewed"], "yes")
+        self.assertEqual(ns.props(self.w, self.card)["next_action"], "Lead accepted")
+
     def test_parent_stays_open_and_explicit_priority_beats_noisy_dashboard(self):
         self.run_line(
             "juniper",

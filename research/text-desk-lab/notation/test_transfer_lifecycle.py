@@ -197,6 +197,66 @@ class TransferLifecycle(unittest.TestCase):
         self.assertEqual(self.worker.state["turns"], 1)
         self.assertFalse(self.worker.alive())
 
+    def lifecycle(self, events):
+        path = self.host.dir / "worker-card" / "transcript.jsonl"
+        path.parent.mkdir(exist_ok=True)
+        path.write_text("".join(json.dumps(e) + "\n" for e in events), encoding="utf-8")
+        return path
+
+    def test_recorded_legacy_stop_survives_parent_restart(self):
+        self.lifecycle([{"kind": "start", "data": {"pid": 123}}, {"kind": "stop"}])
+        self.pool.workers.clear()
+        with patch.object(workshop, "process_gone", return_value=True) as gone:
+            self.assertTrue(self.pool.legacy_owner_stopped("card"))
+        gone.assert_called_once_with(123)
+
+    def test_missing_ambiguous_or_live_owner_stays_held(self):
+        self.assertFalse(self.pool.legacy_owner_stopped("card"))
+        for events, gone in [
+            ([{"kind": "stop"}], True),
+            ([{"kind": "start", "data": {"pid": 123}}], True),
+            ([{"kind": "start", "data": {"pid": 123}}, {"kind": "stop"}], False),
+            ([{"kind": "start", "data": {"pid": 123}}, {"kind": "stop"},
+              {"kind": "start", "data": {"pid": 124}}], True),
+        ]:
+            with self.subTest(events=events, gone=gone):
+                self.lifecycle(events)
+                with patch.object(workshop, "process_gone", return_value=gone):
+                    self.assertFalse(self.pool.legacy_owner_stopped("card"))
+        path = self.lifecycle([{"kind": "start", "data": {"pid": 123}}, {"kind": "stop"}])
+        with path.open("a") as f:
+            f.write('{"kind":"start"')
+        self.assertFalse(self.pool.legacy_owner_stopped("card"))
+
+    def test_known_exit_tail_after_stop_does_not_hide_unknown_lifecycle(self):
+        for tail, expected in [('e": 0, "pid": 123}}\n', True),
+                               ('e": 0, "pid": 124}}\n', False),
+                               ('{"kind":"start"', False)]:
+            with self.subTest(tail=tail):
+                path = self.lifecycle([{"kind": "start", "data": {"pid": 123}}, {"kind": "stop"}])
+                with path.open("a") as f:
+                    f.write(tail)
+                with patch.object(workshop, "process_gone", return_value=True):
+                    self.assertEqual(self.pool.legacy_owner_stopped("card"), expected)
+
+    def test_earlier_surviving_process_also_blocks_legacy_recovery(self):
+        self.lifecycle([{"kind": "start", "data": {"pid": 123}},
+                        {"kind": "start", "data": {"pid": 124}}, {"kind": "stop"}])
+        with patch.object(workshop, "process_gone", side_effect=lambda pid: pid != 123):
+            self.assertFalse(self.pool.legacy_owner_stopped("card"))
+
+    def test_legacy_stop_evidence_reaches_ordinary_mutex_not_transfer_bypass(self):
+        self.complete()
+        self.worker.proc.code = 0
+        self.worker.state["session_provider"] = "claude"
+        self.pool.drain_bring("card", self.raw, self.worker)
+        self.worker.proc = None
+        self.lifecycle([{"kind": "start", "data": {"pid": 123}}, {"kind": "stop"}])
+        with patch.object(workshop, "process_gone", return_value=True):
+            self.assertFalse(self.pool.bring("card", self.subject))
+        self.lock.assert_called_once()
+        self.assertIn("serialization is busy", self.subject["props"]["brings_status"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,9 +17,12 @@ NOTES = (
     (
         "task-review",
         '# task-review <task> <current-basis> "<next action>"\n'
-        "# Read the result first. Review does not verify acceptance or finish a parent.\n"
+        "# Only the lead (otherwise asker, otherwise owner) attests. "
+        "Read the result first. Review does not finish a parent.\n"
         'read $1\ndo prop $1 reviewed_basis=$2 next_action="$3" remove=review_at '
-        'when ($1.owner = $me or $1.lead = $me or $1.asked_by = $me) and $2 != "" and $3 != ""',
+        'when ($1.lead = $me or ($1.lead = "" and $1.asked_by = $me) '
+        'or ($1.lead = "" and $1.asked_by = "" and $1.owner = $me)) '
+        'and $2 != "" and $3 != ""',
     ),
     (
         "task-verify",
@@ -30,10 +33,13 @@ NOTES = (
         "# An interruption between the two writes leaves the task unverified.\n"
         "read $1\nread $3\n"
         'do prop $1 remove=verified_basis '
-        'when ($1.owner = $me or $1.lead = $me or $1.asked_by = $me) '
+        'when ($1.lead = $me or ($1.lead = "" and $1.asked_by = $me) '
+        'or ($1.lead = "" and $1.asked_by = "" and $1.owner = $me)) '
         'and $1.verified_basis != "" and $2 != "" and $3 != ""\n'
         "do prop $1 verified_basis=$2 verified_evidence=$3 "
-        'when ($1.owner = $me or $1.lead = $me or $1.asked_by = $me) and $2 != "" and $3 != ""',
+        'when ($1.lead = $me or ($1.lead = "" and $1.asked_by = $me) '
+        'or ($1.lead = "" and $1.asked_by = "" and $1.owner = $me)) '
+        'and $2 != "" and $3 != ""',
     ),
     (
         "task-followup",
