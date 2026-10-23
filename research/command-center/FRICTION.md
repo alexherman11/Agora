@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (68)
+## open (74)
 
 ### F2. Scripts cannot say who is running them
 
@@ -455,6 +455,48 @@ a10716 · family=lens-words · status=open
 
 Found by Pike's Board paint check, 22 Oct 09:0x (e27117): task-board's sections were partition panels inside an auto-height column; the painter measured them at 0 height, drawn over each other. The partition engine (partition-ui.js, the one tiling engine) needs a host with a definite height and says nothing when it lacks one. Wanted, before task cards go into partitions (seam on a7606): either the partition sizes its leaves to their content when its host has no definite height, or the scene refuses it in words ('partition needs a host with a height'), never a silent overlap. Owner: Sable, tiling lead. Not built yet.
 
+### A pending capture has no native send admission or message-generation binding
+
+a10781 · family=missing-word · status=open
+
+Worker-a10486, 22 October. Actual in-memory DeskKnife append with context_from and captures empty still appends a line while the draft pending token remains: probe_pending_engine.py printed appended_lines=1, new_events=1. A held composer can retain stale capture arguments; chat crossing receipts deliberately do not supply overwrite authority. A world waits/only-when snapshot cannot certify producer admission versus Send ordering. Needed word/boundary: existing native context_from send must admit a draft/message generation and capture reservation under its ordinary mutation serialization, refusing unresolved/unknown admission and preserving original audience/reply/topic provenance. Producer registration must not retarget a later message. No generic authority or service proposed. Source staging/tests and exact remaining decision in [[Capture draft binding — takeover tests and admission checkpoint]]. No live mutation or repaired-send certification.
+
+### Unrelated prepare-test fixtures block urgent commission admission
+
+a10904 · family=coordination · status=open
+
+House held the reply diagnostic on two generated .prepare-test live directories despite no dependency in its brief (c10893/c10896). Documented uncommitted=ok applied at e27913; dispatch not yet confirmed. Investigate false dependency detection and avoid recommending fixture commits. Existing diagnostic owns investigation; no duplicate worker or cleanup.
+
+
+Ran, worker-a10835: shared.mentions matches the directory basename live against the ordinary word live in this brief, producing True for an unrelated .prepare-test-*/live/ path. Narrow candidate: directory entries require explicit normalized path instead of generic basename; retain file matching. No source repair, fixture commit or cleanup performed. Actual worker admitted at e28000; original dispatch-not-confirmed sentence is historical. Evidence: [[Resident reply visibility — existing receipts and display boundary]].
+
+
+Approved repair staged in shared.py plus test_shared_paths.py; both exact fixture examples covered, eight isolated tests OK, existing test_shared all passed. No cleanup of the main fixtures. Exact hashes/review limits and own scratch cleanup refusal: [[Resident reply visibility — existing receipts and display boundary]]. Not ready or live.
+
+### Guarded paint cannot prove process exclusion or screen continuity in restricted runtime
+
+a11036 · family=tool-runtime · status=open
+
+Prepared single-attempt paint refused before DevTools: external Edge metadata unreadable and local foreground continuity unknown. Owned Job cleanup verified empty; no screenshots. Evidence a10790. Rowan reviewing supported execution ownership; no retry, alternate process access, security change or weakened verifier authorized.
+
+### Paused checkpoints still hold ownership and block preparation or handoff
+
+a11156 · family=handoff · status=open
+
+Consolidated lifecycle friction, 22 Oct. World-side pause/checkpoint does not establish adapter exit or lease release. Repeated instances: voice a8796, quiet wakes a10692 and paint a10672 held preparation on worker ownership; later actual prepare receipts cleared those individual requests after the house restart. Independent review a11059 then could not receive 41 files from paused a8796 (checkpoint13:10); transfer finally completed13:33, c11074. Do not replay that completed request. Reverse transfer now remains held: a8796 requests nine review/probe files from a11059, explicitly paused13:47 with package committed46ff6f9. At14:06 brings_status still says source has a worker process; request voice-b1-b2-review-probes-1, hash5e3104c4ff960146b94bbc004da62413ab8f2498f30d55827cec89ca03986615. Existing brings_receipt points to an older, unrelated transfer and is not completion evidence. JEFF routed read-only maintainer inspection m11149; listener availability unconfirmed. Required diagnosis: correlate final worker turn, adapter process/session, actual lease and house ownership lifecycle; identify supported cooperative set-down and durable release receipt. Preserve worktrees/manifests, respect live ownership, no forced termination, lock clearing, duplicate review or ready-as-refresh. Acceptance for an eventual repair: checkpoint-to-release and handoff/prepare progress with exact receipts; live worker remains protected; surviving adapter and unknown release are not treated as free; restart neither loses work nor replays completed operations. Cause not yet proven; this is one consolidated fault report, not permission to clear each card manually.
+
+### Live lenses depend on source absent from main, blocking unrelated landings
+
+a11365 · family=deployment · status=open
+
+22 Oct: drag repair a7987 failed judging because new composition and crew lenses require modules:/crew: terms absent from committed candidate source. Rowan verified live compilation; a11325 records uncommitted supporting code and a backend swap. Existing integration a11327 now owns supported preservation, dependency review and ordinary landing. Preserve world objects and peer edits; do not weaken health. Future activation must keep live lens dependencies available to ordinary candidate judging.
+
+### test_door sometimes loses one gesture across a deskd swap, so landings fail at random
+
+a11696 · family=house · status=open
+
+builder-2 (a11200), 22 Oct. The landing room refused a11200 with test_door: 'every gesture sent across the swaps made exactly one event' failed (113 sent). The branch adds only two read-only scripts that nothing imports. RAN on that branch merged with current main, three times in a row: fail (127 sent, {'none': ['door-test-17288-106'], 'twice': [], 'errors': []}), pass (123), pass (121). So it is intermittent and inherited, not caused by the branch. What fails: one gesture sent while the door swaps deskd made no event and got no error. A live press during a code swap could be lost silently the same way (imagined; not reproduced live). Two needs: the door's swap hand-off should never drop an in-flight gesture, and until then the landing room should not refuse a branch on this one check alone. Not fixed here: door.py is outside this audit card.
+
 ## curing (48)
 
 ### F13. A lens named like its room makes the room's name ambiguous
@@ -867,6 +909,7 @@ Source foundation for Gmail is necessary because world notes/lenses and public a
 
 
 21 Oct, worker-a9011 (builder-4), source checkpoint, not deployed: reviewed separate human-only window cannot be represented as a world lens without exposing mail. Missing world/host word is a private app launch plus a tool-visible do-not-read boundary; added fixed mail host verb and standalone fake window, rectangle refusals in capture/screen tools, and explicit readonly option in the fake protocol. No real transport or token store. Fourteen mail tests and seventeen foundation tests pass, native proof blocked. Private-mode UserDataFolder/cache and capture-preflight races remain unproven. Request: keep real access disabled and supply a host-reviewed native acceptance path. See [[AgoraMail: fake reader checkpoint and blocked native acceptance]].
+22 October worker-a9011: c10812 adds offline child-report protocol only; 21 tests pass. Missing narrow host primitive: private endpoint transfer to the held-Job child with independently measured birth/peer identity and bounded UI/IO dispatch. Current sandbox_window.start disables inheritance and exposes no endpoint seam. Request Mica route host-owner review; no shared-verifier/launcher rewrite or native launch authorized here. Contract and exact hashes: [[AgoraMail: offline child-report protocol and remaining native transport gate]].
 
 ### Follow-up receipts: a pipe write is not acknowledgment
 
@@ -1468,7 +1511,26 @@ a6970 · family=host · status=active
 
 Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
 
-## source-pending (13)
+## live-freshness-checked (1)
+
+### Guard-context freshness — independent sampler and age evidence
+
+a10711 · family=host-reliability · status=live-freshness-checked
+
+Built for a10644, 22 Oct: one daemon sampler owned by the live non-fake frontier house, serial one-second start cadence, immediate next sample after a slower probe. No world read/lock in its thread. Main loop supplies latest guard_nongame, cleared on policy-read failure. Shutdown signals and joins bounded four seconds. No resident wakes or OS wake timers. Fixed output path, timestamps at observation start, MAX_AGE=5, dual clocks and all refusal rules unchanged. Slow native/OS/sleep cases still fail closed. No new lens word.
+Read: House.run publication inside main loop caused loop latency to age the observation; guard_context.py and its existing offline refusal/atomic/path tests.
+Ran: test_guard_context.py 20 tests in 1.243s OK; test_house_restart.py 13 tests in 1.065s OK. Coverage includes independent publication while main waits, policy update/failure, sample failure/redaction, slow-probe cadence, stop, close and live/fake/copy boundary. Full health outcome is retained below; failed, not a pass.
+LIVE baseline READ ONLY before landing: finite sample_guard_age.py, 20 reads one second apart, 3 distinct observations from publisher PID 76620, 6 fresh/admitted and 14 stale refusals. Wall ages min 2.719882s, median 7.231455s, max 14.016350s. All foreground pythonw.exe, foreground_hud=true, state2, input Default, game=null. Admissions follow existing policy, not proof of game absence or an admitted browser. No browser launch or observation publication. These are OLD publisher numbers.
+Source guidance: research/window-lab/sandbox-ownership/FRESHNESS.md. Finite readback: python research/window-lab/sample_guard_age.py. After ordinary landing and authorised house refresh, run it and require all 20 wall and boot ages <=5; retain admitted/reason separately. Post-landing readback RAN 22 Oct 2026, 09:37:23–09:37:42 PDT (16:37:23–16:37:42 UTC): exactly20 reads, all_20_fresh=true, exit0,20 distinct observations, publisher PID70960. Wall ages min0.04863095283508301s, median0.07047498226165771s, max0.08590841293334961s. Boot/tick ages min0.046s, median0.063s, max0.094s. All20 admitted=true, reason=null; foreground chrome.exe, foreground_hud=false, notification_state2, input Default, game=null. Admission is existing world allowlist policy, not measured game absence or a browser acceptance. No guarded run/browser/input/publication/restart requested.
+
+Recovery READ: branch clean except copied -try world; HEADa239178 holds all five original source/test/docs files. Main log contains a239178 and landing c2fef2a, followed by09ef253. Relevant guard_context.py/house.py/sample_guard_age.py diff against main is empty. Thus source was preserved and landed; 'nothing to land' was redundant, no rebuild or ready retry needed.
+
+RERAN offline:20 guard-context tests OK1.136s;13 house-restart tests OK0.584s. Prior broad health remains FAILED as documented above, not relabelled or rerun. No source edits this takeover.
+
+Raw20 rows retained in own worktree research/window-lab/sandbox-ownership/freshness-live-20261022.json (PowerShell UTF-16 redirection), SHA256 b0181122449bba4efa82896b86cb4e80c9f2b9bfd3a69c9145f97cc1dcd92618. Source recipe and old baseline remain preserved. This finite result meets this card's freshness acceptance only; future slow OS/native probes still refuse when stale. No restart performed here, no policy/settings/account/input change. Do not call live freshness complete from offline tests.
+Health finished at copied event e26902: 303.7s, exit1. Python/scripts, guard context and restart checks passed; 95 help notes correct; 103 lenses compile, 0 unexpected refusals. Failures include temp PermissionError across scene and multiple suites; artifact_view errors28; host_route_parent errors21; task_flow errors1; worker_yield errors18; reach four assertions; textedit lock timeout; door timeout; owned fixture teardown Access denied; painter checks failed. Other failures have not been independently reproduced on main. Followups frozen staging is demonstrably already incompatible with unchanged HEAD: expected house hash40b9a403 versus HEAD LF535e71a3 / CRLF4bd83434; its cfg anchor occurs twice on HEAD. Its manifest remains unchanged; no staged integration approval inferred. Final git diff --check passed. Read FRESHNESS.md for reproduction. Required post-landing live20 is now complete as recorded above; broad-health failures remain unresolved and unchanged.
+
+## source-pending (14)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
@@ -1551,16 +1613,17 @@ a10610 · family=missing-guard · status=source-pending
 
 a10303: rejected candidate e208515 contained two forbidden sessions paths from detached first-parent fixture commit6c86859, not worker source c1359aa. Existing branch admission missed landing-room contamination. Staged source rechecks final candidate before live index/parking/merge and aborts judgment if health changes room HEAD. Five isolated regressions pass; original fixture process not attributed. No live session data read/moved/deleted. Evidence: [[Prepare preserved branches — source checks and deployment handoff]].
 
-### Guard-context freshness — independent sampler and age evidence
+### Numeric rows need a bounded chart transform with text evidence
 
-a10711 · family=host-reliability · status=source-pending
+a10929 · family=missing-word · status=source-pending
 
-Built for a10644, 22 Oct: one daemon sampler owned by the live non-fake frontier house, serial one-second start cadence, immediate next sample after a slower probe. No world read/lock in its thread. Main loop supplies latest guard_nongame, cleared on policy-read failure. Shutdown signals and joins bounded four seconds. No resident wakes or OS wake timers. Fixed output path, timestamps at observation start, MAX_AGE=5, dual clocks and all refusal rules unchanged. Slow native/OS/sleep cases still fail closed. No new lens word.
-Read: House.run publication inside main loop caused loop latency to age the observation; guard_context.py and its existing offline refusal/atomic/path tests.
-Ran: test_guard_context.py 20 tests in 1.243s OK; test_house_restart.py 13 tests in 1.065s OK. Coverage includes independent publication while main waits, policy update/failure, sample failure/redaction, slow-probe cadence, stop, close and live/fake/copy boundary. Full health running, append outcome.
-LIVE baseline READ ONLY before landing: finite sample_guard_age.py, 20 reads one second apart, 3 distinct observations from publisher PID 76620, 6 fresh/admitted and 14 stale refusals. Wall ages min 2.719882s, median 7.231455s, max 14.016350s. All foreground pythonw.exe, foreground_hud=true, state2, input Default, game=null. Admissions follow existing policy, not proof of game absence or an admitted browser. No browser launch or observation publication. These are OLD publisher numbers.
-Source guidance: research/window-lab/sandbox-ownership/FRESHNESS.md. Finite readback: python research/window-lab/sample_guard_age.py. After ordinary landing and authorised house refresh, run it and require all 20 wall and boot ages <=5; retain admitted/reason separately. Post-landing distribution NOT YET RUN. No restart performed here, no policy/settings/account/input change. Do not call live freshness complete from offline tests.
-Health finished at copied event e26902: 303.7s, exit1. Python/scripts, guard context and restart checks passed; 95 help notes correct; 103 lenses compile, 0 unexpected refusals. Failures include temp PermissionError across scene and multiple suites; artifact_view errors28; host_route_parent errors21; task_flow errors1; worker_yield errors18; reach four assertions; textedit lock timeout; door timeout; owned fixture teardown Access denied; painter checks failed. Other failures have not been independently reproduced on main. Followups frozen staging is demonstrably already incompatible with unchanged HEAD: expected house hash40b9a403 versus HEAD LF535e71a3 / CRLF4bd83434; its cfg anchor occurs twice on HEAD. Its manifest remains unchanged; no staged integration approval inferred. Final git diff --check passed. Read FRESHNESS.md for reproduction. Live20 after landing still required.
+Missing world word: charts:<note>[/marks], numeric rows into scaled bars, segmented stacks and unsmoothed lines with equal text evidence. Existing picture/role/fold/grid/pulse already suffice for presentation, so no new painter or dashboard host handler. Source edits are NEW files notation/data_graphics.py, notation/sources/charts.py, notation/test_data_graphics.py, plus new research/window-lab/data-dashboard preview/lenses/style/tests/docs/evidence. Author configuration is an ordinary note, inline records or mapped existing rows, explicit units/provenance/scale, bounded to 160 records. Source remains trusted Python using the existing seam; immutable read/dependency/version contracts are not implemented. An empty external row result is labeled unknown because producer unavailable versus genuinely empty is indistinguishable. RAN: same-count row update and 15 config edits through actual compiler; 25 new tests pass. Generic second use is exhibition planning. Source-pending means no live production reload or lens installation performed; preview works independently. Exact API and known regression limits are in research/window-lab/data-dashboard/README.md.
+
+### Fullscreen alone vetoed a requested idle house restart
+
+a11556 · family=host · status=source-pending
+
+Missing host distinction, not a new lens word: restart admission reused the native-run fullscreen/name allowlist as a restart veto. Alex m11543 requests targeted restart checks. a11546 stages a restart-only predicate; native/browser containment unchanged. Games, failed/unknown/changing observations and locked/presentation states still refuse. No live settings change or activation.
 
 ## source-staged (1)
 

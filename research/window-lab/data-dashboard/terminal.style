@@ -1,0 +1,44 @@
+token paper = #EEF1ED
+token ink = #24362F
+token muted = #57675D
+token green = #22684A
+token amber = #83551B
+token red = #A23D32
+token blue = #365E86
+token line = #CAD3CB
+token soft = #E2E8E1
+token focus = #365E86
+token gap = 4
+token zero = 0
+token text = mono 12/1.35
+role desk : on paper, ink, text
+role watch : pad gap x2, between gap x1.5
+role header : between gap x2, border bottom line, pad bottom gap
+role title : text strong, green
+role section : text strong, muted, space above gap
+role row : pad top gap /2, pad bottom gap /2, border bottom line
+role headline : between gap
+role body : text, ink
+role name : text strong, ink
+role muted : text, muted
+role state : text, muted
+role state.on : text strong, green
+role state.warn : text, amber
+role state.bad : text strong, red
+role detail : on soft, pad gap x2, text, muted
+role pct : text strong, ink, align end
+role pct.warn : text strong, amber, align end
+role pct.full : text strong, red, align end
+role tool : text, green
+role fold : text, muted
+role chevron : text, muted
+role chart.teal : green
+role chart.blue : blue
+role chart.violet : blue
+role chart.amber : amber
+role chart.coral : red
+role chart.ok : green
+role chart.warn : amber
+role chart.full : red
+role said : text, muted
+role source : text, muted
