@@ -71,6 +71,7 @@ def accepted(rep):
             and rep.get("guard", [1])[0] == 0
             and rep.get("cleanup", {}).get("ok") is True
             and rep.get("verification", {}).get("allow_interaction") is True
+            and rep.get("verification", {}).get("network_label") == "network: observed, not contained"
             and rep.get("post_admission", {}).get("admitted") is True
             and not rep.get("missing")
             and not rep.get("error"))
@@ -209,9 +210,21 @@ def shoot(c, path, clip=None, scale=1.0):
             "deliverable": fits(px)}
 
 
-def local_network_policy():
-    """Observed loopback only. Never grant exceptions for browser background traffic."""
-    return {"allow_loopback": True, "allow_remote": []}
+def local_network_policy(page):
+    """The verifier's network policy for one paint of our own local page (a13146, JEFF m13143, after Alex: 'network is
+    fine if it's reasonable'): loopback allowed, the remote allowlist empty, and the verifier's local-page mode, which
+    lists the job's own browser's background connections instead of refusing them and labels the result 'network:
+    observed, not contained'. The page must be ours (loopback http, no account); anything else still refuses, as does
+    any connection by a process outside the browser tree. Never an endpoint exception; never containment."""
+    import native_run_verify as nv
+    return {"allow_loopback": True, "allow_remote": [], "network_mode": nv.LOCAL_PAGE, "pages": [page]}
+
+
+def network_summary(verification):
+    """What the report says of the network: the verifier's label and every connection it listed."""
+    net = (verification or {}).get("network") or {}
+    return {"label": (verification or {}).get("network_label") or "network: not judged",
+            "connections": (net.get("evidence") or {}).get("connections", [])}
 
 
 def paint_one(copy, lens, who, size, crops, regions, root):
@@ -223,9 +236,10 @@ def paint_one(copy, lens, who, size, crops, regions, root):
     rd = root / run
     rd.mkdir(parents=True)
     name = f"paint-{os.getpid()}-{size}"
+    page = copy.url(lens, who)
     rep = {"lane": "paint (a10672)", "lens": lens, "as": who, "size": size, "world_at": copy.at,
            "runtime": token_facts(), "rows": [{"id": "paint", "outcome": "fail", "shots": []}], "shots": {},
-           "network_policy": local_network_policy()}
+           "network_policy": local_network_policy(page)}
     adm = guard_context.read()
     rep["admission"] = {"admitted": adm.get("admitted"), "reason": adm.get("reason")}
     if not adm.get("admitted"):
@@ -242,7 +256,7 @@ def paint_one(copy, lens, who, size, crops, regions, root):
                 profile = sb.STATE / f"{name}-profile"
                 verifier = nv.Verifier({
                     "name": name, "profile_roots": [str(profile)], "scratch_roots": [],
-                    "watched_roots": [], **local_network_policy(),
+                    "watched_roots": [], **local_network_policy(page),
                     "require_engine_report": False,
                 }, scope)
                 verifier.before()
@@ -259,7 +273,7 @@ def paint_one(copy, lens, who, size, crops, regions, root):
                     if not guard_context.read().get("admitted"):
                         raise RuntimeError("house admission expired before launch; not retried")
                     stage = "edge"
-                    st = sb.open_edge(name, copy.url(lens, who), size, tries=1,
+                    st = sb.open_edge(name, page, size, tries=1,
                                       job=scope, before_cdp=before_cdp, local_only=True)
                     rep["viewport"] = st["viewport"]
                     iw, ih, dpr = st["viewport"]
@@ -312,6 +326,7 @@ def paint_one(copy, lens, who, size, crops, regions, root):
                         rep["cleanup"] = sb.close(name, quiet=True)
                     verifier.after()
                     rep["verification"] = verifier.verdict()
+                    rep["network"] = network_summary(rep["verification"])
     except BaseException as e:            # SystemExit from open_edge carries its own stage and DevTools state
         from sandbox_receipts import error
         rep["failed_at"], rep["error"] = stage, error(e) if not isinstance(e, SystemExit) else str(e)
@@ -325,8 +340,10 @@ def paint_one(copy, lens, who, size, crops, regions, root):
             rep["guard"] = [1, "guard not started"]
         rep["post_admission"] = guard_context.read()
         ok = accepted(rep)
+        rep.setdefault("network", network_summary(rep.get("verification")))
         rep["result"] = ("painted: shots taken, guard untouched, the job's family observed gone" if ok else
-                         "not accepted: see failed_at, error, guard and cleanup; not retried")
+                         "not accepted: see failed_at, error, guard and cleanup; not retried") \
+            + f"; {rep['network']['label']}"
         if size not in DELIVERABLE:
             rep["delivery"] = f"not deliverable through guarded_artifacts: it admits only {', '.join(DELIVERABLE)}"
         (rd / "report.json").write_text(json.dumps(rep, indent=1), encoding="utf-8")   # last: shots are older

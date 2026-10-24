@@ -53,9 +53,15 @@ class Parts(unittest.TestCase):
 
     def test_acceptance_requires_cleanup_verifier_guard_and_admission(self):
         good = {"rows": [{"outcome": "pass"}], "guard": [0, "untouched"],
-                "cleanup": {"ok": True}, "verification": {"allow_interaction": True},
+                "cleanup": {"ok": True}, "verification": {"allow_interaction": True,
+                                                          "network_label": "network: observed, not contained"},
                 "post_admission": {"admitted": True}}
         self.assertTrue(paint.accepted(good))
+        # a13146: an accepted paint always says what the network was, and never more than 'observed, not contained'
+        for label in (None, "network: observed", "network: contained", "network: unknown, not contained"):
+            bad = deepcopy(good)
+            bad["verification"]["network_label"] = label
+            self.assertFalse(paint.accepted(bad), label)
         for field in ("cleanup", "verification", "post_admission", "guard"):
             bad = deepcopy(good)
             del bad[field]
@@ -72,7 +78,8 @@ class Parts(unittest.TestCase):
 
     def test_delivery_never_overrides_disabled_runtime_route(self):
         rep = {"rows": [{"outcome": "pass", "shots": []}], "guard": [0],
-               "cleanup": {"ok": True}, "verification": {"allow_interaction": True},
+               "cleanup": {"ok": True}, "verification": {"allow_interaction": True,
+                                                         "network_label": "network: observed, not contained"},
                "post_admission": {"admitted": True}, "size": "1280x800"}
         with patch.dict(paint.os.environ, {"DESKD": "off"}), \
              patch.object(paint.subprocess, "run") as send:
@@ -229,10 +236,15 @@ class NetworkContract(unittest.TestCase):
             constructor = stack.enter_context(patch.object(nv, "Verifier", return_value=verifier))
             copy = MagicMock()
             copy.at = 123
+            copy.url.return_value = "http://127.0.0.1:456/lens.html?session=s&as=a&lens=fixture"
             _, report = paint.paint_one(copy, "fixture", "fixture", "1280x800", [], [], MagicMock())
-            self.assertEqual(constructor.call_args.args[0]["allow_remote"], [])
-            self.assertTrue(constructor.call_args.args[0]["allow_loopback"])
-            self.assertEqual(report["network_policy"], paint.local_network_policy())
+            spec = constructor.call_args.args[0]
+            self.assertEqual(spec["allow_remote"], [])
+            self.assertTrue(spec["allow_loopback"])
+            self.assertEqual((spec["network_mode"], spec["pages"]), ("local-page", [copy.url.return_value]))
+            self.assertEqual(launch.call_args.args[1], copy.url.return_value)       # the page judged is the page opened
+            self.assertEqual(report["network_policy"], paint.local_network_policy(copy.url.return_value))
+            self.assertIn("network", report)
             self.assertFalse(paint.accepted(report))
             self.assertEqual(report["error"]["type"], "RuntimeError")
             self.assertFalse(report["interaction_gate"]["allow_interaction"])
@@ -242,33 +254,48 @@ class NetworkContract(unittest.TestCase):
             verifier.stop_sampling.assert_called_once()
             verifier.after.assert_called_once()
 
-    def test_observed_remote_and_unknown_network_still_refuse(self):
+    PAGE = "http://127.0.0.1:456/lens.html?session=s&as=a&lens=fixture"
+
+    def test_the_browsers_background_traffic_is_listed_and_labelled_others_still_refuse(self):
+        # a13146 (JEFF m13143): under the paint's own policy, the job's browser's background traffic (as a11403's real
+        # run saw: IPv6 :443 and mDNS) is observed and listed; a launcher's traffic, an unreadable table, a public or
+        # account page, and the same traffic without the mode are not accepted
         import test_native_run_verify as fixture
-        cases = {
-            "ipv4-background": [(101, 5, "10.0.0.2", 50000, "203.0.113.1", 443)],
-            "ipv6-background": [(101, 5, "::1", 50000, "2001:db8::1", 443)],
-            "redirect-or-frame": [(102, 5, "10.0.0.2", 50000, "198.51.100.9", 80)],
-            "unreadable": [],
-            "udp-unobservable": [],
-            "loopback": [(101, 5, "127.0.0.1", 50000, "127.0.0.1", 456)],
+        edge = [(101, 5, "fd00::2", 50000, "2001:db8::1", 443), (102, 5, "10.0.0.2", 50001, "203.0.113.1", 443),
+                (101, 5, "127.0.0.1", 50002, "127.0.0.1", 456)]
+        cases = {   # name: (tcp rows, udp rows, net fails, page, mode on, expected status)
+            "browser-background": (edge, [(101, "0.0.0.0", 5353)], False, self.PAGE, True, "observed"),
+            "launcher-traffic": ([(100, 5, "10.0.0.2", 50003, "198.51.100.9", 443)], [], False, self.PAGE, True,
+                                 "violation"),
+            "unreadable": ([], [], True, self.PAGE, True, "unknown"),
+            "public-page": (edge, [], False, "https://example.org/", True, "violation"),
+            "account-page": (edge, [], False, "http://alex:pw@127.0.0.1:456/", True, "violation"),
+            "without-the-mode": (edge, [], False, self.PAGE, False, "violation"),
         }
-        for name, rows in cases.items():
+        for name, (tcp, udp, fails, page, mode, expected) in cases.items():
             with self.subTest(name=name):
                 f = fixture.Case()
                 f.setUp()
                 try:
-                    f.n.tcp_rows = rows
-                    f.n.net_fails = name == "unreadable"
-                    if name == "udp-unobservable":
-                        f.n.udp_rows = [(101, "0.0.0.0", 5353)]
-                    verifier = f.verifier(**paint.local_network_policy())
-                    verifier.before()
-                    verdict = verifier.gate()
-                    expected = "observed" if name == "loopback" else (
-                        "unknown" if name in ("unreadable", "udp-unobservable") else "violation")
-                    self.assertEqual(verdict["network"]["status"], expected)
-                    self.assertEqual(verdict["allow_interaction"], name == "loopback")
-                    self.assertEqual(paint.local_network_policy()["allow_remote"], [])
+                    f.n.tcp_rows, f.n.udp_rows, f.n.net_fails = tcp, udp, fails
+                    policy = paint.local_network_policy(page)
+                    if not mode:
+                        policy = {k: v for k, v in policy.items() if k not in ("network_mode", "pages")}
+                    verdict = f.whole(f.verifier(**policy))
+                    self.assertEqual(verdict["network"]["status"], expected, verdict["network"]["reasons"])
+                    self.assertEqual(verdict["allow_interaction"], expected == "observed")
+                    summary = paint.network_summary(verdict)
+                    if mode:
+                        self.assertEqual(summary["label"], f"network: {expected}, not contained")
+                    else:
+                        self.assertEqual(summary["label"], "network: violation")
+                    if name == "browser-background":
+                        self.assertEqual({(c["process"], c["protocol"], c["address"], c["port"])
+                                          for c in summary["connections"]},
+                                         {("msedgewebview2.exe", "tcp", "2001:db8::1", 443),
+                                          ("msedgewebview2.exe", "tcp", "203.0.113.1", 443),
+                                          ("msedgewebview2.exe", "udp", "0.0.0.0", 5353)})
+                    self.assertEqual(policy["allow_remote"], [])
                 finally:
                     f.tearDown()
 

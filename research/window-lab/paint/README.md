@@ -124,3 +124,36 @@ No native retry or ready is authorized. Exact incremental scope, tests,
 source references, limitations and reversal: [NETWORK-OFFLINE.md](NETWORK-OFFLINE.md).
 Preserve Mail's separate start/Win32 seam when composing; only open_edge is
 changed here. Board shots and delivery remain unproved.
+
+## Network: observed, not contained (a13146, 23 October)
+
+JEFF's ruling, in Shop talk m13143 after Alex said "network is fine if it's reasonable": a paint of our own
+local page no longer fails because Edge makes its own background connections. The one real attempt (a13090)
+had refused for exactly this: two IPv6 :443 connections and mDNS on 5353.
+
+paint.py now asks the shared verifier for its `local-page` mode
+(`local_network_policy(page)`: loopback allowed, `allow_remote` empty, `network_mode: local-page`,
+`pages: [the copy's own URL]`). The page judged is the page opened. In that mode:
+
+- Remote TCP connections and wider UDP bindings made by the job's own browser processes are listed, not
+  refused. A browser process is a member explained by measurement whose image is an engine image.
+- The report's `network` holds `label` and `connections`. Each connection names its pid, process, role,
+  protocol, address, port and state.
+- `result` ends with the label.
+
+`accepted()` additionally requires the verdict's label to be exactly `network: observed, not contained`.
+
+Still refused:
+
+- traffic from any process outside the browser tree;
+- a page that isn't a loopback http page, or one that names an account;
+- a non-empty allowlist;
+- a listener beyond loopback;
+- an unreadable socket table (unknown).
+
+Guard, admission, family, windows, writes and cleanup are unchanged. This isn't containment, and no label
+claims it. The suppression switches stay as they were.
+
+Tests (offline, fake kernel): test_paint.py NetworkContract and test_native_run_verify.py. The house's `paint`
+verb (house_paint.py, paint.verb, test_house_paint.py) is still only on worker/a11403. It wasn't part of this
+transfer (c13159).
