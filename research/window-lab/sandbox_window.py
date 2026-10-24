@@ -677,7 +677,9 @@ def open_edge(name, url, size="1500x900", tries=2, viewport=True, job=None, befo
                            "--disable-features=CalculateNativeWinOcclusion", "--disable-backgrounding-occluded-windows",
                            "--disable-renderer-backgrounding",
                            *extra,
-                           f"--window-size={w},{h}", "--window-position=0,0", f"--app={url}"], job=job)
+                           f"--window-size={w},{h}", "--window-position=0,0", f"--app={url}"],
+                    # a13146: an ordinary launch calls start exactly as before (no job argument at all)
+                    **({"job": job} if job is not None else {}))
         st = update_manifest(state_file(name), {
             "pid": pid, "port": port, "url": url, "profile": str(prof), "at": time.time(),
             **({"local_paint_switches": extra} if local_only else {})})
