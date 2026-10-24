@@ -127,7 +127,6 @@ class Browser:
                 self.tmp.cleanup()
                 break
             except PermissionError:
-                c.call('Runtime.evaluate', expression='new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))', awaitPromise=True)
                 time.sleep(.5)
 
 

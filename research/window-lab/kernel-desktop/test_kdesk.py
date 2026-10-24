@@ -13,6 +13,7 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+from urllib.parse import quote
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -87,6 +88,46 @@ class DesktopTest(unittest.TestCase):
 
     def tearDown(self):
         self.d.close()
+
+    def test_window_origins_are_distinct_reused_and_keep_origin_protection(self):
+        d = self.d
+        for _ in range(2):
+            self.assertTrue(d.say('window.open help new=yes')['ok'])
+        windows = d.wait(lambda: [w for w in d.windows() if w['shows'] == 'help'])
+        d.wait(lambda: len([w for w in d.windows() if w['shows'] == 'help']) == 2)
+        windows = [w for w in d.windows() if w['shows'] == 'help']
+        pool = d.srv.window_origins
+        first, second = [pool.origin(w['id']) for w in windows]
+        self.assertNotEqual(first, second)
+        self.assertEqual(first, pool.origin(windows[0]['id']))
+        route = d.url + '/desk/window-origin?win=' + windows[0]['id'] + '&next='
+        for nxt in ('//example.com/x', '/desk/x\r\nInjected: yes', '/desk/\\example.com'):
+            req = urllib.request.Request(route + quote(nxt, safe=''),
+                headers={'Authorization': 'Bearer ' + d.entry.token('alex')})
+            with self.assertRaises(urllib.error.HTTPError) as refused:
+                urllib.request.urlopen(req, timeout=2)
+            self.assertEqual(400, refused.exception.code)
+        with self.assertRaises(urllib.error.HTTPError) as refused:
+            urllib.request.urlopen(route + quote('/desk/help.html', safe=''), timeout=2)
+        self.assertEqual(401, refused.exception.code)
+        for origin in (first, second):
+            sibling = second if origin == first else first
+            for supplied, status in ((origin, 200), (sibling, 403), (d.url, 403), ('https://example.com', 403), ('null', 403)):
+                req = urllib.request.Request(origin + '/see', b'{"line":"help"}',
+                    {'Content-Type': 'application/json', 'Origin': supplied,
+                     'Authorization': 'Bearer ' + d.entry.token('alex')})
+                try:
+                    with urllib.request.urlopen(req, timeout=2) as r:
+                        self.assertEqual(r.status, status)
+                except urllib.error.HTTPError as e:
+                    self.assertEqual(e.code, status)
+        self.assertTrue(d.say('window.close ' + windows[0]['id'])['ok'])
+        d.wait(lambda: all(w['id'] != windows[0]['id'] for w in d.windows()))
+        self.assertTrue(d.say('window.open help new=yes')['ok'])
+        new = d.wait(lambda: next((w for w in d.windows() if w['shows'] == 'help'
+                     and w['id'] not in {r['id'] for r in windows}), None))
+        self.assertEqual(first, pool.origin(new['id']))
+        self.assertEqual(2, len(pool.servers))
 
     def test_taskbar_appears_by_itself_and_windows_open_move_close_and_undo(self):
         d = self.d

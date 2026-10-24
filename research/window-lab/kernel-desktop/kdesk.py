@@ -4,8 +4,9 @@ door on loopback 8810, and the modules the world says are on (the window host an
     python kdesk.py [--world <dir>] [--port 8810]       run it (kdesk_on.py starts it detached; kdesk_off.py stops all)
 
 The door is the kernel's own (kernel/door.py make_handler): /do, /see, /door/stream, the painter's routes that lens.js
-speaks (/api/scene, /api/style, /api/do, /lens.html and the desk-shell files), and /dev/signin. One route is added:
+speaks (/api/scene, /api/style, /api/do, /lens.html and the desk-shell files), and /dev/signin. Desktop routes:
     GET /desk/<file>     the desktop's own pages (pages/: the taskbar, the frame a lens window sits in, lines, help)
+    GET /desk/window-origin?win=<window>&next=<page>   owner-only redirect to a leased loopback listener
 
 Signing in. There is no entry service on the desktop. A stand-in in this process plays its half of the seam (SHAPE 3):
 it knows two sessions, Alex's (for the pages on his screen) and his agent's ("agent for Alex", label claude), kept in
@@ -21,7 +22,8 @@ import re
 import sys
 import time
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qs
+import threading
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[1] / "kernel-lab"))
@@ -142,12 +144,75 @@ class LocalEntry:
         return next(t for t, v in self.sessions.items() if v.get("signer") == signer)
 
 
+class WindowOrigins:
+    """One HTTP connection pool per native window, all serving the same kernel.
+
+    Listeners are reused only after their window disappears; the number of
+    listeners is the high-water mark of concurrently open windows, not all opens.
+    Cookies are host scoped (ports do not isolate identity). No proxy rewrites
+    Host or Origin: the kernel door checks the actual destination as before.
+    """
+    def __init__(self, kernel, handler):
+        self.kernel, self.handler = kernel, handler
+        self.lock = threading.Lock()
+        self.leases = {}
+        self.servers = []
+
+    def origin(self, wid):
+        with self.lock:
+            with self.kernel.lock:
+                active = {w for w in self.kernel.things('window')
+                          if not self.kernel.state.get(w, 'forgotten')}
+            if wid not in active:
+                raise ValueError('no such window')
+            self.leases = {w: s for w, s in self.leases.items() if w in active}
+            if wid not in self.leases:
+                used = set(self.leases.values())
+                server = next((s for s in self.servers if s not in used), None)
+                if server is None:
+                    server = KD.Server(('127.0.0.1', 0), self.handler)
+                    self.servers.append(server)
+                    threading.Thread(target=server.serve_forever, kwargs={'poll_interval': .1},
+                                     daemon=True, name='window-door').start()
+                self.leases[wid] = server
+            return f'http://127.0.0.1:{self.leases[wid].server_address[1]}'
+
+    def close(self):
+        for server in self.servers:
+            server.shutdown()
+            server.server_close()
+
+
+class DesktopServer(KD.Server):
+    def server_close(self):
+        if hasattr(self, 'window_origins'):
+            self.window_origins.close()
+        super().server_close()
+
+
 def make_desk_handler(kernel, entry):
     Base = KD.make_handler(kernel, entry, "")
 
     class Handler(Base):
         def do_GET(self):
             path = urlsplit(self.path).path
+            if path == '/desk/window-origin':
+                actor, why = self._actor()
+                if actor is None:
+                    return self._send(401, {'error': why})
+                if not kernel.is_steward(actor.person):
+                    return self._send(403, {'error': 'only the desktop owner opens windows'})
+                q = parse_qs(urlsplit(self.path).query)
+                nxt = q.get('next', [''])[0]
+                dest = urlsplit(nxt)
+                if (dest.scheme or dest.netloc or '\\' in nxt or any(ord(c) < 32 or ord(c) == 127 for c in nxt)
+                        or not (dest.path.startswith('/desk/') or dest.path == '/lens.html')):
+                    return self._send(400, {'error': 'not a desktop page'})
+                try:
+                    origin = Handler.window_origins.origin(q.get('win', [''])[0])
+                except ValueError as e:
+                    return self._send(404, {'error': str(e)})
+                return self._raw(302, b'', 'text/plain', [('Location', origin + nxt)])
             if path.startswith("/desk/"):
                 return self._file(path[6:])
             if path == '/lens.html':
@@ -155,7 +220,6 @@ def make_desk_handler(kernel, entry):
                 # unchanged, but do not let its optional Google font hit the network.
                 content, ctype = KP.static_file(path)
                 content = re.sub(rb'<link[^>]+href="https://fonts\.googleapis\.com/[^>]+>', b'', content)
-                content = content.replace(b'<head>', b'<head><script src="/desk/stream.js"></script>', 1)
                 return self._raw(200, content, ctype)
             return super().do_GET()
 
@@ -167,8 +231,6 @@ def make_desk_handler(kernel, entry):
             if ctype.startswith("text/") or ctype.endswith("javascript"):
                 ctype += "; charset=utf-8"
             content = p.read_bytes()
-            if p.suffix == '.html':
-                content = content.replace(b'<head>', b'<head><script src="/desk/stream.js"></script>', 1)
             self._raw(200, content, ctype)
 
     return Handler
@@ -176,13 +238,14 @@ def make_desk_handler(kernel, entry):
 
 def start(world=DEFAULT_WORLD, port=8810, modules=True, headless=False):
     """-> (kernel, server, host, entry). Serves on a thread; the caller decides how long it lives."""
-    import threading
     world = Path(world)
     k = Kernel(world, None if (world / "log" / "0001.jsonl").exists() else genesis(headless))
     after_genesis(k, headless)
     entry = LocalEntry(k.keep_dir)
     k.dev_sessions = lambda: entry.sessions             # the door's /dev/signin knows these sessions
-    srv = KD.Server(("127.0.0.1", port), make_desk_handler(k, entry))
+    handler = make_desk_handler(k, entry)
+    srv = DesktopServer(("127.0.0.1", port), handler)
+    srv.window_origins = handler.window_origins = WindowOrigins(k, handler)
     os.environ["AGORA_KDESK_PORT"] = str(srv.server_address[1])     # the modules (children) read where the door is
     host = KM.Host(k, HERE)
     threading.Thread(target=srv.serve_forever, daemon=True, name="door").start()
@@ -214,6 +277,7 @@ def main():
     finally:
         host.stop_all()
         srv.shutdown()
+        srv.server_close()
 
 
 if __name__ == "__main__":

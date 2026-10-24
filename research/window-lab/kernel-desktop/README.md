@@ -1,5 +1,65 @@
 > Written by Claude (PROOF a13428, epic a13308), 23 October 2026. Claims are labelled **ran** (executed here, numbers as printed), **read** (from source, with what I read) or **imagined**. Alex's words are in quotation marks.
 
+# Window stream connection pools — builder update, 24 October 2026
+
+Codex, for Claude's review/commit. **No changes to `research/kernel-lab/kernel/` or shared `lens.js`; no git state changed.**
+
+**Read:** all pywebview windows share a Chromium browser process. The previous single `127.0.0.1:8810` origin let six long-lived HTTP/1 streams consume its connection pool. Short requests, including Lines help and the next window's initial page, then queued. The earlier host-injected SharedWorker adapter in `pages/stream*.js` falls back to native per-page EventSource when SharedWorker is absent; that fallback reintroduces the limit. Those files are retained as superseded experiments but are no longer injected or used.
+
+**Chosen fix (implemented):** `kdesk.py` leases an OS-assigned loopback listener per live window. All listeners use the **same handler, entry service and kernel object**, so records, permissions and happenings remain shared. `kd_window.py` opens through the control door's existing sign-in, then the authenticated owner-only `/desk/window-origin?win=...&next=...` redirect moves the whole page (and its lens iframe) to that window's listener. Ordinary relative fetches and native EventSource work unchanged. Listener count follows the high-water mark of concurrent windows; a forgotten window's listener can be reused on the next allocation. Desktop shutdown closes the listeners. No fixed fifteen-window or port-pool ceiling is built in.
+
+**Why this option:** it does not depend on embedded-browser SharedWorker support, worker lifetime, event multiplexing, reconnect emulation or replacing the EventSource API. A shared-worker/frame relay would also need to preserve the painter's stream URL, credentials, event subscriptions and lifecycle. HTTP/2 would require a different server and local TLS/trust setup. Per-window HTTP listeners require only this desktop adapter and leave the existing painter and kernel contracts intact. This choice should be revisited if actual listener/thread overhead becomes significant at the intended window count, or the desktop moves to a tested HTTP/2 transport.
+
+**Security (read and ran):** every port binds only `127.0.0.1`. No proxy rewrites Host or Origin and no CORS exemption is added: the kernel's existing `_cross_site` check still rejects any POST whose Origin differs from its actual Host, including a sibling window's port. Same-origin POST succeeds; sibling/control-port, foreign-site and `null` Origins return 403. Allocation requires a signed-in desktop owner and a live window; redirect destinations are restricted to local desktop/lens paths and reject backslashes/control characters. **Cookies are host scoped, not port scoped**: all these origins intentionally use Alex's existing HttpOnly, SameSite cookie. Ports isolate connection pools, not users or sessions. Programs continue using the control door on 8810.
+
+## Stream regression evidence
+
+**Ran**, final requested existing suite, pinned Python:
+
+```text
+python -m unittest test_kdesk test_sysread
+Ran 32 tests in 107.365s
+OK
+50 worker calls: handles 340 -> 340
+```
+
+**Ran**, pinned Python, disposable hidden worlds and actual module processes:
+
+```text
+python -m unittest test_kdesk test_sysread test_stream_windows
+50 worker calls: handles 340 -> 340
+15 hidden Chromium windows; native SSE on 15 origins; Lines help: 17.0 ms (<1000 ms); world delivery: 15/15
+Ran 33 tests in 126.127s
+OK
+```
+
+The new `test_stream_windows.py` uses one **headless Edge browser/profile**, fifteen page targets, Help/Lines pages and real feed lens iframes. SharedWorker is explicitly disabled; EventSource must be native, streams must be OPEN, fifteen distinct origins must be present, the actual Lines form must paint help in under one second, and every origin must receive a subsequent world event. Its extra native probes hold **more than fifteen** concurrent streams. HTTP clients without a browser connection limit would not reproduce this regression. A MutationObserver measures answer insertion, avoiding background-tab timer throttling.
+
+**Ran**, after final redirect validation, targeted Origin/listener reuse and hidden browser checks:
+
+```text
+15 hidden Chromium windows; native SSE on 15 origins; Lines help: 23.4 ms (<1000 ms); world delivery: 15/15
+Ran 2 tests in 25.301s
+OK
+```
+
+**Ran live**, authorized restart via `kdesk_off.py`, then `kdesk_on.py --wait` (WMI/pythonw, detached):
+
+```text
+kdesk off: stopped 6 process(es); 0 left; the work area ends at 2088 of 2160; Windows taskbar visible=True
+kdesk: 0 pid 96696
+kdesk: answering, 129 records
+LIVE netstat: 13 shown Agora windows; 14 ESTABLISHED client connections across 13 kernel listener ports; processes={"Id":101024,"ProcessName":"msedgewebview2"}
+LIVE hidden Lines help: 19.0 ms (<1000 ms) while eight extra native windows are open
+LIVE restored: 5 original Agora windows; eight extras closed; Task board shown=True
+```
+
+`verify_stream_live.py` opens eight extras through `window.open feed|help|lines new=yes`, waiting for each native window to show. It takes netstat **before** starting hidden Edge, identifies the WebView2 process, then submits the real Lines form in hidden Edge while the native streams remain open. Its `finally` closes only windows absent from the starting set. The original top bar, taskbar, Feed, Lines and Task board remain. `verify_live.py` subsequently passed both `LIVE OK` checks (five Agora windows, eleven Windows tasks/icons, reserved work area `(0, 60, 3840, 2094)`, recovery guard and fresh readings).
+
+**Limits / intermediate findings:** the first hidden check used the wrong painter selector; corrected to `#paint`. The first listener-reuse check exposed that `Kernel.things` includes forgotten things; leases now exclude them. Two initial live checks issued all eight opens without waiting for each window to show and found only nine connected origins despite thirteen shown rows; cleanup restored the desktop each time. The passing live acceptance test waits at the native shown boundary per open. Rapid burst native-window initialization has not been established by this change. Fifteen simultaneous origins/streams were verified hidden; eight extras (thirteen total) were verified in live WebView2. No fifteen-visible-window test, push or commit was performed.
+
+**Rough spots (source changes):** missing world-level capability: a window-owned transport origin. `kdesk.py` supplies listener leases/redirect and removes the old stream shim injection; `kd_window.py` selects that redirect. `test_kdesk.py`, `test_stream_windows.py` and `verify_stream_live.py` supply Origin, reuse, hidden-browser and bounded live evidence. The Board task and Rough spots note record the gap; Claude owns review and integration.
+
 # Desktop bars and tiles v2 — current, 24 October 2026
 
 Builder update by Codex for Claude's review. No git state changed. All source/assets are confined to this directory; the kernel and `lens.js` are unchanged.
@@ -72,7 +132,7 @@ This confirms running processes, native window geometry, shell state and compile
 - Shared host CSS/JS and Help/Thing/tasks/taskbar pages: a consistent host skin. Lines/Help/Thing remain the existing host pages; a full form/input lens vocabulary would let more of this chrome become lenses.
 - `restyle.py`, `lenses/*`: styles/lenses installed through words, retaining history and undo. No source-over-world boot synchronization.
 - `kdesk.py`: missing host preference for local-only fonts; omit the optional remote font link in the desktop response.
-- `pages/stream.js`, `stream-worker.js`, `kdesk.py`: hidden browser testing exposed HTTP/1's six-connections-per-origin limit: six independent event streams could starve an icon request. A host-loaded SharedWorker shares one native event stream across desktop pages/lenses and fans out the unchanged world/happen events. The shared `lens.js` and the kernel door remain unchanged; page exit releases its subscription. This is a host transport/lifetime adapter, not a new app API.
+- **Historical; superseded by per-window listeners above:** `pages/stream.js`, `stream-worker.js`, `kdesk.py`: hidden browser testing exposed HTTP/1's six-connections-per-origin limit: six independent event streams could starve an icon request. A host-loaded SharedWorker shares one native event stream across desktop pages/lenses and fans out the unchanged world/happen events. The shared `lens.js` and the kernel door remain unchanged; page exit releases its subscription. This is a host transport/lifetime adapter, not a new app API.
 - `test_kdesk.py`, `hidden_evidence.py`, `verify_live.py`: isolated recovery/rendering evidence plus bounded read-only live verification, without touching the other builder's apps.
 
 ---

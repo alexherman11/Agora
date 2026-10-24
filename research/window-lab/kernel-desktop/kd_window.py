@@ -795,6 +795,9 @@ class WindowHost:
             view = row.get("shows") if row.get("shows") in VIEWS else "thing"
             path = f"/desk/{view}.html?win={wid}" + (f"&target={quote(str(row['target']))}" if row.get("target") else "")
         title = f"{row.get('name') or VIEWS.get(view, ('Agora',))[0]} · Agora"
+        # Sign in on the control door, then redirect to this window's listener.
+        # Host cookies also cover the loopback ports; pages keep native EventSource.
+        path = f"/desk/window-origin?win={quote(wid)}&next={quote(path, safe='')}"
         url = (f"http://127.0.0.1:{PORT}/dev/signin?token={quote(self.token)}&next={quote(path)}" if self.token
                else f"http://127.0.0.1:{PORT}{path}")
         self.applied[wid] = box
