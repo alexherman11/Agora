@@ -73,7 +73,7 @@ A button's `does` runs as whoever presses it. A pinned thing (`make kind=pin bar
 | `kd_say.py` | say lines as Alex's agent (or `--as alex`) |
 | `press.py` | a real mouse click or drag, for demos |
 | `test_kdesk.py` | 12 hidden checks: fresh worlds, real HTTP, the modules as real processes in `--headless` mode |
-| `state/` (ignored) | the live world (`state/world`, log and keep), `kdesk.log`, the modules' logs in `state/world/logs/` |
+| `state/` (ignored) | the live world (`state/world`, log and keep), `kdesk.log`, the modules' logs in `state/world/modules/<name>/stderr.log` |
 
 ## Evidence
 
