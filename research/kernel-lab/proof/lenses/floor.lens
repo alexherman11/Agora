@@ -1,0 +1,10 @@
+root : column, role sheet, of tag:meeting as m, each meet
+meet : column, role card
+  h : text "$m.title", role title
+  now : text "Now: $m.now_title"
+  next : text "Next item", role tool, on click do agenda.next $item
+  items : column, of tag:item,meeting=$m.id as i, by order, each agendum
+agendum : column
+  t : text "$i.order. $i.title"
+  who : text "Speakers, in order: $i.claimed_by", role meta, only when $i.claims > 0
+  c : text "Call-backs: $i.contacts", role meta, only when $i.claims > 0

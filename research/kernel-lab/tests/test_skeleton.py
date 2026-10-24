@@ -196,7 +196,7 @@ class Skeleton(unittest.TestCase):
     def test_like_is_sealed_and_once_each(self):
         p = self.ok(self.maya, "post Who can drive Saturday?")["made"][0]
         self.ok(self.maya, f"like {p}")
-        self.refused(self.maya_bot, f"like {p}", "you already like")
+        self.refused(self.maya_bot, f"like {p}", "you have already said like on")
         self.ok(self.bea, f"like {p}")
         self.assertIn("2 likes", self.ok(self.alex, f"look {p}", path="/see")["text"])
         maya, bea = self.person("google:maya"), self.person("email:bea@example.org")
@@ -252,7 +252,7 @@ class Skeleton(unittest.TestCase):
             self.ok(self.maya, f"post note {i}")
         self.ok(self.maya_bot, "post note 3")
         self.ok(self.maya, "post note 4")
-        self.refused(self.maya_bot, "post note 5", "you have posted 5 times today")
+        self.refused(self.maya_bot, "post note 5", "you have said post 5 times today")
         self.ok(self.bea, "post Bea is not limited by Maya")
         self.ok(self.maya, "undo")
         self.ok(self.maya, "post note 5, after an undo")

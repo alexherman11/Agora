@@ -106,7 +106,8 @@ And two choices made while building: the seam's invite counting is a fact of eac
 
 ## Not built, or not yet tested
 
-- **Not built:** *hear* and *hold* (no happenings, no stream, no leases); verb notes (`impl: lines`) and rules; blanks (`$me`, `$new`); selections; snapshots and log segments; the `redact`, `grant`, `freeze` and membership words (redaction is tested in the store only); words that edit an entry (rename, alias, hide); the painter's routes.
+- *Since this was written (23 Oct, later):* hear, hold, the stream and the painter's routes are built (SHAPE section 17), and the words `find`, `claim`, `vote` and `role`, with handles (`as=`, `$name`) and open groups. Their evidence is the Council night run, [[COUNCIL-NIGHT]], which is also a test. hear and hold are built but not yet tested.
+- **Not built:** verb notes (`impl: lines`) and rules; blanks (`$me`, `$new`); selections; snapshots and log segments; the `redact`, `grant`, `freeze` and membership words (redaction is tested in the store only); words that edit an entry (rename, alias, hide); the painter's routes.
 - **Seen marks are in memory**, not in `seen/` beside the world as SHAPE says, so a restart forgets them (the restart test shows it).
 - **The real entry service** is tested in process, against its working tree of 23 Oct evening, which was not yet committed; the two tests may need the frozen contract once it is. It does not yet call `/keep/account` itself, so the test makes that call where it will (SEAM.md section 4). Agent sessions do not exist there yet; the stand-in has them.
 - **No sandbox.** A module process can do anything the account it runs as can do on the machine (SHAPE section 11).
@@ -114,7 +115,7 @@ And two choices made while building: the seam's invite counting is a fact of eac
 
 ## Next
 
-The lens compiler facade (SHAPE section 12): give `scene.py` and `lens_ir.py` an adapter that answers as the desk's World from kernel things, and report its size honestly, because it decides whether "new kernel, same language" holds.
+~~The lens compiler facade (SHAPE section 12).~~ Built: `kernel/painter.py`, 242 lines, and lens.js paints from the kernel unchanged. Next is the rest of Council night (hear, hours in a lens, the map) and what [[COUNCIL-NIGHT]] found about prose in the line language.
 
 ## Related documents
 

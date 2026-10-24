@@ -69,7 +69,7 @@ class Facade:
         return int(t[len(tag):]) if t.startswith(tag) and t[len(tag):].isdigit() else None
 
     def to_kernel(self, desk_id):
-        m = re.fullmatch(r"([asf])(\d+)", desk_id or "")
+        m = re.fullmatch(r"([asf])(\d+)", str(desk_id or ""))
         if not m:
             return None
         n = int(m.group(2))
@@ -99,7 +99,9 @@ class Facade:
             s = saw.setdefault(t, {"rev": rev, "aspects": []})
             s["rev"] = min(rev, s["rev"])
             for a in aspects or ():
-                for x in self.ASPECTS.get(a, [a[5:]] if a.startswith("prop:") else []):
+                # a fact's `<key>_title` (desk_for) was read from the fact `<key>`
+                plain = [a[5:-6] if a.endswith("_title") else a[5:]] if a.startswith("prop:") else []
+                for x in self.ASPECTS.get(a, plain):
                     if x not in s["aspects"]:
                         s["aspects"].append(x)
         note(observed.get("item"), observed.get("rev"))
@@ -146,15 +148,23 @@ class Facade:
                     title = k.name(t)
                 props = {}
                 for key, v in a.items():
-                    if key in ("text", "title", "kind") or key.startswith(("in:", "sees", "member:", "like:")):
+                    if key in ("text", "title", "kind") or key.startswith(("in:", "sees", "member:", "like:", "claim:",
+                                                                           "contact:")):
+                        continue
+                    if isinstance(v, str) and self.num(v) is not None and k.shown(reader, v) is not None:
+                        # a fact naming another thing (about=, meeting=, now=): the desk id of that thing, so a
+                        # lens's `about=$i.id` compares, and its title beside it for printing
+                        other = k.shown(reader, v)
+                        props[key] = f"s{self.num(v)}"
+                        props[f"{key}_title"] = str(other.get("title") or other.get("name") or
+                                                    (other.get("text") or "").split("\n")[0][:80])
                         continue
                     props[key] = v if isinstance(v, str) else json.dumps(v) if isinstance(v, (dict, list)) else str(v)
                 for key in ("made_by", "pinned", "for"):
                     if a.get(key):
                         props[{"made_by": "by", "pinned": "pinned", "for": "for"}[key]] = k.name(a[key])
                 if kind == "post":
-                    props["likes"] = str(a.get("likes", 0))
-                    props["pinned"] = props.get("pinned", "")
+                    props["likes"] = str(a.get("likes", 0))     # `pinned` only when it is: `by pinned` puts those first
                 w.subjects[sid] = {"id": sid, "kind": "note", "title": title, "text": a.get("text", "") if kind != "post"
                                    else a.get("text", ""), "tags": tags, "due": None, "rev": k.state.rev.get(t, 0),
                                    "comments": [], "props": props}

@@ -87,12 +87,64 @@ class Kernel:
         self.happenings = []                           # delivered, not recorded (SHAPE section 5); in memory
         self.leases, self.leases_made = {}, []         # holds: momentary, in memory (SHAPE section 5)
         self.dev_sessions = None                       # start_kernel.py --dev-entry: a callable -> {token: session}
+        self.clock = None                              # a callable -> aware datetime, for a run with its own time
         if not self.log.records:
             if genesis is None:
                 raise ValueError("an empty world needs a genesis")
             self._genesis(genesis)
         self.tag = self.state.get("world", "tag")
         self.place = self.state.get("world", "place")
+
+    def now(self):
+        """The kernel's time (UTC). A run may give it a clock of its own; records are stamped with it."""
+        from datetime import datetime, timezone
+        return self.clock() if self.clock else datetime.now(timezone.utc)
+
+    def once(self, actor, entry, target):
+        """The limits an entry's `once` says, read from the log: each clause is checked against this person's live
+        acts of the same entry (a sealed act is theirs when its seal is theirs). Clauses are joined by ';':
+            per person per target  ·  at most N per day per person  ·  at most N per person per <field>
+        -> None, or the words of a refusal."""
+        rule = (entry.get("once") or "").strip()
+        if not rule:
+            return None
+        import re as _re
+        undone = self.undone()
+
+        def mine(r):
+            if r.get("entry") != entry["id"] or r["seq"] in undone or r.get("undoes"):
+                return False
+            if r.get("by") == "sealed":
+                t = r["parts"][0].get("target") if r.get("parts") else None
+                return r.get("seal") == self.seal(actor.person, entry["id"], t)
+            return actor.person in (r.get("by"), r.get("for"))
+
+        def target_of(r):
+            return r["parts"][0].get("target") if r.get("parts") else None
+        acts = [r for r in self.log.records if mine(r)]
+        for clause in [c.strip() for c in rule.split(";") if c.strip()]:
+            if clause == "per person per target":
+                if target and any(target_of(r) == target for r in acts):
+                    return f"you have already said {entry['word']} on {target}; once each. undo takes yours back"
+                continue
+            m = _re.fullmatch(r"at most (\d+) per day per person", clause)
+            if m:
+                today = self.now().strftime("%Y-%m-%d")
+                if sum(1 for r in acts if r["at"][:10] == today) >= int(m.group(1)):
+                    return (f"you have said {entry['word']} {m.group(1)} times today, the most it takes from one "
+                            f"person in a day")
+                continue
+            m = _re.fullmatch(r"at most (\d+) per person per ([a-z_][a-z0-9_]*)", clause)
+            if m:
+                field = m.group(2)
+                mine_here = self.state.get(target, field) if target else None
+                n = sum(1 for r in acts if target_of(r) and self.state.get(target_of(r), field) == mine_here)
+                if mine_here is not None and n >= int(m.group(1)):
+                    return (f"you have said {entry['word']} {n} time{'' if n == 1 else 's'} for this {field} "
+                            f"({self.name(mine_here)}), the most it takes from one person; undo frees yours")
+                continue
+            return f"{entry['word']}'s entry says once '{clause}', which this kernel cannot read; nothing was done"
+        return None
 
     # ------------------------------------------------------------------ keep
     def _keep_read(self, name, default):
@@ -147,6 +199,8 @@ class Kernel:
             tx.set(gid, "name", grp["name"])
             tx.set(gid, f"in:{place}", 1)
             tx.set(gid, f"member:{steward}", "leader")
+            if grp.get("open"):
+                tx.set(gid, "open", True)               # its things are seen by the whole place
         for th in g.get("things", []):
             # things the steward founds the world with: lenses, styles, a taskbar's buttons. Same rules as `make`.
             tid = tx.mint()
@@ -208,8 +262,10 @@ class Kernel:
     def is_member(self, person, group):
         if self.state.get(person, "kind") != "person":
             return False
-        if group == self.place:
-            return True                                     # every person who joined is a member of the place
+        if group == self.place or self.state.get(group, "open"):
+            return True                                     # every person who joined is a member of the place, and of
+            #                                                 an open group in it (a public channel); its leaders are
+            #                                                 still appointed
         return bool(self.state.get(group, f"member:{person}")) or self.is_leader(person, group)
 
     def is_steward(self, person):
@@ -223,8 +279,9 @@ class Kernel:
                 return True
             if tok == "place" and reader and self.state.get(reader, "kind") == "person":
                 return True
-            if tok == "leaders" and reader and self.is_steward(reader):
-                return True
+            if tok == "leaders" and reader and any(self.is_leader(reader, g)
+                                                   for g in (self.groups_of(thing) or [self.place])):
+                return True                         # the leaders of the thing's own groups (and those above them)
             if tok.startswith("group:") and reader and self.is_member(reader, tok[6:]):
                 return True
             if tok.startswith("person:") and reader == tok[7:]:
@@ -240,17 +297,37 @@ class Kernel:
         if not self._sees(reader, a.get("sees", "place"), t):
             return None
         out = {}
-        likes = 0
+        likes, votes, claims, contacts = 0, {}, [], []
         for k, v in a.items():
             if k.startswith("like:"):
                 likes += 1
                 continue
+            if k.startswith("vote:"):                    # sealed: only the count of each option is shown
+                votes[v] = votes.get(v, 0) + 1
+                continue
+            if k.startswith("sees.") or k == "sees":     # a rule about who sees, not something to see
+                continue
+            if k.startswith("claim:"):
+                claims.append(k[6:])
             rule = a.get(f"sees.{k}")
             if rule is not None and not self._sees(reader, rule, t):
                 continue
             out[k] = v
+            if k.startswith("contact:"):
+                contacts.append(f"{self.name(k[8:])} {v}")
+        if contacts:
+            out["contacts"] = ", ".join(contacts)                      # only those this reader may see
         if a.get("kind") == "post":
             out["likes"] = likes
+        if a.get("kind") == "poll":
+            for o in str(a.get("options") or "").split():
+                out[f"votes_{o}"] = votes.get(o, 0)
+            out["votes"] = sum(votes.values())
+        if claims:
+            out["claimed_by"] = ", ".join(self.name(p) for p in claims)       # in the order they were claimed
+            out["claims"] = len(claims)
+        if str(a.get("seats", "")).isdigit():
+            out["seats_left"] = max(0, int(a["seats"]) - len(claims))
         return out
 
     def no_such(self, t):
@@ -399,7 +476,7 @@ class Kernel:
 
     # ------------------------------------------------------------------ commit
     def _commit(self, tx, by, words, **extra):
-        rec = {"at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "by": by, "words": words,
+        rec = {"at": self.now().strftime("%Y-%m-%dT%H:%M:%SZ"), "by": by, "words": words,
                "parts": tx.parts}
         rec.update({k: v for k, v in extra.items() if v is not None})
         rec = self.log.append(rec)
@@ -491,9 +568,12 @@ class Kernel:
         steps = L.split_batch(line)
         out = {"ok": True, "text": "", "rows": [], "records": [], "made": []}
         texts = []
+        handles = {}
         for i, s in enumerate(steps):
+            s = self.fill_handles(s, handles)
             try:
                 r = self.step(actor, s, press=press if len(steps) == 1 else None, saw=saw, mode=mode)
+                self.keep_handle(s, r.get("made"), handles)
             except Refused as exc:
                 texts.append(f"refused: {exc}")
                 if steps[i + 1:]:
@@ -509,6 +589,19 @@ class Kernel:
         if self.modules:
             self.modules.reconcile()
         return out
+
+    @staticmethod
+    def fill_handles(text, handles):
+        """`$name` -> the thing a step earlier in the same line or answer made with `as=name` (the desk's form)."""
+        if not handles or "$" not in text:
+            return text
+        return L.re.sub(r"\$([a-z][a-z0-9_]*)\b", lambda m: handles.get(m.group(1), m.group(0)), text)
+
+    @staticmethod
+    def keep_handle(text, made, handles):
+        name = L.parse(text).kv.get("as")
+        if name and made:
+            handles[name] = made[-1]
 
     def step(self, actor, text, press=None, saw=None, mode="do"):
         from .words import KERNEL
@@ -541,6 +634,10 @@ class Kernel:
                 if actor.kind == "module" and self._may_person(actor.person, entry, st.target, group):
                     raise Refused(f"{self.name(actor.module)} holds no grant for {st.word}; nothing was done")
                 raise self.refusal_for(entry, group)
+            if entry.get("word_kind") == "do":
+                said = self.once(actor, entry, st.target)
+                if said:
+                    raise Refused(said)
             src, name = self.source(entry)
             if mode == "see" and entry.get("word_kind") != "see":
                 raise Refused(f"{st.word} is an act; /see runs only readings")
@@ -561,7 +658,7 @@ class Kernel:
                 res["text"] = res["text"].replace("[r?]", f"[r{rec['seq']}]")
                 return res
         if src == "module":
-            return self.module_word(actor, st, entry, group, text, press)       # no lock held while the module works
+            return self.module_word(actor, st, entry, group, text, press, saw)  # no lock held while the module works
         raise Refused(f"{st.word} is unbound: its entry says it comes from {src}, which this kernel does not run yet")
 
     def _commit_use(self, tx, actor, words, entry, press, saw, st):
@@ -596,7 +693,7 @@ class Kernel:
                                "saw": saw})
 
     # ------------------------------------------------------------------ module words
-    def module_word(self, actor, st, entry, group, text, press):
+    def module_word(self, actor, st, entry, group, text, press, saw=None):
         mname = self.source(entry)[1]
         mid = self.module_named(mname)
         if not mid or not self.state.get(mid, "on"):
@@ -623,19 +720,27 @@ class Kernel:
                             f"so undo cannot take it back", "record": rec["seq"], "rows": ans.get("rows", [])}
         if entry.get("word_kind") == "see" or not ans.get("lines"):
             return {"text": ans.get("text", ""), "rows": ans.get("rows", [])}
-        return self.admit(mid, actor, text, entry, ans, press)
+        return self.admit(mid, actor, text, entry, ans, press, saw)
 
-    def admit(self, mid, caller, text, entry, ans, press=None):
+    def admit(self, mid, caller, text, entry, ans, press=None, press_saw=None):
         """A module's answer: its lines run as one use, one record, as the caller narrowed to the module, and only if
-        what it read is unchanged (SHAPE section 11). Refused whole otherwise."""
+        what it read is unchanged (SHAPE section 11). Refused whole otherwise. A painted press says what its page
+        showed (`press_saw`): an answer that writes a thing the page showed is fenced on that too, so two leaders
+        pressing Next on one painted agenda move it once, though the module read it fresh both times."""
         from .words import KERNEL
         author = Actor(mid, caller.person, "module", module=mid, caller=caller)
         saw = {k: int(v) for k, v in (ans.get("saw") or {}).items()}
         with self.lock:
             tx = Tx(self)
             notes = []
+            handles = {}
             for line in ans["lines"]:
+                line = self.fill_handles(str(line), handles)
                 st = L.parse(line)
+                if st.word == "do":
+                    line = line.strip()[2:].strip()
+                    st = L.parse(line)
+                made_before = len(tx.made)
                 eid = self.find_entry(st.word)
                 if eid is None:
                     raise Refused(f"{self.name(mid)} answered with '{st.word}', which nothing answers to; nothing was done")
@@ -645,15 +750,23 @@ class Kernel:
                                   f"kernel runs; nothing was done")
                 if st.target and self.shown(caller.person, st.target) is None:
                     raise self.no_such(st.target)
-                group = (self.groups_of(st.target) or [self.place])[0] if st.target else self.place
+                group = st.kv.get("in") or ((self.groups_of(st.target) or [self.place])[0] if st.target else self.place)
+                if self.state.get(group, "kind") not in ("place", "group"):
+                    raise self.no_such(group)
                 if not self.may(author, e, st.target, group):
                     if not self._may_person(caller.person, e, st.target, group):
                         raise Refused(f"{entry['word']} would {st.word} {st.target or ''}, and {self.refusal_for(e, group)}; "
                                       f"nothing was done")
                     raise Refused(f"{self.name(mid)} holds no grant for {st.word}; nothing was done")
+                said = self.once(author, e, st.target)
+                if said:
+                    raise Refused(f"{said}; nothing was done")
+                if press_saw and st.target in press_saw:
+                    self.fence(caller, st.target, [x for x in st.kv if x not in ("in", "as")], press_saw)
                 tx.part(st.word, st.target, line)
                 res = KERNEL[self.source(e)[1]](self, author, st, e, tx, group, saw=saw)
                 notes.append(res["text"])
+                self.keep_handle(line, tx.made[made_before:], handles)
             if tx.empty:
                 return {"text": "\n".join(notes)}
             rec = self._commit_use(tx, author, text, entry, press, saw, L.parse(text))

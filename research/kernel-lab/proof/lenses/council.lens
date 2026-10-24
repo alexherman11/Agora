@@ -1,0 +1,34 @@
+root : column, role sheet
+  meetings : column, of tag:meeting as m, each meet
+  pulse : column, of tag:poll as p, each poll
+  news : column, of tag:post as f, by pinned, each story
+  rides : column, of tag:carpool as c, each ride
+meet : column, role card
+  h : text "$m.title", role title
+  w : text "$m.at_said · $m.where", role meta
+  now : text "Now: $m.now_title"
+  items : column, of tag:item,meeting=$m.id as i, by order, each agendum
+agendum : column
+  t : text "$i.order. $i.title"
+  sign : row, only when $i.seats > 0
+    left : text "$i.seats_left of $i.seats two-minute slots open · closes $i.closes_said", role meta
+    speak : text "Sign up to speak", role tool, on click do claim $item
+  who : text "Speaking: $i.claimed_by", role meta, only when $i.claims > 0
+  notes : column, of tag:summary,about=$i.id as s, each note
+note : column, role card
+  by : text "$s.by · a draft, not the minutes", role meta
+  x : text "$s.text"
+poll : column, role card
+  q : text "$p.title", role title
+  n : text "yes $p.votes_yes · no $p.votes_no · sealed: counts only", role meta
+  b : row
+    y : text "yes", role tool, on click do vote $item yes
+    no : text "no", role tool, on click do vote $item no
+story : column, role card
+  pin : text "pinned by $f.pinned", role meta, only when $f.pinned != ""
+  by : text "$f.by", role meta
+  t : text "$f.text"
+  about : text "see: $f.about_title", role meta, only when $f.about != ""
+ride : row
+  r : text "$c.pickup to City Hall · leaves $c.leaves · $c.seats_left left"
+  go : text "ride", role tool, on click do claim $item

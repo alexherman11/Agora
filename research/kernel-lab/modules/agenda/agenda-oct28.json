@@ -1,0 +1,12 @@
+{
+  "imagined": "A made-up agenda for the Council night proof (a13431). Not a real city's agenda; the times are UTC (6 pm PDT is 01:00Z the next day).",
+  "meeting": {"title": "City Council, Tuesday 28 Oct", "at": "2026-10-29T01:00Z", "where": "City Hall chambers"},
+  "items": [
+    {"order": 1, "title": "Call to order and roll call"},
+    {"order": 2, "title": "Consent calendar"},
+    {"order": 3, "number": "7B", "title": "Public hearing: 41 homes at Murray & 5th",
+     "comment": {"seats": 12, "minutes": 2, "closes": "2026-10-29T00:45Z"}},
+    {"order": 4, "title": "Staff report and council discussion"},
+    {"order": 5, "title": "Council vote, or continuance"}
+  ]
+}

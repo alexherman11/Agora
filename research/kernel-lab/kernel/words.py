@@ -39,6 +39,8 @@ KERNEL_ENTRIES = [
        help="off <module>: stop a module and take back every grant it holds, in one act. undo turns it on again."),
     _k("status", "see", "<module>", "anyone", "no",
        help="status <module>: what a running module says it is doing."),
+    _k("find", "see", "kind=<kind> [k=<v> ...]", "anyone", "no",
+       help="find kind=<kind> [field=value …]: the things of a kind you may see: find kind=slot item=sb40."),
     _k("holds", "see", "", "anyone", "no",
        help="holds: what each running module holds now (an overlay, a stream), and since when."),
     _k("make", "do","kind=<kind> [in=<group>] [k=<v> ...]", "members", "yes",
@@ -49,12 +51,21 @@ KERNEL_ENTRIES = [
             "after it takes a fact away."),
     _k("forget", "do", "<id>", "maker or leaders", "yes",
        help="forget <thing>: take a thing out of every view. It is never erased: undo brings it back."),
+    _k("claim", "do", "<id> [phone=<v>]", "members", "yes", once="per person per target",
+       help="claim <thing> [phone=…]: take a seat on it: a public-comment slot, a carpool seat.\n"
+            "A thing says how many seats it has and when sign-up closes. A phone is seen only by you and the leaders. "
+            "undo gives the seat back."),
+    _k("vote", "do", "<id> <option>", "members", "yes", sealed="yes", once="per person per target", fence="adds",
+       help="vote <poll> <option>: one vote each, sealed: the counts are shown, not who voted how.\n"
+            "undo takes your vote back, so you can vote again."),
+    _k("role", "do", "<id> leader|member|none in=<group>", "leaders", "yes",
+       help="role <person> leader|member|none in=<group>: who leads a group and who belongs to it. Leaders appoint."),
 ]
 
 # aspects no line may write with make or set: what the kernel itself keeps, or derives
 RESERVED_KINDS = {"person", "agent", "module", "grant", "word", "invite", "world", "place", "group"}
 RESERVED = {"kind", "made_by", "for", "pinned", "forgotten", "sees", "lives", "from", "bound"}
-RESERVED_PREFIX = ("in:", "like:", "member:", "answer:", "sees.", "vote:", "claim:")
+RESERVED_PREFIX = ("in:", "like:", "member:", "answer:", "sees.", "vote:", "claim:", "contact:")
 
 FLOOR_HELP = {e["word"]: e["help"] for e in KERNEL_ENTRIES if e["word"] in FLOOR}
 
@@ -122,7 +133,12 @@ def look(k, actor, st, entry, tx, group, saw=None):
         if kind == "word":
             return {"text": f"{a.get('word')} ({t}), a {a.get('word_kind')} word: {a.get('help', '').splitlines()[0]}",
                     "rows": [dict(a, id=t)]}
-        return {"text": f"{k.name(t)} ({t}), a {kind}", "rows": [dict(a, id=t)]}
+        facts = [f"{x}={v}" for x, v in a.items() if x not in ("kind", "made_by", "for") and
+                 not x.startswith(("in:", "member:", "claim:", "contact:"))]
+        who = k.name(a.get("made_by")) if a.get("made_by") else None
+        return {"text": f"{a.get('title') or k.name(t)} ({t}), a{'n' if str(kind)[:1] in 'aeiou' else ''} {kind}"
+                        + (f" by {who}" if who else "") + ("\n  " + "\n  ".join(facts) if facts else ""),
+                "rows": [dict(a, id=t)]}
     posts = []
     for t in k.things("post"):
         a = k.shown(actor.person, t)
@@ -172,15 +188,6 @@ def post(k, actor, st, entry, tx, group, saw=None):
     text = st.words.strip()
     if not text:
         raise Refused("post needs words: post <words> [in=<group>]")
-    m = re.match(r"at most (\d+) per day per person", entry.get("once") or "")
-    if m:
-        n = int(m.group(1))
-        undone = k.undone()
-        today = [r for r in k.log.records if r.get("entry") == entry["id"] and r["seq"] not in undone
-                 and actor.person in (r.get("by"), r.get("for")) and r["at"][:10] == _today()]
-        if len(today) >= n:
-            raise Refused(f"you have posted {n} times today, the most the feed takes from one person in a day; "
-                          f"the feed is a slower lane, and talk in a group has no limit")
     p = tx.mint()
     tx.set(p, "kind", "post")
     tx.set(p, "text", text)
@@ -188,8 +195,9 @@ def post(k, actor, st, entry, tx, group, saw=None):
     if actor.id != actor.person:
         tx.set(p, "for", actor.person)
     tx.set(p, f"in:{group}", len(k.log.records) + 1)
-    if group != k.place:
+    if group != k.place and not k.state.get(group, "open"):
         tx.set(p, "sees", f"group:{group}")
+    _about(k, actor, st, tx, p)
     where = "" if group == k.place else f" in {k.name(group)} (seen by its members)"
     return {"text": f"ok post {p} [r?]{where}"}
 
@@ -323,6 +331,8 @@ def make(k, actor, st, entry, tx, group, saw=None):
     kv = dict(st.kv)
     kind = kv.pop("kind", "")
     kv.pop("in", None)
+    kv.pop("about", None)                               # checked and set by _about
+    kv.pop("as", None)                                  # a handle for later steps of the same line, not a fact
     if not re.match(r"^[a-z][a-z0-9_-]{0,31}$", kind or ""):
         raise Refused("make needs kind=<a plain word>: make kind=button name=Feed")
     if kind in RESERVED_KINDS:
@@ -335,13 +345,14 @@ def make(k, actor, st, entry, tx, group, saw=None):
             tx.set(t, key, v)
     if st.words and "text" not in kv:
         tx.set(t, "text", st.words)
+    _about(k, actor, st, tx, t)
     tx.set(t, "made_by", actor.id)
     if actor.id != actor.person:
         tx.set(t, "for", actor.person)
     tx.set(t, f"in:{group}", len(k.log.records) + 1)
-    if group != k.place:
+    if group != k.place and not k.state.get(group, "open"):          # an open group's work is seen by all
         tx.set(t, "sees", f"group:{group}")
-    return {"text": f"ok make {t} [r?] · a {kind}" + (f" in {k.name(group)}" if group != k.place else "")}
+    return {"text": f"ok make {t} [r?] · a{'n' if kind[0] in 'aeiou' else ''} {kind}" + (f" in {k.name(group)}" if group != k.place else "")}
 
 
 def set_(k, actor, st, entry, tx, group, saw=None):
@@ -368,6 +379,95 @@ def forget(k, actor, st, entry, tx, group, saw=None):
     return {"text": f"ok forget {t} [r?] · out of every view; undo brings it back"}
 
 
+def _about(k, actor, st, tx, t):
+    """`about=<id>`: what a post or a made thing is about (an agenda item, a staff report). It must be one the maker
+    may see."""
+    a = st.kv.get("about")
+    if not a:
+        return
+    if k.shown(actor.person, a) is None:
+        raise k.no_such(a)
+    tx.set(t, "about", a)
+
+
+def claim(k, actor, st, entry, tx, group, saw=None):
+    """claim <thing> [phone=…]: take one of its seats (a comment slot, a carpool seat). A thing says `seats` (1 when
+    it says none) and may say `closes` (a UTC time, 2026-10-28T18:30Z); a contact given is seen only by the person
+    and leaders."""
+    t = st.target
+    a = k.state.things.get(t, {})
+    taken = [x for x in a if x.startswith("claim:")]
+    seats = int(a.get("seats", 1)) if str(a.get("seats", 1)).isdigit() else 1
+    if f"claim:{actor.person}" in a:
+        raise Refused(f"you already hold a seat on {t}; undo gives it back")
+    if a.get("closes") and k.now().strftime("%Y-%m-%dT%H:%MZ") >= str(a["closes"]):
+        raise Refused(f"sign-up for {k.name(t) if a.get('title') else t} closed at {a['closes']}")
+    if len(taken) >= seats:
+        raise Refused(f"{t} is taken ({seats} seat{'' if seats == 1 else 's'}, all claimed); look shows what is open")
+    tx.set(t, f"claim:{actor.person}", actor.id)
+    contact = st.kv.get("phone") or st.kv.get("contact")
+    if contact:
+        tx.set(t, f"contact:{actor.person}", contact)
+        tx.set(t, f"sees.contact:{actor.person}", f"person:{actor.person}|leaders")
+    left = seats - len(taken) - 1
+    return {"text": f"ok claim {t} [r?] · yours; {left} seat{'' if left == 1 else 's'} left"
+                    + ("; your contact is seen only by you and the leaders" if contact else "")}
+
+
+def vote(k, actor, st, entry, tx, group, saw=None):
+    """vote <poll> <option>: sealed. The world knows you voted; readers see only the counts."""
+    t = st.target
+    options = str(k.state.get(t, "options") or "").split()
+    choice = (st.words.split() or [""])[0].lower()
+    if k.state.get(t, "kind") != "poll" or not options:
+        raise Refused(f"{t} is not a poll; make kind=poll title=… options=\"yes no\" makes one")
+    if choice not in options:
+        raise Refused(f"vote {t} needs one of: {' '.join(options)}")
+    if k.state.get(t, "closed"):
+        raise Refused(f"the poll {t} is closed")
+    seal = k.seal(actor.person, entry["id"], t)
+    tx.set(t, f"vote:{seal}", choice)
+    return {"text": f"ok vote {t} [r?] · counted; how you voted is sealed"}
+
+
+def role(k, actor, st, entry, tx, group, saw=None):
+    """role <person> leader|member|none in=<group>: who leads or belongs to a group. Leaders appoint."""
+    p = st.target
+    what = (st.words.split() or [""])[0].lower()
+    if k.state.get(p, "kind") != "person":
+        raise Refused(f"{p} is not a person")
+    if what not in ("leader", "member", "none"):
+        raise Refused("role <person> leader|member|none in=<group>")
+    g = st.kv.get("in") or k.place
+    if what == "none":
+        tx.set(g, f"member:{p}")                        # no value: the fact goes
+    else:
+        tx.set(g, f"member:{p}", what)
+    return {"text": f"ok role {p} [r?] · {k.name(p)} is {'no longer in' if what == 'none' else 'a ' + what + ' of'} "
+                    f"{k.name(g)}"}
+
+
+def find(k, actor, st, entry, tx, group, saw=None):
+    """find kind=<kind> [field=value …]: the things of a kind you may see, in their `order` when they have one."""
+    kv = dict(st.kv)
+    kind = kv.pop("kind", None)
+    kv.pop("in", None)
+    if not kind:
+        raise Refused("find needs kind=<kind>: find kind=slot item=sb40")
+    rows = []
+    for t in k.things(kind):
+        a = k.shown(actor.person, t)
+        if a is None or any(str(a.get(f, "")) != v for f, v in kv.items()):
+            continue
+        rows.append(dict(a, id=t, rev=k.state.rev.get(t, 0)))
+    rows.sort(key=lambda r: (int(r["order"]) if str(r.get("order", "")).isdigit() else 10 ** 9,
+                             int(r["id"][len(k.tag):] or 0)))       # then in the order they were made
+    for r in rows:
+        k.mark(actor, r["id"], r)
+    text = "\n".join(f"  {r['id']} · {r.get('title') or r.get('name') or (r.get('text') or '')[:60]}" for r in rows)
+    return {"text": f"{len(rows)} {kind}{'' if len(rows) == 1 else 's'}" + ("\n" + text if rows else ""), "rows": rows}
+
+
 def holds(k, actor, st, entry, tx, group, saw=None):
     rows = [dict(h, by=k.name(h["by"])) for h in k.leases.values()]
     text = "\n".join(f"  {r['by']} holds {r['word']} ({r['lease']}) since {r['since']}" for r in rows)
@@ -375,4 +475,5 @@ def holds(k, actor, st, entry, tx, group, saw=None):
 
 
 KERNEL = {"look": look, "help": help_, "post": post, "like": like, "pin": pin, "undo": undo, "off": off,
-          "status": status, "make": make, "set": set_, "forget": forget, "holds": holds}
+          "status": status, "make": make, "set": set_, "forget": forget, "holds": holds, "claim": claim,
+          "vote": vote, "role": role, "find": find}

@@ -251,6 +251,9 @@ class Server(ThreadingHTTPServer):
     # a taken port must fail loudly instead (found 23 Oct: a stand-in shared 8818 with the entry service's fake Google)
     allow_reuse_address = sys.platform != "win32"
     daemon_threads = True
+    # the default listen queue is 5: on Council night twenty phones pressing at once beside thirty open streams had a
+    # connection reset (WinError 10054, found 23 Oct)
+    request_queue_size = 128
 
 
 def serve(kernel, entry_url, secret, port, root, cache_s=SESSION_CACHE_S):
