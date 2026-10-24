@@ -1,4 +1,4 @@
-"""kdesk: Alex's desktop on the new kernel. One process: the kernel (research/kernel-lab, unchanged, with kext.py), its
+"""kdesk: Alex's desktop on the new kernel. One process: the kernel (research/kernel-lab, unchanged), its
 door on loopback 8810, and the modules the world says are on (the window host and the little guy).
 
     python kdesk.py [--world <dir>] [--port 8810]       run it (kdesk_on.py starts it detached; kdesk_off.py stops all)
@@ -23,9 +23,10 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
-import kext  # noqa: E402  (puts research/kernel-lab on the path)
+sys.path.insert(0, str(HERE.parents[1] / "kernel-lab"))
 from kernel import door as KD  # noqa: E402
+from kernel import modules as KM  # noqa: E402
+from kernel.kernel import Kernel  # noqa: E402
 
 PAGES = HERE / "pages"
 DEFAULT_WORLD = HERE / "state" / "world"
@@ -138,13 +139,13 @@ def start(world=DEFAULT_WORLD, port=8810, modules=True, headless=False):
     """-> (kernel, server, host, entry). Serves on a thread; the caller decides how long it lives."""
     import threading
     world = Path(world)
-    k = kext.DeskKernel(world, None if (world / "log" / "0001.jsonl").exists() else genesis(headless))
+    k = Kernel(world, None if (world / "log" / "0001.jsonl").exists() else genesis(headless))
     after_genesis(k)
     entry = LocalEntry(k.keep_dir)
     k.dev_sessions = lambda: entry.sessions             # the door's /dev/signin knows these sessions
     srv = KD.Server(("127.0.0.1", port), make_desk_handler(k, entry))
     os.environ["AGORA_KDESK_PORT"] = str(srv.server_address[1])     # the modules (children) read where the door is
-    host = kext.DeskHost(k, HERE)
+    host = KM.Host(k, HERE)
     threading.Thread(target=srv.serve_forever, daemon=True, name="door").start()
     if modules:
         host.reconcile()

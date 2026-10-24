@@ -29,7 +29,7 @@ The words are switches inside the world (recorded, undoable). The two scripts st
 
 ```
  kdesk.py (one process, started detached under pythonw: no console)
-   the kernel, research/kernel-lab/kernel, UNCHANGED  +  kext.py (now only a log file per module)
+   the kernel, research/kernel-lab/kernel, UNCHANGED, with nothing added (kext.py is gone since 12a4a82)
    its door on 127.0.0.1:8810: /do /see /door/stream, the painter's routes (/api/scene ...), /dev/signin, + /desk/<page>
    a stand-in for sign-in, in process: Alex's session (his pages) and "agent for Alex" (label claude), in keep/
    modules, started by the kernel as the world says (SHAPE 11, newline JSON on stdin/stdout):
@@ -51,7 +51,7 @@ make kind=rule on=window.opened do="guy.hop $target"
 make kind=lens name=feed text="<lenses/feed.lens>"
 ```
 
-A button's `does` runs as whoever presses it. A pinned thing (`make kind=pin bar=taskbar shows=<thing>`, what *to taskbar* in the feed does) opens that thing. A new verb note composes words: `verb side steps="rows window; set $1 at=24,40; set $2 at=1300,40" help="..."`, then a button can `does="side <a> <b>"`. Since the kernel took verb notes in (2d872eb, 19:36), a do verb's steps are the kernel's own words and make one record, so one `undo` puts both windows back; the screen follows because windows are world things (**ran**, hidden check). The `rows window` step is there because the kernel asks you to look at a thing before you set it. A verb whose steps are module words (`window.move`) is refused for now (**ran**: "a verb note's steps are the kernel's own words"); before 19:36 kext allowed it, each step its own record, and a taskbar button's press moved Feed that way (**ran**, trial world, `window.move dk32 to=right`).
+A button's `does` runs as whoever presses it. A pinned thing (`make kind=pin bar=taskbar shows=<thing>`, what *to taskbar* in the feed does) opens that thing. A new verb note composes words: `verb side steps="set $1 at=24,40; set $2 at=1300,40" help="..."`, then a button can `does="side <a> <b>"`. A do verb is one act and one record, so one `undo` puts both windows back; the screen follows because windows are world things. Module words compose too (kernel 12a4a82): `verb shove steps="window.move $1 to=left"` is an alias of `window.move`, and `verb swap steps="window.move $1 to=right; set $2 at=500,40"` is still one act that one undo takes back (**ran**, hidden checks). The kernel asks you to look at a thing before you set it; `window.list` reads the window things inside the call, as the caller, so listing them counts as that look.
 
 **The four kinds of word, all used.** do (`window.open`, `guy.say`), see (`window.list`, `rows`, `holds`), hear (`window.opened`, heard by the guy and by the rule), hold (`window.overlay`: the guy asks the kernel for it on his own grants and gets a lease; `holds` lists it; `off guy` ends it).
 
@@ -64,7 +64,6 @@ A button's `does` runs as whoever presses it. A pinned thing (`make kind=pin bar
 | File | What it is |
 |---|---|
 | `kdesk.py` | the process: kernel + extension, the door with `/desk/`, the sign-in stand-in, the genesis of Alex's desktop world |
-| `kext.py` | what the kernel still lacks for the desktop: a log file per module (`<world>/logs/<module>.log`). Everything else it once added (`rows`, verb notes, rules, a module acting on its own, narrowed grants, a fuller hello) is the kernel's own since 2d872eb |
 | `kd_window.py` | the window module and the desktop host: WebView2 windows, the AppBar strip, drags, closes, full-screen step-back |
 | `kd_guy.py`, `sprite.py` | the little guy: his module, his walking and hopping, his picture in a layered (per-pixel alpha) window |
 | `modproto.py` | the module protocol for a Python module |
@@ -79,7 +78,7 @@ A button's `does` runs as whoever presses it. A pinned thing (`make kind=pin bar
 ## Evidence
 
 **Ran**, 23 Oct 2026, Windows 11, one 3840×2160 monitor at 150%, Python 3.12 (the pinned venv), the kernel at commit 529f1b1 plus its working tree of 18:54:
-- The hidden checks: `Ran 12 tests in 22.160s`, `OK`; after the last changes, `Ran 12 tests in 18.936s`, `OK`; on the kernel at 2d872eb with kext slimmed to the log file, `Ran 12 tests in 20.483s`, `OK`. After that change the live world (founded on the older kernel) opened on a copy, hidden, its rule fired once per `window.opened` (it had fired twice while kext's rules and the kernel's both ran), and the live desktop was restarted on it: strip, Feed and the guy back where they were. They cover: the taskbar made by the window module on its own; open, move, close and undo of a window; `off window` and undo; a button made by a line and pressed; a verb note composing window words; a rule hearing `window.opened`; `stop` as a verb note, ending the guy's hold, and undo bringing it back; `look guy`, `holds`, `guy.say`, `status guy`; the window grant's narrowing; owner-only windows; the stream carrying a happening; a lens window opened through `/dev/signin` and painting a post through `/api/scene`; replay giving the same world.
+- The hidden checks: `Ran 12 tests in 22.160s`, `OK`; after the last changes, `Ran 12 tests in 18.936s`, `OK`; on the kernel at 2d872eb with kext slimmed to the log file, `Ran 12 tests in 20.483s`, `OK`; on 12a4a82 with kext gone, `Ran 12 tests in 22.951s`, `OK`. After that change the live world (founded on the older kernel) opened on a copy, hidden, its rule fired once per `window.opened` (it had fired twice while kext's rules and the kernel's both ran), and the live desktop was restarted on it: strip, Feed and the guy back where they were. They cover: the taskbar made by the window module on its own; open, move, close and undo of a window; `off window` and undo; a button made by a line and pressed; a verb note composing window words; a rule hearing `window.opened`; `stop` as a verb note, ending the guy's hold, and undo bringing it back; `look guy`, `holds`, `guy.say`, `status guy`; the window grant's narrowing; owner-only windows; the stream carrying a happening; a lens window opened through `/dev/signin` and painting a post through `/api/scene`; replay giving the same world.
 - On the real desktop, by real clicks (`press.py`) and lines: the taskbar's Side by side button moved Feed (trial world, r27); a drag of Feed by its strip was recorded as `set dk32 at=2241,409 size=1180,1500 [r31]`; Help's taskbar chip brought it forward, its × closed it (`window.close dk38`, r34), and `undo` reopened it (r35, "put back 8 facts"); in the live world, *to taskbar* in the Feed lens made `make kind=pin bar=taskbar shows=dk37` (r30) and the taskbar showed it; ♥ made a sealed like (r31, `by: sealed`) and the lens showed ♥ 1; Wave made the guy say "hi Alex!".
 - The strip: the shell's work area went from 2088 to 2022 with it and back to 2088 when it stopped, every time (after `off window`, after `kdesk_off.py`, and after a hard kill of a probe, 625 ms).
 - Full screen: with a full-screen window in front, the strip and the guy were both hidden, and both came back after it closed.
@@ -99,7 +98,8 @@ A button's `does` runs as whoever presses it. A pinned thing (`make kind=pin bar
 - The kernel keeps dictionary entries out of `make` and `set`, so a verb note needs its own word (`verb`), and a world-made alias needs one too (none yet; `stop` is a verb note instead).
 - A module does not hear its own acts, so after answering with lines the window module looks again by itself.
 - `ModuleProcess._read` handled a fixed set of messages; adding `do`/`see` on a module's own meant copying it. The kernel now has `handle(msg)`.
-- A do verb cannot compose module words yet (the kernel keeps a verb to one record, and a module's answer is its own record). The design's example, a room making `play` mean `media.play` with a one-line verb note, needs that; raised with the kernel builder.
+- A do verb could not compose module words (2d872eb kept a verb to kernel words). Raised with the kernel builder, who changed it the same evening (12a4a82): a one-step module verb is an alias, and a longer one joins the module's answer lines into the verb's one record. The design's example, a room making `play` mean `media.play`, can be written now.
+- kext.py (what this folder once added to the kernel: `rows`, verb notes, rules, a module acting on its own, narrowed grants, a fuller hello, module log files) was taken into the kernel item by item on 23 Oct and deleted; module logs are in `<world>/modules/<name>/stderr.log`.
 
 ## What is not done
 

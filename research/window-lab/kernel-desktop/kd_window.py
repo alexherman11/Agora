@@ -556,7 +556,10 @@ class WindowHost:
         word, args, caller, use = msg["word"], msg.get("args") or {}, msg.get("caller") or {}, msg.get("use")
         kv, words, target = args.get("kv") or {}, (args.get("words") or "").split(), args.get("target")
         if word == "window.list":
-            return self.list_rows(all_="all" in words)
+            # read the window things inside the call, as the caller: they list only what they may see, and the read
+            # counts as their look, so a `set` on a listed window needs no other look first
+            r = self.m.see("rows window", use=use)
+            return self.list_rows(all_="all" in words, only={x.get("id") for x in r.get("rows") or []})
         refused = self._owner_only(caller)
         if refused:
             return refused
@@ -644,13 +647,14 @@ class WindowHost:
             return (current[0], current[1], w, h)
         return (wx + ww - w - 120 - 64 * n, wy + 250 + 64 * n, w, min(h, wh - 300))   # low enough for the guy's bubble
 
-    def list_rows(self, all_=False):
+    def list_rows(self, all_=False, only=None):
+        """only: the window ids the caller may see (None: all of them)."""
         rows = []
         z = self.screen.z_order() if hasattr(self.screen, "z_order") else []
         zi = {h: i for i, h in enumerate(z)}
         for wid, row in sorted(self.rows.items(), key=lambda x: x[0]):
             rec = self.screen.wins.get(wid)
-            if rec is None:
+            if rec is None or (only is not None and wid not in only):
                 continue
             box = self.screen.box(wid)
             hwnd = rec.get("hwnd") if isinstance(rec, dict) else None
