@@ -166,7 +166,8 @@ def make_handler(kernel, entry, secret):
             u = urlparse(self.path)
             q = {k: v[0] for k, v in parse_qs(u.query).items()}
             if u.path == "/health":
-                return self._send(200, {"ok": True, "records": len(kernel.log.records)})
+                return self._send(200, {"ok": True, "records": len(kernel.log.records),
+                                        "grant_scopes": ["kind", "thing", "fields"]})
             if u.path in ("/door/stream", "/stream"):
                 last = self.headers.get("Last-Event-ID") or q.get("since")
                 return self._stream(int(last) if last and last.isdigit() else None)

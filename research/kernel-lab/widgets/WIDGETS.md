@@ -60,10 +60,32 @@ An instance capability stays in the trusted host's closure. The iframe receives 
 **Demos:**
 
 - `taskboard-js`: the lens board's **same** task/settings facts and `task-*`/`summarize.*` words. Three lanes, numerical spring following during a real pointer drag, four priority flags, card/note colours, filters, assignments, menu, rename, notes, history and undo. `N` focuses add; Enter adds; focused-card 1–4 changes priority, D completes, Delete removes, Enter opens details. Notes support Ctrl+B/I/S and checklist source. It reads peer edits and rereads after its own acts. The explicit `undo` grant retains the viewer's ordinary undo reach; this is a significant power, not a view-local undo implementation.
-- `desktop-guy`: an original canvas companion, walking over the desktop and hopping onto `window.list all` window tops. It hears `guy.say`, `guy.hop` and `window.opened`. `guy-editor` edits ordinary `guy-profile` facts: name, coat/face/scarf colours, speed, mood, phrases. The overlay rereads them live.
+- `desktop-guy` and `guy-editor`: **tried and set aside**. Alex preferred the original pixel guy. Both were turned off on the live desktop (r335 and r336); leave them off. Their source remains as experiment history, and the shared widget path remains in use by other widgets. Do not run the all-demo installer on the live desktop: it activates these demos.
+- `pixel-guy-editor`: the original Python guy's studio, installed separately by `pixel_guy_install.py`. It edits a `pixel-guy` thing linked by `provider` to the original guy module. These ordinary facts hold hats, hair, coat, skin, eyes, accessory, shoes, name, speed, chattiness, phrases and a custom 16×8 hat. The original body, scale, walking, hopping and bubble drawing remain in `kd_guy.py`. The widget's pixels come from that original art, exported inline with the definition. `window.open pixel-guy-editor` opens the studio; its world button pins that line to the taskbar. `off pixel-guy-editor` is the editor's off switch; `off guy` is the sprite's.
 - `now-playing`: artwork, current song/artist, pause/next and reported progress through `media.now`/`media.play`/`media.next`. Artwork is a bounded inline image decoded from the existing media-art directory by the reviewed media module. It is never fetched by the widget. Missing artwork has a quiet placeholder; missing playback says nothing is playing. Progress uses the player's reported position and does not fabricate a running clock.
 
-The Python guy remains the fallback and the provider of the existing `guy.*` words. It yields its drawing only while the JS companion holds an actual overlay lease, and returns when that lease ends. It is not retired. `off desktop-guy` stops the JS companion, allowing that fallback to return. `off guy` stops the Python provider/fallback; to stop both, say both off lines.
+The Python guy is Alex's chosen companion and provider of the existing `guy.*` words. The older overlay-yield mechanism remains for compatibility, but the rejected JS overlay must stay off.
+
+### Original pixel guy studio (builder draft, 24 October)
+
+`pixel_guy_install.py` installs only the new studio, its `pixel-guy` appearance thing, the `guy-studio` verb and a taskbar button. It never installs or activates the rejected demos. `provider` links appearance to the original guy module, leaving module identity/name and runtime permissions separate from his editable name. Missing or malformed appearance facts use original defaults. Appearance is polled every 0.4 seconds. Both the PIL cache and native Sprite bitmap cache key include those facts; an undo can reuse the exact original bitmap. No sprite/native-window or kdesk source edit is needed.
+
+The editor holds `window.surface`, reads through `rows`/`look`, hears `set`/`undo`, and may call `guy.say`. A **separate** grant gives it `set undo only="thing:<appearance>;fields:hat,hair,coat,skin,eyes,accessory,shoes,name,speed,chatty,phrases,custom_hat"`. These are ordinary grants, not a widget-specific permission table. Clauses separated by semicolons are conjunctive; unknown clauses fail closed; separate grants cannot contribute partial permissions to a write. Undo checks every restored fact before changing anything. The editor has no make, forget, module-control, widget-code-edit or hopping grant. The live installer checks the running door's reported grant scopes and refuses deployment on an older kernel.
+
+**Ran:** desktop/widget suite `Ran 49 tests in 165.603s`, `OK`; kernel suite `Ran 67 tests in 108.382s`, `OK`; final targeted permission/kernel checks `Ran 28 tests in 37.210s`, `OK`; original-guy tests `Ran 7 tests in 7.077s`, `OK`; hidden browser `PIXEL GUY PROOF: 11 checks passed`. Default pixels match the old guy in every pose, direction and blink state. The browser preview matches Python coordinates in 400 combinations. The production sprite loop with an invisible bitmap-caching sink receives original, cap, then original after undo. A real scratch module observed changed facts in 0.406 seconds without restart. The two contact sheets and editor screenshot in `research/window-lab/kernel-desktop/evidence/pixel-guy-*.png` were opened and visually inspected.
+
+**Live boundary:** not deployed in this builder run. The currently running kernel lacks field-scoped grants, and the host gate reports a full-screen foreground application (read-only inspection identified Chrome, not a game). A coordinator-reviewed shared-desktop reload is required; do not silently load the component builder's in-progress changes. The old demos were verified off. After review/reload and a clear gate, use pinned Python to run `research/kernel-lab/widgets/pixel_guy_install.py --open --hello`. Say first that Pixel guy studio will open as a normal window. That installs the narrow grants and dock button, opens the editor, sets `hat=cap` and says `new hat!`. Do not use the all-demo installer.
+
+Rough spots / source changes for this feature:
+
+| Source | Missing world-level capability |
+| --- | --- |
+| `kernel/kernel.py`, `kernel/words.py` | `grant ... only="thing:...;fields:..."` for ordinary set and bounded undo, with all restored facts checked. |
+| `kernel/door.py` | Running grant-scope discovery through health, so installation cannot mistake tested source for a running permission boundary. |
+| `kd_guy.py`, `guy_looks.py` | The original guy reading/composing ordinary appearance facts, including custom hat rows; appearance-aware bitmap keys. |
+| `widgets/pixel-guy-editor.js`, `pixel_guy_install.py` | A sandboxed creator speaking ordinary lines, `guy-studio`, and a world-owned taskbar button. |
+
+Remaining: coordinator review/reload and the requested visible editor/cap/greeting. Sharing a custom hat is currently copying its ordinary `custom_hat` fact; there is no separate hat library UI.
 
 ## Security boundary
 

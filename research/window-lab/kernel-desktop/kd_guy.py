@@ -30,6 +30,7 @@ if VENV_SITE.exists() and str(VENV_SITE) not in sys.path:
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from modproto import Module, log  # noqa: E402
+import guy_looks  # noqa: E402
 
 HEADLESS = "--headless" in sys.argv
 PORT = int(os.environ.get("AGORA_KDESK_PORT", "8810"))
@@ -98,6 +99,9 @@ class Guy:
         self.pose_sent = None
         self.sprite = None
         self.pictures = {}
+        self.looks = guy_looks.clean({})
+        self.look_revision = 0
+        self.next_phrase = time.time() + 30
         self.lock = threading.Lock()
         self.m = Module(offer=self.offer(), on_call=self.call, on_happen=self.happen, on_status=self.status,
                         on_off=self.off)
@@ -146,7 +150,9 @@ class Guy:
 
     def happen(self, h):
         if h.get("word") == "window.opened":
-            self.say("ooh, a new window")
+            if self.looks['chatty'] != 'quiet':
+                phrases = self.looks['phrases'].splitlines()
+                self.say((phrases[-1] if phrases else "ooh, a new window")[:120])
 
     def status(self):
         p = self.platforms.get(self.on)
@@ -154,7 +160,8 @@ class Guy:
         doing = {"walk": "walking", "stand": "standing", "jump": "hopping", "fall": "falling", "sit": "sitting"}[self.state]
         hold = "holds window.overlay" if self.holding else "waiting for the window.overlay hold"
         return (f"{doing} on {where} at {int(self.x)},{int(self.y)}; {hold}; knows {len(self.platforms)} window tops"
-                + (f"; saying “{self.bubble}”" if time.time() < self.bubble_until else ""))
+                + (f"; saying “{self.bubble}”" if time.time() < self.bubble_until else "")
+                + f"; look r{self.look_revision} {self.looks}")
 
     def off(self):
         try:
@@ -169,6 +176,22 @@ class Guy:
         self.pose_sent = None
 
     # -- where the windows are
+    def refresh_looks(self):
+        """Read ordinary world facts; malformed neighbour edits fall back safely."""
+        rows = self.m.see('rows pixel-guy').get('rows', [])
+        row = next((r for r in rows if r.get('provider') == self.m.hello.get('id')), None)
+        if row is not None:
+            looks = guy_looks.clean(row)
+            if looks != self.looks:
+                self.looks = looks
+                self.pictures.clear()
+            self.look_revision = row.get('rev', 0)
+
+    def watch_looks(self):
+        while not self.m.closed.is_set():
+            self.refresh_looks()
+            self.m.closed.wait(0.4)
+
     def look_around(self):
         # Python remains the fallback and word provider. JS takes the drawing
         # only while its real overlay lease is alive, not merely installed.
@@ -274,7 +297,7 @@ class Guy:
                     self.x = min(max(self.x, bar.x1), bar.x2)
                     self.y, self.on, self.state = bar.y, "bar", "stand"
             elif self.state == "walk":
-                self.x += self.facing * WALK * dt
+                self.x += self.facing * float(self.looks['speed']) * dt
                 if self.x <= p.x1 + SPRITE_HALF or self.x >= p.x2 - SPRITE_HALF:
                     self.x = min(max(self.x, p.x1 + SPRITE_HALF), p.x2 - SPRITE_HALF)
                     self.facing *= -1
@@ -291,6 +314,11 @@ class Guy:
                     threading.Thread(target=self.hop_to, args=(choice,), daemon=True).start()
 
     def pose(self):
+        if self.looks['chatty'] == 'chatty' and time.time() > self.next_phrase:
+            self.next_phrase = time.time() + random.uniform(20, 40)
+            phrases = [p for p in self.looks['phrases'].splitlines() if p.strip()]
+            if phrases:
+                self.say(random.choice(phrases)[:120])
         pose = {"jump": "jump", "fall": "jump", "walk": "walk", "sit": "sit"}.get(self.state, "stand")
         if pose == "walk":
             pose = "walk1" if int(time.time() / 0.17) % 2 else "walk2"
@@ -328,12 +356,14 @@ class Guy:
                 self.sprite.hide(hide)
             if not hide:
                 pose = self.pose()
-                img = self.pictures.get(pose)
+                looks = self.looks
+                key = (pose, tuple(sorted(looks.items())))
+                img = self.pictures.get(key)
                 if img is None:
                     if len(self.pictures) > 40:
                         self.pictures.clear()
-                    img = self.pictures[pose] = art.picture(*pose)
-                self.sprite.show(pose, img, self.x - W / 2, self.y - H + 2)
+                    img = self.pictures[key] = art.picture(*pose, looks=looks)
+                self.sprite.show(key, img, self.x - W / 2, self.y - H + 2)
             time.sleep(1 / FPS)
 
     def hold_overlay(self):
@@ -351,6 +381,8 @@ class Guy:
         self.m.run_reader()
         self.m.ready.wait(30)
         self.hold_overlay()
+        self.refresh_looks()
+        threading.Thread(target=self.watch_looks, daemon=True, name='guy-looks').start()
         if HEADLESS:
             threading.Thread(target=self.drive_headless, daemon=True).start()
             self.m.closed.wait()
@@ -407,21 +439,15 @@ class art:
         return cls._font
 
     @classmethod
-    def picture(cls, pose, facing, bubble, blink):
+    def picture(cls, pose, facing, bubble, blink, looks=None):
         from PIL import Image, ImageDraw
         img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
         d = ImageDraw.Draw(img)
-        rows = cls.HEAD + cls.BODY.get(pose, cls.BODY["stand"])
+        pal = guy_looks.palette(cls.PAL, looks)
         px, ox, oy = cls.PX, W // 2 - 8 * cls.PX, H - 16 * cls.PX
-        for y, row in enumerate(rows):
-            for x, c in enumerate(row):
-                if c == ".":
-                    continue
-                col = cls.PAL[c]
-                if blink and y == 4 and c == "k" and 4 < x < 12:
-                    col = cls.PAL["o"]
-                xx = 15 - x if facing < 0 else x
-                d.rectangle([ox + xx * px, oy + y * px, ox + xx * px + px - 1, oy + y * px + px - 1], fill=col + (255,))
+        for x, y, c in guy_looks.pixels(cls.HEAD, cls.BODY, pose, blink, looks):
+            xx = 15 - x if facing < 0 else x
+            d.rectangle([ox + xx * px, oy + y * px, ox + xx * px + px - 1, oy + y * px + px - 1], fill=pal[c] + (255,))
         if bubble:
             f = cls.font()
             words, lines = bubble.split(), [""]

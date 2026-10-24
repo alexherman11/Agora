@@ -61,7 +61,8 @@ KERNEL_ENTRIES = [
             "Only stewards may run code. Kits carry neither this command nor its grants. off <module> stops it."),
     _k("grant", "do", "<id> words=<words> [only=<narrowing>]", "stewards", "yes",
        help="grant <module or widget> words=\"<words>\" [only=kind:<kind>]: give something already installed one "
-            "more grant, as its own act. holds and look show it; undo or off takes it back."),
+            "more grant, as its own act. only=\"thing:<id>;fields:hat,coat\" limits set and undo to those facts. "
+            "holds and look show it; undo or off takes it back."),
     _k("counts", "see", "<id>", "anyone", "no",
        help="counts <board>: anonymous totals of active uses of its count_word, grouped by count_bucket. "
             "A thing explicitly publishes to a board with count_in=<board> count_bucket=<label>; only things "
@@ -117,7 +118,8 @@ KERNEL_ENTRIES = [
             "a sign-up slot.\nIts other k=v are its first facts. In a group it is seen by the group."),
     _k("set", "do", "<id> k=<v> ...", "maker or leaders", "yes",
        help="set <thing> k=v …: change facts on a thing you made (leaders: any in their group). k= with nothing "
-            "after it takes a fact away."),
+            "after it takes a fact away. Grants may narrow writes with only=\"thing:<id>;fields:hat,coat\"; "
+            "the same scope checks every fact restored by undo."),
     _k("forget", "do", "<id>", "maker or leaders", "yes",
        help="forget <thing>: take a thing out of every view. It is never erased: undo brings it back."),
     _k("claim", "do", "<id> [phone=<v>]", "members", "yes", once="per person per target",
@@ -363,6 +365,9 @@ def undo(k, actor, st, entry, tx, group, saw=None):
         raise Refused(f"r{seq} is {_whose(k, rec)}; you may undo your own acts, leaders the acts in their groups, "
                       f"stewards any")
     facts = [f for part in rec["parts"] for f in part["facts"]]
+    for target in {f[0] for f in facts}:
+        k.reaches(actor, 'undo', k.state.get(target, 'kind'), target=target,
+                  fields=[f[1] for f in facts if f[0] == target])
     made = {f[0] for f in facts if f[1] == "kind" and f[2] == "0"}
     for f in facts:
         t, a = f[0], f[1]
@@ -480,7 +485,7 @@ def make(k, actor, st, entry, tx, group, saw=None):
 
 def set_(k, actor, st, entry, tx, group, saw=None):
     t = st.target
-    k.reaches(actor, "set", k.state.get(t, "kind"))
+    k.reaches(actor, "set", k.state.get(t, "kind"), target=t, fields=st.kv)
     if k.state.get(t, "kind") in RESERVED_KINDS:
         raise Refused(f"{t} is a {k.state.get(t, 'kind')}; set changes only things made with make")
     if not st.kv:

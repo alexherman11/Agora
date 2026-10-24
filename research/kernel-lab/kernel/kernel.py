@@ -651,15 +651,38 @@ class Kernel:
                           "text": str(text)[:500], "announced": True})
         return "ok"
 
-    def reaches(self, actor, word, kind):
-        """A module's grant may be narrowed to kinds (`only=kind:window,pin`): refuse its `word` on another kind."""
+    def reaches(self, actor, word, kind, target=None, fields=()):
+        """Conjunctive grant limits: kind:, thing:, fields: (set/undo only).
+        Each matching grant must independently admit the whole write; never
+        assemble a wider permission from pieces of separate grants.
+        """
         if actor.kind != "module":
             return
         fits = [g for g in self._grants_to(actor.module) if self._matches(self.state.get(g, "words"), word)]
         onlys = [str(self.state.get(g, "only") or "") for g in fits]
-        if fits and all(onlys) and not any(o.startswith("kind:") and kind in o[5:].split(",") for o in onlys):
+        def admits(only):
+            if not only:
+                return True
+            clauses = only.split(';')
+            for clause in clauses:
+                if clause.startswith('kind:'):
+                    if kind not in clause[5:].split(','):
+                        return False
+                elif clause.startswith('thing:'):
+                    if target != clause[6:]:
+                        return False
+                elif clause.startswith('fields:'):
+                    if word not in ('set', 'undo') or not fields or not set(fields) <= set(clause[7:].split(',')):
+                        return False
+                else:
+                    return False
+            return True
+        if fits and not any(admits(o) for o in onlys):
+            if all(o.startswith('kind:') and ';' not in o for o in onlys):
+                raise Refused(f"{self.name(actor.module)}'s grant for {word} reaches only "
+                              f"{', '.join(o[5:] for o in onlys)} things, not a {kind}; nothing was done")
             raise Refused(f"{self.name(actor.module)}'s grant for {word} reaches only "
-                          f"{', '.join(o[5:] for o in onlys)} things, not a {kind}; nothing was done")
+                          f"{', '.join(onlys)}; this {kind} write is outside that scope; nothing was done")
 
     def hello_for(self, mid):
         """What a module is told when it starts: who it is, what it may do, whose it is, and a folder of its own."""
