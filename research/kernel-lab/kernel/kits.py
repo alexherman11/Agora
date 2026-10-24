@@ -9,10 +9,10 @@ import re
 from .kernel import Refused
 
 FIELDS = {
-    "word": set("word aliases word_kind takes help may once sealed undo from bound steps fence status".split()),
+    "word": set("word aliases word_kind takes help may once sealed undo from bound steps steps_bound fence status".split()),
     "lens": set("name title text".split()),
     "style": set("name title text".split()),
-    "rule": set("name title on do off".split()),
+    "rule": set("name title on on_entry do do_bound off of_kind".split()),
     "kind": set("name title help fields".split()),
 }
 REF = re.compile(r"(?<![\w])([a-z]{2,4}\d+)(?![\w])")
@@ -40,9 +40,12 @@ def validate(bundle):
         a = d["facts"]
         if not isinstance(a, dict) or not isinstance(a.get("kind"), str) or a["kind"] not in FIELDS:
             bad()
-        if set(a) - FIELDS[a["kind"]] - {"kind"} or any(not isinstance(v, str) for v in a.values()):
+        allowed = FIELDS[a['kind']] | {'kind'} | ({f for f in a if re.fullmatch(r'(label|help)\.[a-z][a-z0-9-]*', f)}
+                                                  if a['kind'] == 'word' else set())
+        if set(a) - allowed or any(not isinstance(v, str) for v in a.values()):
             bad()
         if a["kind"] == "word":
+            from .dictionary import names as entry_names
             if not all(a.get(f) for f in ("word", "word_kind", "help", "from", "bound")):
                 bad()
             if a["from"] != "verb" and not re.fullmatch(r"module:[a-z][a-z0-9_-]*", a["from"]):
@@ -54,6 +57,11 @@ def validate(bundle):
             if any(not n or n != n.lower() or re.search(r"[\s;=]", n)
                    for n in (a["word"], a["bound"], *a.get("aliases", "").split())):
                 bad()
+            for name in entry_names(a) | {a['bound']}:
+                if not name or re.search(r'[\s;=$]', name):
+                    bad()
+                if '.' in name and not (a['from'].startswith('module:') and name.startswith(a['from'][7:] + '.')):
+                    raise Refused('dotted names belong to the implementing module')
         elif a["kind"] in ("lens", "style", "kind") and not a.get("name"):
             bad()
     if any(not isinstance(t, str) or not REF.fullmatch(t) or t in seen or not isinstance(w, str)
@@ -93,8 +101,17 @@ def kit(k, actor, st, entry, tx, group, saw=None):
                 if e not in chosen:
                     chosen.add(e)
                     pending.append(e)
-    definitions = [{"id": t, "facts": {f: v for f, v in k.state.things[t].items()
-                    if f == "kind" or f in FIELDS[k.state.get(t, "kind")]}} for t in sorted(chosen)]
+    definitions = []
+    for t in sorted(chosen):
+        a = k.state.things[t]
+        facts = {f: v for f, v in a.items() if (f == 'kind' or f in FIELDS[a['kind']]
+                 or f.startswith(('label.', 'help.'))) and f not in ('steps_bound', 'do_bound')}
+        # The portable executable lines carry entry ids themselves, so there is
+        # only one representation for a recipient to review or revise.
+        for field in ('steps', 'do'):
+            if a.get(field + '_bound'):
+                facts[field] = a[field + '_bound']
+        definitions.append({'id': t, 'facts': facts})
     kernel = {e: k.state.get(e, "bound") for e in k.entries() if k.state.get(e, "from") == "kernel"}
     used = set(REF.findall(json.dumps(definitions))) - chosen - {source}
     bundle = validate({"version": 1, "source": k.log.records[0]["digest"], "group": source,
@@ -129,7 +146,8 @@ def take(k, actor, st, entry, tx, group, saw=None):
     for d in bundle["definitions"]:
         a = d["facts"]
         if a["kind"] == "word":
-            for name in {a["word"], a["bound"]} | set(a.get("aliases", "").split()):
+            from .dictionary import names as entry_names
+            for name in entry_names(a) | {a['bound']}:
                 if name in names or k.find_entry(name, group):
                     raise Refused(f"{name} already answers here; take into another group")
                 names.add(name)
@@ -163,6 +181,8 @@ def rename(k, actor, st, entry, tx, group, saw=None):
     if not k.is_leader(actor.person, home):
         raise Refused("only leaders of the entry's own group may rename it")
     values = {f: st.kv[f].lower() for f in ("word", "aliases") if f in st.kv}
+    from .dictionary import check_names
+    check_names(k, t, values)
     if not values or any(not re.fullmatch(r"[^\s;=]+", n) for v in values.values() for n in v.split()):
         raise Refused("rename <entry> word=<name> aliases=\"<names>\"")
     if "word" in values and len(values["word"].split()) != 1:
@@ -172,6 +192,8 @@ def rename(k, actor, st, entry, tx, group, saw=None):
         if other and other != t:
             raise Refused(f"{n} already answers here")
     k.fence(actor, t, list(values), saw)
+    from .dictionary import bind_legacy
+    bind_legacy(k, tx)
     for f, v in values.items():
         tx.set(t, f, v)
     return {"text": "ok rename [r?] · the bound name still answers"}

@@ -1,16 +1,15 @@
 # Task board: literal world lines. No module, host patch or executable app code.
 # Say each non-comment physical line through /do. install.py skips existing definitions.
 make kind=kind name=taskboard-task help="Task board task"
-make kind=kind name=taskboard-event help="Task board event"
 make kind=kind name=taskboard-lane help="Task board lane"
 make kind=taskboard-lane name=Backlog order=0
 make kind=taskboard-lane name=Now order=1
 make kind=taskboard-lane name=Done order=2
-verb task-add takes="title=<text> to=<lane> who=<name> when=<date> source=<key> status=<text> text=<text>" steps="make kind=taskboard-task title=$title lane=$to who=$who when=$when source=$source source_status=$status text=$text seats=1" help="task.add title=\"A title\" to=Backlog who=Alex when=2026-10-24 source=local status=open text=\"Details\": add a card. Source status remains the imported status." as=entry; rename $entry word=task.add
-verb task-move takes="<id> to=<lane>" steps="set $1 lane=$to; make kind=taskboard-event about=$1 text=$to" help="task.move <task> to=Backlog|Now|Done: move a card. Look first when typing. One act records the move and its authored trail; undo reverses both." as=entry; rename $entry word=task.move
-verb task-assign takes="<id> who=<name>" steps="set $1 who=$who; make kind=taskboard-event about=$1 text=$who" help="task.assign <task> who=<name>: assign the work. Look first. The history thing is authored by the real caller." as=entry; rename $entry word=task.assign
-verb task-done takes="<id>" steps="set $1 lane=Done; make kind=taskboard-event about=$1 text=\"Moved to Done\"" help="task.done <task>: finish the card, recording the move and history in one undoable act." as=entry; rename $entry word=task.done
-verb task-note takes="<id> text=<text>" steps="make kind=taskboard-event about=$1 text=$text" help="task.note <task> text=\"A note\": add an authored, recorded history note. Undo takes it back." as=entry; rename $entry word=task.note
+verb task-add takes="title=<text> to=<lane> who=<name> when=<date> source=<key> status=<text> text=<text>" steps="make kind=taskboard-task title=$title lane=$to who=$who when=$when source=$source source_status=$status text=$text seats=1" help="task-add title=\"A title\" to=Backlog who=Alex when=2026-10-24 source=local status=open text=\"Details\": add a card. Source status remains the imported status."
+verb task-move takes="<id> to=<lane>" steps="set $1 lane=$to" help="task-move <task> to=Backlog|Now|Done: move a card. Look first when typing. History reads its record; undo reverses the move."
+verb task-assign takes="<id> who=<name>" steps="set $1 who=$who" help="task-assign <task> who=<name>: assign the work. Look first. History reads the actual record."
+verb task-done takes="<id>" steps="set $1 lane=Done" help="task-done <task>: finish the card in one undoable act. Its own happening triggers the board announcement rule."
+verb task-note takes="<id> text=<text>" steps="set $1 note=$text" help="task-note <task> text=\"A note\": record a note on the card. History keeps earlier notes. Undo takes it back."
 make kind=style name=taskboard text="token paper = #F5F3ED
 token card = #FFFFFF
 token ink = #263746
@@ -49,18 +48,18 @@ make kind=lens name=taskboard style=taskboard text="root : column, role sheet
   let now = count(tag:taskboard-task,prop:lane=Now)
   let done = count(tag:taskboard-task,prop:lane=Done)
   heading : text \"Task board\", role heading
-  hint : text \"Things + words + a view. Move cards with the lane buttons. History stays with the work.\", role meta
+  hint : text \"Drag cards between lanes. History stays with the work. Today: $today\", role meta
   toolbar : row, role tools
     undo : text \"Undo my last act\", role tool, on click do undo
-    add : text \"\", role tool, hint \"New task — type a title\", commit enter, on edit do task.add title=$value to=Backlog who=Alex when=\"Added here\" source=local status=open text=\"\"
+    add : text \"\", role tool, hint \"New task — type a title\", commit enter, on edit do task-add title=$value to=Backlog who=Alex when=$today source=local status=open text=\"\"
   board : row, grid 1fr 1fr 1fr, gap x2
-    backlog : column, role lane, on drop card do task.move $carried to=Backlog when=recorded
+    backlog : column, role lane, on drop card do task-move $carried to=Backlog
       heading : text \"Backlog · $backlog\", role lane.backlog
       cards : column, of tag:taskboard-task,prop:lane=Backlog as task, each card
-    now : column, role lane, on drop card do task.move $carried to=Now when=recorded
+    now : column, role lane, on drop card do task-move $carried to=Now
       heading : text \"Now · $now\", role lane.now
       cards : column, of tag:taskboard-task,prop:lane=Now as task, each card
-    done : column, role lane, on drop card do task.done $carried when=recorded
+    done : column, role lane, on drop card do task-done $carried
       heading : text \"Done · $done\", role lane.done
       cards : column, of tag:taskboard-task,prop:lane=Done as task, each card
 card : column, role card, carry
@@ -68,19 +67,18 @@ card : column, role card, carry
   who : text \"$who · $when\", role meta
   status : text \"Source status: $source_status\", role meta
   moves : row, role tools
-    backlog : text \"Backlog\", role tool, on click do task.move $item to=Backlog when=recorded
-    now : text \"Now\", role tool, on click do task.move $item to=Now when=recorded
-    done : text \"Done\", role tool, on click do task.done $item when=recorded
+    backlog : text \"Backlog\", role tool, on click do task-move $item to=Backlog
+    now : text \"Now\", role tool, on click do task-move $item to=Now
+    done : text \"Done\", role tool, on click do task-done $item
     take : text \"Take\", role tool, on click do claim $item
   details : column, fold \"Details\", role group
     prose : text \"$text\", role body
   history : column, fold \"History\", role group
-    created : text \"Created by $by · source $source_status\", role meta
-    trail : column, of tag:taskboard-event,prop:about=$task.id as event, each event
-  note : text \"\", role tool, hint \"Add a note…\", commit enter, on edit do task.note $item text=$value when=recorded
+    created : text \"Created $made_at by $by · changed $changed_at\", role meta
+    trail : column, of history:$task.id as event, each event
+  note : text \"\", role tool, hint \"Add a note…\", commit enter, on edit do task-note $item text=$value
 event : column, role event
-  action : text \"$text\", role body
-  by : text \"$by\", role meta
-  actor : text \"Claimed by $actor_title\", role meta, only when $actor != \"\"
+  action : text \"$word · $changes\", role body
+  by : text \"$by · $at\", role meta
 "
-make kind=rule name="Task board claim history" on=claim do="make kind=taskboard-event about=$target text=\"Work claimed\" actor=$by"
+make kind=rule name="Task board Done announcement" on=task-done of_kind=taskboard-task do="post \"Task completed\" about=$target"

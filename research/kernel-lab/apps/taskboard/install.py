@@ -93,8 +93,6 @@ def declarations():
 
 def install(door):
     made = skipped = 0
-    rename_available = door.request('/see', {'line': 'help rename'}).get('ok', False)
-    compatibility = not rename_available
     for line in declarations():
         if not line.strip() or line.lstrip().startswith('#'):
             continue
@@ -104,14 +102,8 @@ def install(door):
             bound = words[1]
             existing = door.rows('word', bound=bound)
             if existing:
-                if rename_available and existing[0]['word'] == bound:
-                    door.say('rename ' + existing[0]['id'] + ' word=' + bound.replace('task-', 'task.', 1))
-                    made += 1
-                    continue
                 skipped += 1
                 continue
-            if compatibility:
-                line = line.split('; rename $entry', 1)[0]
         else:
             facts = dict(w.split('=', 1) for w in words[1:] if '=' in w)
             if facts['kind'] == 'lens' and not door.rows('lens', name='taskboard'):
@@ -123,8 +115,6 @@ def install(door):
             if door.rows(facts['kind'], name=facts['name']):
                 skipped += 1
                 continue
-        if compatibility:
-            line = line.replace('task.', 'task-')
         # A stable press makes a lost response safe to retry, including across a restart.
         import hashlib
         door.say(line, press='taskboard-install-' + hashlib.sha256(line.encode()).hexdigest())

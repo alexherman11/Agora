@@ -21,6 +21,25 @@ def _k(word, kind, takes, may, undo, help, **more):
 from hosts.web.layout import HELP as PANE_HELP, panes, arrange
 
 KERNEL_ENTRIES = [
+    _k('language', 'do', '<code>', 'members', 'yes',
+       help='language <code>: choose your language (for example es). Help uses that label and help text '
+            'on each entry when supplied, with the original as fallback. Your agent uses your language too.'),
+    _k('word-set', 'do', '<id> [help=<text>] [aliases=<names>] [may=<who>] [undo=yes|no|external]', 'stewards', 'yes',
+       help='word-set <entry> help=… aliases="…" may=… undo=yes|no|external: steward edits to dictionary data. '
+            'Also takes takes=, once=, sealed=yes|no, status=live|old|hidden, label.<lang>= and help.<lang>=. '
+            'Translations label this same entry. Look first. Implementation cannot be edited.'),
+    _k('word-rename', 'do', '<id> to=<name>', 'stewards', 'yes',
+       help='word-rename <entry> to=<name>: a steward changes a name, keeping stored lines bound to its id. '
+            'Look first. Dotted names belong to the implementing module.'),
+    _k('history', 'see', '<id>', 'anyone', 'no',
+       help='history <thing>: its record trail, oldest first: record, at (UTC), by, word and changed facts. '
+            'Only facts you may see are returned; sealed acts never identify their author. '
+            'A lens repeats these same rows with of history:$task.id as event.'),
+    _k('rule', 'do', 'on=<word> [kind=<kind>] do=<line> [name=<text>]', 'members', 'yes',
+       help='rule on=<word> [kind=<target kind>] do="<line>" [name=<text>]: '
+            'make a rule, binding its words now. It runs as its maker when that word happens on that kind. '
+            '$target and $by are supplied at firing time. off=yes stops it. '
+            'make kind=rule on=<word> of_kind=<kind> do="…" says the same.'),
     *[_k(w, "see" if w == "panes" else "do", "[<words>]", "members", "no" if w == "panes" else "yes", help=h)
       for w, h in PANE_HELP.items()],
     _k("kit", "do", "<id> [name=<text>]", "leaders", "yes",
@@ -106,7 +125,8 @@ KERNEL_ENTRIES = [
 
 # aspects no line may write with make or set: what the kernel itself keeps, or derives
 RESERVED_KINDS = {"person", "agent", "module", "grant", "word", "invite", "world", "place", "group", "kit", "web-layout"}
-RESERVED = {"kind", "made_by", "for", "pinned", "forgotten", "sees", "lives", "from", "bound", "origin", "bundle"}
+RESERVED = {"kind", "made_by", "for", "pinned", "forgotten", "sees", "lives", "from", "bound", "origin", "bundle",
+            "made", "changed", "made_at", "changed_at", "steps_bound", "do_bound", "on_entry"}
 SEES_SAID = {"me", "leaders", "group", "place"}      # what `make … sees=` may say (section 7: it may narrow)
 RESERVED_PREFIX = ("in:", "like:", "member:", "answer:", "sees.", "vote:", "claim:", "contact:")
 
@@ -200,6 +220,7 @@ def look(k, actor, st, entry, tx, group, saw=None):
 
 
 def help_(k, actor, st, entry, tx, group, saw=None):
+    from .dictionary import localized
     if st.words:
         w = st.words.split()[0].lower()
         e = k.find_entry(w, group)
@@ -207,7 +228,10 @@ def help_(k, actor, st, entry, tx, group, saw=None):
             if w in FLOOR_HELP:
                 return {"text": f"{FLOOR_HELP[w]}\n(this word's entry is missing; the kernel answers from its own floor)"}
             raise Refused(f"nothing answers to '{w}' here; help lists the words you may use")
-        a = k.entry(e)
+        if k.shown(actor.person, e) is None:
+            raise k.no_such(e)
+        a = localized(k, actor.person, k.entry(e))
+        k.mark(actor, e, k.shown(actor.person, e))
         facts = [f"{a['word']} ({e}), a {a.get('word_kind')} word", f"takes: {a.get('takes') or 'nothing'}",
                  f"who may: {a.get('may')}"]
         for key in ("once", "sealed", "undo"):
@@ -221,7 +245,9 @@ def help_(k, actor, st, entry, tx, group, saw=None):
         return {"text": a.get("help", "") + "\n" + " · ".join(facts), "rows": [dict(a)]}
     mine, others = [], []
     for e in sorted(k.entries(), key=lambda e: k.state.get(e, "word")):
-        a = k.entry(e)
+        if k.shown(actor.person, e) is None:
+            continue
+        a = localized(k, actor.person, k.entry(e))
         line = f"  {a['word']} ({a.get('word_kind')}): {a.get('help', '').splitlines()[0]}"
         (mine if k.may(actor, a, None, group) else others).append((line, a))
     text = ["words you may use here:"] + [l for l, _ in mine]
@@ -396,6 +422,13 @@ def make(k, actor, st, entry, tx, group, saw=None):
         raise Refused("sees= says me, leaders, group or place: who besides the kernel may see it")
     _writable(k, kv)
     _conditions(k, kv, group)
+    if kind == 'rule':
+        from .dictionary import bind
+        eid = k.find_entry(kv.get('on', ''), group)
+        if not eid:
+            raise Refused('a rule needs on=<published word>')
+        kv['on_entry'] = eid
+        kv['do_bound'] = bind(k, kv.get('do', ''), group)
     t = tx.mint()
     tx.set(t, "kind", kind)
     for key, v in kv.items():
@@ -432,6 +465,17 @@ def set_(k, actor, st, entry, tx, group, saw=None):
         raise Refused("set needs k=v: set <thing> label=Feed")
     _writable(k, st.kv)
     _conditions(k, st.kv, group)
+    if k.state.get(t, 'kind') == 'rule':
+        from .dictionary import bind
+        values = dict(st.kv)
+        if 'on' in values:
+            eid = k.find_entry(values['on'], group)
+            if not eid:
+                raise Refused('a rule needs on=<published word>')
+            values['on_entry'] = eid
+        if 'do' in values:
+            values['do_bound'] = bind(k, values['do'], group)
+        st.kv = values
     k.fence(actor, t, list(st.kv), saw)
     for key, v in st.kv.items():
         if v != "":
@@ -570,6 +614,8 @@ def verb(k, actor, st, entry, tx, group, saw=None):
     if not all(t.strip() in MAY_WORDS for t in may.split(" or ")):
         raise Refused(f"may={may}: say anyone, members, leaders, stewards, maker or nobody, joined by or")
     e = tx.mint()
+    from .dictionary import bind
+    tx.set(e, 'steps_bound', bind(k, steps, group, w, e))
     for a, v in [("kind", "word"), ("word", w), ("word_kind", wk), ("takes", kv.get("takes", "[<words>]")),
                  ("help", help_), ("may", may), ("undo", "yes" if wk == "do" else "no"), ("from", "verb"),
                  ("bound", w), ("steps", steps), ("lives", group), ("made_by", actor.id)]:
@@ -619,9 +665,28 @@ def holds(k, actor, st, entry, tx, group, saw=None):
     return {"text": ("holds:\n" + text) if rows else "nothing is held", "rows": rows}
 
 
+def rule(k, actor, st, entry, tx, group, saw=None):
+    from .lines import Step
+    kv = dict(st.kv)
+    if 'kind' in kv:
+        kv['of_kind'] = kv.pop('kind')
+    kv['kind'] = 'rule'
+    return make(k, actor, Step(st.text, 'make', None, kv, ''), entry, tx, group, saw)
+
+
+def history(k, actor, st, entry, tx, group, saw=None):
+    rows = k.trail(actor.person, st.target)
+    k.mark(actor, st.target, k.shown(actor.person, st.target))
+    return {'text': '\n'.join(f"{r['record']} · {r['at']} · {r['by']} · {r['word']} · {r['changes']}" for r in rows),
+            'rows': rows}
+
+
+from .dictionary import word_set, word_rename, language
 from .kits import kit, take, rename, module
 
 KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module,
+          'word-set': word_set, 'word-rename': word_rename, 'history': history, 'rule': rule,
+          'language': language,
           **{w: panes if w == "panes" else arrange for w in PANE_HELP},
           "counts": counts, "test": test, "look": look, "help": help_, "post": post, "like": like, "pin": pin, "undo": undo, "off": off,
           "status": status, "make": make, "set": set_, "forget": forget, "holds": holds, "claim": claim,

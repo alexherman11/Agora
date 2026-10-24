@@ -40,7 +40,7 @@
       "number": 7,
       "check": "A Feed post arrives live in Council on the phone",
       "ok": true,
-      "detail": "sb44, ordinary post as Maya; no reload"
+      "detail": "sb49, ordinary post as Maya; no reload"
     },
     {
       "number": 8,
@@ -76,7 +76,7 @@
       "number": 13,
       "check": "Painted post maps to its one kernel thing",
       "ok": true,
-      "detail": "sb44 -> a352; shared data, no copies"
+      "detail": "sb49 -> a392; shared data, no copies"
     },
     {
       "number": 14,

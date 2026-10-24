@@ -419,7 +419,13 @@ class Kernel:
             out["claims"] = len(claims)
         if str(a.get("seats", "")).isdigit():
             out["seats_left"] = max(0, int(a["seats"]) - len(claims))
+        from .history import times
+        out.update(times(self, t))
         return out
+
+    def trail(self, reader, thing):
+        from .history import trail
+        return trail(self, reader, thing)
 
     def no_such(self, t):
         return Refused(f"no thing called {t} here; look shows what there is")
@@ -431,14 +437,17 @@ class Kernel:
     def find_entry(self, word, group=None):
         """The word's entry, nearest first from `group` (the line's), else None. Two at one level refuse."""
         word = word.lower()
+        if L.ID.fullmatch(word):
+            if self.state.get(word, 'kind') == 'word':
+                return word
+        from .dictionary import names
         levels = self.up(group or self.place)
         for said in ("named", "bound"):
             # a word is said by its entry's word or an alias; failing that, the bound name still answers, so a rename
             # never breaks a word that worked (DICTIONARY-ENTRY.md, Saying a word)
             for g in levels:
                 hits = [e for e in self.entries() if self.state.get(e, "lives") == g and (
-                        (said == "named" and (self.state.get(e, "word") == word or
-                                              word in (self.state.get(e, "aliases") or "").split()))
+                        (said == "named" and word.casefold() in names(self.state.things[e]))
                         or (said == "bound" and self.state.get(e, "bound") == word))]
                 if len(hits) > 1:
                     raise Refused(f"{word} has two entries in {self.name(g)}: {', '.join(hits)}; a steward should hide one")
@@ -480,7 +489,7 @@ class Kernel:
 
     def _may_person(self, person, entry, target, group, depth=0):
         word = entry["word"]
-        if word in FLOOR and self.is_steward(person):
+        if entry.get('from') == 'kernel' and entry.get('bound') in FLOOR and self.is_steward(person):
             return True
         for tok in (entry.get("may") or "nobody").split(" or "):
             tok = tok.strip()
@@ -554,7 +563,7 @@ class Kernel:
                 # a painted gesture: stale only if what it read, or what it writes, changed since it was painted
                 rev = int(s.get("rev", 0))
                 for a in set(aspects) | set(s.get("aspects") or []):
-                    names = [x for x in self.state.things.get(t, {}) if x.startswith(a[:-1])] if a.endswith("*") \
+                    names = [x for thing, x in self.state.history if thing == t and x.startswith(a[:-1])] if a.endswith("*") \
                         else [a]
                     last = max([self.state.last_seq(t, x) for x in names] + [0])
                     if last > rev:
@@ -575,6 +584,13 @@ class Kernel:
                 raise Refused(f"stale: {t} changed since you looked (r{last} by {who}); look {t} again")
 
     # ------------------------------------------------------------------ commit
+    def check_participants(self, actor, saw):
+        for t, s in (saw or {}).items():
+            if isinstance(s, dict) and s.get('participant'):
+                if self.shown(actor.person, t) is None:
+                    raise self.no_such(t)
+                self.fence(actor, t, s.get('aspects') or ['*'], saw)
+
     def _commit(self, tx, by, words, **extra):
         rec = {"at": self.now().strftime("%Y-%m-%dT%H:%M:%SZ"), "by": by, "words": words,
                "parts": tx.parts}
@@ -588,8 +604,16 @@ class Kernel:
                 # no target, a private note's words reached everyone who hears `make` (found 23 Oct)
                 made = [f[0] for f in p["facts"] if f[1] == "kind" and f[2] == "0"]
                 self._happen({"word": p["word"], "target": p.get("target") or (made[0] if made else None),
+                              "entry": p.get('entry') or self.find_entry(p['word']),
                               "made": made, "by": rec["by"], "for": rec.get("for"),
                               "text": p.get("words", ""), "record": rec["seq"]})
+        eid = rec.get('entry')
+        if self.state.get(eid, 'from') == 'verb' and not any(p.get('entry') == eid for p in rec['parts']):
+            made = [f[0] for p in rec['parts'] for f in p['facts'] if f[1] == 'kind' and f[2] == '0']
+            self._happen({'word': self.state.get(eid, 'word'), 'entry': eid,
+                          'target': L.parse(words).target or (made[0] if made else None),
+                          'made': made, 'by': rec['by'], 'for': rec.get('for'),
+                          'text': words, 'record': rec['seq']})
         with self.changed:
             self.changed.notify_all()                    # pages' streams wake on every record
         return rec
@@ -617,7 +641,8 @@ class Kernel:
                 return f"refused: {self.name(mid)} holds no grant to say {word}"
             if target is not None and target not in self.state.things:
                 target = None
-            self._happen({"word": word, "target": target, "by": mid, "text": str(text)[:500], "announced": True})
+            self._happen({"word": word, 'entry': self.find_entry(word), "target": target, "by": mid,
+                          "text": str(text)[:500], "announced": True})
         return "ok"
 
     def reaches(self, actor, word, kind):
@@ -751,13 +776,19 @@ class Kernel:
         if not st.word:
             raise Refused("an empty line; help lists the words you may use")
         with self.lock:
+            self.check_participants(actor, saw)
             group = st.kv.get("in") or None
             if group and self.state.get(group, "kind") not in ("place", "group"):
                 raise self.no_such(group)
             eid = self.find_entry(st.word, group)
+            if eid is None and st.word in FLOOR and self.is_steward(actor.person):
+                eid = next((e for e in self.things('word') if self.state.get(e, 'from') == 'kernel'
+                            and self.state.get(e, 'bound') == st.word), None)
             if eid is None:
                 raise Refused(f"nothing answers to '{st.word}' here; help lists the words you may use")
             entry = self.entry(eid)
+            st.word = entry['word']
+            text = L.re.sub(r'^\S+', st.word, text, count=1)
             takes = self.takes_id(entry.get("takes"))
             if st.target and takes is None:
                 st.words = (st.target + " " + st.words).strip()       # a word that takes no thing: an id is words
@@ -806,6 +837,7 @@ class Kernel:
         raise Refused(f"{st.word} is unbound: its entry says it comes from {src}, which this kernel does not run yet")
 
     def _commit_use(self, tx, actor, words, entry, press, saw, st):
+        self.check_participants(actor, saw)
         rec = self._commit_use_record(tx, actor, words, entry, press, saw, st)
         # your own act marks what it wrote as seen (the desk's rule): a thing it made, whole; a thing you had looked
         # at, the aspects it changed. A thing you never looked at stays unlooked.
@@ -820,6 +852,9 @@ class Kernel:
         return rec
 
     def _commit_use_record(self, tx, actor, words, entry, press, saw, st):
+        if entry.get('undo') == 'external' or any(
+                self.state.get(p.get('entry'), 'undo') == 'external' for p in tx.parts):
+            tx.extra['external'] = True
         undoes = tx.extra.get("undoes")
         if tx.extra.get("sealed_as"):
             # the undo of a sealed act is sealed too, or it would say who took their like back
@@ -862,7 +897,7 @@ class Kernel:
                     return args[int(key) - 1] if len(args) >= int(key) else ""
                 return shlex.quote(st.kv[key]) if key in st.kv else m[0]
             return L.re.sub(r"\$(target\b|[1-9]|\*|[a-z][a-z0-9_]*\b)", sub, x)
-        steps = [fill(x) for x in L.split_batch(entry.get("steps") or "") if x.strip()]
+        steps = [fill(x) for x in L.split_batch(entry.get('steps_bound') or entry.get("steps") or "") if x.strip()]
         self._local.verb_depth = depth + 1
         try:
             if entry.get("word_kind") == "see":
@@ -889,10 +924,6 @@ class Kernel:
                 kinds = [self.source(self.entry(e))[0] if e else None for e in
                          [self.find_entry(f.word if f.word != "do" else L.parse(x.strip()[2:]).word,
                                           f.kv.get("in") or group) for f, x in zip(firsts, steps)]]
-            if len(steps) == 1 and kinds[0] == "module":
-                # a one-step verb of a module's word is an alias for it (SHAPE: a room says `play` for media.play)
-                line = steps[0] + (f" in={group}" if "in" not in firsts[0].kv else "")
-                return self.step(actor, line, press=press, saw=saw, mode=mode)
             if "module" in kinds:
                 return self._verb_with_modules(actor, st, entry, group, text, steps, press, saw)
             with self.lock:
@@ -911,6 +942,8 @@ class Kernel:
                     if eid is None:
                         raise Refused(f"{entry['word']} stopped at '{x}': nothing answers to {s2.word}; nothing was done")
                     e = self.entry(eid)
+                    s2.word = e['word']
+                    x = L.re.sub(r'^\S+', s2.word, x, count=1)
                     if self.source(e)[0] != "kernel":
                         raise Refused(f"{entry['word']} stopped at '{x}': {s2.word} comes from {e.get('from')}, "
                                       f"which a verb note's steps can't run yet; nothing was done")
@@ -968,6 +1001,8 @@ class Kernel:
                 if eid is None:
                     raise stop(x, f"nothing answers to {s2.word}")
                 e = self.entry(eid)
+                s2.word = e['word']
+                x = L.re.sub(r'^\S+', s2.word, x, count=1)
                 if s2.target and self.takes_id(e.get("takes")) is None:
                     s2.words, s2.target = (s2.target + " " + s2.words).strip(), None
                 if s2.target and L.ID.match(s2.target):
@@ -984,6 +1019,8 @@ class Kernel:
                 self.guard(actor, e, s2)
                 src, name = self.source(e)
             if src == "module":
+                if len(steps) == 1:
+                    s2.kv.setdefault('in', g)  # a module alias retains the caller's group
                 mid = self.module_named(name)
                 if not mid or not self.state.get(mid, "on") or not self.modules or not self.modules.running(mid):
                     raise stop(x, f"{s2.word} is unbound: {name} is not running")
@@ -992,10 +1029,10 @@ class Kernel:
                 if ans.get("refused"):
                     raise stop(x, f"{name}: {ans['refused']}")
                 asked.append((mid, ans.get("use")))
-                if e.get("word_kind") == "see" or not (ans.get("lines") or ans.get("external")):
+                if e.get("word_kind") == "see" or not (ans.get("lines") or ans.get("external") or e.get('undo') == 'external'):
                     notes.append(ans.get("text", ""))
                     continue
-                if ans.get("external"):
+                if ans.get("external") or e.get('undo') == 'external':
                     external.append(name)
                     notes.append(f"{s2.word}: {ans.get('text') or 'done outside the world'}")
                     continue
@@ -1031,7 +1068,12 @@ class Kernel:
                 tx.extra["external"] = True
             if tx.empty:
                 tx.part(st.word, st.target, text)
-            rec = self._commit_use(tx, actor, text, entry, press, saw, st)
+                tx.parts[-1]['entry'] = entry['id']
+            # A one-step module alias keeps the module's authorship, while its
+            # own entry still holds undo/once/seal metadata and its happening.
+            author = Actor(asked[0][0], actor.person, 'module', module=asked[0][0], caller=actor) \
+                if len(steps) == 1 and asked else actor
+            rec = self._commit_use(tx, author, text, entry, press, saw, st)
         for mid, use in asked:
             self.modules.done(mid, use, {"ok": True, "record": f"r{rec['seq']}", "made": tx.made, "text": ""})
         body = "\n".join(n.replace("[r?]", f"[r{rec['seq']}]") for n in notes if n)
@@ -1058,7 +1100,11 @@ class Kernel:
     def _rule_wants(self, h):
         if getattr(self._local, "rule_depth", 0) >= self.RULE_DEPTH:
             return False                    # a rule's act may wake rules, three deep at most
-        return any(self.state.get(r, "on") == h.get("word") for r in self.things("rule"))
+        return any(self._rule_matches(self.state.things[r], h) for r in self.things('rule'))
+
+    def _rule_matches(self, r, h):
+        word = r.get('on_entry') == h.get('entry') if r.get('on_entry') else r.get('on') == h.get('word')
+        return word and (not r.get('of_kind') or self.state.get(h.get('target'), 'kind') == r['of_kind'])
 
     def _rule_loop(self):
         import queue as _q
@@ -1087,7 +1133,7 @@ class Kernel:
         the line runs as the maker ($target, $by filled), on the rules' own thread; its records say `rule`."""
         with self.lock:
             rules = [(r, dict(self.state.things[r])) for r in self.things("rule")
-                     if self.state.get(r, "on") == h.get("word") and not self.state.get(r, "forgotten")
+                     if self._rule_matches(self.state.things[r], h) and not self.state.get(r, "forgotten")
                      and str(self.state.get(r, "off") or "") not in ("yes", "True")
                      and (h.get("record") or 10 ** 12) > self.state.last_seq(r, "kind")]    # not its own making
         for rid, r in rules:
@@ -1098,7 +1144,7 @@ class Kernel:
                 if not self.may_hear(actor.person, h):
                     continue
             by = "" if h.get("by") == "sealed" else str(h.get("for") or h.get("by") or "")
-            line = str(r.get("do") or "").replace("$target", h.get("target") or "").replace("$by", by)
+            line = str(r.get('do_bound') or r.get("do") or "").replace("$target", h.get("target") or "").replace("$by", by)
             self._local.rule, self._local.rule_depth = rid, depth + 1
             try:
                 out = self.run(actor, line)
@@ -1121,7 +1167,7 @@ class Kernel:
                                 {"target": st.target, "words": st.words, "kv": st.kv}, caller=actor)
         if ans.get("refused"):
             raise Refused(f"{mname}: {ans['refused']}")
-        if entry.get("word_kind") == "do" and ans.get("external"):
+        if entry.get("word_kind") == "do" and (ans.get("external") or entry.get('undo') == 'external'):
             # it changed the outside world (a window opened), not the world: an act with its words and no facts,
             # which undo refuses (SHAPE section 11)
             with self.lock:

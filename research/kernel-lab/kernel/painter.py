@@ -10,9 +10,10 @@ The id map is fixed by the kernel's numbers, so it is the same for every build a
 A gesture comes back as a desk line (`do like a337`) with what it observed; both are translated back to kernel ids and
 kernel revs (a desk rev here IS the kernel rev), and the line runs as an ordinary kernel line with that as its `saw`.
 
-Not carried: a selection membership read in `observed` (the kernel fences things, not selections), the house's rows,
-promises, persons' props, comments and links (kernel things have none yet), and events (the World has none, so
-`by changed` and `age<` see nothing).
+The kernel adds a filtered history:<thing> row source and made/changed UTC props,
+and supplies $today. Carry/drop fills $carried and fences both painted participants.
+Not carried: selection membership fences, the house's rows, promises, comments,
+links and desk events (`by changed` and `age<` still have no desk event stream).
 """
 import hashlib
 import json
@@ -47,6 +48,11 @@ def desk_modules():
             finally:
                 sys.dont_write_bytecode = was
             _DESK.update(World=W.World, DeskKnife=DK.DeskKnife, scene=S, style=ST)
+            fields = ('record', 'at', 'by', 'word', 'changes', 'sealed')
+            S.SOURCES['history'] = ('history:<id>', fields)
+            S.SOURCE_FILES['history'] = {'arg': 'needed', 'open': False,
+                                         'rows': lambda desk, arg, session: desk.kernel_history(arg)}
+            S.SOURCE_FIELDS = tuple(dict.fromkeys((*S.SOURCE_FIELDS, *fields)))
     return _DESK
 
 
@@ -108,6 +114,13 @@ class Facade:
         for r in observed.get("reads") or []:
             if isinstance(r, list) and len(r) >= 2 and r[0] != "select":
                 note(r[0], r[1], r[2] if len(r) > 2 and isinstance(r[2], list) else ())
+        for participant in ('carried', 'receiver'):
+            for t, s in self.saw_of(observed.get(participant)).items():
+                if t not in saw:
+                    saw[t] = s
+                else:
+                    saw[t]['rev'] = min(saw[t]['rev'], s['rev'])
+                    saw[t]['aspects'] = list(set(saw[t]['aspects']) | set(s['aspects']))
         return saw
 
     # ------------------------------------------------------------------ the World
@@ -120,6 +133,12 @@ class Facade:
             w.nodes[w.root]["layout"] = "row"
             w.equal_share = False
             d = D["DeskKnife"](w, "lean")
+            w.today = d.today = k.now().date().isoformat()
+            def history(arg):
+                target = self.to_kernel(arg)
+                with k.lock:
+                    return k.trail(reader, target) if target else []
+            d.kernel_history = history
             d.batch, d.lean, d.read_cap, d.ids = True, True, 4, {}
             w.me = (k.name(reader) or "someone")
             groups = sorted((t for t in k.state.things if k.state.get(t, "kind") in ("place", "group")
@@ -160,6 +179,10 @@ class Facade:
                                                     (other.get("text") or "").split("\n")[0][:80])
                         continue
                     props[key] = v if isinstance(v, str) else json.dumps(v) if isinstance(v, (dict, list)) else str(v)
+                # $changed is the desk compiler's event frame, not a prop.
+                # Explicit timestamp names avoid that language collision.
+                props['made_at'] = a.get('made', '')
+                props['changed_at'] = a.get('changed', '')
                 for key in ("made_by", "pinned", "for"):
                     if a.get(key):
                         props[{"made_by": "by", "pinned": "pinned", "for": "for"}[key]] = k.name(a[key])
@@ -220,9 +243,35 @@ class Facade:
     def do(self, actor, body):
         """/api/do from a painted page: the gesture's line and what it observed, as a kernel line with its `saw`."""
         line = self.line_to_kernel(str(body.get("line") or ""))
-        observed = body.get("observed")
+        observed = body.get("observed") if isinstance(body.get('observed'), dict) else None
         saw = self.saw_of(observed) if observed else None
-        out = self.k.run(actor, line, press=body.get("gesture"), saw=saw)
+        from .kernel import Refused
+        try:
+            with self.k.lock:
+                if '$carried' in line:
+                    car = (observed or {}).get('carried') or {}
+                    if not isinstance(car, dict):
+                        raise Refused('a drop needs a carried observation')
+                    carried = self.to_kernel(car.get('item'))
+                    if not carried or carried not in (saw or {}):
+                        raise Refused('a drop needs the carried thing and its painted revision')
+                    line = re.sub(r'\$carried\b', carried, line)
+                for role in ('carried', 'receiver'):
+                    participant = (observed or {}).get(role) or {}
+                    if not isinstance(participant, dict):
+                        raise Refused('a drop needs painted participant observations')
+                    if not participant.get('item'):
+                        continue                 # an unbound root lane has no thing of its own
+                    t = self.to_kernel(participant['item'])
+                    if not t or self.k.shown(actor.person, t) is None:
+                        raise self.k.no_such(t)
+                    if t not in (saw or {}):
+                        raise Refused('a drop needs both participants painted revisions')
+                    saw[t]['participant'] = True
+                    self.k.fence(actor, t, saw[t]['aspects'] or ['*'], saw)
+            out = self.k.run(actor, line, press=body.get("gesture"), saw=saw)
+        except Refused as exc:
+            out = {'ok': False, 'text': 'refused: ' + str(exc)}
         return {"text": out["text"], "error": None if out["ok"] else out["text"], "line": line,
                 "events_total": len(self.k.log.records), "as": self.k.name(actor.id),
                 "created": out.get("made", []), "code": "kernel"}

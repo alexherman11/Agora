@@ -1,18 +1,18 @@
 {
   "first": {
-    "text": "refused: task.done needs a thing: task.done <task>: finish the card, recording the move and history in one undoable act.",
-    "error": "refused: task.done needs a thing: task.done <task>: finish the card, recording the move and history in one undoable act.",
-    "line": "do task.done $carried when=recorded",
-    "events_total": 27,
+    "text": "ok set tb52 [r23] \u00b7 lane=Done\n~ task-done, one act [r23]",
+    "error": null,
+    "line": "do task-done tb52",
+    "events_total": 23,
     "as": "Alex",
     "created": [],
     "code": "kernel"
   },
   "second": {
-    "text": "refused: task.move needs a thing: task.move <task> to=Backlog|Now|Done: move a card. Look first when typing. One act records the move and its authored trail; undo reverses both.",
-    "error": "refused: task.move needs a thing: task.move <task> to=Backlog|Now|Done: move a card. Look first when typing. One act records the move and its authored trail; undo reverses both.",
-    "line": "do task.move $carried to=Backlog when=recorded",
-    "events_total": 27,
+    "text": "refused: stale: tb52 changed since it was painted (lane, r23); nothing was done. The view will repaint.",
+    "error": "refused: stale: tb52 changed since it was painted (lane, r23); nothing was done. The view will repaint.",
+    "line": "do task-move tb52 to=Backlog",
+    "events_total": 24,
     "as": "agent for Alex",
     "created": [],
     "code": "kernel"
@@ -21,7 +21,7 @@
     {
       "session": "lens",
       "as": "alex",
-      "line": "do task.done $carried when=recorded",
+      "line": "do task-done $carried",
       "observed": {
         "item": null,
         "reads": [
@@ -34,8 +34,8 @@
             "select",
             "tag:taskboard-task,prop:lane=Now",
             [
-              "a376",
-              "a384"
+              "a408",
+              "a416"
             ]
           ],
           [
@@ -46,45 +46,45 @@
         ],
         "defpart": {
           "path": "root/board/done",
-          "hash": "1d0b8c6bef09",
+          "hash": "3b9e160dbba4",
           "lens": "taskboard",
-          "id": "s45"
+          "id": "s49"
         },
         "key": "root/board/done",
-        "at": 27,
+        "at": 22,
         "def": {
           "lens": "taskboard",
-          "id": "s45",
-          "rev": 20,
+          "id": "s49",
+          "rev": 14,
           "status": "current",
           "closure": [
             {
               "lens": "taskboard",
-              "id": "s45",
-              "rev": 20,
+              "id": "s49",
+              "rev": 14,
               "status": "current"
             }
           ],
-          "frame": "s45r20",
+          "frame": "s49r14",
           "compiler": "e4b660fa37df",
           "style": "b1835d4a5123",
           "style_name": "taskboard",
-          "style_rev": "s44r19"
+          "style_rev": "s48r13"
         },
         "carried": {
-          "item": "a384",
-          "rev": 24,
+          "item": "a416",
+          "rev": 19,
           "reads": [
             [
-              "a384",
-              24,
+              "a416",
+              19,
               [
                 "place"
               ]
             ],
             [
-              "s48",
-              24,
+              "s52",
+              19,
               [
                 "prop:lane",
                 "tags"
@@ -99,8 +99,8 @@
               "select",
               "tag:taskboard-task,prop:lane=Now",
               [
-                "a376",
-                "a384"
+                "a408",
+                "a416"
               ]
             ],
             [
@@ -113,11 +113,11 @@
             "path": "root/board/now/cards/card",
             "hash": "7951efa46281",
             "lens": "taskboard",
-            "id": "s45"
+            "id": "s49"
           },
           "bind": {
-            "subject": "s48",
-            "subject_rev": 24,
+            "subject": "s52",
+            "subject_rev": 19,
             "parent": "f1",
             "parent_rev": 1,
             "units": "px in parent"
@@ -135,8 +135,8 @@
               "select",
               "tag:taskboard-task,prop:lane=Now",
               [
-                "a376",
-                "a384"
+                "a408",
+                "a416"
               ]
             ],
             [
@@ -147,19 +147,19 @@
           ],
           "defpart": {
             "path": "root/board/done",
-            "hash": "1d0b8c6bef09",
+            "hash": "3b9e160dbba4",
             "lens": "taskboard",
-            "id": "s45"
+            "id": "s49"
           },
           "key": "root/board/done"
         }
       },
-      "gesture": "alex-mvmomos3-qyeew4c0"
+      "gesture": "alex-mvmpnt82-3zn7jpoe"
     },
     {
       "session": "lens",
       "as": "alex",
-      "line": "do task.move $carried to=Backlog when=recorded",
+      "line": "do task-move $carried to=Backlog",
       "observed": {
         "item": null,
         "reads": [
@@ -172,8 +172,8 @@
             "select",
             "tag:taskboard-task,prop:lane=Now",
             [
-              "a376",
-              "a384"
+              "a408",
+              "a416"
             ]
           ],
           [
@@ -184,45 +184,45 @@
         ],
         "defpart": {
           "path": "root/board/backlog",
-          "hash": "e0543956ddfc",
+          "hash": "8d9641595c14",
           "lens": "taskboard",
-          "id": "s45"
+          "id": "s49"
         },
         "key": "root/board/backlog",
-        "at": 27,
+        "at": 24,
         "def": {
           "lens": "taskboard",
-          "id": "s45",
-          "rev": 20,
+          "id": "s49",
+          "rev": 14,
           "status": "current",
           "closure": [
             {
               "lens": "taskboard",
-              "id": "s45",
-              "rev": 20,
+              "id": "s49",
+              "rev": 14,
               "status": "current"
             }
           ],
-          "frame": "s45r20",
+          "frame": "s49r14",
           "compiler": "e4b660fa37df",
           "style": "b1835d4a5123",
           "style_name": "taskboard",
-          "style_rev": "s44r19"
+          "style_rev": "s48r13"
         },
         "carried": {
-          "item": "a384",
-          "rev": 24,
+          "item": "a416",
+          "rev": 19,
           "reads": [
             [
-              "a384",
-              24,
+              "a416",
+              19,
               [
                 "place"
               ]
             ],
             [
-              "s48",
-              24,
+              "s52",
+              19,
               [
                 "prop:lane",
                 "tags"
@@ -237,8 +237,8 @@
               "select",
               "tag:taskboard-task,prop:lane=Now",
               [
-                "a376",
-                "a384"
+                "a408",
+                "a416"
               ]
             ],
             [
@@ -251,11 +251,11 @@
             "path": "root/board/now/cards/card",
             "hash": "7951efa46281",
             "lens": "taskboard",
-            "id": "s45"
+            "id": "s49"
           },
           "bind": {
-            "subject": "s48",
-            "subject_rev": 24,
+            "subject": "s52",
+            "subject_rev": 19,
             "parent": "f1",
             "parent_rev": 1,
             "units": "px in parent"
@@ -273,8 +273,8 @@
               "select",
               "tag:taskboard-task,prop:lane=Now",
               [
-                "a376",
-                "a384"
+                "a408",
+                "a416"
               ]
             ],
             [
@@ -285,32 +285,30 @@
           ],
           "defpart": {
             "path": "root/board/backlog",
-            "hash": "e0543956ddfc",
+            "hash": "8d9641595c14",
             "lens": "taskboard",
-            "id": "s45"
+            "id": "s49"
           },
           "key": "root/board/backlog"
         }
       },
-      "gesture": "alex-mvmomov0-3oslmaad"
+      "gesture": "alex-mvmpntan-9lz7s4qe"
     }
   ],
   "button": {
-    "text": "ok set tb48 [r28] \u00b7 lane=Done\nok make tb53 [r28] \u00b7 a taskboard-event\n~ task.done, one act [r28]",
+    "text": "ok set tb52 [r25] \u00b7 lane=Now\n~ task-move, one act [r25]",
     "error": null,
-    "line": "do task.done tb48 when=recorded",
-    "events_total": 28,
+    "line": "do task-move tb52 to=Now",
+    "events_total": 25,
     "as": "Alex",
-    "created": [
-      "tb53"
-    ],
+    "created": [],
     "code": "kernel"
   },
   "stale_button": {
-    "text": "refused: stale: tb48 changed since it was painted (lane, r28); nothing was done. The view will repaint.",
-    "error": "refused: stale: tb48 changed since it was painted (lane, r28); nothing was done. The view will repaint.",
-    "line": "do task.move tb48 to=Backlog when=recorded",
-    "events_total": 28,
+    "text": "refused: stale: tb52 changed since it was painted (lane, r25); nothing was done. The view will repaint.",
+    "error": "refused: stale: tb52 changed since it was painted (lane, r25); nothing was done. The view will repaint.",
+    "line": "do task-move tb52 to=Backlog",
+    "events_total": 25,
     "as": "agent for Alex",
     "created": [],
     "code": "kernel"

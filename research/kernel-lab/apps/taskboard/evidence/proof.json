@@ -3,7 +3,7 @@
     {
       "check": "App installed entirely through HTTP lines",
       "ok": true,
-      "detail": "14 declarations"
+      "detail": "13 declarations"
     },
     {
       "check": "Second install changes no facts or records",
@@ -11,27 +11,27 @@
       "detail": ""
     },
     {
-      "check": "Dictionary help: task.add",
+      "check": "Dictionary help: task-add",
       "ok": true,
       "detail": ""
     },
     {
-      "check": "Dictionary help: task.move",
+      "check": "Dictionary help: task-move",
       "ok": true,
       "detail": ""
     },
     {
-      "check": "Dictionary help: task.assign",
+      "check": "Dictionary help: task-assign",
       "ok": true,
       "detail": ""
     },
     {
-      "check": "Dictionary help: task.done",
+      "check": "Dictionary help: task-done",
       "ok": true,
       "detail": ""
     },
     {
-      "check": "Dictionary help: task.note",
+      "check": "Dictionary help: task-note",
       "ok": true,
       "detail": ""
     },
@@ -51,34 +51,39 @@
       "detail": ""
     },
     {
-      "check": "Native drag gap reproduced without any source patch",
+      "check": "Real pointer drag moves Now to Done",
       "ok": true,
-      "detail": "refused: task.done needs a thing: task.done <task>: finish the card, recording the move and history in one undoable act."
+      "detail": "ok set tb52 [r23] \u00b7 lane=Done\n~ task-done, one act [r23]"
     },
     {
-      "check": "Both unsupported drags leave the card unchanged",
+      "check": "Second simultaneous pointer drop is stale",
       "ok": true,
-      "detail": "refused: task.move needs a thing: task.move <task> to=Backlog|Now|Done: move a card. Look first when typing. One act records the move and its authored trail; undo reverses both."
+      "detail": "refused: stale: tb52 changed since it was painted (lane, r23); nothing was done. The view will repaint."
     },
     {
-      "check": "Lane button moves the card through lens.js",
+      "check": "Lane button still moves through lens.js",
       "ok": true,
-      "detail": "ok set tb48 [r28] \u00b7 lane=Done\nok make tb53 [r28] \u00b7 a taskboard-event\n~ task.done, one act [r28]"
+      "detail": "ok set tb52 [r25] \u00b7 lane=Now\n~ task-move, one act [r25]"
     },
     {
       "check": "Competing move from the old painted card is stale",
       "ok": true,
-      "detail": "refused: stale: tb48 changed since it was painted (lane, r28); nothing was done. The view will repaint."
+      "detail": "refused: stale: tb52 changed since it was painted (lane, r25); nothing was done. The view will repaint."
     },
     {
-      "check": "Undo moves card back and removes its history event",
+      "check": "Undo restores Done and its record stays in history",
       "ok": true,
       "detail": ""
     },
     {
-      "check": "History fold paints authored things from actual task records",
+      "check": "History fold paints raw records, direct edits and undo",
       "ok": true,
-      "detail": "4 events linked to their real records"
+      "detail": "10 rows linked to actual records"
+    },
+    {
+      "check": "Dates paint from the kernel clock and records",
+      "ok": true,
+      "detail": ""
     },
     {
       "check": "Hidden screenshot captured",
@@ -86,7 +91,12 @@
       "detail": ""
     },
     {
-      "check": "Claim rule adds real task history",
+      "check": "Done own-word rule announces in Feed",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Claim appears in the real record trail",
       "ok": true,
       "detail": ""
     },
@@ -96,9 +106,6 @@
       "detail": ""
     }
   ],
-  "records": 31,
-  "incomplete": [
-    "Native carry/drop seam",
-    "Raw record history row source"
-  ]
+  "records": 27,
+  "incomplete": []
 }
