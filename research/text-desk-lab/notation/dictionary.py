@@ -45,8 +45,19 @@ def split(text):
     return "\n".join(help_).rstrip(), {k: "\n".join(v).strip() for k, v in langs.items()}
 
 
-def _verb_takes(text):
+def doc_of(text):
+    """A verb note's # lines, without their marks: what it says of itself."""
+    return "\n".join(l.lstrip("#").strip() for l in str(text or "").splitlines() if l.strip().startswith("#"))
+
+
+def _verb_takes(text, doc=""):
+    """What a verb note takes: the placeholders its first # line names after its word (`lend <tool> <name>: ...`),
+    else its blanks ($1 $2 $*)."""
     import verbs
+    first = next((l for l in doc.splitlines() if l.strip()), "")
+    m = re.match(r"\S+\s+((?:[<\[][^:]*?))\s*:", first)
+    if m:
+        return m.group(1).strip()
     steps = " ".join(verbs._steps(text))
     nums = sorted({int(n) for n in re.findall(r"\$(\d)", steps)})
     out = [f"${n}" for n in range(1, (nums[-1] if nums else 0) + 1)]
@@ -67,13 +78,12 @@ class Entry:
         self.aliases = self.words[1:]
         self.kind = p.get("word") or ("do" if verb else "")
         self.help, self.langs = split(s.get("text"))
-        if verb:
-            self.help = "\n".join(l.lstrip("#").strip() for l in str(s.get("text") or "").splitlines()
-                                  if l.strip().startswith("#"))
-        self.takes = p.get("takes", _verb_takes(s.get("text") or "") if verb else "")
+        if verb:      # a verb note's help is its # lines; a `## es` line starts a translation, also of # lines
+            self.help, self.langs = doc_of(self.help), {k: doc_of(v) for k, v in self.langs.items()}
+        self.takes = p.get("takes", _verb_takes(s.get("text") or "", self.help) if verb else "")
         carried = verb and __import__("verbs").where(w, s)[0] == "actor"
         self.may = p.get("may") or (f"{__import__('verbs').where(w, s)[1]} (who carries it)" if carried else "anyone")
-        self.undo = p.get("undo") or ("yes" if verb else "")
+        self.undo = p.get("undo") or ("yes" if verb and self.kind not in ("see", "hear") else "")
         self.frm = p.get("from") or ("verb" if verb else "")
         self.bound = p.get("bound") or (self.sid if verb else self.word)
         self.status = p.get("status") or "live"          # recorded; the old desk neither hides nor retires a word

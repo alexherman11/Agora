@@ -21,6 +21,9 @@ Every word anyone can say has one entry: a kernel command, a module's dotted wor
 | **status** | `live`, `old` (still runs, says so) or `hidden` (not offered, still runs when bound) | prop `status=`, default `live`. Recorded; the old desk neither hides nor retires a word |
 | **once** | a limit per person: `per person per target`, `at most N per <day\|hour> per person [in <place>]` | prop `once=`. Recorded only: the kernel's |
 | **sealed** | `yes`: the world knows you used it, readers do not see how (a vote) | prop `sealed=`. Recorded only: the kernel's |
+| **where it lives** | the group or place the word is found in; lookup is nearest first (the line's group, the groups around it, the place) | where the note is placed: a verb note's room (or `on=`), the Dictionary for the house's words. The kernel says it outright as `lives` (no rooms there yet) |
+| **id** | the entry's own id, which never changes. Stored lines bind to it | the note's subject id (`s1712`); retitling, moving and re-propping keep it |
+| **fence** | `adds`: the word only adds (a like, a line in a chat), so it never makes anyone's later act on the same thing stale | prop `fence=adds`. Recorded only; frontier's fence knows chat appends on its own. Proposed by the kernel (its notes, below) |
 
 The four kinds are the design's (Four kinds of word):
 - **do**: an act. Signed, recorded, undoable unless it touched the outside world.
@@ -30,7 +33,7 @@ The four kinds are the design's (Four kinds of word):
 
 ### The kernel's implementation field
 
-The kernel (a13310, SHAPE.md Appendix B) reads one field, `implementation`: `kernel:<name> | lines | module:<name>`. The old desk writes it as two props, because the home base's words predate dotted names and its word (`bring`) differs from the entry's (`home.bring`):
+SHAPE.md (a13310, Appendix B) names one field, `implementation`: `kernel:<name> | lines | module:<name>`. The format keeps it as two, `from` and `bound`, because a word and the name its code answers to can differ: the home base's `bring` is the entry `home.bring`, and a renamed module word must still be asked for by its old name. The kernel's skeleton found the same and now reads both (its notes, below). The mapping:
 
 | implementation | from= | bound= |
 |---|---|---|
@@ -41,12 +44,12 @@ The kernel (a13310, SHAPE.md Appendix B) reads one field, `implementation`: `ker
 ## Where entries live
 
 - **Kernel and module words**: notes in the Dictionary, the binder with prop `role=help` (f1702 in frontier, which began as the Help binder, a1595), at any depth. A binder per source keeps it readable: Commands, Verbs, Home base words.
-- **Verb notes are their own entries**, where they live. A room's `tidy` and the house's `tidy` are two words in two places. One central entry could not say both, and a verb note already holds the word, its aliases (title) and its help (`#` lines). Its entry fields are props on the verb note itself; absent ones take the defaults below.
+- **Verb notes are their own entries**, where they live. A room's `tidy` and the house's `tidy` are two words in two places. One central entry could not say both, and a verb note already holds the word, its aliases (title) and its help (`#` lines). Its entry fields are props on the verb note itself; absent ones take the defaults below. A line `## es` in a verb note starts its Spanish help, more `#` lines; help names it and `read <verb> #es` prints it.
 - **Topics and nouns** (`rooms`, `blanks`, `ids`) are notes in the binder without `word=`. They are help, not words, and are not entries.
 
 Defaults, for an entry that leaves a field out:
 - kind: `do` for a verb note, otherwise none (the check names it);
-- takes: for a verb note, read from its blanks (`$1 $2 $*`);
+- takes: for a verb note, the placeholders its first `#` line names after its word (`# lend <tool> <name>: ...` takes `<tool> <name>`), else its blanks (`$1 $2 $*`);
 - may: `anyone` (a carried verb: its carrier);
 - undo: `yes` for a verb note (its steps are acts the house takes back);
 - from: `verb` for a verb note, otherwise none.
@@ -65,6 +68,7 @@ An entry that is not bound says **unbound** in `help` and `examine`, with the re
 
 - A word is said by any word of the entry's title. The bound name always answers too (the code's own word is the floor), so retitling `examine|x|ex` to `inspect|x|ex` makes `inspect` the shown word and keeps `examine` working for every line already written.
 - A word the code answers to itself is never taken by an alias of another entry. The check names the clash.
+- **The floor.** The kernel's own words keep a floor that no edit removes: stewards can always `look`, `help`, `undo`, `off` and `grant`, and help falls back to what the code knows when an entry is missing or empty (a1595). An entry may narrow who may for everyone but stewards.
 - Dotted words come from modules; bare words come from the world or the kernel.
 
 ## Rules every entry keeps

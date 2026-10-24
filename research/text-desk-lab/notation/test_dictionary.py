@@ -113,10 +113,10 @@ try:
     words = {r["word"]: r for r in rs}
     check("2. rows dictionary lists the binder's entries and the house's verb notes, each bound",
           {"examine", "move", "tidy", "gather"} <= set(words) and words["tidy"]["from"] == "verb"
-          and words["tidy"]["takes"] == "$1" and all(r["bound"] == "yes" for r in rs), rs)
+          and words["tidy"]["takes"] == "<surface>" and all(r["bound"] == "yes" for r in rs), rs)
     t, e = one("pike", "help tidy")
     check("2. help tidy (a verb note): its entry line comes from the note itself, with defaults",
-          "entry: do · takes $1 · undo takes it back · who may: anyone · from a verb note, bound to its own lines" in t, t)
+          "entry: do · takes <surface> · undo takes it back · who may: anyone · from a verb note, bound to its own lines" in t, t)
 
     # ---- 3. aliases --------------------------------------------------------------------------------------------------
     t, e = one("juniper", f"inspect {R.BOARD}")
@@ -206,6 +206,56 @@ try:
     probs = helpnotes.check(D)
     check("9. a command with no entry is named, once the dictionary is on",
           any(p.startswith("no dictionary entry for look") for p in probs), probs)
+    # ---- 10. a lending shelf, built from help alone (as Claude built one in frontier, 23 Oct) -------------------------
+    out = reply("mica", f"look {R.HOME} :1", f'do create {R.HOME} kind=surface title="Tool shelf" layout=column',
+                "do prop $new role=room")
+    SHELF = W.last_created
+    made = reply("mica", f"go {SHELF}", f"do create {SHELF} kind=note title=Ladder text=\"6 m, from Maya's garage.\"",
+                 f"do create {SHELF} kind=note title=Drill text=\"Cordless, two batteries.\"",
+                 f'do create {SHELF} kind=note tags=verb on={SHELF} title=lend text="# lend <tool> <name>: lend a tool '
+                 f'on this shelf to a neighbour.\\ndo prop \\$1 lent_to=\\$2 lent_on=\\$today"',
+                 f'do create {SHELF} kind=note tags=verb on={SHELF} title=return text="# return <tool>: it is back.\\n'
+                 f'do prop \\$1 remove=lent_to,lent_on"',
+                 f'do create {SHELF} kind=note tags=verb on={SHELF} title=who-has text="# who-has: what is lent, to '
+                 f'whom.\\ntable prop:lent_to,in:\\$here cols=title,lent_to"',
+                 f'do create {SHELF} kind=note tags=verb on={SHELF} title=borrow text="# borrow <tool>: lend it to '
+                 f'yourself.\\nlend \\$1 \\$me"')
+    check("10. mica makes a shelf room, two tools and four verbs; borrow's stored line is bound to lend",
+          all(not e for _, _, e in made) and "lend → a" in made[-1][1], made[-1])
+    LEND = [a for a in W.nodes if W.nodes[a].get("subject") and W.subjects[W.nodes[a]["subject"]]["title"] == "lend"][0]
+    def props_of(aid):
+        return W.subjects[W.nodes[aid]["subject"]].get("props") or {}
+    LADDER = next(k["id"] for k in W.children(SHELF) if W.subjects.get(k.get("subject"), {}).get("title") == "Ladder")
+    rs = {r["word"]: r for r in scene.rows(D, "dictionary")}
+    check("10. the dictionary knows lend, and what it takes from its own first line", rs["lend"]["takes"] == "<tool> <name>"
+          and rs["borrow"]["takes"] == "<tool>", (rs.get("lend"), rs.get("borrow")))
+    t, e = one("mica", "lend Ladder maya")
+    t2, e2 = one("mica", "borrow Drill")
+    t3, e3 = one("mica", "who-has")
+    check("10. lend, borrow and who-has work together", props_of(LADDER).get("lent_to") == "maya"
+          and "Drill" in t3 and "maya" in t3 and "mica" in t3, (t, t2, t3))
+    out = reply("mica", f"read {LEND}", f'do retitle {LEND} title="loan|prestar"', f'do append {LEND} line="## es"',
+                f'do append {LEND} line="# prestar <herramienta> <nombre>: presta una herramienta a un vecino."')
+    check("10. mica renames lend to loan, adds prestar, and a Spanish help section, with no source edit",
+          all(not e for _, _, e in out), out)
+    reply("mica", "return Drill")
+    t, e = one("mica", "borrow Drill")
+    check("10. the old stored line still runs: borrow says lend, bound to the note, now loan",
+          not e and "(loan a" in t and "lent_to=mica" in t, (t, e))
+    t, e = one("mica", "prestar Ladder juniper")
+    check("10. prestar is loan", not e and "lent_to=juniper" in t, (t, e))
+    t, e = one("mica", "help prestar")
+    check("10. help prestar: the English help, the Spanish named, not printed among it",
+          "presta una herramienta" not in t and f"also in: es (read {LEND} #es)" in t and "lend <tool> <name>" in t, t)
+    t, e = one("mica", f"read {LEND} #es")
+    check("10. read <verb> #es prints the Spanish", "presta una herramienta" in t, t)
+    WHO = [a for a in W.nodes if W.nodes[a].get("subject") and W.subjects[W.nodes[a]["subject"]]["title"] == "who-has"][0]
+    reply("mica", f"read {WHO}", f"do prop {WHO} word=see")
+    t, e = one("mica", "help who-has")
+    check("10. who-has said word=see: a reading, nothing to undo", "entry: see · takes nothing · nothing to undo" in t, t)
+    t, e = one("mica", "lend Drill maya")
+    check("10. typed, the old word lend is gone (only stored lines keep it)", "lend" in t + e and not
+          "lent_to=maya" in t, (t, e))
 finally:
     d = witnessed._dir(D._session)
     if d is not None and d.parent.exists() and d.parent.name == D._session:

@@ -848,6 +848,9 @@ def describe(desk, s):
     steps = [l for l in _steps(s["text"])]
     import dictionary          # a13316: a verb note is its own dictionary entry
     e = dictionary.entry_of(desk, s["id"])
+    if e and e.langs:          # its help without its translations (## es), which are named instead
+        doc = [l for l in e.help.splitlines() if l.strip()] + [
+            "also in: " + ", ".join(f"{k} (read {e.aid} #{k})" for k in e.langs)]
     return (f"{' | '.join(_names(s['title']))}  (a verb in the world: {w.appearances_of(s['id'])[0]}, made by "
             f"{_author(w, s['id']) or '?'}, {home})\n"
             + (f"  entry: {dictionary.header(desk, e)}\n" if e else "")
