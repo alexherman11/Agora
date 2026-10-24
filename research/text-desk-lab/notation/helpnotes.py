@@ -62,9 +62,14 @@ def entries(w):
 def lookup(w):
     """-> {word: (subject, appearance id)}; the first note to name a word has it."""
     out = {}
-    for words, s, aid in entries(w):
+    found = entries(w)
+    for words, s, aid in found:
         for x in words:
             out.setdefault(x, (s, aid))
+    for words, s, aid in found:        # a13316: a renamed entry still answers to the code's word it is bound to
+        bound = str((s.get("props") or {}).get("bound") or "").lower()
+        if bound and (s.get("props") or {}).get("word"):
+            out.setdefault(bound, (s, aid))
     return out
 
 
@@ -297,6 +302,8 @@ def check(desk, only=None):
             ans = desk.cmd_help(word)
             if FALLBACK in ans:
                 say(s, f"{ref(s, aid)}: says help {word}, which help doesn't know")
+    import dictionary          # a13316: the entries among these notes (word=), and every kernel word has one
+    probs += dictionary.check(desk, only=only)
     return list(dict.fromkeys(probs))
 
 

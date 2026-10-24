@@ -1534,6 +1534,12 @@ class DeskKnife(DeskMoo):
         words = line.split(None, 1)
         cmd = words[0].lower()
         arg = words[1].strip() if len(words) > 1 else ""
+        if cmd not in helpnotes.commands():
+            import dictionary      # a13316: a word of a kernel command's dictionary entry (inspect|x|ex) is that command
+            to = dictionary.alias(self, cmd)
+            if to and to in helpnotes.commands():
+                cmd, words = to, [to] + words[1:]
+                line = " ".join(words)
         if arg and cmd not in ("do", "rule", "run", "script") and (blanks.ctx_of(self).template or cmd in blanks.READS):
             # words that name things (look $new, go $here); inside a verb or script, every command's words
             arg = blanks.fill(self, arg, quote=True)
@@ -1647,6 +1653,12 @@ class DeskKnife(DeskMoo):
             if len(argv) < 2:
                 raise Refusal("do needs: do <verb> <target> [k=v ...]")
             verb = argv[0].lower()
+            if verb not in self._builtin_verbs() and verb not in promises.VERBS + promises.HOUSE_VERBS:
+                import dictionary  # a13316: a word of a built-in verb's dictionary entry (do shift ...) is that verb
+                to = dictionary.alias(self, verb)
+                if to and to in self._builtin_verbs():
+                    verb, argv[0] = to, to
+                    arg = re.sub(r"^\s*\S+", to, arg, count=1)
             if verb in promises.VERBS + promises.HOUSE_VERBS:      # a1587: do accept a2001 is accept a2001
                 return self._promise_verb(verb, arg.split(None, 1)[1] if len(arg.split(None, 1)) > 1 else "")
             is_target = is_target_word      # a selection term is the target, = or not (Juniper; see SEL)
@@ -1743,7 +1755,7 @@ class DeskKnife(DeskMoo):
         # topic's answer first (a1308)
         noun = name not in cmds and name not in builtin and name != helpnotes.MANUAL and name not in helpnotes.topics(w)
         if note is not None and not noun:
-            return note
+            return self._entry_help(name, note)
         if name in cmds:
             return helpnotes.floor(self, name)
         if name in knife.PAIR_DOC:
@@ -1754,7 +1766,7 @@ class DeskKnife(DeskMoo):
             if made:
                 return "\n\n".join(verbs.describe(self, s) for s in made)
             if note is not None:
-                return note
+                return self._entry_help(name, note)
             try:
                 self._resolve(name)                           # help <thing> is examine <thing>
                 return self.cmd_examine(name)
@@ -1776,6 +1788,13 @@ class DeskKnife(DeskMoo):
         if name in moo.REGISTRY:
             return helpnotes.floor(self, name)
         return super().cmd_help(name)
+
+    def _entry_help(self, name, note):
+        """a13316: help <word> for a dictionary entry: its kind, what it takes, undo, who may, where it comes from and
+        whether it is bound, before its help (dictionary.help_text); any other note's text as it is."""
+        import dictionary
+        hit = helpnotes.lookup(self.world).get(name)
+        return dictionary.help_text(self, hit[0]["id"], note) if hit else note
 
     def _topics(self):
         cmds = set(self._commands()) | set(self.COMMAND_ALIAS)
@@ -1869,6 +1888,8 @@ class DeskKnife(DeskMoo):
                     out += self._rule_lines(r)
             import verbs
             out += verbs.binding_lines(w, ("s", s["id"]), s["text"])     # a1156: what its stored words are bound to
+            import dictionary
+            out += dictionary.card(self, s["id"])      # a13316: a dictionary entry says its kind, takes, undo, who may, from
             if s["kind"] == "chat":
                 pend = moo.unanswered(w, s["id"], str(w.me or "alex").lower())
                 out.append("  awaiting reply: " + " | ".join(pend) if pend else "  nothing awaiting a reply")

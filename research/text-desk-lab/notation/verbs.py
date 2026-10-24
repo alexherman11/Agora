@@ -271,16 +271,20 @@ def _world_word(desk, step):
         # a1587), not a world verb, so a stored line (a lens's Decline button) is bound as the desk's, as it runs
         import promises
         builtin = word in desk._builtin_verbs() or word in promises.VERBS + promises.HOUSE_VERBS
+        import dictionary      # a13316: a word of a built-in verb's entry is that verb, as the desk runs it
+        builtin = builtin or dictionary.alias(desk, word) in desk._builtin_verbs()
         return None if builtin else (word, argv[2:])
     word = argv[0].lstrip("@").lower()
-    return None if word in DESK_WORDS else (word, argv[1:])
+    import dictionary
+    return None if word in DESK_WORDS or dictionary.alias(desk, word) in DESK_WORDS else (word, argv[1:])
 
 
 def builtin_words(desk):
     """a1156 (4): the words the desk itself answers (its commands, its verbs and their synonyms). A world verb never
     takes one. The retired built-ins (tidy, reply, stack ...) are not among them since a990; on 9 Oct (step 6) they
     became verb notes of the house (houseverbs.py), so a room's tidy stands over the house's as any verb does."""
-    return set(desk._builtin_verbs()) | DESK_WORDS
+    import dictionary          # a13316: and the words of their dictionary entries (inspect|x|ex)
+    return set(desk._builtin_verbs()) | DESK_WORDS | set(dictionary.aliases(desk))
 
 
 def _desc(w, s):
@@ -842,8 +846,11 @@ def describe(desk, s):
             "room": f"at hand in {_room_name(w, val)}; from elsewhere, use {w.appearances_of(s['id'])[0]}"}[kind]
     doc = [l.lstrip("#").strip() for l in s["text"].splitlines() if l.strip().startswith("#")]
     steps = [l for l in _steps(s["text"])]
+    import dictionary          # a13316: a verb note is its own dictionary entry
+    e = dictionary.entry_of(desk, s["id"])
     return (f"{' | '.join(_names(s['title']))}  (a verb in the world: {w.appearances_of(s['id'])[0]}, made by "
             f"{_author(w, s['id']) or '?'}, {home})\n"
+            + (f"  entry: {dictionary.header(desk, e)}\n" if e else "")
             + ("".join(f"  {d}\n" for d in doc) if doc else "")
             + "  does:\n" + "".join(f"    {l}\n" for l in steps)
             + "".join(l + "\n" for l in binding_lines(w, ("s", s["id"]), s["text"]))
