@@ -65,7 +65,7 @@ def write(path, data):
 def update_manifest(path, fields):
     """Merge presentation metadata without racing a launch/cleanup receipt."""
     import os
-    if set(fields) - {"pid", "port", "url", "profile", "at", "viewport"}:
+    if set(fields) - {"pid", "port", "url", "profile", "at", "viewport", "local_paint_switches"}:
         raise ValueError("ownership metadata is not a presentation update")
     path = Path(path)
     lock = path.with_suffix(".cleanup-lock")
