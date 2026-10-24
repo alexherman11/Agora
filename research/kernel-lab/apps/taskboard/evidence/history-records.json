@@ -1,0 +1,297 @@
+[
+  {
+    "event": {
+      "kind": "taskboard-event",
+      "text": "Now",
+      "about": "tb48",
+      "made_by": "tb32",
+      "for": "tb2",
+      "by": "agent for Alex",
+      "id": "tb49",
+      "rev": 24
+    },
+    "record": {
+      "at": "2026-10-24T17:38:05Z",
+      "by": "tb32",
+      "words": "task.move tb48 to=Now when=2026-10-24",
+      "parts": [
+        {
+          "word": "set",
+          "target": "tb48",
+          "words": "set tb48 lane=Now",
+          "facts": [
+            [
+              "tb48",
+              "lane",
+              "ff3db2efd44b4f79",
+              "Now"
+            ]
+          ],
+          "entry": "tb27"
+        },
+        {
+          "word": "make",
+          "target": null,
+          "words": "make kind=taskboard-event about=tb48 text=Now",
+          "facts": [
+            [
+              "tb49",
+              "kind",
+              "0",
+              "taskboard-event"
+            ],
+            [
+              "tb49",
+              "text",
+              "0",
+              "Now"
+            ],
+            [
+              "tb49",
+              "about",
+              "0",
+              "tb48"
+            ],
+            [
+              "tb49",
+              "made_by",
+              "0",
+              "tb32"
+            ],
+            [
+              "tb49",
+              "for",
+              "0",
+              "tb2"
+            ],
+            [
+              "tb49",
+              "in:tb1",
+              "0",
+              24
+            ]
+          ],
+          "entry": "tb26"
+        }
+      ],
+      "entry": "tb40",
+      "for": "tb2",
+      "via": "agent",
+      "v": 1,
+      "seq": 24,
+      "prev": "da9270e89404cbd201f3bd7f",
+      "digest": "d45131a38f27765e9aad811e"
+    }
+  },
+  {
+    "event": {
+      "kind": "taskboard-event",
+      "text": "Now",
+      "about": "tb47",
+      "made_by": "tb2",
+      "by": "Alex",
+      "id": "tb50",
+      "rev": 25
+    },
+    "record": {
+      "at": "2026-10-24T17:38:05Z",
+      "by": "tb2",
+      "words": "task.move tb47 to=Now when=2026-10-24",
+      "parts": [
+        {
+          "word": "set",
+          "target": "tb47",
+          "words": "set tb47 lane=Now",
+          "facts": [
+            [
+              "tb47",
+              "lane",
+              "ff3db2efd44b4f79",
+              "Now"
+            ]
+          ],
+          "entry": "tb27"
+        },
+        {
+          "word": "make",
+          "target": null,
+          "words": "make kind=taskboard-event about=tb47 text=Now",
+          "facts": [
+            [
+              "tb50",
+              "kind",
+              "0",
+              "taskboard-event"
+            ],
+            [
+              "tb50",
+              "text",
+              "0",
+              "Now"
+            ],
+            [
+              "tb50",
+              "about",
+              "0",
+              "tb47"
+            ],
+            [
+              "tb50",
+              "made_by",
+              "0",
+              "tb2"
+            ],
+            [
+              "tb50",
+              "in:tb1",
+              "0",
+              25
+            ]
+          ],
+          "entry": "tb26"
+        }
+      ],
+      "entry": "tb40",
+      "v": 1,
+      "seq": 25,
+      "prev": "d45131a38f27765e9aad811e",
+      "digest": "55a2998808f03e2a1ba954e2"
+    }
+  },
+  {
+    "event": {
+      "kind": "taskboard-event",
+      "text": "Claude",
+      "about": "tb47",
+      "made_by": "tb2",
+      "by": "Alex",
+      "id": "tb51",
+      "rev": 26
+    },
+    "record": {
+      "at": "2026-10-24T17:38:05Z",
+      "by": "tb2",
+      "words": "task.assign tb47 who=Claude when=2026-10-24",
+      "parts": [
+        {
+          "word": "set",
+          "target": "tb47",
+          "words": "set tb47 who=Claude",
+          "facts": [
+            [
+              "tb47",
+              "who",
+              "4510a172d93e13e3",
+              "Claude"
+            ]
+          ],
+          "entry": "tb27"
+        },
+        {
+          "word": "make",
+          "target": null,
+          "words": "make kind=taskboard-event about=tb47 text=Claude",
+          "facts": [
+            [
+              "tb51",
+              "kind",
+              "0",
+              "taskboard-event"
+            ],
+            [
+              "tb51",
+              "text",
+              "0",
+              "Claude"
+            ],
+            [
+              "tb51",
+              "about",
+              "0",
+              "tb47"
+            ],
+            [
+              "tb51",
+              "made_by",
+              "0",
+              "tb2"
+            ],
+            [
+              "tb51",
+              "in:tb1",
+              "0",
+              26
+            ]
+          ],
+          "entry": "tb26"
+        }
+      ],
+      "entry": "tb41",
+      "v": 1,
+      "seq": 26,
+      "prev": "55a2998808f03e2a1ba954e2",
+      "digest": "ac0b1f192b000b8dcd381075"
+    }
+  },
+  {
+    "event": {
+      "kind": "taskboard-event",
+      "text": "Bring the latest agenda",
+      "about": "tb47",
+      "made_by": "tb2",
+      "by": "Alex",
+      "id": "tb52",
+      "rev": 27
+    },
+    "record": {
+      "at": "2026-10-24T17:38:05Z",
+      "by": "tb2",
+      "words": "task.note tb47 text=\"Bring the latest agenda\" when=2026-10-24",
+      "parts": [
+        {
+          "word": "make",
+          "target": null,
+          "words": "make kind=taskboard-event about=tb47 text='Bring the latest agenda'",
+          "facts": [
+            [
+              "tb52",
+              "kind",
+              "0",
+              "taskboard-event"
+            ],
+            [
+              "tb52",
+              "text",
+              "0",
+              "Bring the latest agenda"
+            ],
+            [
+              "tb52",
+              "about",
+              "0",
+              "tb47"
+            ],
+            [
+              "tb52",
+              "made_by",
+              "0",
+              "tb2"
+            ],
+            [
+              "tb52",
+              "in:tb1",
+              "0",
+              27
+            ]
+          ],
+          "entry": "tb26"
+        }
+      ],
+      "entry": "tb43",
+      "v": 1,
+      "seq": 27,
+      "prev": "ac0b1f192b000b8dcd381075",
+      "digest": "9589d97cf771154d261185f4"
+    }
+  }
+]

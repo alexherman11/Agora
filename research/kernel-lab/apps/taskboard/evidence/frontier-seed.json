@@ -1,0 +1,190 @@
+{
+  "read_at": "2026-10-24T17:28:29Z",
+  "epic": "a13308",
+  "tasks": [
+    {
+      "source": "a13310",
+      "title": "The kernel's first shape: built for many people, carrying the language",
+      "lane": "Now",
+      "who": "claude",
+      "status": "doing",
+      "text": "Explore and then build the smallest kernel that holds the design: a plain log as the store, persons with accounts, the dictionary at the centre, who may (checked when a word runs) and who sees (at every read), sealed authorship, and the door speaking lines in and rows out. Every act is a line. Decide what carries over from the desk (line language, receipts, the fence, undo, binding stored words, the lens compiler and painter) and what is left behind (the pickle, single machine, no auth). First the shape, written for Claude to approve; then a walking skeleton a person and an agent can both use."
+    },
+    {
+      "source": "a13313",
+      "title": "Signing in and the public site",
+      "lane": "Now",
+      "who": "claude",
+      "status": "doing",
+      "text": "Alex: a plain public site (mission, what we are doing, how to join) and a sign-in that is \"good quality\" and \"easy for people to use\": invite links (one per channel, freezable), Continue with Google or an emailed sign-in link, then a couple of questions that become the first facts on a person. Accounts are kept apart from persons: sign-in says who you are, and the kernel says what you may do. Test mode first. Real Google and email keys come from Alex's .env, never from us."
+    },
+    {
+      "source": "a13316",
+      "title": "One dictionary, tried first in the desk we live in",
+      "lane": "Now",
+      "who": "claude",
+      "status": "doing",
+      "text": "Before the kernel bakes it in, try the dictionary where agents already live. Every word (built-ins, verb notes, the home base's host verbs) gets one entry as a world note, with its kind (do, see, hear, hold), what it takes, help, who may, whether it undoes, and where it comes from. Names, aliases and help are editable without source; code only binds the implementation. Watch whether residents navigate by it. The entry format found here is the one the kernel takes.\nClaude, 23 Oct 18:30: built and live (8d3978f, docs 2f505d3; door swapped ok). Format: research/community-app/DICTIONARY-ENTRY.md, aligned with the kernel's Appendix B (a13310). The Help binder f1702 is the Dictionary: 154 entries (82 kernel, 53 verb notes as their own entries, 19 home base words); help and examine print each entry's kind, takes, undo, who may, from and bound or UNBOUND (showing, a8296, until a8138 lands); rows dictionary lists them; an alias added to a kernel entry's title runs at once. help dictionary explains. Rough spot a13518. Open: host-word aliases don't reach the home base; kernel aliases in stored lines aren't bound at save. Asked Pike once (a975) to find and use a word by it; result to follow here.\nClaude, 18:40, real use: asked once, Pike (a975) went help dictionary -> rows dictionary undo=no and found 8 words; it hurt that undo=external (the 19 home base words) is a second can't-undo value nothing pointed to. Fixed in the world, no source: the dictionary note now says ask rows dictionary undo!=yes kind!=see kind!=hear (27 words). Pike also used a word new to them (why) cleanly. Not mine, passed on: the table selection has no id: term. Ready for review by the epic's holder.\nClaude, 18:50: the realistic trial, as asked: a lending shelf (Tool shelf f13529: lend, return, who-has, borrow) built from help alone, used, then renamed loan|prestar with devolver, quien-tiene and examinar, no source edit; borrow's old stored line kept running (bound to the note's id). Two frictions fixed in source (3165466, door ok): verb-note translations, takes from the first # line. Write-up: research/community-app/dictionary-trial-oct23.md. Format now folds in the kernel's list (where it lives, id, fence, floor). Ideas on a13437."
+    },
+    {
+      "source": "a13328",
+      "title": "A server ready for 200 strangers",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "open",
+      "text": "The Oregon box (seabright.example.org) made safe and kept up: no password logins, a firewall, backups of the world's plain files, and a way back when something breaks. This touches Alex's rented machine, so each step is said before it is taken."
+    },
+    {
+      "source": "c13439",
+      "title": "Agents connect through an MCP adapter on the door with two tools, do and see",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "Agents connect through an MCP adapter on the door with two tools, do and see. Any neighbour's Claude or ChatGPT joins as their person, labelled. (Claude, from the kernel shape a13310)"
+    },
+    {
+      "source": "c13440",
+      "title": "When the may vocabulary is not enough, may becomes a see word that answers yes or no, written ",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "When the may vocabulary is not enough, may becomes a see word that answers yes or no, written like any other word, instead of growing more vocabulary. (kernel shape)"
+    },
+    {
+      "source": "c13441",
+      "title": "Feed ordering by bridging (Polis, Community Notes)",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "Feed ordering by bridging (Polis, Community Notes): surface what different clusters agree on. A later ordering, itself a view anyone can copy. (Claude, 23 Oct)"
+    },
+    {
+      "source": "c13442",
+      "title": "Dictionary entries carry translations",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "Dictionary entries carry translations. A Spanish-speaking neighbour sees every word, help and receipt in Spanish with no code. (Claude, 23 Oct)"
+    },
+    {
+      "source": "c13443",
+      "title": "Worn paths",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "Worn paths: when people keep pressing the same sequence, offer it back as a named verb with their name on it. (Community App draft, Reaching)"
+    },
+    {
+      "source": "c13444",
+      "title": "World tags (sb42) may need to lengthen once many communities meet",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "World tags (sb42) may need to lengthen once many communities meet. Collision refuses today. (kernel shape)"
+    },
+    {
+      "source": "c13445",
+      "title": "Stronger anonymity for votes",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "Stronger anonymity for votes: blind signatures or a separate tally holder, so even the host cannot unseal. (kernel shape, section 8)"
+    },
+    {
+      "source": "c13545",
+      "title": "Freeze and sweep",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "Freeze and sweep: when a leader freezes a flooded invite link, offer to pause everyone who came through it in the last hour, shown by name, each one restorable, and the kernel pauses their persons too. Freezing alone only stops new joins. (sign-in a13313: in the scripted evening, 14 bot accounts got in through the Instagram link before Alex saw them and froze it)"
+    },
+    {
+      "source": "c13546",
+      "title": "A flood alarm on each invite link",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "A flood alarm on each invite link: a link that suddenly admits many people in a few minutes holds new joins for a leader's yes and tells the leaders, instead of waiting for someone to notice. (sign-in a13313, the scripted evening's bot)"
+    },
+    {
+      "source": "c13547",
+      "title": "Sign in on the laptop by tapping on the phone",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "Sign in on the laptop by tapping on the phone: when the emailed link is opened on another device, the waiting laptop tab signs itself in once the phone approves. Today the phone says to type the code on the laptop, which works but asks more of people. (sign-in a13313, Maya's two devices in the scripted evening)"
+    },
+    {
+      "source": "c13548",
+      "title": "Event QR codes that are open only during the event (a start and an end time), so a photo of th",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "Event QR codes that are open only during the event (a start and an end time), so a photo of the flyer stops working after the meeting. (sign-in a13313, the flyer at the Galt Elementary meeting)"
+    },
+    {
+      "source": "c13552",
+      "title": "A renamed word keeps answering for a while, as status=old, saying its new name",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "A renamed word keeps answering for a while, as status=old, saying its new name: after lend became loan|prestar on the Tool shelf, typing lend said only unknown command. Stored lines were safe (bound to the id); a neighbour's habit was not. (Claude, lending shelf trial, a13316)"
+    },
+    {
+      "source": "c13553",
+      "title": "Host words through the dictionary",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "Host words through the dictionary: the lens compiler reads on click host <word> through the home base's entries, so a room can say play for media.play and a renamed module word keeps working in old lenses. Today an alias on a home base entry reaches help only. (Claude, a13316)"
+    },
+    {
+      "source": "c13554",
+      "title": "Kernel aliases bound at save",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "Kernel aliases bound at save: a stored line that says inspect (an alias on examine's entry) should bind to the entry's id when saved, as verb words are (a1156), so taking the alias away later cannot break it. The kernel plans this; the old desk does not do it. (Claude, a13316)"
+    },
+    {
+      "source": "c13575",
+      "title": "Windows remember intent",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "Windows remember intent: a window is a world thing (shows, lens, at, size), and the desktop host makes the screen match it, so undo of a close reopens the window where it was and a restart brings the desk back as you left it. The same thing on the website or phone could mean 'this pane is open'. (Claude, PROOF a13428)"
+    },
+    {
+      "source": "c13576",
+      "title": "Desktop pets as modules",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "Desktop pets as modules: the guy is about 400 lines and holds one surface. A kit of small creatures (a cat who sleeps on the window you have not touched in an hour, a bird that lands on whatever just changed) would be a friendly first module for a neighbour who wants to try building. (Claude, PROOF a13428)"
+    },
+    {
+      "source": "c13578",
+      "title": "A taskbar lens needs two rows the painter can read",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "A taskbar lens needs two rows the painter can read: the time (a clock source that ticks, with a 'moves' budget so only it repaints) and which window is in front. Then the whole taskbar is a lens anyone can restyle, and the page in kernel-desktop/pages/taskbar.html goes. (Claude, PROOF a13428)"
+    },
+    {
+      "source": "c13600",
+      "title": "Claude (kernel)",
+      "lane": "Backlog",
+      "who": "claude-kernel",
+      "status": "idea",
+      "text": "Claude (kernel): ideas from Council night. 1) Prose meets the line language: a post with ';' splits into two steps and an apostrophe opens a quote that never closes. A word that takes <words> could take the rest of the line. 2) Hours in a lens: the page can't know sign-up closed at 5:45, so the button stays and the press is refused. 3) 'open' does two things (everyone sees, and everyone counts as a member); maybe those are two words. 4) A feed wants newest first; 'by' sorts ascending only. 5) A module can't learn whether its answer was admitted (a done message). 6) Every phone's redraw rebuilds its world through the desk's compiler under one lock; at 30 phones that is the cost to watch."
+    },
+    {
+      "source": "c13617",
+      "title": "Found in the walkthrough, 24 Oct",
+      "lane": "Backlog",
+      "who": "claude",
+      "status": "idea",
+      "text": "Found in the walkthrough, 24 Oct: the new kernel has no word to edit a dictionary entry. set dk56 undo=external is refused ('set changes only things made with make'). So renaming, aliasing, re-helping or fixing a word's undo class needs source, which the design says it never should. Also media.next is marked undo: yes, but skipping a song is outside the world, so it should be external. Wanted: a word such as word.set <word> aliases= help= undo= may=, held by stewards. (Claude)"
+    }
+  ]
+}

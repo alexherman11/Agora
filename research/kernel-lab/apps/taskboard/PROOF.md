@@ -1,0 +1,61 @@
+# Task board, made of words
+
+Builder handoff for Claude's review, 24 October 2026. **Partial completion:** the useful board is installed and seeded; native dragging and a raw record-history fold need the shared capabilities in [NEEDS.md](NEEDS.md). No staging, commit, push, restart, source patch, module installation or model call was performed.
+
+**Read:** the live charter, AGENTS.md, SHAPE section 17, Council night, KITS, the desktop README and Communities and the Dictionary. These establish the ordinary authenticated door, verb notes, authored records, undo, lens.js and `window.open`. All files authored here are inside this app directory. World changes went through the explicitly requested live doors.
+
+## What is installed
+
+**Ran:** [install.lines](install.lines) contains **14 declarations**, **19 word statements**, **86 physical lines** (including comments and the multiline quoted view/style). The five verb notes use `rename` as a second statement. There are three kind declarations, three lane things, five helped verb notes, one style, one lens and one claim-history rule. [build_lines.py](build_lines.py) only serializes these definitions; it is not an app runtime. The app has no executable module or host code. The whole lines file can be said through a current kernel door; the installer reads its quoted multiline values without altering them.
+
+**Ran:** [install.py](install.py) uses Alex's existing session, without printing, copying or changing tokens. It first checks the desktop's current `keep/sessions.json` for `signer=alex`, with `keep/dev-sessions.json` as the older dev-entry fallback. It talks only to loopback HTTP and waits/retries connection failures. Stable definition names, bound word names, source keys and request receipts make a repeated install a no-op. An interrupted install resumes; it never overwrites existing task edits. The older live dictionary uses the bare-name fallback documented in NEEDS. The current scratch dictionary publishes the requested `task.*` names. The single-word lens address is `taskboard`, because the current window module loses quoted multiword view names; the visible heading/window name is `Task board`.
+
+**Ran:** the live Frontier door supplied the epic's open stories and the idea card's open comments. Four stories plus nineteen idea comments became **23 tasks: Backlog 20, Now 3, Done 0**. Original status, owner, source key and body are preserved. Story `doing` maps to Now; `open` and ideas map to Backlog. The import records when the snapshot was read. The ideas are copied as written, even where later work may have superseded them. [frontier-seed.json](evidence/frontier-seed.json) contains that snapshot. This is seeding, not bidirectional synchronization; rerunning adds newly encountered sources but preserves local task changes.
+
+## Scratch proof
+
+```powershell
+C:/Projects/Agora4/.venv/Scripts/python.exe research/kernel-lab/apps/taskboard/proof.py
+```
+
+**Imagined:** the meeting preparation and invitation tasks; the people/agent actions are scripted, with no model called. **Ran:** a fresh scratch kernel inside this app's ignored evidence directory, two authenticated actors sharing Alex's person (Alex and Builder, labelled `agent for Alex`), real parallel HTTP requests, and two isolated hidden Chrome pages painting the unchanged lens.js.
+
+**Ran, final run:** `19 of 19 checks passed`, exit 0. [proof.json](evidence/proof.json) lists them. **This count includes successful reproduction of unsupported drag behavior; it does not mean dragging passed.**
+
+| Check | Result |
+| --- | --- |
+| Install and repeat | 14 declarations installed; second install changes no facts or records |
+| Five requested names and help | `task.add`, `task.move`, `task.assign`, `task.done`, `task.note` are verb notes with help |
+| Alex and agent work together | Two parallel moves on different cards admitted |
+| Agent authorship | Move record carries `via=agent` and `for=Alex`; History paints `agent for Alex` |
+| Real pointer drags | Both refuse the unresolved carried identity; no card changes |
+| Existing gesture workaround | Real lane-button click moves to Done; competing old painted gesture refuses `stale` |
+| Undo | Card returns to Now and its same-transaction history event disappears |
+| History | Four visible event things matched to their actual task records, not fabricated prose history |
+| Rule | Claim creates a rule-authored history event identifying the actual claimer |
+| Persistence | Fresh Kernel replay equals the scratch state exactly |
+| Screenshot | Hidden 1380 × 920 screenshot captured and visually inspected |
+
+The actual drag and button receipts are in [drag-receipts.json](evidence/drag-receipts.json). [history-records.json](evidence/history-records.json) pairs each displayed history thing with its real record, timestamp, author and facts. The screenshot was visually checked for three lanes, readable cards, action controls, open History folds and the agent label.
+
+![Scratch board with recorded history](evidence/scratch-board.png)
+
+## Live result and limits
+
+**Ran:** live install resumed after the older dictionary refused `rename`, without restarting the desktop or altering its code. Read-only repeat verification printed:
+
+```text
+Live repeat: 0 definitions changed, 0 tasks added, 0 records added
+Live seed: 23 tasks · Backlog 20 · Now 3 · Done 0
+Live hidden painter screenshot: passed
+```
+
+The screenshot below is a **headless reading of the live board**, not a capture of the native WebView2 window. [live.json](evidence/live.json) holds the current verification and window receipt/state when available. Only the final board is requested through `window.open`; scratch windows never appear on Alex's screen. Its × closes it; the ordinary `window.close` word does too. The claim rule can be stopped with `off=yes` on its named rule thing. The install is ordinary world acts, individually undoable subject to later edits.
+
+**Ran:** `window.open taskboard` admitted the board's window intent, but `window.list` reported `shown=false`, `box=null`; six pre-existing desktop windows remained shown. One board-only close/reopen retry produced the same result. The final live verifier printed `Live desktop: open recorded; actual shown state unconfirmed`. **The native board is not confirmed visible.** No host restart, reload, focus change, or source fix was used to force it. The persisted window intent remains for the host to reconcile. See NEEDS item 7.
+
+![Live seeded board, hidden painter capture](evidence/live-board-headless.png)
+
+**Not done:** native drag movement and its requested stale-drag proof, raw record-trail rendering and live event timestamps, dotted names in the older live dictionary, confirmed native-window visibility, and a native-window screenshot. There is no Done-feed announcement; the working rule records claims instead. The board has working lane buttons and authored history as the constrained word-only workarounds.
+
+**What would change this assessment:** a kernel door that fills and fences native carry/drop, a permission-filtered record row source, and publication of the current dictionary-editing words into the desktop world. Those must be proved independently; a headless picture or a passing button test does not establish them.

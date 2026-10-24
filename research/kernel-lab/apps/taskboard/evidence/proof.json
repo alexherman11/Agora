@@ -1,0 +1,104 @@
+{
+  "checks": [
+    {
+      "check": "App installed entirely through HTTP lines",
+      "ok": true,
+      "detail": "14 declarations"
+    },
+    {
+      "check": "Second install changes no facts or records",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Dictionary help: task.add",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Dictionary help: task.move",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Dictionary help: task.assign",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Dictionary help: task.done",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Dictionary help: task.note",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Alex and agent work simultaneously",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Agent move has real authorship",
+      "ok": true,
+      "detail": "agent"
+    },
+    {
+      "check": "Three lanes paint through unchanged lens.js",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Native drag gap reproduced without any source patch",
+      "ok": true,
+      "detail": "refused: task.done needs a thing: task.done <task>: finish the card, recording the move and history in one undoable act."
+    },
+    {
+      "check": "Both unsupported drags leave the card unchanged",
+      "ok": true,
+      "detail": "refused: task.move needs a thing: task.move <task> to=Backlog|Now|Done: move a card. Look first when typing. One act records the move and its authored trail; undo reverses both."
+    },
+    {
+      "check": "Lane button moves the card through lens.js",
+      "ok": true,
+      "detail": "ok set tb48 [r28] \u00b7 lane=Done\nok make tb53 [r28] \u00b7 a taskboard-event\n~ task.done, one act [r28]"
+    },
+    {
+      "check": "Competing move from the old painted card is stale",
+      "ok": true,
+      "detail": "refused: stale: tb48 changed since it was painted (lane, r28); nothing was done. The view will repaint."
+    },
+    {
+      "check": "Undo moves card back and removes its history event",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "History fold paints authored things from actual task records",
+      "ok": true,
+      "detail": "4 events linked to their real records"
+    },
+    {
+      "check": "Hidden screenshot captured",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Claim rule adds real task history",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Scratch world replays exactly",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "records": 31,
+  "incomplete": [
+    "Native carry/drop seam",
+    "Raw record history row source"
+  ]
+}
