@@ -1,0 +1,32 @@
+[
+  {
+    "check": "Cards still show their authoritative titles",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "Focused-card priority shortcut writes the fact",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "Card menu remains available with its action set",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "Detail drawer reads real history",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "Multiline Markdown saves to authoritative facts",
+    "ok": false,
+    "detail": "timed out waiting"
+  },
+  {
+    "check": "Board proof completed",
+    "ok": false,
+    "detail": "!!document.querySelector(\"[data-task=\\\"dk105\\\"]\")\nNone\nA LITTLE SPACE FOR WHAT MATTERS\nTask board\nShared world\n\nA clear mind, one thing at a time.\n\n+\nN\nUndo\nAll tasks\nP1\nP2\nP3\nP4\nSummarize board\nBacklog\n14\n+\n\u2691\n\u00b7\u00b7\u00b7\nAsk the library about the projector\n\u2727 Summarized\nAL\n\u2691\n\u00b7\u00b7\u00b7\nCollect crossing questions\n\u2727 Summarized\nAL\n\u2691\n\u00b7\u00b7\u00b7\nConfirm the accessible entrance\nEvening notes\nWelcome every neighbour.\n- [ ] Bring tea\n\u2727 Summarized\nJE\n\u2691\n\u00b7\u00b7\u00b7\nPrepare tea and a quiet corner\n\u2727 Summarized\nJE\n\u2691\n\u00b7\u00b7\u00b7\nShare the bus timetable\n\u2727 Summarized\nJE\n\u2691\n\u00b7\u00b7\u00b7\nDraft follow-up for volunteers\n\u2727 Summarized\nJE\n\u2691\n\u00b7\u00b7\u00b7\nReview invitation wording\n\u2727 Summarized\nAL\n\u2691\n\u00b7\u00b7\u00b7\nCheck the microphone reaches the back row\n\u2727 Summarized\nAL\n\u2691\n\u00b7\u00b7\u00b7\nCheck "
+  }
+]

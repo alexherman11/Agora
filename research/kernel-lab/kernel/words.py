@@ -21,6 +21,12 @@ def _k(word, kind, takes, may, undo, help, **more):
 from hosts.web.layout import HELP as PANE_HELP, panes, arrange
 
 KERNEL_ENTRIES = [
+    _k('components', 'see', '[for="purpose"]', 'anyone', 'no',
+       help='components [for="a calendar of events"]: discover components grouped by category, with honest limits. help <component> reads its full typed card and example.'),
+    _k('component', 'do', '<id>', 'stewards', 'yes',
+       help='component <thing>: explicitly review the current inline JavaScript module bytes. A later code edit needs review again. Components share a painter page and its viewer-narrowed grants; this is trusted code.'),
+    _k('look-view', 'see', '<window or lens>', 'anyone', 'no',
+       help='look-view <window, widget or component lens>: fresh description, typed settings, rendered parts, visible facts, gesture lines and arrangement tree. No component code runs to produce this reading.'),
     _k('language', 'do', '<code>', 'members', 'yes',
        help='language <code>: choose your language (for example es). Help uses that label and help text '
             'on each entry when supplied, with the original as fallback. Your agent uses your language too.'),
@@ -136,7 +142,7 @@ KERNEL_ENTRIES = [
 # aspects no line may write with make or set: what the kernel itself keeps, or derives
 RESERVED_KINDS = {"person", "agent", "module", "grant", "word", "invite", "world", "place", "group", "kit", "web-layout"}
 RESERVED = {"kind", "made_by", "for", "pinned", "forgotten", "sees", "lives", "from", "bound", "origin", "bundle",
-            "made", "changed", "made_at", "changed_at", "steps_bound", "do_bound", "on_entry"}
+            "made", "changed", "made_at", "changed_at", "steps_bound", "do_bound", "on_entry", "reviewed_code"}
 SEES_SAID = {"me", "leaders", "group", "place"}      # what `make … sees=` may say (section 7: it may narrow)
 RESERVED_PREFIX = ("in:", "like:", "member:", "answer:", "sees.", "vote:", "claim:", "contact:")
 
@@ -238,6 +244,8 @@ def help_(k, actor, st, entry, tx, group, saw=None):
         w = st.words.split()[0].lower()
         e = k.find_entry(w, group)
         if e is None:
+            card = component_card(k, actor, w)
+            if card: return card
             if w in FLOOR_HELP:
                 return {"text": f"{FLOOR_HELP[w]}\n(this word's entry is missing; the kernel answers from its own floor)"}
             raise Refused(f"nothing answers to '{w}' here; help lists the words you may use")
@@ -711,8 +719,10 @@ def history(k, actor, st, entry, tx, group, saw=None):
 from .dictionary import word_set, word_rename, language
 from .kits import kit, take, rename, module, grant
 from .inpage import widget
+from painter.arrangement import component, look_view, components, component_card
 
 KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant": grant, "widget": widget, "describe": describe,
+          'component': component, 'look-view': look_view, 'components': components,
           'word-set': word_set, 'word-rename': word_rename, 'history': history, 'rule': rule,
           'language': language,
           **{w: panes if w == "panes" else arrange for w in PANE_HELP},

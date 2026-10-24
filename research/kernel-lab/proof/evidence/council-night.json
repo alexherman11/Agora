@@ -4,7 +4,7 @@
   "ran": "every check, count and timing below",
   "imagined": "the people, their words, the agenda (modules/agenda/agenda-oct28.json) and the summaries; no model was called"
  },
- "when": "2026-10-24T20:02Z",
+ "when": "2026-10-24T21:41Z",
  "world": {
   "records": 144,
   "persons": 41,
@@ -13,7 +13,7 @@
    "agenda (Node)",
    "tally (Node)"
   ],
-  "things": 121
+  "things": 125
  },
  "checks": [
   {
@@ -34,7 +34,7 @@
   {
    "check": "twelve riders press for nine carpool seats at once",
    "ok": true,
-   "detail": "9 seats taken, 3 told the car is full: refused: sb104 is taken (3 seats, all claimed); look shows what is open"
+   "detail": "9 seats taken, 3 told the car is full: refused: sb107 is taken (3 seats, all claimed); look shows what is open"
   },
   {
    "check": "sixteen sign up at once for twelve two-minute slots",
@@ -44,7 +44,7 @@
   {
    "check": "once each: a second sign-up is refused",
    "ok": true,
-   "detail": "refused: you have already said claim on sb100; once each. undo takes yours back"
+   "detail": "refused: you have already said claim on sb104; once each. undo takes yours back"
   },
   {
    "check": "undo gives a slot back, and the next neighbour takes it",
@@ -54,7 +54,7 @@
   {
    "check": "sign-up closes at a time of day",
    "ok": true,
-   "detail": "refused: sign-up for sb100 closed at 2026-10-29T00:45Z (a seat was free)"
+   "detail": "refused: sign-up for sb104 closed at 2026-10-29T00:45Z (a seat was free)"
   },
   {
    "check": "speakers' phone numbers are seen only by leaders",
@@ -79,12 +79,12 @@
   {
    "check": "one vote each; undo lets a neighbour change theirs",
    "ok": true,
-   "detail": "a second vote: 'refused: you have already said vote on sb113; once each. undo takes yours back'; Maya changed hers; still 40 votes"
+   "detail": "a second vote: 'refused: you have already said vote on sb117; once each. undo takes yours back'; Maya changed hers; still 40 votes"
   },
   {
    "check": "two leaders press Next at once: the meeting moves one item",
    "ok": true,
-   "detail": "one moved it; the other: 'refused: stale: sb97 changed since it was painted (now, r140); nothing was done. The view will repaint.'"
+   "detail": "one moved it; the other: 'refused: stale: sb101 changed since it was painted (now, r140); nothing was done. The view will repaint.'"
   },
   {
    "check": "a neighbour's Next is refused",
@@ -99,7 +99,7 @@
   {
    "check": "thirty phones follow every 'now speaking'",
    "ok": true,
-   "detail": "5 moves × 30 phones; seen within p50 229.4 ms, p95 432.9 ms, max 476.4 ms; 0 missed"
+   "detail": "5 moves × 30 phones; seen within p50 229.2 ms, p95 428.3 ms, max 482.0 ms; 0 missed"
   },
   {
    "check": "the outcome is a pinned announcement, with the staff report linked",
@@ -126,134 +126,134 @@
  "of": 21,
  "timing_ms": {
   "acts": 114,
-  "act_p50": 21.6,
-  "act_p95": 131.9,
-  "typed_p50": 22.7,
-  "pressed_p50": 19.7,
-  "follow_p50": 229.4,
-  "follow_p95": 432.9,
-  "phone_redraws": 378,
-  "whole_run_s": 13.5
+  "act_p50": 19.0,
+  "act_p95": 126.9,
+  "typed_p50": 19.3,
+  "pressed_p50": 18.5,
+  "follow_p50": 229.2,
+  "follow_p95": 428.3,
+  "phone_redraws": 390,
+  "whole_run_s": 13.2
  },
  "refused_acts": [
   {
    "who": "Maya",
    "how": "typed",
-   "line": "agenda.load in=sb41",
+   "line": "agenda.load in=sb45",
    "ok": false,
-   "ms": 3.9,
+   "ms": 2.9,
    "said": "refused: agenda.load is for leaders of Council watch; help agenda.load says more"
-  },
-  {
-   "who": "Luis",
-   "how": "pressed",
-   "line": "do claim a832",
-   "ok": false,
-   "ms": 24.1,
-   "said": "refused: sb104 is taken (3 seats, all claimed); look shows what is open"
-  },
-  {
-   "who": "Otto",
-   "how": "pressed",
-   "line": "do claim a824",
-   "ok": false,
-   "ms": 22.5,
-   "said": "refused: sb103 is taken (3 seats, all claimed); look shows what is open"
   },
   {
    "who": "Mei",
    "how": "pressed",
-   "line": "do claim a840",
+   "line": "do claim a872",
    "ok": false,
-   "ms": 23.8,
-   "said": "refused: sb105 is taken (3 seats, all claimed); look shows what is open"
+   "ms": 24.2,
+   "said": "refused: sb109 is taken (3 seats, all claimed); look shows what is open"
   },
   {
-   "who": "Hana",
+   "who": "Fern",
    "how": "pressed",
-   "line": "do claim a800",
+   "line": "do claim a856",
    "ok": false,
-   "ms": 3.3,
-   "said": "refused: sb100 is taken (12 seats, all claimed); look shows what is open"
+   "ms": 26.5,
+   "said": "refused: sb107 is taken (3 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Luis",
+   "how": "pressed",
+   "line": "do claim a864",
+   "ok": false,
+   "ms": 26.8,
+   "said": "refused: sb108 is taken (3 seats, all claimed); look shows what is open"
   },
   {
    "who": "Priya",
    "how": "pressed",
-   "line": "do claim a800",
+   "line": "do claim a832",
    "ok": false,
-   "ms": 2.7,
-   "said": "refused: sb100 is taken (12 seats, all claimed); look shows what is open"
+   "ms": 2.8,
+   "said": "refused: sb104 is taken (12 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Hana",
+   "how": "pressed",
+   "line": "do claim a832",
+   "ok": false,
+   "ms": 2.4,
+   "said": "refused: sb104 is taken (12 seats, all claimed); look shows what is open"
   },
   {
    "who": "Nora",
    "how": "pressed",
-   "line": "do claim a800",
+   "line": "do claim a832",
    "ok": false,
-   "ms": 2.4,
-   "said": "refused: sb100 is taken (12 seats, all claimed); look shows what is open"
+   "ms": 2.3,
+   "said": "refused: sb104 is taken (12 seats, all claimed); look shows what is open"
   },
   {
    "who": "Kiko",
    "how": "pressed",
-   "line": "do claim a800",
+   "line": "do claim a832",
    "ok": false,
    "ms": 1.8,
-   "said": "refused: sb100 is taken (12 seats, all claimed); look shows what is open"
+   "said": "refused: sb104 is taken (12 seats, all claimed); look shows what is open"
   },
   {
    "who": "Maya",
    "how": "typed",
-   "line": "claim sb100",
+   "line": "claim sb104",
    "ok": false,
-   "ms": 2.6,
-   "said": "refused: you have already said claim on sb100; once each. undo takes yours back"
+   "ms": 1.9,
+   "said": "refused: you have already said claim on sb104; once each. undo takes yours back"
   },
   {
    "who": "Hana",
    "how": "typed",
-   "line": "claim sb100",
+   "line": "claim sb104",
    "ok": false,
-   "ms": 2.7,
-   "said": "refused: sign-up for sb100 closed at 2026-10-29T00:45Z"
+   "ms": 2.8,
+   "said": "refused: sign-up for sb104 closed at 2026-10-29T00:45Z"
   },
   {
    "who": "Ruth",
    "how": "typed",
    "line": "post one more thing about parking",
    "ok": false,
-   "ms": 1.7,
+   "ms": 1.8,
    "said": "refused: you have said post 5 times today, the most it takes from one person in a day"
   },
   {
    "who": "Bea",
    "how": "typed",
-   "line": "vote sb113 no",
+   "line": "vote sb117 no",
    "ok": false,
-   "ms": 2.6,
-   "said": "refused: you have already said vote on sb113; once each. undo takes yours back"
+   "ms": 2.7,
+   "said": "refused: you have already said vote on sb117; once each. undo takes yours back"
   },
   {
-   "who": "Alex",
+   "who": "Dana",
    "how": "pressed",
-   "line": "do agenda.next a776",
+   "line": "do agenda.next a808",
    "ok": false,
-   "ms": 31.8,
-   "said": "refused: stale: sb97 changed since it was painted (now, r140); nothing was done. The view will repaint."
+   "ms": 16.0,
+   "said": "refused: stale: sb101 changed since it was painted (now, r140); nothing was done. The view will repaint."
   },
   {
    "who": "Ruth",
    "how": "pressed",
-   "line": "do agenda.next a776",
+   "line": "do agenda.next a808",
    "ok": false,
-   "ms": 2.1,
+   "ms": 2.2,
    "said": "refused: agenda.next is for leaders of Council watch; help agenda.next says more"
   },
   {
    "who": "Sam",
    "how": "typed",
-   "line": "pin sb120",
+   "line": "pin sb124",
    "ok": false,
-   "ms": 3.9,
+   "ms": 3.6,
    "said": "refused: pin is for leaders of Seabright; help pin says more"
   }
  ],

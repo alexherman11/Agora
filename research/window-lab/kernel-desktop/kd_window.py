@@ -405,7 +405,14 @@ class GuiScreen(Screen):
         if user32.IsIconic(h):
             user32.ShowWindow(h, SW_RESTORE)
         user32.SetForegroundWindow(h)
-        return "brought forward"
+        if user32.GetForegroundWindow() == h:
+            return "brought forward"
+        # Windows may refuse a background process keyboard focus. An explicit
+        # open can still raise its ordinary window without stealing that focus.
+        # Do not use topmost, synthetic input, or thread-input attachment.
+        if user32.SetWindowPos(h, None, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE):
+            return "raised without changing keyboard focus"
+        return "Windows did not bring this window forward"
 
     def minimize(self, wid):
         rec = self.wins.get(wid)

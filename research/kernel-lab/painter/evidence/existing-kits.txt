@@ -1,0 +1,49 @@
+founding: forty neighbours and three agents sign in (1 pm)
+  ok   forty people and three agents · 41 persons (Alex and 40 neighbours), 3 agents
+  ok   the agenda module brings the agenda in as one act · 1 record, 6 things, by the agenda module for Dana
+  ok   only a leader may load an agenda · refused: agenda.load is for leaders of Council watch; help agenda.load says more
+before: carpools and comment slots (3 pm to 5:50 pm)
+  ok   twelve riders press for nine carpool seats at once · 9 seats taken, 3 told the car is full: refused: sb109 is taken (3 seats, all claimed); look shows what is open
+  ok   sixteen sign up at once for twelve two-minute slots · 12 slots claimed, 4 told it is taken
+  ok   once each: a second sign-up is refused · refused: you have already said claim on sb104; once each. undo takes yours back
+  ok   undo gives a slot back, and the next neighbour takes it · Bea gave theirs back; Priya took it
+  ok   sign-up closes at a time of day · refused: sign-up for sb104 closed at 2026-10-29T00:45Z (a seat was free)
+  ok   speakers' phone numbers are seen only by leaders · absent from a neighbour's look and both of their pages; present in Dana's look and floor page
+  ok   the feed is a slow lane · refused: you have said post 5 times today, the most it takes from one person in a day
+during: thirty phones follow the meeting (6 pm)
+  ok   forty vote at once in a sealed pulse poll · yes 32 · no 8; 20 typed, 20 pressed
+  ok   no record and no view says who voted how · 40 vote records, all by 'sealed', none naming a voter
+  ok   one vote each; undo lets a neighbour change theirs · a second vote: 'refused: you have already said vote on sb117; once each. undo takes yours back'; Maya changed hers; still 40 votes
+  ok   two leaders press Next at once: the meeting moves one item · one moved it; the other: 'refused: stale: sb101 changed since it was painted (now, r140); nothing was done. The view will repaint.'
+  ok   a neighbour's Next is refused · refused: agenda.next is for leaders of Council watch; help agenda.next says more
+  ok   agents' summaries are labelled as agents · 7 summaries, each made by an agent for its person; the page says 'agent for Maya' on hers
+  ok   thirty phones follow every 'now speaking' · 5 moves × 30 phones; seen within p50 245.8 ms, p95 440.9 ms, max 481.2 ms; 0 missed
+after: the outcome, pinned (7:30 pm)
+  ok   the outcome is a pinned announcement, with the staff report linked · two records from one line (r142, r143); first in a neighbour's feed
+  ok   a neighbour may not pin · refused: pin is for leaders of Seabright; help pin says more
+  ok   the tally module (Node) reads the feed as Sam may see it · most liked:
+the whole: replay and timings
+  ok   replaying the log gives the same world · 144 records replayed
+21 of 21 checks passed · 144 records · acts p50 22.4 ms · evidence in C:\Users\Alex\AppData\Local\Temp\council-night-h439oeui\evidence\council-night.json
+01 ok Seabright runs the original Council night · original 21 checks, unchanged assertions
+02 ok one kit gathers every definition class · 11 definitions: ['kind', 'lens', 'rule', 'style', 'word']
+03 ok sharing a kit is ordinary posting · ordinary post points to the kit
+04 ok taking places new definitions in one act · 11 fresh wt things, one record
+05 ok no source people, posts, phones or votes crossed · 15 Watsonville people, zero imported posts/polls/claims/contacts
+06 ok every definition remembers its origin · source genesis digest and source definition id on every fresh copy
+07 ok agenda.load arrives unbound · agenda.load (wt66), a do word · takes: [<words>] [in=<group>] · who may: leaders · undo: yes · from: module:agenda · unbound: this community must grant and run the module
+08 ok agenda.next arrives unbound · agenda.next (wt67), a do word · takes: <id> · who may: leaders · undo: yes · from: module:agenda · unbound: this community must grant and run the module
+09 ok local rename and Spanish aliases leave Seabright alone · three local names; source snapshot unchanged
+10 ok a group leader cannot run a module · refused: module is for stewards; help module says more
+11 ok this community grants and runs its own module · local steward supplied executable and grants; none came from the kit
+12 ok Spanish alias loads Watsonville's own evening · new meeting and three items from Watsonville fixture
+13 ok fifteen neighbours sign up for twelve comment slots · 12 admitted, 3 full refusals
+14 ok fifteen sealed votes through the copied word · counts {'kind': 'poll', 'title': 'Ask for tenant protections?', 'options': 'yes no', 'made_by': 'wt45', 'in:wt44': 34, 'votes_yes': 11, 'votes_no': 4, 'votes': 15, 'made': '2026-11-03T22:00:00Z', 'changed': '2026-11-03T22:00:00Z'}, admitted 15, sealed records 15
+15 ok copied words retain once-each · refused: you have already said pulse on wt77; once each. undo takes yours back
+16 ok Watsonville pins its own outcome · local post pinned by Lucia
+17 ok the copied rule answers as its local maker · local acknowledgement rule read the local pinned outcome
+18 ok copied phone views paint local activity · existing council and floor lenses, unchanged text
+19 ok source remains independent after the evening · all source facts equal the snapshot before taking
+20 ok Seabright replay is identical · 153 records replayed, exact snapshot equality
+21 ok Watsonville replay is identical · 54 records replayed, exact snapshot equality
+21 of 21 checks passed

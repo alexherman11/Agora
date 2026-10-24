@@ -1,0 +1,134 @@
+{
+  "exit": 0,
+  "timed_out": false,
+  "seconds": 47.03,
+  "answer": "Updated `taskboard-components` (dk170) to show assignee initials in 28px circles: AA for Alex Anderson and JB for Jeff Builder.\n\nCode was necessary. Created and explicitly reviewed supporting component dk179 as Alex. All 25 cards use it; shared task facts and the other board remain unchanged.\n\nVerified the definition and bindings through `look-view`. Visual appearance could not be inspected with the available tools.",
+  "board": "A",
+  "number": 6,
+  "request": "Show the assignee's initials in a little circle on each card.",
+  "changes": [
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "code",
+      "category": "component code",
+      "lines": 39
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "category",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "example",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "for",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "gestures",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "in:dk1",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "kind",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "made_by",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "name",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "parts",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "purpose",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "reviewed_code",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "settings",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "slots",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "uses",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk170",
+      "kind": "lens",
+      "field": "text",
+      "category": "lens",
+      "lines": 2
+    }
+  ],
+  "lines": 55,
+  "landed": [
+    "component code",
+    "facts",
+    "lens"
+  ],
+  "success": true,
+  "board_proof": true,
+  "proof_passed": 11,
+  "proof_checks": 11,
+  "wall_seconds": 56.52
+}

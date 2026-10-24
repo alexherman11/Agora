@@ -78,7 +78,7 @@
     {
       "check": "Triage duration",
       "ok": true,
-      "detail": "6.0 seconds; requested 0.1 minutes"
+      "detail": "600.0 seconds; requested 10 minutes"
     },
     {
       "check": "Real quick-add typing keeps spaces and strips p2",
@@ -113,7 +113,7 @@
     {
       "check": "Pointer drag moves card to Done",
       "ok": true,
-      "detail": "ok set tv70 [r102] \u00b7 lane=Done\n~ task-move, one act [r102]"
+      "detail": "ok set tv74 [r102] \u00b7 lane=Done\n~ task-move, one act [r102]"
     },
     {
       "check": "Stale competing drag refuses without moving",
@@ -173,7 +173,7 @@
   ],
   "activity": [
     {
-      "seconds": 0.703,
+      "seconds": 0.64,
       "who": "Alex",
       "line": "summarize.add text=\"Fix the bar before the neighbourhood demo p1\"",
       "records": [
@@ -181,57 +181,75 @@
       ]
     },
     {
-      "seconds": 0.719,
+      "seconds": 0.703,
       "who": "Alex",
-      "line": "look tv70",
+      "line": "look tv74",
       "records": []
     },
     {
-      "seconds": 0.719,
+      "seconds": 0.703,
       "who": "Alex",
-      "line": "task-move tv70 to=Now",
+      "line": "task-move tv74 to=Now",
       "records": [
         "r34"
       ]
     },
     {
-      "seconds": 0.719,
+      "seconds": 0.718,
       "who": "Alex",
-      "line": "task-note tv70 text=\"## Evening notes\n\n**Welcome** every neighbour.\n\n- [ ] Check the entrance\n- [ ] Bring tea\n\nKeep the *original* details.\"",
+      "line": "task-note tv74 text=\"## Evening notes\n\n**Welcome** every neighbour.\n\n- [ ] Check the entrance\n- [ ] Bring tea\n\nKeep the *original* details.\"",
       "records": [
         "r35"
       ]
     },
     {
-      "seconds": 0.735,
+      "seconds": 0.718,
       "who": "Alex",
-      "line": "task-note-colour tv70 colour=sage",
+      "line": "task-note-colour tv74 colour=sage",
       "records": [
         "r36"
       ]
     },
     {
-      "seconds": 0.735,
+      "seconds": 0.734,
       "who": "Alex",
-      "line": "task-note-style tv70 style=strong",
+      "line": "task-note-style tv74 style=strong",
       "records": [
         "r37"
       ]
     },
     {
-      "seconds": 0.735,
+      "seconds": 0.734,
       "who": "Alex",
-      "line": "history tv70",
+      "line": "history tv74",
       "records": []
     },
     {
-      "seconds": 0.953,
+      "seconds": 5.734,
       "who": "Alex",
-      "line": "history tv70",
+      "line": "history tv74",
       "records": []
     },
     {
-      "seconds": 0.953,
+      "seconds": 10.734,
+      "who": "Alex",
+      "line": "history tv74",
+      "records": []
+    },
+    {
+      "seconds": 15.734,
+      "who": "Alex",
+      "line": "history tv74",
+      "records": []
+    },
+    {
+      "seconds": 20.734,
+      "who": "Alex",
+      "line": "history tv74",
+      "records": []
+    },
+    {
+      "seconds": 24.656,
       "who": "agent",
       "line": "summarize.add text=\"Confirm the venue and accessible entrance p2\"",
       "records": [
@@ -239,49 +257,67 @@
       ]
     },
     {
-      "seconds": 1.016,
+      "seconds": 24.718,
       "who": "agent",
-      "line": "look tv71",
+      "line": "look tv75",
       "records": []
     },
     {
-      "seconds": 1.016,
+      "seconds": 24.718,
       "who": "agent",
-      "line": "task-note tv71 text=\"## Evening notes\n\n**Welcome** every neighbour.\n\n- [ ] Check the entrance\n- [ ] Bring tea\n\nKeep the *original* details.\"",
+      "line": "task-note tv75 text=\"## Evening notes\n\n**Welcome** every neighbour.\n\n- [ ] Check the entrance\n- [ ] Bring tea\n\nKeep the *original* details.\"",
       "records": [
         "r40"
       ]
     },
     {
-      "seconds": 1.016,
+      "seconds": 24.718,
       "who": "agent",
-      "line": "task-note-colour tv71 colour=lilac",
+      "line": "task-note-colour tv75 colour=lilac",
       "records": [
         "r41"
       ]
     },
     {
-      "seconds": 1.016,
+      "seconds": 24.718,
       "who": "agent",
-      "line": "task-note-style tv71 style=slant",
+      "line": "task-note-style tv75 style=slant",
       "records": [
         "r42"
       ]
     },
     {
-      "seconds": 1.032,
+      "seconds": 24.718,
       "who": "agent",
-      "line": "history tv71",
+      "line": "history tv75",
       "records": []
     },
     {
-      "seconds": 1.172,
+      "seconds": 29.734,
       "who": "agent",
-      "line": "history tv71",
+      "line": "history tv75",
       "records": []
     },
     {
-      "seconds": 1.203,
+      "seconds": 34.734,
+      "who": "agent",
+      "line": "history tv75",
+      "records": []
+    },
+    {
+      "seconds": 39.734,
+      "who": "agent",
+      "line": "history tv75",
+      "records": []
+    },
+    {
+      "seconds": 44.734,
+      "who": "agent",
+      "line": "history tv75",
+      "records": []
+    },
+    {
+      "seconds": 48.656,
       "who": "Alex",
       "line": "summarize.add text=\"Review invitation wording with the organisers p3\"",
       "records": [
@@ -289,25 +325,43 @@
       ]
     },
     {
-      "seconds": 1.203,
+      "seconds": 48.718,
       "who": "Alex",
-      "line": "look tv72",
+      "line": "look tv76",
       "records": []
     },
     {
-      "seconds": 1.203,
+      "seconds": 48.718,
       "who": "Alex",
-      "line": "history tv72",
+      "line": "history tv76",
       "records": []
     },
     {
-      "seconds": 1.422,
+      "seconds": 53.718,
       "who": "Alex",
-      "line": "history tv72",
+      "line": "history tv76",
       "records": []
     },
     {
-      "seconds": 1.438,
+      "seconds": 58.718,
+      "who": "Alex",
+      "line": "history tv76",
+      "records": []
+    },
+    {
+      "seconds": 63.718,
+      "who": "Alex",
+      "line": "history tv76",
+      "records": []
+    },
+    {
+      "seconds": 68.718,
+      "who": "Alex",
+      "line": "history tv76",
+      "records": []
+    },
+    {
+      "seconds": 72.656,
       "who": "agent",
       "line": "summarize.add text=\"Print a large type version of the agenda p4\"",
       "records": [
@@ -315,27 +369,51 @@
       ]
     },
     {
-      "seconds": 1.5,
+      "seconds": 72.656,
       "who": "agent",
-      "line": "look tv73",
+      "line": "look tv77",
       "records": []
     },
     {
-      "seconds": 1.5,
+      "seconds": 72.672,
       "who": "agent",
-      "line": "task-move tv73 to=Now",
+      "line": "task-move tv77 to=Now",
       "records": [
         "r47"
       ]
     },
     {
-      "seconds": 1.5,
+      "seconds": 72.672,
       "who": "agent",
-      "line": "history tv73",
+      "line": "history tv77",
       "records": []
     },
     {
-      "seconds": 1.672,
+      "seconds": 77.672,
+      "who": "agent",
+      "line": "history tv77",
+      "records": []
+    },
+    {
+      "seconds": 82.672,
+      "who": "agent",
+      "line": "history tv77",
+      "records": []
+    },
+    {
+      "seconds": 87.672,
+      "who": "agent",
+      "line": "history tv77",
+      "records": []
+    },
+    {
+      "seconds": 92.672,
+      "who": "agent",
+      "line": "history tv77",
+      "records": []
+    },
+    {
+      "seconds": 96.656,
       "who": "Alex",
       "line": "summarize.add text=\"Ask the library about the projector p1\"",
       "records": [
@@ -343,19 +421,43 @@
       ]
     },
     {
-      "seconds": 1.735,
+      "seconds": 96.656,
       "who": "Alex",
-      "line": "look tv74",
+      "line": "look tv78",
       "records": []
     },
     {
-      "seconds": 1.735,
+      "seconds": 96.656,
       "who": "Alex",
-      "line": "history tv74",
+      "line": "history tv78",
       "records": []
     },
     {
-      "seconds": 1.907,
+      "seconds": 101.672,
+      "who": "Alex",
+      "line": "history tv78",
+      "records": []
+    },
+    {
+      "seconds": 106.672,
+      "who": "Alex",
+      "line": "history tv78",
+      "records": []
+    },
+    {
+      "seconds": 111.672,
+      "who": "Alex",
+      "line": "history tv78",
+      "records": []
+    },
+    {
+      "seconds": 116.672,
+      "who": "Alex",
+      "line": "history tv78",
+      "records": []
+    },
+    {
+      "seconds": 120.656,
       "who": "agent",
       "line": "summarize.add text=\"Prepare tea and a quiet corner p2\"",
       "records": [
@@ -363,19 +465,43 @@
       ]
     },
     {
-      "seconds": 1.969,
+      "seconds": 120.703,
       "who": "agent",
-      "line": "look tv75",
+      "line": "look tv79",
       "records": []
     },
     {
-      "seconds": 1.969,
+      "seconds": 120.703,
       "who": "agent",
-      "line": "history tv75",
+      "line": "history tv79",
       "records": []
     },
     {
-      "seconds": 2.157,
+      "seconds": 125.718,
+      "who": "agent",
+      "line": "history tv79",
+      "records": []
+    },
+    {
+      "seconds": 130.718,
+      "who": "agent",
+      "line": "history tv79",
+      "records": []
+    },
+    {
+      "seconds": 135.718,
+      "who": "agent",
+      "line": "history tv79",
+      "records": []
+    },
+    {
+      "seconds": 140.718,
+      "who": "agent",
+      "line": "history tv79",
+      "records": []
+    },
+    {
+      "seconds": 144.656,
       "who": "Alex",
       "line": "summarize.add text=\"Check that the microphone reaches the back row p3\"",
       "records": [
@@ -383,27 +509,51 @@
       ]
     },
     {
-      "seconds": 2.219,
+      "seconds": 144.703,
       "who": "Alex",
-      "line": "look tv76",
+      "line": "look tv80",
       "records": []
     },
     {
-      "seconds": 2.219,
+      "seconds": 144.718,
       "who": "Alex",
-      "line": "task-move tv76 to=Now",
+      "line": "task-move tv80 to=Now",
       "records": [
         "r54"
       ]
     },
     {
-      "seconds": 2.219,
+      "seconds": 144.718,
       "who": "Alex",
-      "line": "history tv76",
+      "line": "history tv80",
       "records": []
     },
     {
-      "seconds": 2.391,
+      "seconds": 149.734,
+      "who": "Alex",
+      "line": "history tv80",
+      "records": []
+    },
+    {
+      "seconds": 154.734,
+      "who": "Alex",
+      "line": "history tv80",
+      "records": []
+    },
+    {
+      "seconds": 159.734,
+      "who": "Alex",
+      "line": "history tv80",
+      "records": []
+    },
+    {
+      "seconds": 164.75,
+      "who": "Alex",
+      "line": "history tv80",
+      "records": []
+    },
+    {
+      "seconds": 168.64,
       "who": "agent",
       "line": "summarize.add text=\"Write a short welcome for newcomers p4\"",
       "records": [
@@ -411,19 +561,43 @@
       ]
     },
     {
-      "seconds": 2.453,
+      "seconds": 168.703,
       "who": "agent",
-      "line": "look tv77",
+      "line": "look tv81",
       "records": []
     },
     {
-      "seconds": 2.453,
+      "seconds": 168.703,
       "who": "agent",
-      "line": "history tv77",
+      "line": "history tv81",
       "records": []
     },
     {
-      "seconds": 2.625,
+      "seconds": 173.703,
+      "who": "agent",
+      "line": "history tv81",
+      "records": []
+    },
+    {
+      "seconds": 178.703,
+      "who": "agent",
+      "line": "history tv81",
+      "records": []
+    },
+    {
+      "seconds": 183.703,
+      "who": "agent",
+      "line": "history tv81",
+      "records": []
+    },
+    {
+      "seconds": 188.703,
+      "who": "agent",
+      "line": "history tv81",
+      "records": []
+    },
+    {
+      "seconds": 192.656,
       "who": "Alex",
       "line": "summarize.add text=\"Collect questions about the Seabright crossing p1\"",
       "records": [
@@ -431,25 +605,43 @@
       ]
     },
     {
-      "seconds": 2.688,
+      "seconds": 192.672,
       "who": "Alex",
-      "line": "look tv78",
+      "line": "look tv82",
       "records": []
     },
     {
-      "seconds": 2.688,
+      "seconds": 192.672,
       "who": "Alex",
-      "line": "history tv78",
+      "line": "history tv82",
       "records": []
     },
     {
-      "seconds": 2.86,
+      "seconds": 197.672,
       "who": "Alex",
-      "line": "history tv78",
+      "line": "history tv82",
       "records": []
     },
     {
-      "seconds": 2.875,
+      "seconds": 202.672,
+      "who": "Alex",
+      "line": "history tv82",
+      "records": []
+    },
+    {
+      "seconds": 207.672,
+      "who": "Alex",
+      "line": "history tv82",
+      "records": []
+    },
+    {
+      "seconds": 212.672,
+      "who": "Alex",
+      "line": "history tv82",
+      "records": []
+    },
+    {
+      "seconds": 216.656,
       "who": "agent",
       "line": "summarize.add text=\"Share the bus timetable with visitors p2\"",
       "records": [
@@ -457,27 +649,51 @@
       ]
     },
     {
-      "seconds": 2.891,
+      "seconds": 216.672,
       "who": "agent",
-      "line": "look tv79",
+      "line": "look tv83",
       "records": []
     },
     {
-      "seconds": 2.891,
+      "seconds": 216.672,
       "who": "agent",
-      "line": "task-move tv79 to=Now",
+      "line": "task-move tv83 to=Now",
       "records": [
         "r61"
       ]
     },
     {
-      "seconds": 2.891,
+      "seconds": 216.672,
       "who": "agent",
-      "line": "history tv79",
+      "line": "history tv83",
       "records": []
     },
     {
-      "seconds": 3.11,
+      "seconds": 221.672,
+      "who": "agent",
+      "line": "history tv83",
+      "records": []
+    },
+    {
+      "seconds": 226.672,
+      "who": "agent",
+      "line": "history tv83",
+      "records": []
+    },
+    {
+      "seconds": 231.672,
+      "who": "agent",
+      "line": "history tv83",
+      "records": []
+    },
+    {
+      "seconds": 236.672,
+      "who": "agent",
+      "line": "history tv83",
+      "records": []
+    },
+    {
+      "seconds": 240.656,
       "who": "Alex",
       "line": "summarize.add text=\"Check the door signage; include the side entrance p3\"",
       "records": [
@@ -485,19 +701,43 @@
       ]
     },
     {
-      "seconds": 3.172,
+      "seconds": 240.718,
       "who": "Alex",
-      "line": "look tv80",
+      "line": "look tv84",
       "records": []
     },
     {
-      "seconds": 3.172,
+      "seconds": 240.718,
       "who": "Alex",
-      "line": "history tv80",
+      "line": "history tv84",
       "records": []
     },
     {
-      "seconds": 3.36,
+      "seconds": 245.718,
+      "who": "Alex",
+      "line": "history tv84",
+      "records": []
+    },
+    {
+      "seconds": 250.718,
+      "who": "Alex",
+      "line": "history tv84",
+      "records": []
+    },
+    {
+      "seconds": 255.718,
+      "who": "Alex",
+      "line": "history tv84",
+      "records": []
+    },
+    {
+      "seconds": 260.718,
+      "who": "Alex",
+      "line": "history tv84",
+      "records": []
+    },
+    {
+      "seconds": 264.656,
       "who": "agent",
       "line": "summarize.add text=\"Bring spare pens and blank name badges p4\"",
       "records": [
@@ -505,25 +745,43 @@
       ]
     },
     {
-      "seconds": 3.375,
+      "seconds": 264.718,
       "who": "agent",
-      "line": "look tv81",
+      "line": "look tv85",
       "records": []
     },
     {
-      "seconds": 3.375,
+      "seconds": 264.718,
       "who": "agent",
-      "line": "history tv81",
+      "line": "history tv85",
       "records": []
     },
     {
-      "seconds": 3.578,
+      "seconds": 269.718,
       "who": "agent",
-      "line": "history tv81",
+      "line": "history tv85",
       "records": []
     },
     {
-      "seconds": 3.594,
+      "seconds": 274.718,
+      "who": "agent",
+      "line": "history tv85",
+      "records": []
+    },
+    {
+      "seconds": 279.718,
+      "who": "agent",
+      "line": "history tv85",
+      "records": []
+    },
+    {
+      "seconds": 284.718,
+      "who": "agent",
+      "line": "history tv85",
+      "records": []
+    },
+    {
+      "seconds": 288.656,
       "who": "Alex",
       "line": "summarize.add text=\"Confirm the chairs and leave space for wheelchairs p1\"",
       "records": [
@@ -531,27 +789,51 @@
       ]
     },
     {
-      "seconds": 3.657,
+      "seconds": 288.718,
       "who": "Alex",
-      "line": "look tv82",
+      "line": "look tv86",
       "records": []
     },
     {
-      "seconds": 3.657,
+      "seconds": 288.718,
       "who": "Alex",
-      "line": "task-move tv82 to=Now",
+      "line": "task-move tv86 to=Now",
       "records": [
         "r68"
       ]
     },
     {
-      "seconds": 3.657,
+      "seconds": 288.718,
       "who": "Alex",
-      "line": "history tv82",
+      "line": "history tv86",
       "records": []
     },
     {
-      "seconds": 3.828,
+      "seconds": 293.718,
+      "who": "Alex",
+      "line": "history tv86",
+      "records": []
+    },
+    {
+      "seconds": 298.718,
+      "who": "Alex",
+      "line": "history tv86",
+      "records": []
+    },
+    {
+      "seconds": 303.718,
+      "who": "Alex",
+      "line": "history tv86",
+      "records": []
+    },
+    {
+      "seconds": 308.734,
+      "who": "Alex",
+      "line": "history tv86",
+      "records": []
+    },
+    {
+      "seconds": 312.64,
       "who": "agent",
       "line": "summarize.add text=\"Draft a follow-up message for volunteers p2\"",
       "records": [
@@ -559,19 +841,43 @@
       ]
     },
     {
-      "seconds": 3.891,
+      "seconds": 312.703,
       "who": "agent",
-      "line": "look tv83",
+      "line": "look tv87",
       "records": []
     },
     {
-      "seconds": 3.891,
+      "seconds": 312.703,
       "who": "agent",
-      "line": "history tv83",
+      "line": "history tv87",
       "records": []
     },
     {
-      "seconds": 4.078,
+      "seconds": 317.703,
+      "who": "agent",
+      "line": "history tv87",
+      "records": []
+    },
+    {
+      "seconds": 322.703,
+      "who": "agent",
+      "line": "history tv87",
+      "records": []
+    },
+    {
+      "seconds": 327.703,
+      "who": "agent",
+      "line": "history tv87",
+      "records": []
+    },
+    {
+      "seconds": 332.718,
+      "who": "agent",
+      "line": "history tv87",
+      "records": []
+    },
+    {
+      "seconds": 336.656,
       "who": "Alex",
       "line": "summarize.add text=\"Test the map on a phone before the meeting p3\"",
       "records": [
@@ -579,31 +885,43 @@
       ]
     },
     {
-      "seconds": 4.125,
+      "seconds": 336.656,
       "who": "Alex",
-      "line": "look tv84",
+      "line": "look tv88",
       "records": []
     },
     {
-      "seconds": 4.141,
+      "seconds": 336.672,
       "who": "Alex",
-      "line": "history tv84",
+      "line": "history tv88",
       "records": []
     },
     {
-      "seconds": 4.297,
+      "seconds": 341.672,
       "who": "Alex",
-      "line": "history tv84",
+      "line": "history tv88",
       "records": []
     },
     {
-      "seconds": 4.313,
+      "seconds": 346.672,
       "who": "Alex",
-      "line": "history tv84",
+      "line": "history tv88",
       "records": []
     },
     {
-      "seconds": 4.313,
+      "seconds": 351.672,
+      "who": "Alex",
+      "line": "history tv88",
+      "records": []
+    },
+    {
+      "seconds": 356.672,
+      "who": "Alex",
+      "line": "history tv88",
+      "records": []
+    },
+    {
+      "seconds": 360.656,
       "who": "agent",
       "line": "summarize.add text=\"Ask two neighbours to review the task board p4\"",
       "records": [
@@ -611,33 +929,57 @@
       ]
     },
     {
-      "seconds": 4.375,
+      "seconds": 360.703,
       "who": "agent",
-      "line": "look tv85",
+      "line": "look tv89",
       "records": []
     },
     {
-      "seconds": 4.375,
+      "seconds": 360.718,
       "who": "agent",
-      "line": "task-move tv85 to=Now",
+      "line": "task-move tv89 to=Now",
       "records": [
         "r75"
       ]
     },
     {
-      "seconds": 4.391,
+      "seconds": 360.718,
       "who": "agent",
       "line": "summarize.all lane=Now",
       "records": []
     },
     {
-      "seconds": 4.391,
+      "seconds": 360.718,
       "who": "agent",
-      "line": "history tv85",
+      "line": "history tv89",
       "records": []
     },
     {
-      "seconds": 4.547,
+      "seconds": 365.718,
+      "who": "agent",
+      "line": "history tv89",
+      "records": []
+    },
+    {
+      "seconds": 370.718,
+      "who": "agent",
+      "line": "history tv89",
+      "records": []
+    },
+    {
+      "seconds": 375.734,
+      "who": "agent",
+      "line": "history tv89",
+      "records": []
+    },
+    {
+      "seconds": 380.734,
+      "who": "agent",
+      "line": "history tv89",
+      "records": []
+    },
+    {
+      "seconds": 384.64,
       "who": "Alex",
       "line": "summarize.add text=\"Set aside five minutes for a break p1\"",
       "records": [
@@ -645,43 +987,43 @@
       ]
     },
     {
-      "seconds": 4.563,
+      "seconds": 384.703,
       "who": "Alex",
-      "line": "look tv86",
+      "line": "look tv90",
       "records": []
     },
     {
-      "seconds": 4.563,
+      "seconds": 384.703,
       "who": "Alex",
-      "line": "history tv86",
+      "line": "history tv90",
       "records": []
     },
     {
-      "seconds": 4.782,
+      "seconds": 389.718,
       "who": "Alex",
-      "line": "history tv86",
+      "line": "history tv90",
       "records": []
     },
     {
-      "seconds": 4.782,
+      "seconds": 394.718,
       "who": "Alex",
-      "line": "history tv86",
+      "line": "history tv90",
       "records": []
     },
     {
-      "seconds": 4.782,
+      "seconds": 399.718,
       "who": "Alex",
-      "line": "history tv86",
+      "line": "history tv90",
       "records": []
     },
     {
-      "seconds": 4.797,
+      "seconds": 404.734,
       "who": "Alex",
-      "line": "history tv86",
+      "line": "history tv90",
       "records": []
     },
     {
-      "seconds": 4.797,
+      "seconds": 408.64,
       "who": "agent",
       "line": "summarize.add text=\"Prepare a checklist for the evening hosts p2\"",
       "records": [
@@ -689,19 +1031,43 @@
       ]
     },
     {
-      "seconds": 4.86,
+      "seconds": 408.718,
       "who": "agent",
-      "line": "look tv87",
+      "line": "look tv91",
       "records": []
     },
     {
-      "seconds": 4.86,
+      "seconds": 408.718,
       "who": "agent",
-      "line": "history tv87",
+      "line": "history tv91",
       "records": []
     },
     {
-      "seconds": 5.032,
+      "seconds": 413.718,
+      "who": "agent",
+      "line": "history tv91",
+      "records": []
+    },
+    {
+      "seconds": 418.718,
+      "who": "agent",
+      "line": "history tv91",
+      "records": []
+    },
+    {
+      "seconds": 423.734,
+      "who": "agent",
+      "line": "history tv91",
+      "records": []
+    },
+    {
+      "seconds": 428.734,
+      "who": "agent",
+      "line": "history tv91",
+      "records": []
+    },
+    {
+      "seconds": 432.64,
       "who": "Alex",
       "line": "summarize.add text=\"Find the latest council meeting notes p3\"",
       "records": [
@@ -709,27 +1075,51 @@
       ]
     },
     {
-      "seconds": 5.094,
+      "seconds": 432.703,
       "who": "Alex",
-      "line": "look tv88",
+      "line": "look tv92",
       "records": []
     },
     {
-      "seconds": 5.094,
+      "seconds": 432.718,
       "who": "Alex",
-      "line": "task-move tv88 to=Now",
+      "line": "task-move tv92 to=Now",
       "records": [
         "r82"
       ]
     },
     {
-      "seconds": 5.094,
+      "seconds": 432.718,
       "who": "Alex",
-      "line": "history tv88",
+      "line": "history tv92",
       "records": []
     },
     {
-      "seconds": 5.282,
+      "seconds": 437.734,
+      "who": "Alex",
+      "line": "history tv92",
+      "records": []
+    },
+    {
+      "seconds": 442.734,
+      "who": "Alex",
+      "line": "history tv92",
+      "records": []
+    },
+    {
+      "seconds": 447.734,
+      "who": "Alex",
+      "line": "history tv92",
+      "records": []
+    },
+    {
+      "seconds": 452.734,
+      "who": "Alex",
+      "line": "history tv92",
+      "records": []
+    },
+    {
+      "seconds": 456.64,
       "who": "agent",
       "line": "summarize.add text=\"Summarize the actions after the meeting p4\"",
       "records": [
@@ -737,31 +1127,43 @@
       ]
     },
     {
-      "seconds": 5.344,
+      "seconds": 456.703,
       "who": "agent",
-      "line": "look tv89",
+      "line": "look tv93",
       "records": []
     },
     {
-      "seconds": 5.344,
+      "seconds": 456.718,
       "who": "agent",
-      "line": "history tv89",
+      "line": "history tv93",
       "records": []
     },
     {
-      "seconds": 5.5,
+      "seconds": 461.718,
       "who": "agent",
-      "line": "history tv89",
+      "line": "history tv93",
       "records": []
     },
     {
-      "seconds": 5.5,
+      "seconds": 466.718,
       "who": "agent",
-      "line": "history tv89",
+      "line": "history tv93",
       "records": []
     },
     {
-      "seconds": 5.516,
+      "seconds": 471.718,
+      "who": "agent",
+      "line": "history tv93",
+      "records": []
+    },
+    {
+      "seconds": 476.718,
+      "who": "agent",
+      "line": "history tv93",
+      "records": []
+    },
+    {
+      "seconds": 480.656,
       "who": "Alex",
       "line": "summarize.add text=\"Keep the original notes alongside the summary p1\"",
       "records": [
@@ -769,25 +1171,43 @@
       ]
     },
     {
-      "seconds": 5.532,
+      "seconds": 480.703,
       "who": "Alex",
-      "line": "look tv90",
+      "line": "look tv94",
       "records": []
     },
     {
-      "seconds": 5.532,
+      "seconds": 480.703,
       "who": "Alex",
-      "line": "history tv90",
+      "line": "history tv94",
       "records": []
     },
     {
-      "seconds": 5.75,
+      "seconds": 485.718,
       "who": "Alex",
-      "line": "history tv90",
+      "line": "history tv94",
       "records": []
     },
     {
-      "seconds": 5.75,
+      "seconds": 490.718,
+      "who": "Alex",
+      "line": "history tv94",
+      "records": []
+    },
+    {
+      "seconds": 495.718,
+      "who": "Alex",
+      "line": "history tv94",
+      "records": []
+    },
+    {
+      "seconds": 500.718,
+      "who": "Alex",
+      "line": "history tv94",
+      "records": []
+    },
+    {
+      "seconds": 504.656,
       "who": "agent",
       "line": "summarize.add text=\"Arrange a ride home for the late volunteers p2\"",
       "records": [
@@ -795,27 +1215,51 @@
       ]
     },
     {
-      "seconds": 5.813,
+      "seconds": 504.656,
       "who": "agent",
-      "line": "look tv91",
+      "line": "look tv95",
       "records": []
     },
     {
-      "seconds": 5.813,
+      "seconds": 504.656,
       "who": "agent",
-      "line": "task-move tv91 to=Now",
+      "line": "task-move tv95 to=Now",
       "records": [
         "r89"
       ]
     },
     {
-      "seconds": 5.813,
+      "seconds": 504.656,
       "who": "agent",
-      "line": "history tv91",
+      "line": "history tv95",
       "records": []
     },
     {
-      "seconds": 5.985,
+      "seconds": 509.672,
+      "who": "agent",
+      "line": "history tv95",
+      "records": []
+    },
+    {
+      "seconds": 514.672,
+      "who": "agent",
+      "line": "history tv95",
+      "records": []
+    },
+    {
+      "seconds": 519.672,
+      "who": "agent",
+      "line": "history tv95",
+      "records": []
+    },
+    {
+      "seconds": 524.672,
+      "who": "agent",
+      "line": "history tv95",
+      "records": []
+    },
+    {
+      "seconds": 528.672,
       "who": "Alex",
       "line": "summarize.add text=\"Recheck the date on the printed flyers p3\"",
       "records": [
@@ -823,19 +1267,43 @@
       ]
     },
     {
-      "seconds": 6.047,
+      "seconds": 528.734,
       "who": "Alex",
-      "line": "look tv92",
+      "line": "look tv96",
       "records": []
     },
     {
-      "seconds": 6.047,
+      "seconds": 528.75,
       "who": "Alex",
-      "line": "history tv92",
+      "line": "history tv96",
       "records": []
     },
     {
-      "seconds": 6.235,
+      "seconds": 533.75,
+      "who": "Alex",
+      "line": "history tv96",
+      "records": []
+    },
+    {
+      "seconds": 538.75,
+      "who": "Alex",
+      "line": "history tv96",
+      "records": []
+    },
+    {
+      "seconds": 543.75,
+      "who": "Alex",
+      "line": "history tv96",
+      "records": []
+    },
+    {
+      "seconds": 548.75,
+      "who": "Alex",
+      "line": "history tv96",
+      "records": []
+    },
+    {
+      "seconds": 552.656,
       "who": "agent",
       "line": "summarize.add text=\"Thank everyone who helped with setup p4\"",
       "records": [
@@ -843,19 +1311,43 @@
       ]
     },
     {
-      "seconds": 6.25,
+      "seconds": 552.718,
       "who": "agent",
-      "line": "look tv93",
+      "line": "look tv97",
       "records": []
     },
     {
-      "seconds": 6.25,
+      "seconds": 552.718,
       "who": "agent",
-      "line": "history tv93",
+      "line": "history tv97",
       "records": []
     },
     {
-      "seconds": 6.469,
+      "seconds": 557.718,
+      "who": "agent",
+      "line": "history tv97",
+      "records": []
+    },
+    {
+      "seconds": 562.718,
+      "who": "agent",
+      "line": "history tv97",
+      "records": []
+    },
+    {
+      "seconds": 567.718,
+      "who": "agent",
+      "line": "history tv97",
+      "records": []
+    },
+    {
+      "seconds": 572.734,
+      "who": "agent",
+      "line": "history tv97",
+      "records": []
+    },
+    {
+      "seconds": 576.64,
       "who": "Alex",
       "line": "summarize.add text=\"Plan the next small step with the group p1\"",
       "records": [
@@ -863,83 +1355,107 @@
       ]
     },
     {
-      "seconds": 6.532,
+      "seconds": 576.687,
       "who": "Alex",
-      "line": "look tv94",
+      "line": "look tv98",
       "records": []
     },
     {
-      "seconds": 6.532,
+      "seconds": 576.687,
       "who": "Alex",
-      "line": "task-move tv94 to=Now",
+      "line": "task-move tv98 to=Now",
       "records": [
         "r96"
       ]
     },
     {
-      "seconds": 6.532,
+      "seconds": 576.703,
       "who": "Alex",
-      "line": "history tv94",
+      "line": "history tv98",
       "records": []
     },
     {
-      "seconds": 9.297,
+      "seconds": 581.703,
       "who": "Alex",
-      "line": "look tv95",
+      "line": "history tv98",
       "records": []
     },
     {
-      "seconds": 9.438,
+      "seconds": 586.703,
       "who": "Alex",
-      "line": "set tv95 short= short_source=",
+      "line": "history tv98",
+      "records": []
+    },
+    {
+      "seconds": 591.703,
+      "who": "Alex",
+      "line": "history tv98",
+      "records": []
+    },
+    {
+      "seconds": 596.703,
+      "who": "Alex",
+      "line": "history tv98",
+      "records": []
+    },
+    {
+      "seconds": 603.187,
+      "who": "Alex",
+      "line": "look tv99",
+      "records": []
+    },
+    {
+      "seconds": 603.218,
+      "who": "Alex",
+      "line": "set tv99 short= short_source=",
       "records": [
         "r99"
       ]
     },
     {
-      "seconds": 9.766,
+      "seconds": 603.453,
       "who": "Alex",
-      "line": "look tv95",
+      "line": "look tv99",
       "records": []
     },
     {
-      "seconds": 9.797,
+      "seconds": 603.547,
       "who": "Alex",
-      "line": "task-remove tv95",
+      "line": "task-remove tv99",
       "records": [
         "r100"
       ]
     },
     {
-      "seconds": 12.094,
+      "seconds": 606.078,
       "who": "Alex",
-      "line": "look tv70",
+      "line": "look tv74",
       "records": []
     },
     {
-      "seconds": 12.188,
+      "seconds": 606.093,
       "who": "Alex",
-      "line": "task-move tv70 to=Now",
+      "line": "task-move tv74 to=Now",
       "records": [
         "r103"
       ]
     },
     {
-      "seconds": 25.61,
+      "seconds": 619.187,
       "who": "agent",
-      "line": "look tv94",
+      "line": "look tv98",
       "records": []
     },
     {
-      "seconds": 25.625,
+      "seconds": 619.187,
       "who": "agent",
-      "line": "task-remove tv94",
+      "line": "task-remove tv98",
       "records": [
         "r109"
       ]
     },
     {
-      "seconds": 25.625,
+      "seconds": 619.187,
       "who": "agent",
       "line": "undo",
       "records": [
@@ -947,8 +1463,8 @@
       ]
     }
   ],
-  "requested_minutes": 0.1,
-  "wall_seconds": 25.66,
+  "requested_minutes": 10,
+  "wall_seconds": 619.22,
   "records": 110,
-  "at": "2026-10-24T19:50:57.462263+00:00"
+  "at": "2026-10-24T21:44:27.761741+00:00"
 }

@@ -1,0 +1,175 @@
+{
+  "exit": 0,
+  "timed_out": false,
+  "seconds": 62.64,
+  "answer": "Updated `taskboard-components` (dk170) with due-date chips: neutral for today/future dates, red and labelled \u201cOverdue\u201d for dates before today (UTC). Cards without dates have no chip.\n\nNo code was necessary. Only the board arrangement and its styles changed; shared facts and the other board remain untouched.\n\n`look-view` confirms 3 overdue and 2 upcoming chips. Visual appearance could not be inspected.",
+  "board": "A",
+  "number": 2,
+  "request": "Show a due date chip on cards that have one; make it red when it's overdue.",
+  "changes": [
+    {
+      "thing": "dk170",
+      "kind": "lens",
+      "field": "text",
+      "category": "lens",
+      "lines": 4
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "background",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "color",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "for",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "in:dk1",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "kind",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "lens",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "made_by",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "padding",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "radius",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "target",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "background",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "color",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "emphasis",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "for",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "in:dk1",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "kind",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "lens",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "made_by",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "padding",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "radius",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "target",
+      "category": "style",
+      "lines": 1
+    }
+  ],
+  "lines": 25,
+  "landed": [
+    "lens",
+    "style"
+  ],
+  "success": false,
+  "board_proof": false,
+  "proof_passed": 10,
+  "proof_checks": 11,
+  "wall_seconds": 82.62
+}

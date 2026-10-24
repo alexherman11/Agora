@@ -1,0 +1,14 @@
+{
+  "research/kernel-lab/painter/painter.js": {
+    "frozen": "ac082aabbfdc86257574a16cf8475fc01ec2a45f1156f94009c47d48ca9a83c1",
+    "current": "11a1977812e1df5c4305f9fa323046c7c9664d3650faeb34cb529f783b9ee639"
+  },
+  "research/kernel-lab/painter/catalogue.py": {
+    "frozen": "4f27b53b6299968d3d9447846f09b559c8244bd4c7484ecff3ef1bdbfec2d646",
+    "current": "1363c87d1031845465eea81f98592bce5e51270502843d603963b157f7f77620"
+  },
+  "research/kernel-lab/painter/install.py": {
+    "frozen": "d389606db4ff73065c63a58a6c5c2dc0467ae0eca24912f157dc13bd0d767aa3",
+    "current": "878555e4aadf5073f2c27ee85945eb19f561535ee72395757b45f444642c117b"
+  }
+}

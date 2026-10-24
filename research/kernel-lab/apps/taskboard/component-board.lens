@@ -1,0 +1,45 @@
+# Arrangement only: five reviewed components; same task facts and words as v2.
+root : column, of tag:taskboard-settings as view, each board-view
+board-view : board, filter $view.filter
+  on add do summarize.add text="$value"
+  on filter do task-filter $view.id priority="$value"
+  on summarize do summarize.all
+  on undo do undo
+  lanes : column, of tag:taskboard-lane as lane, by order, each lane-view
+lane-view : lane, name $lane.name
+  on drop card do task-move $carried to="$lane.name"
+  cards : column, of tag:taskboard-task, prop:lane=$lane.name as task, by priority, each task-view
+task-view : card, title $task.short, colour $task.colour, note $task.note, note_colour $task.note_colour, note_style $task.note_style, who $task.who
+  only when $view.filter = "all" or $task.priority = $view.filter
+  on key 1 do task-priority $task.id priority=1
+  on key 2 do task-priority $task.id priority=2
+  on key 3 do task-priority $task.id priority=3
+  on key 4 do task-priority $task.id priority=4
+  on key d do task-move $task.id to=Done
+  on key Delete do task-remove $task.id
+  on title do task-rename $task.id title="$value"
+  on close do task-rename $task.id title="$task.title"
+  on text do task-text $task.id text="$value"
+  on note do task-note $task.id text="$value"
+  on note-colour do task-note-colour $task.id colour="$value"
+  on note-style do task-note-style $task.id style="$value"
+  flag : flag, priority $task.priority
+  actions : menu
+    on menu "⚑  P1 · Urgent" do task-priority $task.id priority=1
+    on menu "⚑  P2 · High" do task-priority $task.id priority=2
+    on menu "⚑  P3 · Normal" do task-priority $task.id priority=3
+    on menu "⚑  P4 · Low" do task-priority $task.id priority=4
+    on menu "Colour · Paper" do task-colour $task.id colour=paper
+    on menu "Colour · Rose" do task-colour $task.id colour=rose
+    on menu "Colour · Peach" do task-colour $task.id colour=peach
+    on menu "Colour · Sage" do task-colour $task.id colour=sage
+    on menu "Colour · Sky" do task-colour $task.id colour=sky
+    on menu "Colour · Lilac" do task-colour $task.id colour=lilac
+    on menu "Move · Backlog" do task-move $task.id to=Backlog
+    on menu "Move · Now" do task-move $task.id to=Now
+    on menu "Move · Done" do task-move $task.id to=Done
+    on menu "Assign to Alex" do task-assign $task.id who=Alex
+    on menu "Assign to JEFF" do task-assign $task.id who=JEFF
+    on menu "Details & rename" do task-edit $task.id
+    on menu "Summarize" do summarize.task $task.id
+    on menu "Remove" do task-remove $task.id

@@ -102,7 +102,8 @@ class CDP:
 
 
 class Browser:
-    def __init__(self, url=None, host_key=None):
+    def __init__(self, url=None, host_key=None, test_flags=()):
+        self.test_flags = list(test_flags)
         self.allowed_origin = (urlsplit(url).scheme + '://' + urlsplit(url).netloc) if url else None
         self.host_key = host_key or os.environ.get('AGORA_WIDGET_HOST_KEY','')
 
@@ -114,7 +115,7 @@ class Browser:
         self.process = subprocess.Popen([executable,
             '--headless=new', private, '--disable-gpu', '--no-first-run', '--no-default-browser-check',
             '--remote-debugging-port=0', '--remote-allow-origins=*', '--disable-background-networking',
-            '--user-data-dir=' + self.tmp.name, 'about:blank'], stdout=subprocess.DEVNULL,
+            '--user-data-dir=' + self.tmp.name, *self.test_flags, 'about:blank'], stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL, creationflags=0x08000000)
         active = Path(self.tmp.name) / 'DevToolsActivePort'
         end = time.monotonic() + 20

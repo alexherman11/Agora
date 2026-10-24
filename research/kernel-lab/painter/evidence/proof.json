@@ -1,0 +1,117 @@
+{
+  "checks": [
+    {
+      "check": "Idempotent component installation",
+      "ok": true
+    },
+    {
+      "check": "Painter describes 25 cards and three lanes without executing component JS",
+      "ok": true
+    },
+    {
+      "check": "Five app components arrange the board",
+      "ok": true
+    },
+    {
+      "check": "Part reading carries facts, settings and gesture lines",
+      "ok": true
+    },
+    {
+      "check": "Catalogue purposes and examples discoverable",
+      "ok": true
+    },
+    {
+      "check": "25 cards and three drop lanes at 1600px",
+      "ok": true
+    },
+    {
+      "check": "Every task paints a priority marker",
+      "ok": true
+    },
+    {
+      "check": "Priorities sort within lanes",
+      "ok": true
+    },
+    {
+      "check": "Notes preserve multiline source and colours",
+      "ok": true
+    },
+    {
+      "check": "Real quick-add typing preserves spaces and strips p2",
+      "ok": true
+    },
+    {
+      "check": "Card menu exposes priority colour moves assignment rename summary removal",
+      "ok": true
+    },
+    {
+      "check": "Card menu changes the actual priority",
+      "ok": true
+    },
+    {
+      "check": "Pointer drag has spring ghost",
+      "ok": true
+    },
+    {
+      "check": "Real pointer drag says task-move and moves to Done",
+      "ok": true
+    },
+    {
+      "check": "Stale competing pointer drag refuses without moving",
+      "ok": true
+    },
+    {
+      "check": "History renders real record dates and authors",
+      "ok": true
+    },
+    {
+      "check": "Detail drawer saves lossless multiline Markdown through fresh revisions",
+      "ok": true
+    },
+    {
+      "check": "Actual Bold and Italic selection commands persist Markdown",
+      "ok": true
+    },
+    {
+      "check": "Note colours and slant style write actual facts",
+      "ok": true
+    },
+    {
+      "check": "Focused-card keyboard shortcut changes priority",
+      "ok": true
+    },
+    {
+      "check": "Raw history retains prior note and moves",
+      "ok": true
+    },
+    {
+      "check": "P1 filter is an actual world gesture",
+      "ok": true
+    },
+    {
+      "check": "Remove forgets a card",
+      "ok": true
+    },
+    {
+      "check": "Undo restores the original card and trail",
+      "ok": true
+    },
+    {
+      "check": "JS comparison board reads identical task identities",
+      "ok": true
+    },
+    {
+      "check": "Gallery uses painter and renders live catalogue examples",
+      "ok": true
+    },
+    {
+      "check": "Gallery has a one-click taskbar entry",
+      "ok": true
+    },
+    {
+      "check": "Scratch replay matches all current facts",
+      "ok": true
+    }
+  ],
+  "count": 28
+}

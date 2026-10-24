@@ -1,0 +1,5 @@
+{
+  "success": true,
+  "reason": "Checker distinguishes explicit exclusions from the tasks listed as qualifying. Exact original word calls replayed, no new agent or implementation edits.",
+  "replayed_calls": 11
+}

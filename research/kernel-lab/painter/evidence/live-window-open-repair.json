@@ -1,0 +1,141 @@
+{
+  "off_record": "r490",
+  "tasks_unchanged": true,
+  "task_count": 26,
+  "task_hash": "1bcedb871a6d230d42cce35f56ad8281acf8fc12be242c4bd22cfaacfdf955dd",
+  "receipts": [
+    "Task board is open already: raised without changing keyboard focus (new=yes opens another)",
+    "Widget \u00b7 Task board \u00b7 JavaScript is open already: raised without changing keyboard focus (new=yes opens another)",
+    "Task board \u00b7 Components is open already: raised without changing keyboard focus (new=yes opens another)"
+  ],
+  "windows": [
+    {
+      "id": "dk268",
+      "kind": "window",
+      "name": "Task board \u00b7 Components",
+      "shows": "taskboard-components",
+      "target": null,
+      "edge": "",
+      "box": [
+        2564,
+        220,
+        1258,
+        1828
+      ],
+      "shown": true,
+      "front": false,
+      "z": 5
+    },
+    {
+      "id": "dk202",
+      "kind": "window",
+      "name": "Widget \u00b7 Task board \u00b7 JavaScript",
+      "shows": "taskboard-js",
+      "target": null,
+      "edge": "",
+      "box": [
+        1290,
+        220,
+        1258,
+        1828
+      ],
+      "shown": true,
+      "front": false,
+      "z": 6
+    },
+    {
+      "id": "dk114",
+      "kind": "window",
+      "name": "Task board",
+      "shows": "taskboard",
+      "target": null,
+      "edge": "",
+      "box": [
+        16,
+        220,
+        1258,
+        1828
+      ],
+      "shown": true,
+      "front": false,
+      "z": 7
+    },
+    {
+      "id": "dk74",
+      "kind": "window",
+      "name": "Lines",
+      "shows": "lines",
+      "target": null,
+      "edge": "",
+      "box": [
+        1285,
+        1033,
+        1100,
+        945
+      ],
+      "shown": true,
+      "front": false,
+      "z": 8
+    },
+    {
+      "id": "dk171",
+      "kind": "window",
+      "name": "Help",
+      "shows": "help",
+      "target": null,
+      "edge": "",
+      "box": [
+        2412,
+        678,
+        1200,
+        1300
+      ],
+      "shown": true,
+      "front": false,
+      "z": 9
+    },
+    {
+      "id": "dk35",
+      "kind": "window",
+      "name": "Agora taskbar",
+      "shows": "taskbar",
+      "target": null,
+      "edge": "bottom",
+      "box": [
+        0,
+        2094,
+        3840,
+        66
+      ],
+      "shown": false,
+      "front": false,
+      "z": 9999
+    },
+    {
+      "id": "dk73",
+      "kind": "window",
+      "name": "Topbar",
+      "shows": "topbar",
+      "target": null,
+      "edge": "top",
+      "box": [
+        0,
+        0,
+        3840,
+        60
+      ],
+      "shown": false,
+      "front": false,
+      "z": 9999
+    },
+    {
+      "kind": "work",
+      "box": [
+        0,
+        60,
+        3840,
+        2034
+      ]
+    }
+  ]
+}

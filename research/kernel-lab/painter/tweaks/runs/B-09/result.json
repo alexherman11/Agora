@@ -1,0 +1,175 @@
+{
+  "exit": 0,
+  "timed_out": false,
+  "seconds": 79.47,
+  "answer": "Added \u201cSnooze until tomorrow\u201d to `taskboard-js` (`dk176`) through inline JavaScript, explicitly reviewed and reactivated as Alex.\n\nSnoozes persist separately in `dk179`; cards return at the next local midnight. The other board and shared task/lane facts were untouched.\n\nVerified saved code and grants. Visual behavior and midnight return were not runtime-tested; the widget is currently unmounted.",
+  "board": "B",
+  "number": 9,
+  "request": "Add 'Snooze until tomorrow' to the card menu: the card hides until tomorrow, then comes back.",
+  "changes": [
+    {
+      "thing": "dk177",
+      "kind": "grant",
+      "field": "revoked",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "taskboard-js-snoozes",
+      "field": "board",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "taskboard-js-snoozes",
+      "field": "for",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "taskboard-js-snoozes",
+      "field": "in:dk1",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "taskboard-js-snoozes",
+      "field": "kind",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "taskboard-js-snoozes",
+      "field": "made_by",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "taskboard-js-snoozes",
+      "field": "name",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "taskboard-js-snoozes",
+      "field": "title",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "taskboard-js-snoozes",
+      "field": "until",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "grant",
+      "field": "by",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "grant",
+      "field": "kind",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "grant",
+      "field": "only",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "grant",
+      "field": "to",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "grant",
+      "field": "where",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "grant",
+      "field": "words",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk181",
+      "kind": "grant",
+      "field": "by",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk181",
+      "kind": "grant",
+      "field": "kind",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk181",
+      "kind": "grant",
+      "field": "only",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk181",
+      "kind": "grant",
+      "field": "to",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk181",
+      "kind": "grant",
+      "field": "where",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk181",
+      "kind": "grant",
+      "field": "words",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk176",
+      "kind": "widget",
+      "field": "code",
+      "category": "source",
+      "lines": 38
+    }
+  ],
+  "lines": 59,
+  "landed": [
+    "facts",
+    "source"
+  ],
+  "success": true,
+  "board_proof": false,
+  "proof_passed": 4,
+  "proof_checks": 6,
+  "wall_seconds": 112.19
+}

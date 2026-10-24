@@ -1,0 +1,27 @@
+{
+  "exit": 0,
+  "timed_out": false,
+  "seconds": 57.98,
+  "answer": "Added \u201cSnooze until tomorrow\u201d to card menus on `taskboard-components` (`dk170`). Cards hide until the next UTC day, then return in their existing lane.\n\nNo code was necessary\u2014only arrangement changes. The other board remains unchanged.\n\nVerified hide/return conditions using \u201cFix the bar before the neighbourhood demo\u201d (`dk105`), then cleared the test snooze. All 25 cards are restored. Visual appearance and an actual midnight rollover were not inspected.",
+  "board": "A",
+  "number": 9,
+  "request": "Add 'Snooze until tomorrow' to the card menu: the card hides until tomorrow, then comes back.",
+  "changes": [
+    {
+      "thing": "dk170",
+      "kind": "lens",
+      "field": "text",
+      "category": "lens",
+      "lines": 71
+    }
+  ],
+  "lines": 71,
+  "landed": [
+    "lens"
+  ],
+  "success": true,
+  "board_proof": true,
+  "proof_passed": 11,
+  "proof_checks": 11,
+  "wall_seconds": 68.98
+}

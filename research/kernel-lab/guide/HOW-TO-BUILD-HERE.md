@@ -57,6 +57,16 @@ Open `/lens.html?lens=shelf` on the door's own website, signed in as yourself. E
 
 Words live in groups. Replace `<group>` in the view text with the group's id too. Use `in=<group>` when typing or painting a group word. `may=members` says who may say the word. Each step still checks its own rights. The place's leader is a steward. Leading one group does not make you a steward.
 
+## What can be made here
+
+Start with a purpose: `components for="an events calendar"`, `components for="a writing room"`, or `components for="a file browser"`. Then `help calendar`, `help editor` or `help tree` reads each piece's settings, parts, slots, gestures, example and limits. `components` lists the whole catalogue grouped by category. `window.open component-gallery` shows live examples made with the same painter.
+
+For a feed or chat, arrange a list, avatars, Markdown and an input over visible rows. For dashboards, arrange tables, charts, badges and progress. For phone or desktop layouts, compose columns, rows, grids, split panes and drawers. For the task board, five components (board, lane, card, flag, menu) arrange the same task facts and words as the JavaScript widget. A canvas/pixel surface draws 2D things; it does not supply a game engine or 3D CAD. A table does not supply spreadsheet formulas. An editor does not supply collaborative rich text. Domain services still need words and grants.
+
+A component lens is `make kind=lens name=evening painter=components text="root : calendar, month 2026-10"`. A part line is `name : component, setting value`; indentation nests child slots. Repeated rows use `of tag:kind as item, by order, each template`. A gesture line is `on select do choose-date value="$value"`. The complete short grammar and safe style vocabulary are in `research/kernel-lab/painter/ARRANGEMENT.md`; the purpose map and missing layers are in `research/kernel-lab/painter/REACH.md`.
+
+Style also lives in things: `make kind=part-style lens=evening target=calendar color=blue`. Targets name a component part and optional fact condition, such as `card.title[priority=1]`. `look-view evening` reads fresh counts, settings, parts, facts and gesture lines without running the component code. Personal `view-preference` things override your arrangement/settings; they do not move other people's shared facts. Components are reviewed trusted JavaScript installed by a steward; a copied definition has no review. Read the limitations on its card before promising an app.
+
 ## When a word is missing
 
 Write down the missing word first. If words cannot express it, a builder can supply a module, in any language. Its exports are words with dictionary entries. Bare words come from the world or kernel. Dotted words, such as `tally.top`, come from modules.

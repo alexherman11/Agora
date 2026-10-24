@@ -1,0 +1,12 @@
+[
+  "Make p1 cards glow softly red.",
+  "Show a due date chip on cards that have one; make it red when it's overdue.",
+  "Hide the Done lane, just for me.",
+  "Make cards more compact: at most two lines of text, less padding.",
+  "Add a Waiting lane between Doing and Done.",
+  "Show the assignee's initials in a little circle on each card.",
+  "When a card lands in Done, play a small check-mark animation.",
+  "Show the lane names and the card menu in Spanish for me.",
+  "Add 'Snooze until tomorrow' to the card menu: the card hides until tomorrow, then comes back.",
+  "Which p1 tasks have been sitting in Doing for more than three days?"
+]

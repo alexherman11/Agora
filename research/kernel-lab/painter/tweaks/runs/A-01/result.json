@@ -1,0 +1,69 @@
+{
+  "exit": 0,
+  "timed_out": false,
+  "seconds": 25.41,
+  "answer": "Added a soft translucent red glow for p1 card bodies on `taskboard-components`, using style `dk179` (receipt `r226`).\n\nNo code was necessary. The other board and shared task/lane facts were unchanged. `look-view` confirms the style; I couldn\u2019t inspect the rendered pixels.",
+  "board": "A",
+  "number": 1,
+  "request": "Make p1 cards glow softly red.",
+  "changes": [
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "for",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "glow",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "in:dk1",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "kind",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "lens",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "made_by",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "target",
+      "category": "style",
+      "lines": 1
+    }
+  ],
+  "lines": 7,
+  "landed": [
+    "style"
+  ],
+  "success": false,
+  "board_proof": false,
+  "proof_passed": 10,
+  "proof_checks": 11,
+  "wall_seconds": 45.73
+}

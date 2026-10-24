@@ -46,13 +46,13 @@
    "number": 7,
    "check": "agenda.load arrives unbound",
    "ok": true,
-   "detail": "agenda.load (wt62), a do word · takes: [<words>] [in=<group>] · who may: leaders · undo: yes · from: module:agenda · unbound: this community must grant and run the module"
+   "detail": "agenda.load (wt66), a do word · takes: [<words>] [in=<group>] · who may: leaders · undo: yes · from: module:agenda · unbound: this community must grant and run the module"
   },
   {
    "number": 8,
    "check": "agenda.next arrives unbound",
    "ok": true,
-   "detail": "agenda.next (wt63), a do word · takes: <id> · who may: leaders · undo: yes · from: module:agenda · unbound: this community must grant and run the module"
+   "detail": "agenda.next (wt67), a do word · takes: <id> · who may: leaders · undo: yes · from: module:agenda · unbound: this community must grant and run the module"
   },
   {
    "number": 9,
@@ -88,13 +88,13 @@
    "number": 14,
    "check": "fifteen sealed votes through the copied word",
    "ok": true,
-   "detail": "counts {'kind': 'poll', 'title': 'Ask for tenant protections?', 'options': 'yes no', 'made_by': 'wt41', 'in:wt40': 34, 'votes_yes': 11, 'votes_no': 4, 'votes': 15, 'made': '2026-11-03T22:00:00Z', 'changed': '2026-11-03T22:00:00Z'}, admitted 15, sealed records 15"
+   "detail": "counts {'kind': 'poll', 'title': 'Ask for tenant protections?', 'options': 'yes no', 'made_by': 'wt45', 'in:wt44': 34, 'votes_yes': 11, 'votes_no': 4, 'votes': 15, 'made': '2026-11-03T22:00:00Z', 'changed': '2026-11-03T22:00:00Z'}, admitted 15, sealed records 15"
   },
   {
    "number": 15,
    "check": "copied words retain once-each",
    "ok": true,
-   "detail": "refused: you have already said pulse on wt73; once each. undo takes yours back"
+   "detail": "refused: you have already said pulse on wt77; once each. undo takes yours back"
   },
   {
    "number": 16,
@@ -148,11 +148,11 @@
  },
  "bundle": {
   "version": 1,
-  "source": "91f784dd7a421d205cb796e6",
-  "group": "sb41",
+  "source": "9426f5c70af9b5db0d3531fc",
+  "group": "sb45",
   "definitions": [
    {
-    "id": "sb121",
+    "id": "sb125",
     "facts": {
      "kind": "word",
      "word": "prepare",
@@ -163,11 +163,11 @@
      "undo": "yes",
      "from": "verb",
      "bound": "prepare",
-     "steps": "sb46 $*"
+     "steps": "sb50 $*"
     }
    },
    {
-    "id": "sb122",
+    "id": "sb126",
     "facts": {
      "kind": "word",
      "word": "speak",
@@ -178,11 +178,11 @@
      "undo": "yes",
      "from": "verb",
      "bound": "speak",
-     "steps": "sb36 $1"
+     "steps": "sb40 $1"
     }
    },
    {
-    "id": "sb123",
+    "id": "sb127",
     "facts": {
      "kind": "word",
      "word": "pulse",
@@ -193,13 +193,13 @@
      "undo": "yes",
      "from": "verb",
      "bound": "pulse",
-     "steps": "sb37 $1 $2",
+     "steps": "sb41 $1 $2",
      "once": "per person per target",
      "sealed": "yes"
     }
    },
    {
-    "id": "sb124",
+    "id": "sb128",
     "facts": {
      "kind": "kind",
      "name": "meeting",
@@ -207,7 +207,7 @@
     }
    },
    {
-    "id": "sb125",
+    "id": "sb129",
     "facts": {
      "kind": "kind",
      "name": "item",
@@ -215,7 +215,7 @@
     }
    },
    {
-    "id": "sb126",
+    "id": "sb130",
     "facts": {
      "kind": "style",
      "name": "community",
@@ -223,17 +223,17 @@
     }
    },
    {
-    "id": "sb127",
+    "id": "sb131",
     "facts": {
      "kind": "rule",
      "name": "acknowledge",
      "on": "pin",
-     "do": "sb20 $target",
-     "on_entry": "sb24"
+     "do": "sb24 $target",
+     "on_entry": "sb28"
     }
    },
    {
-    "id": "sb46",
+    "id": "sb50",
     "facts": {
      "kind": "word",
      "word": "agenda.load",
@@ -247,7 +247,7 @@
     }
    },
    {
-    "id": "sb47",
+    "id": "sb51",
     "facts": {
      "kind": "word",
      "word": "agenda.next",
@@ -261,7 +261,7 @@
     }
    },
    {
-    "id": "sb94",
+    "id": "sb98",
     "facts": {
      "kind": "lens",
      "name": "council",
@@ -269,7 +269,7 @@
     }
    },
    {
-    "id": "sb95",
+    "id": "sb99",
     "facts": {
      "kind": "lens",
      "name": "floor",
@@ -278,88 +278,88 @@
    }
   ],
   "kernel": {
-   "sb36": "claim",
-   "sb24": "pin",
-   "sb37": "vote",
-   "sb20": "look"
+   "sb28": "pin",
+   "sb41": "vote",
+   "sb24": "look",
+   "sb40": "claim"
   }
  },
  "copies": [
   {
-   "id": "wt55",
-   "origin": {
-    "world": "91f784dd7a421d205cb796e6",
-    "thing": "sb121"
-   }
-  },
-  {
-   "id": "wt56",
-   "origin": {
-    "world": "91f784dd7a421d205cb796e6",
-    "thing": "sb122"
-   }
-  },
-  {
-   "id": "wt57",
-   "origin": {
-    "world": "91f784dd7a421d205cb796e6",
-    "thing": "sb123"
-   }
-  },
-  {
-   "id": "wt58",
-   "origin": {
-    "world": "91f784dd7a421d205cb796e6",
-    "thing": "sb124"
-   }
-  },
-  {
    "id": "wt59",
    "origin": {
-    "world": "91f784dd7a421d205cb796e6",
+    "world": "9426f5c70af9b5db0d3531fc",
     "thing": "sb125"
    }
   },
   {
    "id": "wt60",
    "origin": {
-    "world": "91f784dd7a421d205cb796e6",
+    "world": "9426f5c70af9b5db0d3531fc",
     "thing": "sb126"
    }
   },
   {
    "id": "wt61",
    "origin": {
-    "world": "91f784dd7a421d205cb796e6",
+    "world": "9426f5c70af9b5db0d3531fc",
     "thing": "sb127"
    }
   },
   {
    "id": "wt62",
    "origin": {
-    "world": "91f784dd7a421d205cb796e6",
-    "thing": "sb46"
+    "world": "9426f5c70af9b5db0d3531fc",
+    "thing": "sb128"
    }
   },
   {
    "id": "wt63",
    "origin": {
-    "world": "91f784dd7a421d205cb796e6",
-    "thing": "sb47"
+    "world": "9426f5c70af9b5db0d3531fc",
+    "thing": "sb129"
    }
   },
   {
    "id": "wt64",
    "origin": {
-    "world": "91f784dd7a421d205cb796e6",
-    "thing": "sb94"
+    "world": "9426f5c70af9b5db0d3531fc",
+    "thing": "sb130"
    }
   },
   {
    "id": "wt65",
    "origin": {
-    "world": "91f784dd7a421d205cb796e6",
-    "thing": "sb95"
+    "world": "9426f5c70af9b5db0d3531fc",
+    "thing": "sb131"
+   }
+  },
+  {
+   "id": "wt66",
+   "origin": {
+    "world": "9426f5c70af9b5db0d3531fc",
+    "thing": "sb50"
+   }
+  },
+  {
+   "id": "wt67",
+   "origin": {
+    "world": "9426f5c70af9b5db0d3531fc",
+    "thing": "sb51"
+   }
+  },
+  {
+   "id": "wt68",
+   "origin": {
+    "world": "9426f5c70af9b5db0d3531fc",
+    "thing": "sb98"
+   }
+  },
+  {
+   "id": "wt69",
+   "origin": {
+    "world": "9426f5c70af9b5db0d3531fc",
+    "thing": "sb99"
    }
   }
  ],
@@ -367,889 +367,889 @@
   {
    "who": "Alex",
    "how": "typed",
-   "line": "role sb51 leader in=sb41",
+   "line": "role sb55 leader in=sb45",
    "ok": true,
-   "ms": 6.7,
-   "said": "ok role sb51 [r50] · Dana is a leader of Council watch"
+   "ms": 4.8,
+   "said": "ok role sb55 [r50] · Dana is a leader of Council watch"
   },
   {
    "who": "Alex",
    "how": "typed",
    "line": "make kind=lens name=council text=\"root : column, role sheet\n  meetings : column, of tag:meeting as m, each meet\n  pulse ",
    "ok": true,
-   "ms": 5.3,
-   "said": "ok make sb94 [r51] · a lens in Council watch"
+   "ms": 5.9,
+   "said": "ok make sb98 [r51] · a lens in Council watch"
   },
   {
    "who": "Alex",
    "how": "typed",
    "line": "make kind=lens name=floor text=\"root : column, role sheet, of tag:meeting as m, each meet\nmeet : column, role card\n  h :",
    "ok": true,
-   "ms": 4.4,
-   "said": "ok make sb95 [r52] · a lens in Council watch"
+   "ms": 3.5,
+   "said": "ok make sb99 [r52] · a lens in Council watch"
   },
   {
    "who": "Dana",
    "how": "typed",
-   "line": "make kind=research title=\"Staff report, item 7B\" url=https://example.org/seabright/council/7B-staff-report.pdf in=sb41",
+   "line": "make kind=research title=\"Staff report, item 7B\" url=https://example.org/seabright/council/7B-staff-report.pdf in=sb45",
    "ok": true,
-   "ms": 5.1,
-   "said": "ok make sb96 [r53] · a research in Council watch"
+   "ms": 4.2,
+   "said": "ok make sb100 [r53] · a research in Council watch"
   },
   {
    "who": "Dana",
    "how": "typed",
-   "line": "agenda.load in=sb41",
+   "line": "agenda.load in=sb45",
    "ok": true,
-   "ms": 31.6,
-   "said": "ok make sb97 [r54] · a meeting in Council watch"
+   "ms": 26.3,
+   "said": "ok make sb101 [r54] · a meeting in Council watch"
   },
   {
    "who": "Maya",
    "how": "typed",
-   "line": "agenda.load in=sb41",
+   "line": "agenda.load in=sb45",
    "ok": false,
-   "ms": 3.8,
+   "ms": 2.3,
    "said": "refused: agenda.load is for leaders of Council watch; help agenda.load says more"
   },
   {
    "who": "Omar",
    "how": "typed",
-   "line": "make kind=carpool pickup=\"Murray & 5th\" leaves=\"5:30 pm\" seats=3 lat=36.9688 lon=-122.0083 in=sb41",
+   "line": "make kind=carpool pickup=\"Murray & 5th\" leaves=\"5:30 pm\" seats=3 lat=36.9688 lon=-122.0083 in=sb45",
    "ok": true,
-   "ms": 5.8,
-   "said": "ok make sb103 [r55] · a carpool in Council watch"
+   "ms": 4.3,
+   "said": "ok make sb107 [r55] · a carpool in Council watch"
   },
   {
    "who": "Lena",
    "how": "typed",
-   "line": "make kind=carpool pickup=\"Seabright & Logan\" leaves=\"5:30 pm\" seats=3 lat=36.9661 lon=-122.0098 in=sb41",
+   "line": "make kind=carpool pickup=\"Seabright & Logan\" leaves=\"5:30 pm\" seats=3 lat=36.9661 lon=-122.0098 in=sb45",
    "ok": true,
-   "ms": 5.5,
-   "said": "ok make sb104 [r56] · a carpool in Council watch"
+   "ms": 4.7,
+   "said": "ok make sb108 [r56] · a carpool in Council watch"
   },
   {
    "who": "Gus",
    "how": "typed",
-   "line": "make kind=carpool pickup=\"Mott & Effey\" leaves=\"5:30 pm\" seats=3 lat=36.9705 lon=-122.0061 in=sb41",
+   "line": "make kind=carpool pickup=\"Mott & Effey\" leaves=\"5:30 pm\" seats=3 lat=36.9705 lon=-122.0061 in=sb45",
    "ok": true,
-   "ms": 5.6,
-   "said": "ok make sb105 [r57] · a carpool in Council watch"
-  },
-  {
-   "who": "Gus",
-   "how": "pressed",
-   "line": "do claim a840",
-   "ok": true,
-   "ms": 11.4,
-   "said": "ok claim sb105 [r58] · yours; 2 seats left"
+   "ms": 4.6,
+   "said": "ok make sb109 [r57] · a carpool in Council watch"
   },
   {
    "who": "Ines",
    "how": "pressed",
-   "line": "do claim a832",
+   "line": "do claim a864",
    "ok": true,
-   "ms": 17.1,
-   "said": "ok claim sb104 [r59] · yours; 2 seats left"
+   "ms": 9.3,
+   "said": "ok claim sb108 [r58] · yours; 2 seats left"
   },
   {
-   "who": "Wes",
+   "who": "Gus",
    "how": "pressed",
-   "line": "do claim a832",
+   "line": "do claim a872",
    "ok": true,
-   "ms": 16.3,
-   "said": "ok claim sb104 [r60] · yours; 1 seat left"
-  },
-  {
-   "who": "Nora",
-   "how": "pressed",
-   "line": "do claim a840",
-   "ok": true,
-   "ms": 22.5,
-   "said": "ok claim sb105 [r61] · yours; 1 seat left"
-  },
-  {
-   "who": "Kiko",
-   "how": "pressed",
-   "line": "do claim a832",
-   "ok": true,
-   "ms": 19.9,
-   "said": "ok claim sb104 [r62] · yours; 0 seats left"
-  },
-  {
-   "who": "Otto",
-   "how": "pressed",
-   "line": "do claim a824",
-   "ok": true,
-   "ms": 21.3,
-   "said": "ok claim sb103 [r64] · yours; 1 seat left"
+   "ms": 14.2,
+   "said": "ok claim sb109 [r59] · yours; 2 seats left"
   },
   {
    "who": "Hana",
    "how": "pressed",
-   "line": "do claim a824",
+   "line": "do claim a856",
    "ok": true,
-   "ms": 30.4,
-   "said": "ok claim sb103 [r63] · yours; 2 seats left"
+   "ms": 14.1,
+   "said": "ok claim sb107 [r60] · yours; 2 seats left"
   },
   {
-   "who": "Raul",
+   "who": "Nora",
    "how": "pressed",
-   "line": "do claim a824",
+   "line": "do claim a872",
    "ok": true,
-   "ms": 26.4,
-   "said": "ok claim sb103 [r65] · yours; 0 seats left"
-  },
-  {
-   "who": "Luis",
-   "how": "pressed",
-   "line": "do claim a832",
-   "ok": false,
-   "ms": 23.7,
-   "said": "refused: sb104 is taken (3 seats, all claimed); look shows what is open"
-  },
-  {
-   "who": "Fern",
-   "how": "pressed",
-   "line": "do claim a824",
-   "ok": false,
-   "ms": 24.5,
-   "said": "refused: sb103 is taken (3 seats, all claimed); look shows what is open"
-  },
-  {
-   "who": "Abel",
-   "how": "pressed",
-   "line": "do claim a840",
-   "ok": false,
-   "ms": 25.3,
-   "said": "refused: sb105 is taken (3 seats, all claimed); look shows what is open"
+   "ms": 25.1,
+   "said": "ok claim sb109 [r63] · yours; 0 seats left"
   },
   {
    "who": "Mei",
    "how": "pressed",
-   "line": "do claim a840",
+   "line": "do claim a872",
    "ok": true,
-   "ms": 23.8,
-   "said": "ok claim sb105 [r66] · yours; 0 seats left"
-  },
-  {
-   "who": "Maya",
-   "how": "typed",
-   "line": "claim sb100 phone=831-555-1001",
-   "ok": true,
-   "ms": 20.5,
-   "said": "ok claim sb100 [r67] · yours; 11 seats left; your contact is seen only by you and the leaders"
-  },
-  {
-   "who": "Jo",
-   "how": "typed",
-   "line": "claim sb100 phone=831-555-1003",
-   "ok": true,
-   "ms": 30.6,
-   "said": "ok claim sb100 [r68] · yours; 10 seats left; your contact is seen only by you and the leaders"
-  },
-  {
-   "who": "Omar",
-   "how": "typed",
-   "line": "claim sb100 phone=831-555-1007",
-   "ok": true,
-   "ms": 33.1,
-   "said": "ok claim sb100 [r69] · yours; 9 seats left; your contact is seen only by you and the leaders"
-  },
-  {
-   "who": "Sam",
-   "how": "typed",
-   "line": "claim sb100 phone=831-555-1005",
-   "ok": true,
-   "ms": 45.9,
-   "said": "ok claim sb100 [r70] · yours; 8 seats left; your contact is seen only by you and the leaders"
+   "ms": 21.8,
+   "said": "ok claim sb109 [r62] · yours; 1 seat left"
   },
   {
    "who": "Raul",
-   "how": "typed",
-   "line": "claim sb100 phone=831-555-1015",
+   "how": "pressed",
+   "line": "do claim a856",
    "ok": true,
-   "ms": 38.9,
-   "said": "ok claim sb100 [r73] · yours; 5 seats left; your contact is seen only by you and the leaders"
-  },
-  {
-   "who": "Gus",
-   "how": "typed",
-   "line": "claim sb100 phone=831-555-1011",
-   "ok": true,
-   "ms": 42.0,
-   "said": "ok claim sb100 [r72] · yours; 6 seats left; your contact is seen only by you and the leaders"
+   "ms": 25.2,
+   "said": "ok claim sb107 [r64] · yours; 1 seat left"
   },
   {
    "who": "Wes",
-   "how": "typed",
-   "line": "claim sb100 phone=831-555-1013",
+   "how": "pressed",
+   "line": "do claim a864",
    "ok": true,
-   "ms": 41.3,
-   "said": "ok claim sb100 [r74] · yours; 4 seats left; your contact is seen only by you and the leaders"
-  },
-  {
-   "who": "Tom",
-   "how": "typed",
-   "line": "claim sb100 phone=831-555-1009",
-   "ok": true,
-   "ms": 44.9,
-   "said": "ok claim sb100 [r71] · yours; 7 seats left; your contact is seen only by you and the leaders"
-  },
-  {
-   "who": "Bea",
-   "how": "pressed",
-   "line": "do claim a800",
-   "ok": true,
-   "ms": 25.8,
-   "said": "ok claim sb100 [r75] · yours; 3 seats left"
-  },
-  {
-   "who": "Lena",
-   "how": "pressed",
-   "line": "do claim a800",
-   "ok": true,
-   "ms": 9.8,
-   "said": "ok claim sb100 [r76] · yours; 2 seats left"
-  },
-  {
-   "who": "Ruth",
-   "how": "pressed",
-   "line": "do claim a800",
-   "ok": true,
-   "ms": 10.4,
-   "said": "ok claim sb100 [r77] · yours; 1 seat left"
-  },
-  {
-   "who": "Ines",
-   "how": "pressed",
-   "line": "do claim a800",
-   "ok": true,
-   "ms": 10.0,
-   "said": "ok claim sb100 [r78] · yours; 0 seats left"
-  },
-  {
-   "who": "Priya",
-   "how": "pressed",
-   "line": "do claim a800",
-   "ok": false,
-   "ms": 2.8,
-   "said": "refused: sb100 is taken (12 seats, all claimed); look shows what is open"
-  },
-  {
-   "who": "Hana",
-   "how": "pressed",
-   "line": "do claim a800",
-   "ok": false,
-   "ms": 2.1,
-   "said": "refused: sb100 is taken (12 seats, all claimed); look shows what is open"
-  },
-  {
-   "who": "Nora",
-   "how": "pressed",
-   "line": "do claim a800",
-   "ok": false,
-   "ms": 2.3,
-   "said": "refused: sb100 is taken (12 seats, all claimed); look shows what is open"
+   "ms": 27.9,
+   "said": "ok claim sb108 [r61] · yours; 1 seat left"
   },
   {
    "who": "Kiko",
    "how": "pressed",
-   "line": "do claim a800",
+   "line": "do claim a864",
+   "ok": true,
+   "ms": 25.2,
+   "said": "ok claim sb108 [r65] · yours; 0 seats left"
+  },
+  {
+   "who": "Fern",
+   "how": "pressed",
+   "line": "do claim a856",
+   "ok": true,
+   "ms": 24.1,
+   "said": "ok claim sb107 [r66] · yours; 0 seats left"
+  },
+  {
+   "who": "Abel",
+   "how": "pressed",
+   "line": "do claim a872",
    "ok": false,
-   "ms": 1.7,
-   "said": "refused: sb100 is taken (12 seats, all claimed); look shows what is open"
+   "ms": 24.9,
+   "said": "refused: sb109 is taken (3 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Luis",
+   "how": "pressed",
+   "line": "do claim a864",
+   "ok": false,
+   "ms": 23.8,
+   "said": "refused: sb108 is taken (3 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Otto",
+   "how": "pressed",
+   "line": "do claim a856",
+   "ok": false,
+   "ms": 22.9,
+   "said": "refused: sb107 is taken (3 seats, all claimed); look shows what is open"
   },
   {
    "who": "Maya",
    "how": "typed",
-   "line": "claim sb100",
+   "line": "claim sb104 phone=831-555-1001",
+   "ok": true,
+   "ms": 6.5,
+   "said": "ok claim sb104 [r67] · yours; 11 seats left; your contact is seen only by you and the leaders"
+  },
+  {
+   "who": "Jo",
+   "how": "typed",
+   "line": "claim sb104 phone=831-555-1003",
+   "ok": true,
+   "ms": 28.0,
+   "said": "ok claim sb104 [r68] · yours; 10 seats left; your contact is seen only by you and the leaders"
+  },
+  {
+   "who": "Omar",
+   "how": "typed",
+   "line": "claim sb104 phone=831-555-1007",
+   "ok": true,
+   "ms": 33.3,
+   "said": "ok claim sb104 [r69] · yours; 9 seats left; your contact is seen only by you and the leaders"
+  },
+  {
+   "who": "Gus",
+   "how": "typed",
+   "line": "claim sb104 phone=831-555-1011",
+   "ok": true,
+   "ms": 42.8,
+   "said": "ok claim sb104 [r71] · yours; 7 seats left; your contact is seen only by you and the leaders"
+  },
+  {
+   "who": "Tom",
+   "how": "typed",
+   "line": "claim sb104 phone=831-555-1009",
+   "ok": true,
+   "ms": 44.6,
+   "said": "ok claim sb104 [r72] · yours; 6 seats left; your contact is seen only by you and the leaders"
+  },
+  {
+   "who": "Wes",
+   "how": "typed",
+   "line": "claim sb104 phone=831-555-1013",
+   "ok": true,
+   "ms": 42.3,
+   "said": "ok claim sb104 [r73] · yours; 5 seats left; your contact is seen only by you and the leaders"
+  },
+  {
+   "who": "Sam",
+   "how": "typed",
+   "line": "claim sb104 phone=831-555-1005",
+   "ok": true,
+   "ms": 48.2,
+   "said": "ok claim sb104 [r70] · yours; 8 seats left; your contact is seen only by you and the leaders"
+  },
+  {
+   "who": "Raul",
+   "how": "typed",
+   "line": "claim sb104 phone=831-555-1015",
+   "ok": true,
+   "ms": 36.5,
+   "said": "ok claim sb104 [r74] · yours; 4 seats left; your contact is seen only by you and the leaders"
+  },
+  {
+   "who": "Bea",
+   "how": "pressed",
+   "line": "do claim a832",
+   "ok": true,
+   "ms": 27.1,
+   "said": "ok claim sb104 [r75] · yours; 3 seats left"
+  },
+  {
+   "who": "Lena",
+   "how": "pressed",
+   "line": "do claim a832",
+   "ok": true,
+   "ms": 18.9,
+   "said": "ok claim sb104 [r76] · yours; 2 seats left"
+  },
+  {
+   "who": "Ruth",
+   "how": "pressed",
+   "line": "do claim a832",
+   "ok": true,
+   "ms": 17.7,
+   "said": "ok claim sb104 [r77] · yours; 1 seat left"
+  },
+  {
+   "who": "Ines",
+   "how": "pressed",
+   "line": "do claim a832",
+   "ok": true,
+   "ms": 11.9,
+   "said": "ok claim sb104 [r78] · yours; 0 seats left"
+  },
+  {
+   "who": "Hana",
+   "how": "pressed",
+   "line": "do claim a832",
    "ok": false,
-   "ms": 1.5,
-   "said": "refused: you have already said claim on sb100; once each. undo takes yours back"
+   "ms": 9.3,
+   "said": "refused: sb104 is taken (12 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Priya",
+   "how": "pressed",
+   "line": "do claim a832",
+   "ok": false,
+   "ms": 3.1,
+   "said": "refused: sb104 is taken (12 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Nora",
+   "how": "pressed",
+   "line": "do claim a832",
+   "ok": false,
+   "ms": 2.0,
+   "said": "refused: sb104 is taken (12 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Kiko",
+   "how": "pressed",
+   "line": "do claim a832",
+   "ok": false,
+   "ms": 1.8,
+   "said": "refused: sb104 is taken (12 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Maya",
+   "how": "typed",
+   "line": "claim sb104",
+   "ok": false,
+   "ms": 2.0,
+   "said": "refused: you have already said claim on sb104; once each. undo takes yours back"
   },
   {
    "who": "Bea",
    "how": "typed",
    "line": "undo",
    "ok": true,
-   "ms": 3.2,
+   "ms": 3.8,
    "said": "ok undo r75 [r79] · put back 1 fact"
   },
   {
    "who": "Priya",
    "how": "typed",
-   "line": "claim sb100 phone=831-555-2000",
+   "line": "claim sb104 phone=831-555-2000",
    "ok": true,
-   "ms": 3.6,
-   "said": "ok claim sb100 [r80] · yours; 0 seats left; your contact is seen only by you and the leaders"
+   "ms": 3.4,
+   "said": "ok claim sb104 [r80] · yours; 0 seats left; your contact is seen only by you and the leaders"
   },
   {
    "who": "Jo",
    "how": "typed",
    "line": "undo",
    "ok": true,
-   "ms": 3.8,
+   "ms": 3.6,
    "said": "ok undo r68 [r81] · put back 3 facts"
   },
   {
    "who": "Hana",
    "how": "typed",
-   "line": "claim sb100",
+   "line": "claim sb104",
    "ok": false,
    "ms": 1.6,
-   "said": "refused: sign-up for sb100 closed at 2026-10-29T00:45Z"
+   "said": "refused: sign-up for sb104 closed at 2026-10-29T00:45Z"
   },
   {
    "who": "Vera",
    "how": "typed",
-   "line": "look sb100",
+   "line": "look sb104",
    "ok": true,
-   "ms": 2.8,
-   "said": "Public hearing: 41 homes at Murray & 5th (sb100), an item by agenda"
+   "ms": 3.7,
+   "said": "Public hearing: 41 homes at Murray & 5th (sb104), an item by agenda"
   },
   {
    "who": "Dana",
    "how": "typed",
-   "line": "look sb100",
+   "line": "look sb104",
    "ok": true,
    "ms": 1.7,
-   "said": "Public hearing: 41 homes at Murray & 5th (sb100), an item by agenda"
+   "said": "Public hearing: 41 homes at Murray & 5th (sb104), an item by agenda"
   },
   {
    "who": "Ruth",
    "how": "typed",
    "line": "post Parking on Murray will be gone by 6, walk if you can (1)",
    "ok": true,
-   "ms": 3.3,
-   "said": "ok post sb106 [r82]"
+   "ms": 3.5,
+   "said": "ok post sb110 [r82]"
   },
   {
    "who": "Ruth",
    "how": "typed",
    "line": "post Parking on Murray will be gone by 6, walk if you can (2)",
    "ok": true,
-   "ms": 3.6,
-   "said": "ok post sb107 [r83]"
+   "ms": 3.4,
+   "said": "ok post sb111 [r83]"
   },
   {
    "who": "Ruth",
    "how": "typed",
    "line": "post Parking on Murray will be gone by 6, walk if you can (3)",
    "ok": true,
-   "ms": 4.1,
-   "said": "ok post sb108 [r84]"
+   "ms": 3.0,
+   "said": "ok post sb112 [r84]"
   },
   {
    "who": "Ruth",
    "how": "typed",
    "line": "post Parking on Murray will be gone by 6, walk if you can (4)",
    "ok": true,
-   "ms": 3.7,
-   "said": "ok post sb109 [r85]"
+   "ms": 3.1,
+   "said": "ok post sb113 [r85]"
   },
   {
    "who": "Ruth",
    "how": "typed",
    "line": "post Parking on Murray will be gone by 6, walk if you can (5)",
    "ok": true,
-   "ms": 3.3,
-   "said": "ok post sb110 [r86]"
+   "ms": 3.2,
+   "said": "ok post sb114 [r86]"
   },
   {
    "who": "Ruth",
    "how": "typed",
    "line": "post one more thing about parking",
    "ok": false,
-   "ms": 1.5,
+   "ms": 1.4,
    "said": "refused: you have said post 5 times today, the most it takes from one person in a day"
   },
   {
    "who": "Dana",
    "how": "pressed",
-   "line": "do agenda.next a776",
+   "line": "do agenda.next a808",
    "ok": true,
-   "ms": 14.9,
-   "said": "ok set sb97 [r87] · now=sb98"
+   "ms": 27.6,
+   "said": "ok set sb101 [r87] · now=sb102"
   },
   {
    "who": "Maya/notes",
    "how": "typed",
-   "line": "make kind=summary about=sb98 text=\"Roll call: all five present. The mayor read the hearing rules: two minutes each, in s",
+   "line": "make kind=summary about=sb102 text=\"Roll call: all five present. The mayor read the hearing rules: two minutes each, in ",
    "ok": true,
-   "ms": 9.7,
-   "said": "ok make sb111 [r88] · a summary in Council watch"
+   "ms": 8.8,
+   "said": "ok make sb115 [r88] · a summary in Council watch"
   },
   {
    "who": "Dana",
    "how": "pressed",
-   "line": "do agenda.next a776",
+   "line": "do agenda.next a808",
    "ok": true,
-   "ms": 21.8,
-   "said": "ok set sb97 [r89] · now=sb99"
+   "ms": 30.4,
+   "said": "ok set sb101 [r89] · now=sb103"
   },
   {
    "who": "Maya/notes",
    "how": "typed",
-   "line": "make kind=summary about=sb99 text=\"Consent calendar passed 5-0 without discussion; nothing on it touches Murray & 5th.\" ",
+   "line": "make kind=summary about=sb103 text=\"Consent calendar passed 5-0 without discussion; nothing on it touches Murray & 5th.\"",
    "ok": true,
-   "ms": 5.5,
-   "said": "ok make sb112 [r90] · a summary in Council watch"
+   "ms": 8.3,
+   "said": "ok make sb116 [r90] · a summary in Council watch"
   },
   {
    "who": "Dana",
    "how": "pressed",
-   "line": "do agenda.next a776",
+   "line": "do agenda.next a808",
    "ok": true,
-   "ms": 44.8,
-   "said": "ok set sb97 [r91] · now=sb100"
+   "ms": 21.4,
+   "said": "ok set sb101 [r91] · now=sb104"
   },
   {
    "who": "Dana",
    "how": "typed",
-   "line": "make kind=poll title=\"Push for continuance?\" options=\"yes no\" in=sb41",
+   "line": "make kind=poll title=\"Push for continuance?\" options=\"yes no\" in=sb45",
    "ok": true,
-   "ms": 11.2,
-   "said": "ok make sb113 [r92] · a poll in Council watch"
+   "ms": 9.8,
+   "said": "ok make sb117 [r92] · a poll in Council watch"
   },
   {
    "who": "Maya",
    "how": "typed",
-   "line": "vote sb113 yes",
+   "line": "vote sb117 yes",
    "ok": true,
-   "ms": 46.5,
-   "said": "ok vote sb113 [r93] · counted; how you voted is sealed"
+   "ms": 35.2,
+   "said": "ok vote sb117 [r93] · counted; how you voted is sealed"
   },
   {
    "who": "Jo",
    "how": "typed",
-   "line": "vote sb113 yes",
+   "line": "vote sb117 yes",
    "ok": true,
-   "ms": 59.0,
-   "said": "ok vote sb113 [r94] · counted; how you voted is sealed"
+   "ms": 41.9,
+   "said": "ok vote sb117 [r94] · counted; how you voted is sealed"
   },
   {
    "who": "Sam",
    "how": "typed",
-   "line": "vote sb113 yes",
+   "line": "vote sb117 yes",
    "ok": true,
-   "ms": 87.4,
-   "said": "ok vote sb113 [r95] · counted; how you voted is sealed"
+   "ms": 43.5,
+   "said": "ok vote sb117 [r95] · counted; how you voted is sealed"
   },
   {
    "who": "Omar",
    "how": "typed",
-   "line": "vote sb113 yes",
+   "line": "vote sb117 yes",
    "ok": true,
-   "ms": 79.6,
-   "said": "ok vote sb113 [r96] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Gus",
-   "how": "typed",
-   "line": "vote sb113 yes",
-   "ok": true,
-   "ms": 98.4,
-   "said": "ok vote sb113 [r98] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Wes",
-   "how": "typed",
-   "line": "vote sb113 yes",
-   "ok": true,
-   "ms": 92.9,
-   "said": "ok vote sb113 [r99] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Tom",
-   "how": "typed",
-   "line": "vote sb113 no",
-   "ok": true,
-   "ms": 100.9,
-   "said": "ok vote sb113 [r97] · counted; how you voted is sealed"
+   "ms": 55.6,
+   "said": "ok vote sb117 [r96] · counted; how you voted is sealed"
   },
   {
    "who": "Raul",
    "how": "typed",
-   "line": "vote sb113 no",
+   "line": "vote sb117 no",
    "ok": true,
-   "ms": 162.5,
-   "said": "ok vote sb113 [r100] · counted; how you voted is sealed"
+   "ms": 68.5,
+   "said": "ok vote sb117 [r100] · counted; how you voted is sealed"
   },
   {
-   "who": "Luis",
+   "who": "Tom",
    "how": "typed",
-   "line": "vote sb113 no",
+   "line": "vote sb117 no",
    "ok": true,
-   "ms": 161.9,
-   "said": "ok vote sb113 [r102] · counted; how you voted is sealed"
+   "ms": 74.6,
+   "said": "ok vote sb117 [r97] · counted; how you voted is sealed"
   },
   {
-   "who": "Otto",
+   "who": "Gus",
    "how": "typed",
-   "line": "vote sb113 no",
+   "line": "vote sb117 yes",
    "ok": true,
-   "ms": 150.5,
-   "said": "ok vote sb113 [r103] · counted; how you voted is sealed"
+   "ms": 73.3,
+   "said": "ok vote sb117 [r98] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Wes",
+   "how": "typed",
+   "line": "vote sb117 yes",
+   "ok": true,
+   "ms": 72.5,
+   "said": "ok vote sb117 [r99] · counted; how you voted is sealed"
   },
   {
    "who": "Abel",
    "how": "typed",
-   "line": "vote sb113 no",
+   "line": "vote sb117 no",
    "ok": true,
-   "ms": 177.3,
-   "said": "ok vote sb113 [r101] · counted; how you voted is sealed"
+   "ms": 89.0,
+   "said": "ok vote sb117 [r101] · counted; how you voted is sealed"
   },
   {
-   "who": "Ike",
+   "who": "Luis",
    "how": "typed",
-   "line": "vote sb113 yes",
+   "line": "vote sb117 no",
    "ok": true,
-   "ms": 120.0,
-   "said": "ok vote sb113 [r104] · counted; how you voted is sealed"
+   "ms": 98.8,
+   "said": "ok vote sb117 [r102] · counted; how you voted is sealed"
   },
   {
-   "who": "Cruz",
+   "who": "Otto",
    "how": "typed",
-   "line": "vote sb113 yes",
+   "line": "vote sb117 no",
    "ok": true,
-   "ms": 153.9,
-   "said": "ok vote sb113 [r105] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Bea",
-   "how": "pressed",
-   "line": "do vote a904 yes",
-   "ok": true,
-   "ms": 159.7,
-   "said": "ok vote sb113 [r107] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Dana",
-   "how": "pressed",
-   "line": "do vote a904 yes",
-   "ok": true,
-   "ms": 198.5,
-   "said": "ok vote sb113 [r106] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Priya",
-   "how": "pressed",
-   "line": "do vote a904 yes",
-   "ok": true,
-   "ms": 146.1,
-   "said": "ok vote sb113 [r108] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Ada",
-   "how": "typed",
-   "line": "vote sb113 yes",
-   "ok": true,
-   "ms": 51.7,
-   "said": "ok vote sb113 [r115] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Lena",
-   "how": "pressed",
-   "line": "do vote a904 yes",
-   "ok": true,
-   "ms": 162.7,
-   "said": "ok vote sb113 [r113] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Ines",
-   "how": "pressed",
-   "line": "do vote a904 yes",
-   "ok": true,
-   "ms": 125.7,
-   "said": "ok vote sb113 [r111] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Ruth",
-   "how": "pressed",
-   "line": "do vote a904 yes",
-   "ok": true,
-   "ms": 181.7,
-   "said": "ok vote sb113 [r112] · counted; how you voted is sealed"
+   "ms": 107.6,
+   "said": "ok vote sb117 [r103] · counted; how you voted is sealed"
   },
   {
    "who": "Sol",
    "how": "typed",
-   "line": "vote sb113 yes",
+   "line": "vote sb117 yes",
    "ok": true,
-   "ms": 111.3,
-   "said": "ok vote sb113 [r109] · counted; how you voted is sealed"
+   "ms": 43.1,
+   "said": "ok vote sb117 [r108] · counted; how you voted is sealed"
   },
   {
-   "who": "Yuri",
+   "who": "Ike",
    "how": "typed",
-   "line": "vote sb113 yes",
+   "line": "vote sb117 yes",
    "ok": true,
-   "ms": 84.5,
-   "said": "ok vote sb113 [r114] · counted; how you voted is sealed"
+   "ms": 91.1,
+   "said": "ok vote sb117 [r105] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Cruz",
+   "how": "typed",
+   "line": "vote sb117 yes",
+   "ok": true,
+   "ms": 111.2,
+   "said": "ok vote sb117 [r106] · counted; how you voted is sealed"
   },
   {
    "who": "Pia",
    "how": "typed",
-   "line": "vote sb113 yes",
+   "line": "vote sb117 yes",
    "ok": true,
-   "ms": 146.4,
-   "said": "ok vote sb113 [r110] · counted; how you voted is sealed"
+   "ms": 92.0,
+   "said": "ok vote sb117 [r104] · counted; how you voted is sealed"
   },
   {
-   "who": "Hana",
+   "who": "Lena",
    "how": "pressed",
-   "line": "do vote a904 yes",
+   "line": "do vote a936 yes",
    "ok": true,
-   "ms": 103.2,
-   "said": "ok vote sb113 [r116] · counted; how you voted is sealed"
+   "ms": 104.6,
+   "said": "ok vote sb117 [r109] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Dana",
+   "how": "pressed",
+   "line": "do vote a936 yes",
+   "ok": true,
+   "ms": 166.4,
+   "said": "ok vote sb117 [r107] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Ines",
+   "how": "pressed",
+   "line": "do vote a936 yes",
+   "ok": true,
+   "ms": 71.5,
+   "said": "ok vote sb117 [r110] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Ruth",
+   "how": "pressed",
+   "line": "do vote a936 yes",
+   "ok": true,
+   "ms": 126.5,
+   "said": "ok vote sb117 [r112] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Yuri",
+   "how": "typed",
+   "line": "vote sb117 yes",
+   "ok": true,
+   "ms": 50.6,
+   "said": "ok vote sb117 [r113] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Ada",
+   "how": "typed",
+   "line": "vote sb117 yes",
+   "ok": true,
+   "ms": 49.8,
+   "said": "ok vote sb117 [r114] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Priya",
+   "how": "pressed",
+   "line": "do vote a936 yes",
+   "ok": true,
+   "ms": 99.7,
+   "said": "ok vote sb117 [r115] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Bea",
+   "how": "pressed",
+   "line": "do vote a936 yes",
+   "ok": true,
+   "ms": 146.7,
+   "said": "ok vote sb117 [r111] · counted; how you voted is sealed"
   },
   {
    "who": "Cleo",
    "how": "typed",
-   "line": "vote sb113 yes",
+   "line": "vote sb117 yes",
    "ok": true,
-   "ms": 47.0,
-   "said": "ok vote sb113 [r117] · counted; how you voted is sealed"
+   "ms": 29.3,
+   "said": "ok vote sb117 [r116] · counted; how you voted is sealed"
   },
   {
-   "who": "Eli",
-   "how": "typed",
-   "line": "vote sb113 yes",
+   "who": "Hana",
+   "how": "pressed",
+   "line": "do vote a936 yes",
    "ok": true,
-   "ms": 55.4,
-   "said": "ok vote sb113 [r118] · counted; how you voted is sealed"
+   "ms": 70.6,
+   "said": "ok vote sb117 [r117] · counted; how you voted is sealed"
   },
   {
    "who": "Hugo",
    "how": "typed",
-   "line": "vote sb113 no",
+   "line": "vote sb117 no",
    "ok": true,
-   "ms": 52.6,
-   "said": "ok vote sb113 [r119] · counted; how you voted is sealed"
+   "ms": 31.6,
+   "said": "ok vote sb117 [r119] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Eli",
+   "how": "typed",
+   "line": "vote sb117 yes",
+   "ok": true,
+   "ms": 34.3,
+   "said": "ok vote sb117 [r118] · counted; how you voted is sealed"
   },
   {
    "who": "Nora",
    "how": "pressed",
-   "line": "do vote a904 yes",
+   "line": "do vote a936 yes",
    "ok": true,
-   "ms": 21.7,
-   "said": "ok vote sb113 [r120] · counted; how you voted is sealed"
+   "ms": 34.5,
+   "said": "ok vote sb117 [r120] · counted; how you voted is sealed"
   },
   {
    "who": "Kiko",
    "how": "pressed",
-   "line": "do vote a904 yes",
+   "line": "do vote a936 yes",
    "ok": true,
-   "ms": 19.6,
-   "said": "ok vote sb113 [r121] · counted; how you voted is sealed"
+   "ms": 23.9,
+   "said": "ok vote sb117 [r121] · counted; how you voted is sealed"
   },
   {
    "who": "Fern",
    "how": "pressed",
-   "line": "do vote a904 yes",
+   "line": "do vote a936 yes",
    "ok": true,
-   "ms": 20.1,
-   "said": "ok vote sb113 [r122] · counted; how you voted is sealed"
+   "ms": 19.7,
+   "said": "ok vote sb117 [r122] · counted; how you voted is sealed"
   },
   {
    "who": "Mei",
    "how": "pressed",
-   "line": "do vote a904 yes",
+   "line": "do vote a936 yes",
    "ok": true,
-   "ms": 19.4,
-   "said": "ok vote sb113 [r123] · counted; how you voted is sealed"
+   "ms": 21.4,
+   "said": "ok vote sb117 [r123] · counted; how you voted is sealed"
   },
   {
    "who": "June",
    "how": "pressed",
-   "line": "do vote a904 yes",
+   "line": "do vote a936 yes",
    "ok": true,
-   "ms": 32.3,
-   "said": "ok vote sb113 [r124] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Lark",
-   "how": "pressed",
-   "line": "do vote a904 yes",
-   "ok": true,
-   "ms": 22.0,
-   "said": "ok vote sb113 [r125] · counted; how you voted is sealed"
+   "ms": 18.0,
+   "said": "ok vote sb117 [r124] · counted; how you voted is sealed"
   },
   {
    "who": "Tess",
    "how": "pressed",
-   "line": "do vote a904 yes",
+   "line": "do vote a936 yes",
    "ok": true,
-   "ms": 29.3,
-   "said": "ok vote sb113 [r126] · counted; how you voted is sealed"
+   "ms": 19.1,
+   "said": "ok vote sb117 [r125] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Lark",
+   "how": "pressed",
+   "line": "do vote a936 yes",
+   "ok": true,
+   "ms": 17.0,
+   "said": "ok vote sb117 [r126] · counted; how you voted is sealed"
   },
   {
    "who": "Ravi",
    "how": "pressed",
-   "line": "do vote a904 no",
+   "line": "do vote a936 no",
    "ok": true,
-   "ms": 20.8,
-   "said": "ok vote sb113 [r127] · counted; how you voted is sealed"
+   "ms": 18.0,
+   "said": "ok vote sb117 [r127] · counted; how you voted is sealed"
   },
   {
    "who": "Vera",
    "how": "pressed",
-   "line": "do vote a904 yes",
+   "line": "do vote a936 yes",
    "ok": true,
-   "ms": 19.1,
-   "said": "ok vote sb113 [r128] · counted; how you voted is sealed"
+   "ms": 18.9,
+   "said": "ok vote sb117 [r128] · counted; how you voted is sealed"
   },
   {
    "who": "Zoe",
    "how": "pressed",
-   "line": "do vote a904 no",
+   "line": "do vote a936 no",
    "ok": true,
-   "ms": 24.2,
-   "said": "ok vote sb113 [r129] · counted; how you voted is sealed"
+   "ms": 16.5,
+   "said": "ok vote sb117 [r129] · counted; how you voted is sealed"
   },
   {
    "who": "Ben",
    "how": "pressed",
-   "line": "do vote a904 yes",
+   "line": "do vote a936 yes",
    "ok": true,
-   "ms": 22.9,
-   "said": "ok vote sb113 [r130] · counted; how you voted is sealed"
+   "ms": 17.1,
+   "said": "ok vote sb117 [r130] · counted; how you voted is sealed"
   },
   {
    "who": "Dev",
    "how": "pressed",
-   "line": "do vote a904 yes",
+   "line": "do vote a936 yes",
    "ok": true,
-   "ms": 36.6,
-   "said": "ok vote sb113 [r131] · counted; how you voted is sealed"
+   "ms": 17.1,
+   "said": "ok vote sb117 [r131] · counted; how you voted is sealed"
   },
   {
    "who": "Faye",
    "how": "pressed",
-   "line": "do vote a904 yes",
+   "line": "do vote a936 yes",
    "ok": true,
-   "ms": 22.9,
-   "said": "ok vote sb113 [r132] · counted; how you voted is sealed"
+   "ms": 16.6,
+   "said": "ok vote sb117 [r132] · counted; how you voted is sealed"
   },
   {
    "who": "Ruth",
    "how": "typed",
-   "line": "look sb113",
+   "line": "look sb117",
    "ok": true,
-   "ms": 12.1,
-   "said": "Push for continuance? (sb113), a poll by Dana"
+   "ms": 14.5,
+   "said": "Push for continuance? (sb117), a poll by Dana"
   },
   {
    "who": "Bea",
    "how": "typed",
-   "line": "vote sb113 no",
+   "line": "vote sb117 no",
    "ok": false,
-   "ms": 2.5,
-   "said": "refused: you have already said vote on sb113; once each. undo takes yours back"
+   "ms": 3.2,
+   "said": "refused: you have already said vote on sb117; once each. undo takes yours back"
   },
   {
    "who": "Maya",
    "how": "typed",
    "line": "undo",
    "ok": true,
-   "ms": 18.2,
+   "ms": 19.0,
    "said": "ok undo r93 [r133] · put back 1 fact"
   },
   {
    "who": "Maya",
    "how": "typed",
-   "line": "vote sb113 no",
+   "line": "vote sb117 no",
    "ok": true,
-   "ms": 20.9,
-   "said": "ok vote sb113 [r134] · counted; how you voted is sealed"
+   "ms": 22.4,
+   "said": "ok vote sb117 [r134] · counted; how you voted is sealed"
   },
   {
    "who": "Maya/notes",
    "how": "typed",
-   "line": "make kind=summary about=sb100 text=\"Public hearing on 41 homes at Murray & 5th. Most speakers asked about parking and th",
+   "line": "make kind=summary about=sb104 text=\"Public hearing on 41 homes at Murray & 5th. Most speakers asked about parking and th",
    "ok": true,
-   "ms": 20.4,
-   "said": "ok make sb114 [r135] · a summary in Council watch"
+   "ms": 24.5,
+   "said": "ok make sb118 [r135] · a summary in Council watch"
   },
   {
    "who": "Bea/notes",
    "how": "typed",
-   "line": "make kind=summary about=sb100 text=\"Bea's notes: the crossing guard at Murray came up four times.\" in=sb41",
+   "line": "make kind=summary about=sb104 text=\"Bea's notes: the crossing guard at Murray came up four times.\" in=sb45",
    "ok": true,
-   "ms": 31.4,
-   "said": "ok make sb115 [r136] · a summary in Council watch"
+   "ms": 49.0,
+   "said": "ok make sb119 [r136] · a summary in Council watch"
   },
   {
    "who": "Jo/notes",
    "how": "typed",
-   "line": "make kind=summary about=sb100 text=\"Jo's notes: two speakers asked for more homes near the 68 bus.\" in=sb41",
+   "line": "make kind=summary about=sb104 text=\"Jo's notes: two speakers asked for more homes near the 68 bus.\" in=sb45",
    "ok": true,
-   "ms": 27.6,
-   "said": "ok make sb116 [r137] · a summary in Council watch"
+   "ms": 25.7,
+   "said": "ok make sb120 [r137] · a summary in Council watch"
   },
   {
    "who": "Dana",
    "how": "pressed",
-   "line": "do agenda.next a776",
+   "line": "do agenda.next a808",
    "ok": true,
-   "ms": 24.2,
-   "said": "ok set sb97 [r138] · now=sb101"
+   "ms": 34.3,
+   "said": "ok set sb101 [r138] · now=sb105"
   },
   {
    "who": "Maya/notes",
    "how": "typed",
-   "line": "make kind=summary about=sb101 text=\"Staff answered the traffic questions only in part; the traffic study is not finished",
+   "line": "make kind=summary about=sb105 text=\"Staff answered the traffic questions only in part; the traffic study is not finished",
    "ok": true,
-   "ms": 32.1,
-   "said": "ok make sb117 [r139] · a summary in Council watch"
-  },
-  {
-   "who": "Dana",
-   "how": "pressed",
-   "line": "do agenda.next a776",
-   "ok": true,
-   "ms": 18.7,
-   "said": "ok set sb97 [r140] · now=sb102"
+   "ms": 12.0,
+   "said": "ok make sb121 [r139] · a summary in Council watch"
   },
   {
    "who": "Alex",
    "how": "pressed",
-   "line": "do agenda.next a776",
+   "line": "do agenda.next a808",
+   "ok": true,
+   "ms": 28.2,
+   "said": "ok set sb101 [r140] · now=sb106"
+  },
+  {
+   "who": "Dana",
+   "how": "pressed",
+   "line": "do agenda.next a808",
    "ok": false,
-   "ms": 20.6,
-   "said": "refused: stale: sb97 changed since it was painted (now, r140); nothing was done. The view will repaint."
+   "ms": 32.3,
+   "said": "refused: stale: sb101 changed since it was painted (now, r140); nothing was done. The view will repaint."
   },
   {
    "who": "Maya/notes",
    "how": "typed",
-   "line": "make kind=summary about=sb102 text=\"Council continued the item to 18 Nov, asking staff to return with the traffic study.",
+   "line": "make kind=summary about=sb106 text=\"Council continued the item to 18 Nov, asking staff to return with the traffic study.",
    "ok": true,
-   "ms": 17.5,
-   "said": "ok make sb118 [r141] · a summary in Council watch"
+   "ms": 9.3,
+   "said": "ok make sb122 [r141] · a summary in Council watch"
   },
   {
    "who": "Ruth",
    "how": "pressed",
-   "line": "do agenda.next a776",
+   "line": "do agenda.next a808",
    "ok": false,
-   "ms": 5.3,
+   "ms": 1.9,
    "said": "refused: agenda.next is for leaders of Council watch; help agenda.next says more"
   },
   {
    "who": "Dana",
    "how": "typed",
-   "line": "post Council continued item 7B to 18 Nov. Staff return with the traffic study. Thank you, all 12 speakers. about=sb96 in",
+   "line": "post Council continued item 7B to 18 Nov. Staff return with the traffic study. Thank you, all 12 speakers. about=sb100 i",
    "ok": true,
-   "ms": 45.2,
-   "said": "ok post sb119 [r142] in Council watch (seen by its members)"
+   "ms": 30.8,
+   "said": "ok post sb123 [r142] in Council watch (seen by its members)"
   },
   {
    "who": "Sam",
    "how": "typed",
    "line": "look",
    "ok": true,
-   "ms": 68.2,
+   "ms": 46.7,
    "said": "Seabright: the feed, 6 posts"
   },
   {
@@ -1257,15 +1257,15 @@
    "how": "typed",
    "line": "post Thanks to everyone who drove",
    "ok": true,
-   "ms": 39.3,
-   "said": "ok post sb120 [r144]"
+   "ms": 17.8,
+   "said": "ok post sb124 [r144]"
   },
   {
    "who": "Sam",
    "how": "typed",
-   "line": "pin sb120",
+   "line": "pin sb124",
    "ok": false,
-   "ms": 19.9,
+   "ms": 2.6,
    "said": "refused: pin is for leaders of Seabright; help pin says more"
   },
   {
@@ -1273,95 +1273,95 @@
    "how": "typed",
    "line": "tally.top 2",
    "ok": true,
-   "ms": 17.3,
+   "ms": 17.8,
    "said": "most liked:"
   },
   {
    "who": "Dana",
    "how": "typed",
-   "line": "verb prepare steps=\"agenda.load $*\" help=\"Bring in our own posted agenda\" may=leaders in=sb41",
+   "line": "verb prepare steps=\"agenda.load $*\" help=\"Bring in our own posted agenda\" may=leaders in=sb45",
    "ok": true,
-   "ms": 44.9,
-   "said": "ok verb prepare (sb121) [r145] · a new word in Council watch: agenda.load $*"
+   "ms": 31.7,
+   "said": "ok verb prepare (sb125) [r145] · a new word in Council watch: agenda.load $*"
   },
   {
    "who": "Dana",
    "how": "typed",
-   "line": "verb speak steps=\"claim $1\" takes=\"<id>\" help=\"Take a public comment slot\" in=sb41",
+   "line": "verb speak steps=\"claim $1\" takes=\"<id>\" help=\"Take a public comment slot\" in=sb45",
    "ok": true,
-   "ms": 43.5,
-   "said": "ok verb speak (sb122) [r146] · a new word in Council watch: claim $1"
+   "ms": 20.0,
+   "said": "ok verb speak (sb126) [r146] · a new word in Council watch: claim $1"
   },
   {
    "who": "Dana",
    "how": "typed",
    "line": "verb pulse steps=\"vote $1 $2\" takes=\"<id> <option>\" sealed=yes once=\"per person per target\" help=\"Our sealed pulse poll\"",
    "ok": true,
-   "ms": 79.6,
-   "said": "ok verb pulse (sb123) [r147] · a new word in Council watch: vote $1 $2"
+   "ms": 17.8,
+   "said": "ok verb pulse (sb127) [r147] · a new word in Council watch: vote $1 $2"
   },
   {
    "who": "Dana",
    "how": "typed",
-   "line": "make kind=kind name=meeting help=\"A meeting with ordered items\" in=sb41",
+   "line": "make kind=kind name=meeting help=\"A meeting with ordered items\" in=sb45",
    "ok": true,
-   "ms": 12.9,
-   "said": "ok make sb124 [r148] · a kind in Council watch"
+   "ms": 17.9,
+   "said": "ok make sb128 [r148] · a kind in Council watch"
   },
   {
    "who": "Dana",
    "how": "typed",
-   "line": "make kind=kind name=item help=\"An item of a meeting\" in=sb41",
+   "line": "make kind=kind name=item help=\"An item of a meeting\" in=sb45",
    "ok": true,
-   "ms": 84.3,
-   "said": "ok make sb125 [r149] · a kind in Council watch"
+   "ms": 18.2,
+   "said": "ok make sb129 [r149] · a kind in Council watch"
   },
   {
    "who": "Dana",
    "how": "typed",
-   "line": "make kind=style name=community text=\"token paper = #FBFAF7\" in=sb41",
+   "line": "make kind=style name=community text=\"token paper = #FBFAF7\" in=sb45",
    "ok": true,
-   "ms": 34.4,
-   "said": "ok make sb126 [r150] · a style in Council watch"
+   "ms": 17.6,
+   "said": "ok make sb130 [r150] · a style in Council watch"
   },
   {
    "who": "Dana",
    "how": "typed",
-   "line": "make kind=rule name=acknowledge on=pin do=\"look $target\" in=sb41",
+   "line": "make kind=rule name=acknowledge on=pin do=\"look $target\" in=sb45",
    "ok": true,
-   "ms": 38.8,
-   "said": "ok make sb127 [r151] · a rule in Council watch"
+   "ms": 21.3,
+   "said": "ok make sb131 [r151] · a rule in Council watch"
   },
   {
    "who": "Dana",
    "how": "typed",
-   "line": "kit sb41 name=\"Council watch\"",
+   "line": "kit sb45 name=\"Council watch\"",
    "ok": true,
-   "ms": 45.9,
-   "said": "ok kit sb128 [r152] · 11 definitions, no data"
+   "ms": 21.8,
+   "said": "ok kit sb132 [r152] · 11 definitions, no data"
   },
   {
    "who": "Dana",
    "how": "typed",
-   "line": "look sb128",
+   "line": "look sb132",
    "ok": true,
-   "ms": 32.1,
-   "said": "Council watch (sb128), a kit by Dana"
+   "ms": 2.3,
+   "said": "Council watch (sb132), a kit by Dana"
   },
   {
    "who": "Dana",
    "how": "typed",
-   "line": "post Council watch tools for another community about=sb128",
+   "line": "post Council watch tools for another community about=sb132",
    "ok": true,
-   "ms": 35.8,
-   "said": "ok post sb129 [r153]"
+   "ms": 33.5,
+   "said": "ok post sb133 [r153]"
   },
   {
    "who": "Sam",
    "how": "typed",
    "line": "look",
    "ok": true,
-   "ms": 3.4,
+   "ms": 2.7,
    "said": "Seabright: the feed, 8 posts"
   }
  ],
@@ -1369,65 +1369,65 @@
   {
    "who": "Marisol",
    "how": "typed",
-   "line": "role wt41 leader in=wt40",
+   "line": "role wt45 leader in=wt44",
    "ok": true,
-   "ms": 36.7,
-   "said": "ok role wt41 [r16] · Lucia is a leader of Tenant organizing"
+   "ms": 23.2,
+   "said": "ok role wt45 [r16] · Lucia is a leader of Tenant organizing"
   },
   {
    "who": "Lucia",
    "how": "typed",
-   "line": "take bundle=\"{\\\"version\\\": 1, \\\"source\\\": \\\"91f784dd7a421d205cb796e6\\\", \\\"group\\\": \\\"sb41\\\", \\\"definitions\\\": [{\\\"id\\\": ",
+   "line": "take bundle=\"{\\\"version\\\": 1, \\\"source\\\": \\\"9426f5c70af9b5db0d3531fc\\\", \\\"group\\\": \\\"sb45\\\", \\\"definitions\\\": [{\\\"id\\\": ",
    "ok": true,
-   "ms": 116.6,
+   "ms": 63.4,
    "said": "ok take [r17] · 11 new definitions in Tenant organizing"
   },
   {
    "who": "Lucia",
    "how": "typed",
-   "line": "help agenda.load in=wt40",
+   "line": "help agenda.load in=wt44",
    "ok": true,
-   "ms": 3.2,
+   "ms": 3.8,
    "said": "agenda.load: bring the posted council agenda in: the meeting, its items in order, and the public-comment list on the hearing item."
   },
   {
    "who": "Lucia",
    "how": "typed",
-   "line": "agenda.load in=wt40",
+   "line": "agenda.load in=wt44",
    "ok": false,
-   "ms": 31.2,
+   "ms": 23.8,
    "said": "refused: agenda.load is unbound: agenda is off; look agenda says more"
   },
   {
    "who": "Lucia",
    "how": "typed",
-   "line": "help agenda.next in=wt40",
+   "line": "help agenda.next in=wt44",
    "ok": true,
-   "ms": 4.0,
+   "ms": 3.0,
    "said": "agenda.next <meeting>: move the meeting on to its next item, so everyone following sees what is being heard now. Its group's leaders may."
   },
   {
    "who": "Lucia",
    "how": "typed",
-   "line": "help agenda.next in=wt40",
+   "line": "help agenda.next in=wt44",
    "ok": true,
-   "ms": 27.8,
+   "ms": 3.1,
    "said": "agenda.next <meeting>: move the meeting on to its next item, so everyone following sees what is being heard now. Its group's leaders may."
   },
   {
    "who": "Lucia",
    "how": "typed",
-   "line": "look wt55",
+   "line": "look wt59",
    "ok": true,
-   "ms": 24.3,
-   "said": "prepare (wt55), a do word: Bring in our own posted agenda"
+   "ms": 27.9,
+   "said": "prepare (wt59), a do word: Bring in our own posted agenda"
   },
   {
    "who": "Lucia",
    "how": "typed",
-   "line": "rename wt55 word=organize aliases=\"preparar organizar\" in=wt40",
+   "line": "rename wt59 word=organize aliases=\"preparar organizar\" in=wt44",
    "ok": true,
-   "ms": 35.7,
+   "ms": 30.3,
    "said": "ok rename [r18] · the bound name still answers"
   },
   {
@@ -1435,7 +1435,7 @@
    "how": "typed",
    "line": "module agenda run=\"[\\\"C:\\\\\\\\Program Files\\\\\\\\nodejs\\\\\\\\node.EXE\\\", \\\"C:\\\\\\\\Projects\\\\\\\\Agora4\\\\\\\\research\\\\\\\\kernel-lab\\",
    "ok": false,
-   "ms": 3.0,
+   "ms": 25.5,
    "said": "refused: module is for stewards; help module says more"
   },
   {
@@ -1443,312 +1443,312 @@
    "how": "typed",
    "line": "module agenda run=\"[\\\"C:\\\\\\\\Program Files\\\\\\\\nodejs\\\\\\\\node.EXE\\\", \\\"C:\\\\\\\\Projects\\\\\\\\Agora4\\\\\\\\research\\\\\\\\kernel-lab\\",
    "ok": true,
-   "ms": 689.0,
+   "ms": 191.2,
    "said": "ok module agenda [r19] · local run command and explicit grants"
   },
   {
    "who": "Lucia",
    "how": "typed",
-   "line": "help agenda.load in=wt40",
+   "line": "help agenda.load in=wt44",
    "ok": true,
-   "ms": 2.5,
+   "ms": 9.4,
    "said": "agenda.load: bring the posted council agenda in: the meeting, its items in order, and the public-comment list on the hearing item."
   },
   {
    "who": "Lucia",
    "how": "typed",
-   "line": "preparar agenda-watsonville.json in=wt40",
+   "line": "preparar agenda-watsonville.json in=wt44",
    "ok": true,
-   "ms": 39.0,
-   "said": "ok make wt69 [r21] · a meeting in Tenant organizing"
+   "ms": 51.9,
+   "said": "ok make wt73 [r21] · a meeting in Tenant organizing"
+  },
+  {
+   "who": "Lucia",
+   "how": "typed",
+   "line": "speak wt75 in=wt44",
+   "ok": true,
+   "ms": 23.1,
+   "said": "ok claim wt75 [r22] · yours; 11 seats left"
   },
   {
    "who": "Marisol",
    "how": "typed",
-   "line": "speak wt71 in=wt40",
+   "line": "speak wt75 in=wt44",
    "ok": true,
-   "ms": 14.1,
-   "said": "ok claim wt71 [r22] · yours; 11 seats left"
-  },
-  {
-   "who": "Lucia",
-   "how": "typed",
-   "line": "speak wt71 in=wt40",
-   "ok": true,
-   "ms": 24.0,
-   "said": "ok claim wt71 [r23] · yours; 10 seats left"
+   "ms": 34.1,
+   "said": "ok claim wt75 [r23] · yours; 10 seats left"
   },
   {
    "who": "Rosa",
    "how": "typed",
-   "line": "speak wt71 in=wt40",
+   "line": "speak wt75 in=wt44",
    "ok": true,
-   "ms": 30.3,
-   "said": "ok claim wt71 [r24] · yours; 9 seats left"
+   "ms": 64.6,
+   "said": "ok claim wt75 [r24] · yours; 9 seats left"
   },
   {
    "who": "Elena",
    "how": "typed",
-   "line": "speak wt71 in=wt40",
+   "line": "speak wt75 in=wt44",
    "ok": true,
-   "ms": 41.7,
-   "said": "ok claim wt71 [r25] · yours; 8 seats left"
-  },
-  {
-   "who": "Diego",
-   "how": "typed",
-   "line": "speak wt71 in=wt40",
-   "ok": true,
-   "ms": 45.3,
-   "said": "ok claim wt71 [r26] · yours; 7 seats left"
-  },
-  {
-   "who": "Pablo",
-   "how": "typed",
-   "line": "speak wt71 in=wt40",
-   "ok": true,
-   "ms": 55.2,
-   "said": "ok claim wt71 [r27] · yours; 6 seats left"
-  },
-  {
-   "who": "Carmen",
-   "how": "typed",
-   "line": "speak wt71 in=wt40",
-   "ok": true,
-   "ms": 51.2,
-   "said": "ok claim wt71 [r28] · yours; 5 seats left"
-  },
-  {
-   "who": "Javier",
-   "how": "typed",
-   "line": "speak wt71 in=wt40",
-   "ok": true,
-   "ms": 51.4,
-   "said": "ok claim wt71 [r29] · yours; 4 seats left"
-  },
-  {
-   "who": "Mateo",
-   "how": "typed",
-   "line": "speak wt71 in=wt40",
-   "ok": true,
-   "ms": 61.5,
-   "said": "ok claim wt71 [r30] · yours; 3 seats left"
-  },
-  {
-   "who": "Andres",
-   "how": "typed",
-   "line": "speak wt71 in=wt40",
-   "ok": true,
-   "ms": 53.4,
-   "said": "ok claim wt71 [r31] · yours; 2 seats left"
-  },
-  {
-   "who": "Isabel",
-   "how": "typed",
-   "line": "speak wt71 in=wt40",
-   "ok": true,
-   "ms": 53.0,
-   "said": "ok claim wt71 [r32] · yours; 1 seat left"
-  },
-  {
-   "who": "Dolores",
-   "how": "typed",
-   "line": "speak wt71 in=wt40",
-   "ok": true,
-   "ms": 50.6,
-   "said": "ok claim wt71 [r33] · yours; 0 seats left"
+   "ms": 97.8,
+   "said": "ok claim wt75 [r25] · yours; 8 seats left"
   },
   {
    "who": "Sofia",
    "how": "typed",
-   "line": "speak wt71 in=wt40",
-   "ok": false,
-   "ms": 64.8,
-   "said": "refused: wt71 is taken (12 seats, all claimed); look shows what is open"
+   "line": "speak wt75 in=wt44",
+   "ok": true,
+   "ms": 111.3,
+   "said": "ok claim wt75 [r26] · yours; 7 seats left"
+  },
+  {
+   "who": "Diego",
+   "how": "typed",
+   "line": "speak wt75 in=wt44",
+   "ok": true,
+   "ms": 146.0,
+   "said": "ok claim wt75 [r28] · yours; 5 seats left"
+  },
+  {
+   "who": "Pablo",
+   "how": "typed",
+   "line": "speak wt75 in=wt44",
+   "ok": true,
+   "ms": 159.4,
+   "said": "ok claim wt75 [r27] · yours; 6 seats left"
+  },
+  {
+   "who": "Carmen",
+   "how": "typed",
+   "line": "speak wt75 in=wt44",
+   "ok": true,
+   "ms": 157.4,
+   "said": "ok claim wt75 [r30] · yours; 3 seats left"
+  },
+  {
+   "who": "Mateo",
+   "how": "typed",
+   "line": "speak wt75 in=wt44",
+   "ok": true,
+   "ms": 158.2,
+   "said": "ok claim wt75 [r29] · yours; 4 seats left"
+  },
+  {
+   "who": "Isabel",
+   "how": "typed",
+   "line": "speak wt75 in=wt44",
+   "ok": true,
+   "ms": 157.1,
+   "said": "ok claim wt75 [r32] · yours; 1 seat left"
   },
   {
    "who": "Teresa",
    "how": "typed",
-   "line": "speak wt71 in=wt40",
+   "line": "speak wt75 in=wt44",
+   "ok": true,
+   "ms": 159.0,
+   "said": "ok claim wt75 [r33] · yours; 0 seats left"
+  },
+  {
+   "who": "Andres",
+   "how": "typed",
+   "line": "speak wt75 in=wt44",
+   "ok": true,
+   "ms": 158.4,
+   "said": "ok claim wt75 [r31] · yours; 2 seats left"
+  },
+  {
+   "who": "Dolores",
+   "how": "typed",
+   "line": "speak wt75 in=wt44",
    "ok": false,
-   "ms": 56.9,
-   "said": "refused: wt71 is taken (12 seats, all claimed); look shows what is open"
+   "ms": 156.1,
+   "said": "refused: wt75 is taken (12 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Javier",
+   "how": "typed",
+   "line": "speak wt75 in=wt44",
+   "ok": false,
+   "ms": 161.6,
+   "said": "refused: wt75 is taken (12 seats, all claimed); look shows what is open"
   },
   {
    "who": "Miguel",
    "how": "typed",
-   "line": "speak wt71 in=wt40",
+   "line": "speak wt75 in=wt44",
    "ok": false,
-   "ms": 52.8,
-   "said": "refused: wt71 is taken (12 seats, all claimed); look shows what is open"
+   "ms": 170.0,
+   "said": "refused: wt75 is taken (12 seats, all claimed); look shows what is open"
   },
   {
    "who": "Lucia",
    "how": "typed",
-   "line": "make kind=poll title=\"Ask for tenant protections?\" options=\"yes no\" in=wt40",
+   "line": "make kind=poll title=\"Ask for tenant protections?\" options=\"yes no\" in=wt44",
    "ok": true,
-   "ms": 4.9,
-   "said": "ok make wt73 [r34] · a poll in Tenant organizing"
-  },
-  {
-   "who": "Lucia",
-   "how": "typed",
-   "line": "pulse wt73 yes in=wt40",
-   "ok": true,
-   "ms": 10.8,
-   "said": "ok vote wt73 [r35] · counted; how you voted is sealed"
+   "ms": 15.2,
+   "said": "ok make wt77 [r34] · a poll in Tenant organizing"
   },
   {
    "who": "Marisol",
    "how": "typed",
-   "line": "pulse wt73 no in=wt40",
+   "line": "pulse wt77 no in=wt44",
    "ok": true,
-   "ms": 21.5,
-   "said": "ok vote wt73 [r36] · counted; how you voted is sealed"
+   "ms": 20.9,
+   "said": "ok vote wt77 [r35] · counted; how you voted is sealed"
   },
   {
-   "who": "Rosa",
+   "who": "Lucia",
    "how": "typed",
-   "line": "pulse wt73 yes in=wt40",
+   "line": "pulse wt77 yes in=wt44",
    "ok": true,
-   "ms": 31.5,
-   "said": "ok vote wt73 [r37] · counted; how you voted is sealed"
+   "ms": 40.4,
+   "said": "ok vote wt77 [r36] · counted; how you voted is sealed"
   },
   {
    "who": "Diego",
    "how": "typed",
-   "line": "pulse wt73 yes in=wt40",
+   "line": "pulse wt77 yes in=wt44",
    "ok": true,
-   "ms": 34.5,
-   "said": "ok vote wt73 [r39] · counted; how you voted is sealed"
+   "ms": 68.1,
+   "said": "ok vote wt77 [r37] · counted; how you voted is sealed"
   },
   {
    "who": "Elena",
    "how": "typed",
-   "line": "pulse wt73 no in=wt40",
+   "line": "pulse wt77 no in=wt44",
    "ok": true,
-   "ms": 33.8,
-   "said": "ok vote wt73 [r38] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Sofia",
-   "how": "typed",
-   "line": "pulse wt73 yes in=wt40",
-   "ok": true,
-   "ms": 37.7,
-   "said": "ok vote wt73 [r40] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Javier",
-   "how": "typed",
-   "line": "pulse wt73 yes in=wt40",
-   "ok": true,
-   "ms": 42.6,
-   "said": "ok vote wt73 [r41] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Teresa",
-   "how": "typed",
-   "line": "pulse wt73 yes in=wt40",
-   "ok": true,
-   "ms": 51.6,
-   "said": "ok vote wt73 [r42] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Pablo",
-   "how": "typed",
-   "line": "pulse wt73 yes in=wt40",
-   "ok": true,
-   "ms": 61.4,
-   "said": "ok vote wt73 [r46] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Miguel",
-   "how": "typed",
-   "line": "pulse wt73 yes in=wt40",
-   "ok": true,
-   "ms": 47.4,
-   "said": "ok vote wt73 [r44] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Andres",
-   "how": "typed",
-   "line": "pulse wt73 yes in=wt40",
-   "ok": true,
-   "ms": 52.3,
-   "said": "ok vote wt73 [r43] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Isabel",
-   "how": "typed",
-   "line": "pulse wt73 no in=wt40",
-   "ok": true,
-   "ms": 51.5,
-   "said": "ok vote wt73 [r47] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Mateo",
-   "how": "typed",
-   "line": "pulse wt73 yes in=wt40",
-   "ok": true,
-   "ms": 60.5,
-   "said": "ok vote wt73 [r45] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Carmen",
-   "how": "typed",
-   "line": "pulse wt73 no in=wt40",
-   "ok": true,
-   "ms": 58.8,
-   "said": "ok vote wt73 [r49] · counted; how you voted is sealed"
-  },
-  {
-   "who": "Dolores",
-   "how": "typed",
-   "line": "pulse wt73 yes in=wt40",
-   "ok": true,
-   "ms": 47.7,
-   "said": "ok vote wt73 [r48] · counted; how you voted is sealed"
+   "ms": 91.0,
+   "said": "ok vote wt77 [r38] · counted; how you voted is sealed"
   },
   {
    "who": "Rosa",
    "how": "typed",
-   "line": "pulse wt73 no in=wt40",
+   "line": "pulse wt77 yes in=wt44",
+   "ok": true,
+   "ms": 92.1,
+   "said": "ok vote wt77 [r39] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Pablo",
+   "how": "typed",
+   "line": "pulse wt77 yes in=wt44",
+   "ok": true,
+   "ms": 97.1,
+   "said": "ok vote wt77 [r40] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Carmen",
+   "how": "typed",
+   "line": "pulse wt77 no in=wt44",
+   "ok": true,
+   "ms": 95.2,
+   "said": "ok vote wt77 [r41] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Teresa",
+   "how": "typed",
+   "line": "pulse wt77 yes in=wt44",
+   "ok": true,
+   "ms": 96.7,
+   "said": "ok vote wt77 [r42] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Miguel",
+   "how": "typed",
+   "line": "pulse wt77 yes in=wt44",
+   "ok": true,
+   "ms": 86.8,
+   "said": "ok vote wt77 [r44] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Sofia",
+   "how": "typed",
+   "line": "pulse wt77 yes in=wt44",
+   "ok": true,
+   "ms": 106.8,
+   "said": "ok vote wt77 [r46] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Isabel",
+   "how": "typed",
+   "line": "pulse wt77 no in=wt44",
+   "ok": true,
+   "ms": 90.2,
+   "said": "ok vote wt77 [r43] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Javier",
+   "how": "typed",
+   "line": "pulse wt77 yes in=wt44",
+   "ok": true,
+   "ms": 107.5,
+   "said": "ok vote wt77 [r45] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Mateo",
+   "how": "typed",
+   "line": "pulse wt77 yes in=wt44",
+   "ok": true,
+   "ms": 108.7,
+   "said": "ok vote wt77 [r47] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Andres",
+   "how": "typed",
+   "line": "pulse wt77 yes in=wt44",
+   "ok": true,
+   "ms": 93.4,
+   "said": "ok vote wt77 [r48] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Dolores",
+   "how": "typed",
+   "line": "pulse wt77 yes in=wt44",
+   "ok": true,
+   "ms": 91.5,
+   "said": "ok vote wt77 [r49] · counted; how you voted is sealed"
+  },
+  {
+   "who": "Rosa",
+   "how": "typed",
+   "line": "pulse wt77 no in=wt44",
    "ok": false,
-   "ms": 3.1,
-   "said": "refused: you have already said pulse on wt73; once each. undo takes yours back"
+   "ms": 1.6,
+   "said": "refused: you have already said pulse on wt77; once each. undo takes yours back"
   },
   {
    "who": "Lucia",
    "how": "typed",
-   "line": "agenda.next wt69 in=wt40",
+   "line": "agenda.next wt73 in=wt44",
    "ok": true,
-   "ms": 22.1,
-   "said": "ok set wt69 [r50] · now=wt70"
+   "ms": 6.2,
+   "said": "ok set wt73 [r50] · now=wt74"
   },
   {
    "who": "Lucia",
    "how": "typed",
-   "line": "agenda.next wt69 in=wt40",
+   "line": "agenda.next wt73 in=wt44",
    "ok": true,
-   "ms": 10.6,
-   "said": "ok set wt69 [r51] · now=wt71"
+   "ms": 6.0,
+   "said": "ok set wt73 [r51] · now=wt75"
   },
   {
    "who": "Lucia",
    "how": "typed",
-   "line": "agenda.next wt69 in=wt40",
+   "line": "agenda.next wt73 in=wt44",
    "ok": true,
-   "ms": 8.7,
-   "said": "ok set wt69 [r52] · now=wt72"
+   "ms": 5.2,
+   "said": "ok set wt73 [r52] · now=wt76"
   },
   {
    "who": "Lucia",
    "how": "typed",
-   "line": "post We asked for tenant protections. Next organizing meeting Friday. in=wt40 as=o; pin $o",
+   "line": "post We asked for tenant protections. Next organizing meeting Friday. in=wt44 as=o; pin $o",
    "ok": true,
-   "ms": 8.5,
-   "said": "ok post wt74 [r53] in Tenant organizing (seen by its members)"
+   "ms": 5.4,
+   "said": "ok post wt78 [r53] in Tenant organizing (seen by its members)"
   }
  ],
  "shots": {},
@@ -1759,7 +1759,7 @@
    "ran": "every check, count and timing below",
    "imagined": "the people, their words, the agenda (modules/agenda/agenda-oct28.json) and the summaries; no model was called"
   },
-  "when": "2026-10-24T20:02Z",
+  "when": "2026-10-24T21:42Z",
   "world": {
    "records": 144,
    "persons": 41,
@@ -1768,7 +1768,7 @@
     "agenda (Node)",
     "tally (Node)"
    ],
-   "things": 121
+   "things": 125
   },
   "checks": [
    {
@@ -1789,7 +1789,7 @@
    {
     "check": "twelve riders press for nine carpool seats at once",
     "ok": true,
-    "detail": "9 seats taken, 3 told the car is full: refused: sb105 is taken (3 seats, all claimed); look shows what is open"
+    "detail": "9 seats taken, 3 told the car is full: refused: sb109 is taken (3 seats, all claimed); look shows what is open"
    },
    {
     "check": "sixteen sign up at once for twelve two-minute slots",
@@ -1799,7 +1799,7 @@
    {
     "check": "once each: a second sign-up is refused",
     "ok": true,
-    "detail": "refused: you have already said claim on sb100; once each. undo takes yours back"
+    "detail": "refused: you have already said claim on sb104; once each. undo takes yours back"
    },
    {
     "check": "undo gives a slot back, and the next neighbour takes it",
@@ -1809,7 +1809,7 @@
    {
     "check": "sign-up closes at a time of day",
     "ok": true,
-    "detail": "refused: sign-up for sb100 closed at 2026-10-29T00:45Z (a seat was free)"
+    "detail": "refused: sign-up for sb104 closed at 2026-10-29T00:45Z (a seat was free)"
    },
    {
     "check": "speakers' phone numbers are seen only by leaders",
@@ -1834,12 +1834,12 @@
    {
     "check": "one vote each; undo lets a neighbour change theirs",
     "ok": true,
-    "detail": "a second vote: 'refused: you have already said vote on sb113; once each. undo takes yours back'; Maya changed hers; still 40 votes"
+    "detail": "a second vote: 'refused: you have already said vote on sb117; once each. undo takes yours back'; Maya changed hers; still 40 votes"
    },
    {
     "check": "two leaders press Next at once: the meeting moves one item",
     "ok": true,
-    "detail": "one moved it; the other: 'refused: stale: sb97 changed since it was painted (now, r140); nothing was done. The view will repaint.'"
+    "detail": "one moved it; the other: 'refused: stale: sb101 changed since it was painted (now, r140); nothing was done. The view will repaint.'"
    },
    {
     "check": "a neighbour's Next is refused",
@@ -1854,7 +1854,7 @@
    {
     "check": "thirty phones follow every 'now speaking'",
     "ok": true,
-    "detail": "5 moves × 30 phones; seen within p50 235.8 ms, p95 443.0 ms, max 525.8 ms; 0 missed"
+    "detail": "5 moves × 30 phones; seen within p50 245.8 ms, p95 440.9 ms, max 481.2 ms; 0 missed"
    },
    {
     "check": "the outcome is a pinned announcement, with the staff report linked",
@@ -1881,134 +1881,134 @@
   "of": 21,
   "timing_ms": {
    "acts": 114,
-   "act_p50": 22.5,
-   "act_p95": 161.9,
-   "typed_p50": 27.6,
-   "pressed_p50": 22.0,
-   "follow_p50": 235.8,
-   "follow_p95": 443.0,
-   "phone_redraws": 351,
-   "whole_run_s": 13.3
+   "act_p50": 22.4,
+   "act_p95": 104.6,
+   "typed_p50": 22.4,
+   "pressed_p50": 21.8,
+   "follow_p50": 245.8,
+   "follow_p95": 440.9,
+   "phone_redraws": 358,
+   "whole_run_s": 12.3
   },
   "refused_acts": [
    {
     "who": "Maya",
     "how": "typed",
-    "line": "agenda.load in=sb41",
+    "line": "agenda.load in=sb45",
     "ok": false,
-    "ms": 3.8,
+    "ms": 2.3,
     "said": "refused: agenda.load is for leaders of Council watch; help agenda.load says more"
-   },
-   {
-    "who": "Luis",
-    "how": "pressed",
-    "line": "do claim a832",
-    "ok": false,
-    "ms": 23.7,
-    "said": "refused: sb104 is taken (3 seats, all claimed); look shows what is open"
-   },
-   {
-    "who": "Fern",
-    "how": "pressed",
-    "line": "do claim a824",
-    "ok": false,
-    "ms": 24.5,
-    "said": "refused: sb103 is taken (3 seats, all claimed); look shows what is open"
    },
    {
     "who": "Abel",
     "how": "pressed",
-    "line": "do claim a840",
+    "line": "do claim a872",
     "ok": false,
-    "ms": 25.3,
-    "said": "refused: sb105 is taken (3 seats, all claimed); look shows what is open"
+    "ms": 24.9,
+    "said": "refused: sb109 is taken (3 seats, all claimed); look shows what is open"
+   },
+   {
+    "who": "Luis",
+    "how": "pressed",
+    "line": "do claim a864",
+    "ok": false,
+    "ms": 23.8,
+    "said": "refused: sb108 is taken (3 seats, all claimed); look shows what is open"
+   },
+   {
+    "who": "Otto",
+    "how": "pressed",
+    "line": "do claim a856",
+    "ok": false,
+    "ms": 22.9,
+    "said": "refused: sb107 is taken (3 seats, all claimed); look shows what is open"
+   },
+   {
+    "who": "Hana",
+    "how": "pressed",
+    "line": "do claim a832",
+    "ok": false,
+    "ms": 9.3,
+    "said": "refused: sb104 is taken (12 seats, all claimed); look shows what is open"
    },
    {
     "who": "Priya",
     "how": "pressed",
-    "line": "do claim a800",
+    "line": "do claim a832",
     "ok": false,
-    "ms": 2.8,
-    "said": "refused: sb100 is taken (12 seats, all claimed); look shows what is open"
-   },
-   {
-    "who": "Hana",
-    "how": "pressed",
-    "line": "do claim a800",
-    "ok": false,
-    "ms": 2.1,
-    "said": "refused: sb100 is taken (12 seats, all claimed); look shows what is open"
+    "ms": 3.1,
+    "said": "refused: sb104 is taken (12 seats, all claimed); look shows what is open"
    },
    {
     "who": "Nora",
     "how": "pressed",
-    "line": "do claim a800",
+    "line": "do claim a832",
     "ok": false,
-    "ms": 2.3,
-    "said": "refused: sb100 is taken (12 seats, all claimed); look shows what is open"
+    "ms": 2.0,
+    "said": "refused: sb104 is taken (12 seats, all claimed); look shows what is open"
    },
    {
     "who": "Kiko",
     "how": "pressed",
-    "line": "do claim a800",
+    "line": "do claim a832",
     "ok": false,
-    "ms": 1.7,
-    "said": "refused: sb100 is taken (12 seats, all claimed); look shows what is open"
+    "ms": 1.8,
+    "said": "refused: sb104 is taken (12 seats, all claimed); look shows what is open"
    },
    {
     "who": "Maya",
     "how": "typed",
-    "line": "claim sb100",
+    "line": "claim sb104",
     "ok": false,
-    "ms": 1.5,
-    "said": "refused: you have already said claim on sb100; once each. undo takes yours back"
+    "ms": 2.0,
+    "said": "refused: you have already said claim on sb104; once each. undo takes yours back"
    },
    {
     "who": "Hana",
     "how": "typed",
-    "line": "claim sb100",
+    "line": "claim sb104",
     "ok": false,
     "ms": 1.6,
-    "said": "refused: sign-up for sb100 closed at 2026-10-29T00:45Z"
+    "said": "refused: sign-up for sb104 closed at 2026-10-29T00:45Z"
    },
    {
     "who": "Ruth",
     "how": "typed",
     "line": "post one more thing about parking",
     "ok": false,
-    "ms": 1.5,
+    "ms": 1.4,
     "said": "refused: you have said post 5 times today, the most it takes from one person in a day"
    },
    {
     "who": "Bea",
     "how": "typed",
-    "line": "vote sb113 no",
+    "line": "vote sb117 no",
     "ok": false,
-    "ms": 2.5,
-    "said": "refused: you have already said vote on sb113; once each. undo takes yours back"
+    "ms": 3.2,
+    "said": "refused: you have already said vote on sb117; once each. undo takes yours back"
    },
    {
-    "who": "Alex",
+    "who": "Dana",
     "how": "pressed",
-    "line": "do agenda.next a776",
+    "line": "do agenda.next a808",
     "ok": false,
-    "ms": 20.6,
-    "said": "refused: stale: sb97 changed since it was painted (now, r140); nothing was done. The view will repaint."
+    "ms": 32.3,
+    "said": "refused: stale: sb101 changed since it was painted (now, r140); nothing was done. The view will repaint."
    },
    {
     "who": "Ruth",
     "how": "pressed",
-    "line": "do agenda.next a776",
+    "line": "do agenda.next a808",
     "ok": false,
-    "ms": 5.3,
+    "ms": 1.9,
     "said": "refused: agenda.next is for leaders of Council watch; help agenda.next says more"
    },
    {
     "who": "Sam",
     "how": "typed",
-    "line": "pin sb120",
+    "line": "pin sb124",
     "ok": false,
-    "ms": 19.9,
+    "ms": 2.6,
     "said": "refused: pin is for leaders of Seabright; help pin says more"
    }
   ],

@@ -1,0 +1,21 @@
+01 ok Laptop opens three unchanged painter panes · Feed, Council, Help at 1440px
+02 ok Phone shows exactly one pane · 390px, the same three views available
+03 ok A word rearranges panes · pane.move Feed to=Help, admitted by the door
+04 ok A mouse drag rearranges panes by the same word · real Chrome mouse input: Help onto Council
+05 ok Another neighbour retains their layout · Luis has not moved
+06 ok A touch swipe shows Council on the concurrent phone · Chrome touch input, not synthetic DOM events
+07 ok A Feed post arrives live in Council on the phone · sb55, ordinary post as Maya; no reload
+08 ok Who-sees filters every laptop and phone pane · Maya sees her own private post and help in all three panes on both hosts
+09 ok Who-sees excludes private things in every other neighbour pane · Luis cannot see Maya’s draft or private help
+10 ok Feed uses the desktop painter and identities · same lens URL, exact painted node keys; native window not started
+11 ok Council uses the desktop painter and identities · same lens URL, exact painted node keys; native window not started
+12 ok Help uses the desktop painter and identities · same lens URL, exact painted node keys; native window not started
+13 ok Painted post maps to its one kernel thing · sb55 -> a440; shared data, no copies
+14 ok Painter JavaScript is byte-for-byte unchanged · served source equals desk-shell/lens.js
+15 ok Reload keeps the personal tiling · new document, stored tree unchanged
+16 ok Rearranging preserves the existing painter and draft · Chrome moveBefore keeps iframe state and host composer
+17 ok Split and close keep the same underlying things · four panes, then three; post remains
+18 ok A resize word persists personal proportions · 60 percent to the first column
+19 ok Screenshots captured at both requested widths · 1440×900 and 390×844 PNGs
+20 ok Facts replay preserves personal layouts and posts · exact state comparison; no words re-executed
+20 checks passed

@@ -1,0 +1,5 @@
+{
+  "success": true,
+  "reason": "Checker now accepts an Overdue label and red chip background; exact original word calls replayed, no new agent or implementation edits.",
+  "replayed_calls": 26
+}

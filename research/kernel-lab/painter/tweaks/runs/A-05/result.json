@@ -1,0 +1,27 @@
+{
+  "exit": 0,
+  "timed_out": false,
+  "seconds": 36.22,
+  "answer": "Updated `taskboard-components` (`dk170`) to order lanes: Backlog \u2192 Now \u2192 Waiting \u2192 Done. Added Waiting drop and menu actions.\n\nNo JavaScript changes were necessary. Other board and shared facts stayed unchanged. Structure verified with `look-view`; pixels and drag interaction were not visually tested. Waiting currently has no tasks.",
+  "board": "A",
+  "number": 5,
+  "request": "Add a Waiting lane between Doing and Done.",
+  "changes": [
+    {
+      "thing": "dk170",
+      "kind": "lens",
+      "field": "text",
+      "category": "lens",
+      "lines": 18
+    }
+  ],
+  "lines": 18,
+  "landed": [
+    "lens"
+  ],
+  "success": false,
+  "board_proof": true,
+  "proof_passed": 11,
+  "proof_checks": 11,
+  "wall_seconds": 45.86
+}
