@@ -154,6 +154,45 @@ class DesktopWords(unittest.TestCase):
         self.assertEqual(len(self.k.log.records), n)
         self.do(self.alex, "verb post steps=\"look\" help=\"post: hidden\"", ok=False)   # no word hides another
 
+    def test_module_words_in_verb_notes(self):
+        until(lambda: self.status().get("own"))
+        # one step that is a module's word: an alias, as if the module's word were said
+        self.do(self.alex, 'verb remind steps="reminder.add $*" help="remind <words>: a reminder only you see"')
+        out = self.do(self.alex, "remind buy milk")
+        rec = self.k.log.records[-1]
+        self.assertEqual((rec["by"], rec.get("for")), (self.mod, self.alex_id))
+        self.assertIn("buy milk", self.reminders(self.alex))
+        # a module step among kernel steps: the module's lines join the verb's one act, and one undo takes it back
+        steps = 'reminder.add tidy the desk; make kind=note text="desk tidied" sees=me'
+        self.do(self.alex, f"verb tidyup steps={quoted(steps)} help=\"tidyup: a reminder and a note\"")
+        n = len(self.k.log.records)
+        out = self.do(self.alex, "tidyup")
+        self.assertEqual(len(self.k.log.records), n + 1, out["text"])
+        self.assertEqual(len(out["made"]), 2)
+        self.assertIn("tidy the desk", self.reminders(self.alex))
+        self.assertTrue(until(lambda: any(d.get("record") == f"r{n + 1}" for d in self.status()["done"])),
+                        "the module was not told its lines joined the verb's act")
+        self.do(self.alex, "undo")
+        self.assertNotIn("tidy the desk", self.reminders(self.alex))
+        self.assertEqual(self.do(self.alex, "rows note")["text"].count("desk tidied"), 0)
+        # a module step its grant does not reach stops the whole verb, and nothing is written
+        steps = 'make kind=note text="first" sees=me; reminder.note second'
+        self.do(self.alex, f"verb both steps={quoted(steps)} help=\"both: two notes\"")
+        n = len(self.k.log.records)
+        out = self.do(self.alex, "both", ok=False)
+        self.assertIn("both stopped at 'reminder.note second'", out["text"])
+        self.assertIn("reaches only reminder things", out["text"])
+        self.assertEqual(len(self.k.log.records), n)
+
+    def test_a_module_reading_for_you_counts_as_your_look(self):
+        own = until(lambda: (s := self.status()).get("own") and s["own"]["made"][0])
+        out = self.do(self.alex, f"set {own} text=\"the module started, seen\"", ok=False)
+        self.assertIn("you have not looked", out["text"])
+        self.do(self.alex, "reminder.mine")                         # the module reads Alex's reminders for him
+        self.do(self.alex, f"set {own} text=\"the module started, seen\"")
+        log = Path(self.status()["home"], "stderr.log")
+        self.assertIn(f"reminders: started for {self.alex_id}", log.read_text(encoding="utf-8"))
+
     def test_rules_answer_what_their_maker_may_hear(self):
         car = self.do(self.alex, "make kind=carpool pickup=\"Murray & 5th\" seats=2")["made"][0]
         rule = self.do(self.alex, 'make kind=rule on=claim do="make kind=reminder text=\\"a seat was taken on '

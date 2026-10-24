@@ -64,8 +64,28 @@ class ModuleProcess:
                 pass
 
     def _read_err(self):
+        """What the module says on stderr: its last 20 lines here, for refusals and status, and all of it in
+        `<world>/modules/<name>/stderr.log` (the desktop's kext kept this; 23 Oct)."""
+        fh = None
+        try:
+            k = self.host.kernel
+            home = Path(k.dir) / "modules" / str(k.state.get(self.mid, "name") or self.mid)
+            home.mkdir(parents=True, exist_ok=True)
+            fh = open(home / "stderr.log", "a", encoding="utf-8")
+            fh.write(f"--- started {time.strftime('%Y-%m-%d %H:%M:%S')} pid {self.proc.pid}\n")
+            fh.flush()
+        except OSError:
+            fh = None
         for line in self.proc.stderr:
             self.err = (self.err + [line.rstrip()])[-20:]
+            if fh:
+                try:
+                    fh.write(line)
+                    fh.flush()
+                except (OSError, ValueError):
+                    fh = None
+        if fh:
+            fh.close()
 
     def _read(self):
         for line in self.proc.stdout:

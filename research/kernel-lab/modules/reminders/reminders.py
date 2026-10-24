@@ -69,6 +69,7 @@ def main():
         t = msg.get("t")
         if t == "hello":
             state["hello"] = msg
+            print(f"reminders: started for {msg.get('for')}", file=sys.stderr, flush=True)
             try:
                 Path(msg["home"], "started.txt").write_text(time.strftime("%Y-%m-%d %H:%M:%S"), encoding="utf-8")
             except (KeyError, OSError):

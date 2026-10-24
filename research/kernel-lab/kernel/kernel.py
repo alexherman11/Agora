@@ -778,6 +778,7 @@ class Kernel:
         by = actor.module if actor.kind == "module" else actor.id
         return self._commit(tx, by=by, words=words, entry=entry["id"], press=press, undoes=undoes,
                             rule=getattr(self._local, "rule", None),         # a rule ran it (never on a sealed act)
+                            external=tx.extra.get("external"),
                             **{"for": actor.person if by != actor.person else None,
                                "via": "module" if actor.kind == "module" else ("agent" if actor.kind == "agent" else None),
                                "saw": saw})
@@ -808,6 +809,16 @@ class Kernel:
                     rows += r.get("rows", [])
                 return {"text": "\n".join(t for t in said if t), "rows": rows}
             with self.lock:
+                firsts = [L.parse(x) for x in steps]
+                kinds = [self.source(self.entry(e))[0] if e else None for e in
+                         [self.find_entry(f.word if f.word != "do" else L.parse(x.strip()[2:]).word,
+                                          f.kv.get("in") or group) for f, x in zip(firsts, steps)]]
+            if len(steps) == 1 and kinds[0] == "module":
+                # a one-step verb of a module's word is an alias for it (SHAPE: a room says `play` for media.play)
+                return self.step(actor, steps[0], press=press, saw=saw, mode=mode)
+            if "module" in kinds:
+                return self._verb_with_modules(actor, st, entry, group, text, steps, press, saw)
+            with self.lock:
                 tx, notes, handles = Tx(self), [], {}
                 for x in steps:
                     x = self.fill_handles(x, handles)
@@ -821,8 +832,8 @@ class Kernel:
                         raise Refused(f"{entry['word']} stopped at '{x}': nothing answers to {s2.word}; nothing was done")
                     e = self.entry(eid)
                     if self.source(e)[0] != "kernel":
-                        raise Refused(f"{entry['word']} stopped at '{x}': a verb note's steps are the kernel's own "
-                                      f"words, and {s2.word} comes from {e.get('from')}; nothing was done")
+                        raise Refused(f"{entry['word']} stopped at '{x}': {s2.word} comes from {e.get('from')}, "
+                                      f"which a verb note's steps can't run yet; nothing was done")
                     if s2.target and self.takes_id(e.get("takes")) is None:
                         s2.words, s2.target = (s2.target + " " + s2.words).strip(), None
                     if s2.target:
@@ -850,6 +861,112 @@ class Kernel:
                         "made": tx.made}
         finally:
             self._local.verb_depth = depth
+
+    def _verb_with_modules(self, actor, st, entry, group, text, steps, press=None, saw=None):
+        """A do verb with module words among its steps: each module is asked as the caller (no lock held while it
+        works), and its answer's lines join the verb's one act, checked as the caller narrowed to that module. A module
+        reads the world as it was before the verb began; it can't name what an earlier step made. A step that changed
+        the outside world (an external answer) makes the whole act one that undo refuses."""
+        from .words import KERNEL
+        tx, notes, handles, asked, external = Tx(self), [], {}, [], []
+
+        def stop(x, why):
+            for mid, use in asked:
+                self.modules.done(mid, use, {"ok": False, "refused": why, "made": [], "text": why})
+            return Refused(f"{entry['word']} stopped at '{x}': {why}; nothing was done")
+        for x in steps:
+            x = self.fill_handles(x, handles)
+            s2 = L.parse(x)
+            if s2.word == "do":
+                x = x.strip()[2:].strip()
+                s2 = L.parse(x)
+            g = s2.kv.get("in") or group
+            with self.lock:
+                eid = self.find_entry(s2.word, g)
+                if eid is None:
+                    raise stop(x, f"nothing answers to {s2.word}")
+                e = self.entry(eid)
+                if s2.target and self.takes_id(e.get("takes")) is None:
+                    s2.words, s2.target = (s2.target + " " + s2.words).strip(), None
+                if s2.target:
+                    if s2.target in tx.made:
+                        if self.source(e)[0] == "module":
+                            raise stop(x, f"{s2.target} is made by this verb and is not in the world yet, so a "
+                                          f"module can't be asked about it")
+                    elif self.shown(actor.person, s2.target) is None:
+                        raise stop(x, f"no thing called {s2.target} here")
+                    else:
+                        g = s2.kv.get("in") or (self.groups_of(s2.target) or [group])[0]
+                if not self.may(actor, e, s2.target, g):
+                    raise stop(x, str(self.refusal_for(e, g)))
+                src, name = self.source(e)
+            if src == "module":
+                mid = self.module_named(name)
+                if not mid or not self.state.get(mid, "on") or not self.modules or not self.modules.running(mid):
+                    raise stop(x, f"{s2.word} is unbound: {name} is not running")
+                ans = self.modules.call(mid, e.get("bound") or e["word"],
+                                        {"target": s2.target, "words": s2.words, "kv": s2.kv}, caller=actor)
+                if ans.get("refused"):
+                    raise stop(x, f"{name}: {ans['refused']}")
+                asked.append((mid, ans.get("use")))
+                if e.get("word_kind") == "see" or not (ans.get("lines") or ans.get("external")):
+                    notes.append(ans.get("text", ""))
+                    continue
+                if ans.get("external"):
+                    external.append(name)
+                    notes.append(f"{s2.word}: {ans.get('text') or 'done outside the world'}")
+                    continue
+                with self.lock:
+                    try:
+                        notes += self._admit_lines(tx, mid, actor, e, ans)
+                    except Refused as exc:
+                        raise stop(x, str(exc).replace("; nothing was done", ""))
+                continue
+            with self.lock:
+                if e.get("word_kind") == "see":
+                    notes.append(KERNEL[name](self, actor, s2, e, None, g).get("text", ""))
+                    continue
+                said = self.once(actor, e, s2.target)
+                if said:
+                    raise stop(x, said)
+                made_before = len(tx.made)
+                tx.part(s2.word, s2.target, x)
+                try:
+                    res = KERNEL[name](self, actor, s2, e, tx, g, saw=saw)
+                except Refused as exc:
+                    raise stop(x, str(exc))
+                notes.append(res["text"])
+                self.keep_handle(x, tx.made[made_before:], handles)
+        with self.lock:
+            changed = self._changed_under(tx)
+            if changed:
+                raise stop(steps[-1], f"{changed} changed while the verb ran")
+            if tx.empty and not external:
+                return {"text": "\n".join(n for n in notes if n)}
+            if external:
+                tx.extra["external"] = True
+            if tx.empty:
+                tx.part(st.word, st.target, text)
+            rec = self._commit_use(tx, actor, text, entry, press, saw, st)
+        for mid, use in asked:
+            self.modules.done(mid, use, {"ok": True, "record": f"r{rec['seq']}", "made": tx.made, "text": ""})
+        body = "\n".join(n.replace("[r?]", f"[r{rec['seq']}]") for n in notes if n)
+        tail = f"\n~ {entry['word']}, one act [r{rec['seq']}]" + (
+            f"; it touched the outside world through {', '.join(external)}, so undo cannot take it back"
+            if external else "")
+        return {"text": body + tail, "record": rec["seq"], "made": tx.made}
+
+    def _changed_under(self, tx):
+        """A thing whose fact moved since `tx` read it (the lock was let go while a module worked), or None."""
+        from .store import h as _h
+        first = {}
+        for p in tx.parts:
+            for f in p["facts"]:
+                first.setdefault((f[0], f[1]), f[2])
+        for (t, a), before in first.items():
+            if _h(self.state.things.get(t, {}).get(a, GONE)) != before:
+                return t
+        return None
 
     # ------------------------------------------------------------------ rules (SHAPE section 5)
     RULE_DEPTH = 3
@@ -947,13 +1064,25 @@ class Kernel:
         what it read is unchanged (SHAPE section 11). Refused whole otherwise. A painted press says what its page
         showed (`press_saw`): an answer that writes a thing the page showed is fenced on that too, so two leaders
         pressing Next on one painted agenda move it once, though the module read it fresh both times."""
-        from .words import KERNEL
         author = Actor(mid, caller.person, "module", module=mid, caller=caller)
         saw = {k: int(v) for k, v in (ans.get("saw") or {}).items()}
         with self.lock:
             tx = Tx(self)
-            notes = []
-            handles = {}
+            notes = self._admit_lines(tx, mid, caller, entry, ans, press_saw)
+            if tx.empty:
+                return {"text": "\n".join(notes)}
+            rec = self._commit_use(tx, author, text, entry, press, saw, L.parse(text))
+            body = "\n".join(n.replace("[r?]", f"[r{rec['seq']}]") for n in notes)
+            return {"text": f"{body}\n~ by {self.name(mid)} for {self.name(caller.person)}", "record": rec["seq"],
+                    "made": tx.made}
+
+    def _admit_lines(self, tx, mid, caller, entry, ans, press_saw=None):
+        """A module's answer lines into `tx`, each checked as the caller narrowed to the module. Lock held."""
+        from .words import KERNEL
+        author = Actor(mid, caller.person, "module", module=mid, caller=caller)
+        saw = {k: int(v) for k, v in (ans.get("saw") or {}).items()}
+        if True:
+            notes, handles = [], {}
             for line in ans["lines"]:
                 line = self.fill_handles(str(line), handles)
                 st = L.parse(line)
@@ -987,20 +1116,23 @@ class Kernel:
                 res = KERNEL[self.source(e)[1]](self, author, st, e, tx, group, saw=saw)
                 notes.append(res["text"])
                 self.keep_handle(line, tx.made[made_before:], handles)
-            if tx.empty:
-                return {"text": "\n".join(notes)}
-            rec = self._commit_use(tx, author, text, entry, press, saw, L.parse(text))
-            body = "\n".join(n.replace("[r?]", f"[r{rec['seq']}]") for n in notes)
-            return {"text": f"{body}\n~ by {self.name(mid)} for {self.name(caller.person)}", "record": rec["seq"],
-                    "made": tx.made}
+            return notes
 
     def module_see(self, mid, caller, line):
         """A module reading while it answers a call: a see word, run as the caller narrowed to the module."""
         author = Actor(mid, caller.person, "module", module=mid, caller=caller)
         try:
-            return self.step(author, line, mode="see")
+            r = self.step(author, line, mode="see")
         except Refused as exc:
             return {"refused": str(exc), "text": f"refused: {exc}", "rows": []}
+        # the kernel read these for the caller, so they count as the caller's look: a taskbar button that lists
+        # windows through a module and then sets one is not refused "you have not looked" (desktop, 23 Oct)
+        marks = self.seen.get(author.id, {})
+        for row in r.get("rows") or []:
+            t = row.get("id") if isinstance(row, dict) else None
+            if t in marks:
+                self.seen.setdefault(caller.id, {})[t] = dict(marks[t])
+        return r
 
     def on_offer(self, mid, words):
         """A module offers its words. Each becomes an entry only in its own namespace, only with help, and only if
