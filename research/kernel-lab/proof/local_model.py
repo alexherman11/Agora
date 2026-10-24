@@ -79,7 +79,7 @@ def run():
             check('both processes offered', all(host.wait_offered(k.module_named(n)) for n in ('model','summarize')))
             configure(alex)
             check('dictionary may and once held in world', all(r.get('may')=='members' and r.get('once') for r in alex.rows('word') if r.get('from')=='module:model'))
-            check('real Ollama tags/status', (s:=timed('status',alex,'model.status'))['ok'] and s['rows'][0]['up'] and 'qwen2.5:3b' in s['rows'][0]['installed'], s.get('text'))
+            check('real Ollama tags/status', (s:=timed('status',alex,'model.status'))['ok'] and s['rows'][0]['up'] and 'qwen3.5:9b' in s['rows'][0]['installed'], s.get('text'))
             install(alex)
             # Automatic summaries are real; two cards keep the gaming check short.
             tasks=[]
@@ -94,12 +94,12 @@ def run():
                     time.sleep(.05)
                 timings['card-'+str(priority)]=round((time.perf_counter()-start)*1000,1)
                 print(f'TIMING card-{priority}: {timings["card-"+str(priority)]:.1f} ms',flush=True)
-                check('task card real model summary '+str(priority), 'local model · qwen2.5:3b' in row.get('short_source',''),row.get('short'))
+                check('task card real model summary '+str(priority), 'local model · qwen3.5:9b' in row.get('short_source',''),row.get('short'))
             result=timed('summarize-all',alex,'summarize.all')
             check('board batch delegates to one model process',result['ok'] and all('model module for Alex' in k.state.get(t,'short_source') for t in tasks))
             board=alex.say('make kind=board name="My board" model_kind=taskboard-task')['made'][0]
             result=timed('agent-urgency',agent,'model.ask "what is most urgent on my board?" about='+board)
-            check('agent asks about visible board',result['ok'] and 'local model · qwen2.5:3b' in result['text'] and 'exit' in result['text'].lower(),result['text'])
+            check('agent asks about visible board',result['ok'] and 'local model · qwen3.5:9b' in result['text'] and 'exit' in result['text'].lower(),result['text'])
             alex.say('rule on=post kind=post do='+quote('model.classify $target options="housing meeting help other" into=topic'))
             start=time.perf_counter()
             post=alex.say('post "Our landlord raised the rent; tenants need housing advice"')['made'][0]

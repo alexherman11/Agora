@@ -22,4 +22,4 @@ def configure(door):
             door.say('look '+row['id'])
             door.say('word-set '+row['id']+' may=members once="at most 60 per day per person"')
     if not door.rows('model-settings', name='model'):
-        door.say('make kind=model-settings name=model model=qwen2.5:3b')
+        door.say('make kind=model-settings name=model model=qwen3.5:9b')

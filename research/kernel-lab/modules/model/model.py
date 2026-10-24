@@ -15,7 +15,7 @@ inference_lock = threading.Lock()
 home = None
 usage = {}
 DEFAULT_ONCE = 'at most 60 per day per person'
-MODEL = 'qwen2.5:3b'
+MODEL = 'qwen3.5:9b'
 
 
 def quote(value):
@@ -65,7 +65,7 @@ def generate(model, prompt, tokens=96):
     if not inference_lock.acquire(blocking=False):
         raise ValueError('the local model is busy; please try again shortly')
     try:
-        data = local('/api/generate', dict(model=model, prompt=prompt, stream=False,
+        data = local('/api/generate', dict(model=model, prompt=prompt, stream=False, think=False,
             keep_alive='5m', options=dict(temperature=0, num_predict=tokens)))
         if not data.get('done') or not isinstance(data.get('response'), str) or not data['response'].strip():
             raise OSError('local model returned no complete answer')
