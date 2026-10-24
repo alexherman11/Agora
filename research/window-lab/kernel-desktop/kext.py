@@ -324,6 +324,8 @@ class DeskModuleProcess(KM.ModuleProcess):
                     fh.flush()
                 except (OSError, ValueError):
                     fh = None
+        if fh:
+            fh.close()
 
     def _read(self):
         # a copy of the kernel's ModuleProcess._read (18:40) with one addition, marked: `do` and `see` on its own
