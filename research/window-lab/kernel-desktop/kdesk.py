@@ -46,8 +46,9 @@ def genesis(headless=False):
         "steward": {"name": "Alex", "account": STEWARD_ACCOUNT},
         "modules": [
             {"name": "window", "run": [py, str(HERE / "kd_window.py")] + tail, "publishes": "window.*",
-             "grants": WINDOW_GRANTS},
-            {"name": "guy", "run": [py, str(HERE / "kd_guy.py")] + tail, "publishes": "guy.*", "grants": GUY_GRANTS},
+             "grants": WINDOW_GRANTS, "only": "kind:window", "for": "steward"},
+            {"name": "guy", "run": [py, str(HERE / "kd_guy.py")] + tail, "publishes": "guy.*", "grants": GUY_GRANTS,
+             "for": "steward"},
         ],
     }
 
@@ -59,12 +60,16 @@ ABOUT = {"window": "the window host: it makes the Agora windows on this desktop 
 
 
 def after_genesis(k):
-    """What a genesis cannot say yet, written once as the kernel's own record: the narrowing on the window module's
-    grant (only window things) and what each module is, in words."""
+    """What a genesis cannot say, written once as the kernel's own record: what each module is, in words. A world
+    founded before the kernel took `only` and `for` (23 Oct, 19:36) also gets those here: the window grant narrowed to
+    window things, and both modules installed for the steward."""
     from kernel.kernel import Tx
     with k.lock:
         todo = []
+        steward = next((t for t in k.things("person") if k.is_steward(t)), None)
         for m in k.things("module"):
+            if k.state.get(m, "name") in ABOUT and steward and not k.state.get(m, "for"):
+                todo.append((m, "for", steward))
             name = k.state.get(m, "name")
             if name == "window":
                 for g in k.things("grant"):
@@ -78,7 +83,7 @@ def after_genesis(k):
         tx.part("install", None, "install")
         for t, a, v in todo:
             tx.set(t, a, v)
-        k._commit(tx, by="kernel", words="install: what each module is, and the window grant's narrowing")
+        k._commit(tx, by="kernel", words="install: what each module is, whose, and the window grant's narrowing")
 
 
 class LocalEntry:

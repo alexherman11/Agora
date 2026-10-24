@@ -509,7 +509,8 @@ class WindowHost:
     def hello(self, msg):
         self.mid, self.owner = msg.get("id"), msg.get("owner")
         try:
-            sessions = json.loads((Path(msg["world"]) / "keep" / "sessions.json").read_text(encoding="utf-8"))
+            world = Path(msg["world"]) if msg.get("world") else Path(msg["home"]).parents[1]   # home: <world>/modules/<me>
+            sessions = json.loads((world / "keep" / "sessions.json").read_text(encoding="utf-8"))
             self.token = next(t for t, v in sessions.items() if v.get("signer") == "alex")
         except (OSError, KeyError, StopIteration, ValueError) as exc:
             log(f"no desktop session for the pages: {exc!r}")

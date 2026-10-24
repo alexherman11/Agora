@@ -118,19 +118,31 @@ class DesktopTest(unittest.TestCase):
         self.assertTrue(d.say(rows[0]["does"], "alex")["ok"])                # the taskbar's press, as Alex
         d.wait(lambda: d.window("lines"))
 
-    def test_a_verb_note_composes_window_words(self):
+    def test_a_verb_note_places_two_windows_in_one_act(self):
+        # Since 2d872eb a do verb's steps are the kernel's own words and make one record. Windows are world things, so
+        # `set` on them is enough: the window module makes the screen follow. One undo takes both moves back.
         d = self.d
         d.say("window.open help")
         d.say("window.open lines")
         d.wait(lambda: len(d.windows()) == 3)
         a, b = d.wait(lambda: d.window("help")), d.wait(lambda: d.window("lines"))
-        out = d.say('verb side steps="window.move $1 to=left; window.move $2 to=right" '
+        before = (a["box"][0], b["box"][0])
+        out = d.say('verb side steps="rows window; set $1 at=24,40; set $2 at=1300,40" '
                     'help="side <window> <window>: two windows side by side"')
         self.assertTrue(out["ok"], out["text"])
         self.assertIn("from: verb", d.say("help side")["text"])
         out = d.say(f"side {a['id']} {b['id']}")
         self.assertTrue(out["ok"], out["text"])
-        d.wait(lambda: d.window("help")["box"][0] == 24 and d.window("lines")["box"][0] > 1000)
+        self.assertIn("one act", out["text"])
+        d.wait(lambda: d.window("help")["box"][0] == 24 and d.window("lines")["box"][0] == 1300)
+        self.assertTrue(d.say("undo")["ok"])
+        d.wait(lambda: (d.window("help")["box"][0], d.window("lines")["box"][0]) == before)
+        # module words are not steps of a do verb yet (the kernel's choice, argued on a13310): refused, nothing done
+        out = d.say('verb shove steps="window.move $1 to=left" help="shove <window>: to the left"')
+        self.assertTrue(out["ok"], out["text"])
+        out = d.say(f"shove {a['id']}")
+        self.assertFalse(out["ok"])
+        self.assertIn("kernel's own words", out["text"])
 
     def test_a_rule_hears_window_opened(self):
         d = self.d
@@ -138,7 +150,7 @@ class DesktopTest(unittest.TestCase):
         self.assertTrue(out["ok"], out["text"])
         d.say("window.open help")
         d.wait(lambda: d.window("help")["box"][0] > 1000)
-        d.wait(lambda: d.k.fired > 0)
+        d.wait(lambda: d.k.rules_fired)
 
     def test_stop_is_a_verb_note_made_in_the_world(self):
         d = self.d
@@ -162,11 +174,11 @@ class DesktopTest(unittest.TestCase):
     def test_the_window_module_is_narrowed_to_window_things(self):
         d = self.d
         mid = d.k.module_named("window")
-        r = d.k.run(d.k.own_actor(mid), "make kind=button bar=taskbar label=sneaky")
+        r = d.k.module_own(mid, "make kind=button bar=taskbar label=sneaky")
         self.assertFalse(r["ok"])
-        self.assertIn("reaches window things, not a button", r["text"])
-        self.assertTrue(d.k.run(d.k.own_actor(mid), "make kind=window shows=help name=Help at=10,10 size=500,500")["ok"])
-        self.assertFalse(d.k.run(d.k.own_actor(mid), "post hello from a module")["ok"])
+        self.assertIn("reaches only window things, not a button", r["text"])
+        self.assertTrue(d.k.module_own(mid, "make kind=window shows=help name=Help at=10,10 size=500,500")["ok"])
+        self.assertFalse(d.k.module_own(mid, "post hello from a module")["ok"])
 
     def test_only_the_owner_opens_windows(self):
         d = self.d
