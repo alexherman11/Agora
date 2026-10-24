@@ -54,19 +54,20 @@ class Seam:
         secret = self.app.cfg.kernel_secret
         if not secret or not is_loopback_host(req.environ.get("REMOTE_ADDR", "")):
             return False
-        given = req.header("Authorization")
-        return hmac.compare_digest(given.encode(), f"Bearer {secret}".encode())
+        given = req.header("X-Kernel-Secret")  # the kernel's header (research/kernel-lab/kernel/door.py)
+        return hmac.compare_digest(given.encode(), secret.encode())
 
     def _deny(self):
         from .web import Response
         return Response.json({"error": "not trusted"}, "403 Forbidden")
 
     def session_check(self, req):
-        """POST {"token": "<session cookie value>"} -> {"account", "method", "agent"}.
+        """POST {"token": "<session cookie value>"} -> {"account", "method", "agent", "record"}.
 
-        `account` is the record (or null when the session is unknown, ended or
-        its account switched off), `method` how this session signed in, and
-        `agent` is always null for now: agent sessions do not exist yet.
+        `account` is the account id (null when the session is unknown, ended or
+        its account switched off), `method` how this session signed in, `agent`
+        always null for now (agent sessions do not exist yet), and `record` the
+        verified account in full.
         """
         from .web import Response
         if not self._trusted(req):
@@ -80,9 +81,9 @@ class Seam:
         token = str(body.get("token", ""))
         account = self.app.service.session_account(token)
         if account is None:
-            return Response.json({"account": None, "method": None, "agent": None})
-        return Response.json({"account": account_record(self.app, account),
-                              "method": self.app.service.session_method(token), "agent": None})
+            return Response.json({"account": None, "method": None, "agent": None, "record": None})
+        return Response.json({"account": account["id"], "method": self.app.service.session_method(token),
+                              "agent": None, "record": account_record(self.app, account)})
 
     def account(self, req, account_id: str):
         from .web import Response

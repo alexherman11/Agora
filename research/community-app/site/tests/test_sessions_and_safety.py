@@ -64,8 +64,8 @@ def test_sign_in_requests_are_rate_limited(app):
     assert c.post("/signin/email", {"email": LEADER}).status == 429
     # Many addresses from one place run into the per-address-of-sender limit.
     d = Client(app, remote="10.0.0.9")
-    statuses = [d.post("/signin/email", {"email": f"p{i}@example.com"}).status for i in range(25)]
-    assert statuses.count(303) == 20 and statuses[-1] == 429
+    statuses = [d.post("/signin/email", {"email": f"p{i}@example.com"}).status for i in range(65)]
+    assert statuses.count(303) == 60 and statuses[-1] == 429  # 60: a meeting's whole room shares one wifi
 
 
 def test_rate_limit_window_resets(app, clock):

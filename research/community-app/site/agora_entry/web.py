@@ -34,7 +34,7 @@ MAX_BODY = 64 * 1024
 
 # (limit, window seconds)
 LIMITS = {
-    "email_ip": (20, 3600), "email_addr": (5, 3600), "email_noinvite": (1, 86400),
+    "email_ip": (60, 3600), "email_addr": (5, 3600), "email_noinvite": (1, 86400),
     "code_ip": (30, 3600), "link_ip": (60, 3600), "google_ip": (30, 600),
     "join_ip": (120, 3600), "invite_make": (100, 86400), "page_ip": (600, 60),
 }
@@ -144,7 +144,8 @@ class App:
         self.seam = Seam(self)
         self.pages = pages.Pages(self)
         prefix = "__Host-" if cfg.secure_cookies else ""
-        self.cookie = {k: prefix + "entry_" + k for k in ("sid", "csrf", "pending", "flow")}
+        self.cookie = {k: prefix + "entry_" + k for k in ("csrf", "pending", "flow")}
+        self.cookie["sid"] = prefix + "agora_session"  # the kernel reads this one too (SEAM.md)
         self.routes = [
             ("GET", r"/", self.public),
             ("GET", r"/join/(?P<code>[A-Za-z0-9]{1,40})", self.join),
@@ -373,7 +374,8 @@ class App:
             return self.pages.refused(req, SignInRefused(
                 "This sign-in link has expired or was already used.", "link_spent"))
         # A button, not an automatic sign-in: mail scanners open links too.
-        return self.pages.link_confirm(req, token, found["email"])
+        elsewhere = req.cookies.get(self.cookie["pending"]) != found["id"]
+        return self.pages.link_confirm(req, token, found["email"], elsewhere)
 
     def signin_link_post(self, req: Request) -> Response:
         if not self.allow("link_ip", req.ip):
@@ -451,6 +453,7 @@ class App:
         if errors:
             return self.pages.welcome(req, values=values, errors=errors)
         self.service.save_answers(req.account["id"], values, name)
+        self.service.kernel_join(req.account["id"])
         return Response.redirect("/home")
 
     def home(self, req: Request) -> Response:
@@ -458,6 +461,9 @@ class App:
             return r
         if not req.account["onboarded_at"]:
             return Response.redirect("/welcome")
+        if self.cfg.kernel_url and not req.account["kernel_person"]:
+            self.service.kernel_join(req.account["id"])  # the kernel was away, or said no: ask again
+            req.account = self.service.session_account(req.session_token) or req.account
         return self.pages.home(req)
 
     def account_page(self, req: Request) -> Response:

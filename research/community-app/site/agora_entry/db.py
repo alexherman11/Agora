@@ -24,7 +24,9 @@ CREATE TABLE IF NOT EXISTS accounts (
     created_at      INTEGER NOT NULL,
     updated_at      INTEGER NOT NULL,
     onboarded_at    INTEGER,
-    disabled_at     INTEGER
+    disabled_at     INTEGER,
+    kernel_person   TEXT,
+    kernel_refused  TEXT
 );
 CREATE TABLE IF NOT EXISTS answers (
     account_id      TEXT NOT NULL,
@@ -118,6 +120,19 @@ class Store:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._local = threading.local()
         self._raw().executescript(SCHEMA)
+        self._add_columns("accounts", {"kernel_person": "TEXT", "kernel_refused": "TEXT"})
+        self._rename_column("sessions", "agent", "user_agent")
+
+    def _add_columns(self, table: str, columns: dict[str, str]) -> None:
+        have = {r["name"] for r in self._raw().execute(f"PRAGMA table_info({table})")}
+        for name, kind in columns.items():
+            if name not in have:
+                self._raw().execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
+
+    def _rename_column(self, table: str, old: str, new: str) -> None:
+        have = {r["name"] for r in self._raw().execute(f"PRAGMA table_info({table})")}
+        if old in have and new not in have:
+            self._raw().execute(f"ALTER TABLE {table} RENAME COLUMN {old} TO {new}")
 
     def _raw(self) -> sqlite3.Connection:
         conn = getattr(self._local, "conn", None)

@@ -122,7 +122,7 @@ def seam_app(tmp_path, clock):
 
 
 def call(c: Client, method: str, path: str, secret: str | None, body: dict | None = None):
-    headers = {"Authorization": f"Bearer {secret}"} if secret else {}
+    headers = {"X-Kernel-Secret": secret} if secret else {}
     raw = json.dumps(body).encode() if body is not None else None
     return c.request(method, path, headers=headers, body=raw,
                      ctype="application/json" if raw is not None else None)
@@ -145,7 +145,8 @@ def test_session_check_turns_a_session_into_a_verified_account(seam_app):
     assert r.status == 200
     reply = json.loads(r.text)
     assert reply["method"] == "email" and reply["agent"] is None
-    record = reply["account"]
+    assert reply["account"] == app.service.account_by_email("maya@example.com")["id"]
+    record = reply["record"]
     assert record["account_id"].startswith("acct_") and record["email"] == "maya@example.com"
     assert record["email_verified"] is True and record["display_name"] == "Maya R."
     assert record["answers"] == {"display_name": "Maya R.", "help": ["meetings"], "neighbourhood": "Seabright"}
@@ -153,7 +154,7 @@ def test_session_check_turns_a_session_into_a_verified_account(seam_app):
     assert record["invited_through"]["maker_account_id"] == app.service.account_by_email(LEADER)["id"]
     assert "roles" not in record  # what you may do is the kernel's, not ours to hand over
 
-    gone = {"account": None, "method": None, "agent": None}
+    gone = {"account": None, "method": None, "agent": None, "record": None}
     r = call(kernel, "POST", "/internal/session/check", "kernel-test-secret", {"token": "nope"})
     assert json.loads(r.text) == gone
     maya.post("/signout")

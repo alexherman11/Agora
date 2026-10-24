@@ -209,8 +209,10 @@ class Service:
 
     def invites(self) -> list[dict]:
         rows = self.store.all(
-            "SELECT i.*, a.display_name AS maker_name, a.email AS maker_email FROM invites i"
-            " LEFT JOIN accounts a ON a.id=i.maker_id ORDER BY i.created_at DESC")
+            "SELECT i.*, a.display_name AS maker_name, a.email AS maker_email,"
+            " (SELECT COUNT(*) FROM invite_uses u WHERE u.invite_id=i.id AND u.at>?) AS last_hour"
+            " FROM invites i LEFT JOIN accounts a ON a.id=i.maker_id ORDER BY i.created_at DESC",
+            (self.now() - 3600,))
         out = []
         for r in rows:
             d = dict(r)
@@ -433,6 +435,39 @@ class Service:
         for k in ("id_hash", "last_seen", "expires_at", "revoked_at"):
             account.pop(k)
         return account
+
+    def kernel_join(self, account_id: str) -> str:
+        """Tell the kernel about this member, if there is a kernel. -> "joined", "refused", "away" or "none"."""
+        from .kernel_client import KernelAway, KernelRefused, keep_account
+        if not self.cfg.kernel_url:
+            return "none"
+        account = self.account(account_id)
+        if account is None or account["onboarded_at"] is None:
+            return "none"
+        # This service has already checked and counted the invite (SEAM.md section 5, worlds with
+        # invites_counted_by: entry), so the kernel gets what it came through, not a code to count.
+        invite = self.invite_by_id(account["invite_id"]).invite if account["invite_id"] else None
+        if invite:
+            via = {"invite_id": invite["id"], "channel": invite["channel"], "maker_account_id": invite["maker_id"]}
+        elif account["email"] in self.cfg.leaders:
+            via = {"admitted": "site-leaders"}
+        else:
+            via = None
+        try:
+            out = keep_account(self.cfg.kernel_url, self.cfg.kernel_secret, account_id,
+                               account["display_name"], via, self.answers(account_id))
+        except KernelAway as exc:
+            print(f"kernel away, {account_id} will be asked again: {exc}", flush=True)
+            return "away"
+        except KernelRefused as refused:
+            self.store.run("UPDATE accounts SET kernel_refused=? WHERE id=?", (str(refused)[:300], account_id))
+            return "refused"
+        person = str(out.get("person", ""))[:64]
+        with self.store.connect() as conn:
+            conn.execute("UPDATE accounts SET kernel_person=?, kernel_refused=NULL WHERE id=?", (person, account_id))
+            self.store.event(conn, self.now(), "account.joined_place", account_id, person=person,
+                             new=bool(out.get("new")))
+        return "joined"
 
     def session_method(self, token: str) -> str | None:
         row = self.store.one("SELECT method FROM sessions WHERE id_hash=?", (sha256(token),))

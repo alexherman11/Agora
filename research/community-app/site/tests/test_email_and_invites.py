@@ -260,3 +260,20 @@ def test_racing_for_the_last_uses_lets_in_exactly_that_many(app, leader):
     assert results.count("SignInRefused") == 7, results
     assert app.service.invite_by_id(invite["id"]).invite["uses"] == 3
     assert len(app.service.invite_people(invite["id"])) == 3
+
+
+def test_a_link_opened_on_another_device_says_so_first(app, leader):
+    laptop, phone = Client(app), Client(app)
+    laptop.email_signin(LEADER)
+    link = last_mail(app)["links"][0]
+    token = link.split("t=", 1)[1]
+    page = phone.get("/signin/link?t=" + token)
+    assert "Signing in on another device?" in page.text and "Sign in on this device" in page.text
+    # Leaving it there keeps the code good for the laptop.
+    r = laptop.post("/signin/code", {"code": mail_code(last_mail(app))})
+    assert r.location == "/home"
+    # The tab that asked sees no such note.
+    laptop2 = Client(app)
+    laptop2.email_signin(LEADER)
+    token2 = last_mail(app)["links"][0].split("t=", 1)[1]
+    assert "another device" not in laptop2.get("/signin/link?t=" + token2).text

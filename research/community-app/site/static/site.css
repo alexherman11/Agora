@@ -94,6 +94,7 @@ main.wide { max-width: 1040px; }
   display: grid; place-items: center; font-weight: 700; font-size: .95rem;
 }
 .note { color: var(--muted); }
+.note.elsewhere { background: var(--sun-soft); color: #5b4612; padding: 12px 14px; border-radius: 12px; margin: 0 0 14px; }
 .note.warn { background: var(--coral-soft); color: #7c3426; padding: 10px 14px; border-radius: 10px; }
 
 @media (min-width: 760px) {
@@ -180,6 +181,7 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .invite-list li:last-child .invite-row { border-bottom: 0; }
 .sub { display: block; color: var(--muted); font-size: .85rem; }
 .right { text-align: right; flex: none; }
+.sub.hot { color: var(--coral); font-weight: 650; }
 .empty { color: var(--faint); padding: 8px 0; }
 .chip-s { display: inline-block; font-size: .75rem; font-weight: 650; padding: 2px 8px; border-radius: 999px; vertical-align: middle; background: var(--sea-soft); color: var(--sea-dark); letter-spacing: .01em; }
 .chip-s.frozen { background: #e7eef6; color: #2f5378; }

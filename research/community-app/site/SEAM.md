@@ -46,26 +46,28 @@ Neither stores the other's secrets. Emails stay in the entry store and never ent
 
 ## 3. How the kernel trusts it (built)
 
-- **Only through `/internal/`, only from loopback, only with the shared secret** (`Authorization: Bearer <KERNEL_SHARED_SECRET>`, compared in constant time). With no secret set, the seam is shut. The public proxy must never forward `/internal/*`.
+- **Only through `/internal/`, only from loopback, only with the shared secret** (header `X-Kernel-Secret: <KERNEL_SHARED_SECRET>`, the kernel's own header, compared in constant time). With no secret set, the seam is shut. The public proxy must never forward `/internal/*`.
 - **Never from the browser.** The kernel reads the session cookie and asks; anything a page puts in its body (`as=`) is ignored, as SHAPE already says.
-- The cookie is `__Host-entry_sid` on https (`entry_sid` in test mode): HttpOnly, SameSite=Lax, Path=/, so the kernel on the same origin receives it. Sessions last 90 days at most and end after 30 idle days, at sign-out, at "sign out on every device", or when the account is switched off.
+- The cookie is `__Host-agora_session` on https (`agora_session` in test mode): HttpOnly, SameSite=Lax, Path=/, so the kernel on the same origin receives it. Sessions last 90 days at most and end after 30 idle days, at sign-out, at "sign out on every device", or when the account is switched off.
 - Caching the answer for at most 30 s, as the kernel proposes, is fine: sign-out reaches the kernel within 30 s.
 
 | Endpoint | Answer |
 |---|---|
-| `POST /internal/session/check {"token": "<cookie value>"}` | `{"account": record, "method": "email" or "google", "agent": null}`, or all three null |
+| `POST /internal/session/check {"token": "<cookie value>"}` | `{"account": "<account id>", "method": "email" or "google", "agent": null, "record": record}`, or all four null |
 | `GET /internal/accounts/<account_id>` | `{"account": record}` |
 | `GET /internal/events?after=<seq>&limit=<n>` | events, oldest first: `account.created`, `account.signed_in`, `account.onboarded`, `account.updated`, `account.linked`, `account.signed_out`, `invite.made`, `invite.used`, `invite.frozen`, `invite.unfrozen`, `site.public_invite`. No tokens, cookies or IP addresses in them. |
 
-The path is the kernel's `/session/check`, put under `/internal/` so the proxy can block one prefix.
+The path is the kernel's `/session/check`, put under `/internal/` so the proxy can block one prefix: the kernel adds `/internal/session/check` to its `--entry` address itself (`--entry http://127.0.0.1:8817`).
 
 **ran**: `tests/test_crypto_qr_seam.py` signs a person in, checks their session through the seam, signs them out and sees `null`; reads the event feed and finds no session token in it; and gets 403 with no secret, a wrong secret, a non-loopback address, or when the service has no secret set.
 
-## 4. Joining (agreed, not built)
+## 4. Joining (built)
 
-The kernel proposes `POST /keep/account {account, name, invite, answers}` → `{person, new}` or a refusal, called by the entry service. Agreed, with one change of moment: the call happens **when the welcome questions are answered**, not at first sign-in, because before then there is no name and no answers. Until the kernel says yes, the account exists (the proof) and the person does not. A refusal is shown to the person in the kernel's words, which are already written for people ("invite frozen: a leader has stopped this link").
+When the welcome questions are answered, the entry service calls the kernel's `POST /keep/account {account, name, invite, answers}` with `X-Kernel-Secret` (`agora_entry/kernel_client.py`). Until the kernel says yes, the account exists (the proof) and the person does not. The kernel's answer is kept on the account (`kernel_person`), and its refusal, already written for people ("no invite: …"), is shown on the person's home page. If the kernel is away, nothing is lost: the next visit to `/home` asks again, and the kernel's `join` gives the same person to the same account however often it is asked.
 
-I will build the call once the kernel serves the route; today `join` is a Python method and no HTTP route exists (**read**: `kernel.py`, 23 Oct). Building a client against my guess of the route would only test my guess.
+`invite` is what the entry service already checked and counted: `{"invite_id", "channel", "maker_account_id"}`, or `{"admitted": "site-leaders"}` for a leader who came in through `SITE_LEADERS`.
+
+**ran**: `scenario/evening.py` (README, Evidence) founds a kernel world with the real `research/kernel-lab` door in its own process, and every neighbour who joins through the browser becomes a kernel person whose answers the kernel shows back to them.
 
 ## 5. Invites (open: who counts)
 
@@ -79,7 +81,7 @@ So, two phases:
 - **Now:** the entry service owns invites. `/keep/account` carries `invite: {"invite_id", "code", "channel", "maker_account_id"}` that the entry service has already checked and counted; the kernel records `joined_via` and does not count.
 - **Later**, when the kernel's invites exist: the entry service asks `POST /keep/invite {code}` → `{status: open|frozen|expired|full|missing, maker_name}` before showing the join page, stops counting, and the kernel counts in `join`. The leaders' pages (make, freeze, QR) become kernel words and views; the entry service keeps the join page and the QR drawing.
 
-The kernel builder decides when to switch.
+The kernel builder decided how: each world fixes `invites_counted_by: entry | kernel` at its genesis (Notes from the kernel, 2). The entry service sends invites as above, which is what `entry` worlds expect.
 
 ## 6. Who may (built as a stand-in)
 
@@ -106,7 +108,7 @@ The kernel proposes `/auth/*` to the entry service and everything else to the ke
 
 After the questions, the entry service sends people to `/home`, a placeholder that says the feed is coming. When the kernel serves the feed, the kernel takes `/home` (or names another path, and I point the redirect there).
 
-## 9. Questions for the kernel builder
+## 9. Questions for the kernel builder (answered in their notes below)
 
 1. Is "the account exists before the person" (section 4) right for you, or do you want `/keep/account` called at first sign-in with empty answers?
 2. Section 5's two phases: does `/keep/account` carrying an already-counted invite work for your `join`?

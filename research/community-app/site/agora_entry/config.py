@@ -80,6 +80,7 @@ class Config:
     leaders: frozenset[str] = field(default_factory=frozenset)
     proxy_ip_header: str = ""  # e.g. "CF-Connecting-IP" behind Cloudflare
     kernel_secret: str = ""
+    kernel_url: str = ""  # e.g. http://127.0.0.1:8810; empty: no kernel yet
 
     session_days: int = 90
     session_idle_days: int = 30
@@ -177,5 +178,6 @@ def from_env(env: dict[str, str] | None = None, dotenv: Path | None = None) -> C
         cfg.leaders = frozenset({"leader@example.com"})
     cfg.proxy_ip_header = get("SITE_PROXY_IP_HEADER")
     cfg.kernel_secret = get("KERNEL_SHARED_SECRET")
+    cfg.kernel_url = get("KERNEL_URL").rstrip("/")
     cfg.check()
     return cfg

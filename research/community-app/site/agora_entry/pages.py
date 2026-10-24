@@ -10,7 +10,7 @@ import time
 
 from .render import Safe, esc, fill, join, tag
 
-ASSET = "2"
+ASSET = "4"
 MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()
 
 
@@ -189,17 +189,24 @@ class Pages:
                     minutes=self.app.cfg.link_minutes, dev=dev, **error_bits(error, "code"))
         return self.page(req, "Check your email", body, status="400 Bad Request" if error else "200 OK")
 
-    def link_confirm(self, req, token: str, email: str):
+    def link_confirm(self, req, token: str, email: str, elsewhere: bool = False):
+        # Opened in a browser that didn't ask (the mail is on the phone, the waiting tab on the laptop):
+        # say so first, because signing in here spends the code the other device is waiting for.
+        other = Safe(
+            '<div class="note elsewhere"><strong>Signing in on another device?</strong> Type the 6-digit code '
+            'from the email there instead, and leave this page. The button below signs in only this one.</div>'
+        ) if elsewhere else Safe("")
+        label = "Sign in on this device" if elsewhere else "Continue"
         body = Safe(
             f'<section class="panel">'
             f'<h1>Sign in</h1>'
-            f'<p class="lead">Signing in as <strong>{esc(email)}</strong>.</p>'
+            f'<p class="lead">Signing in as <strong>{esc(email)}</strong>.</p>{other}'
             f'<form method="post" action="/signin/link" class="stack">'
             f'<input type="hidden" name="csrf" value="{esc(self.app.csrf_token(req))}">'
             f'<input type="hidden" name="t" value="{esc(token)}">'
-            f'<button class="btn primary" type="submit">Continue</button>'
+            f'<button class="btn {"secondary" if elsewhere else "primary"}" type="submit">{esc(label)}</button>'
             f'</form>'
-            f'<p class="fine">Not you? Close this page. Nothing happens until you press Continue.</p>'
+            f'<p class="fine">Not you? Close this page. Nothing happens until you press the button.</p>'
             f'</section>')
         return self.page(req, "Sign in", body)
 
@@ -267,12 +274,14 @@ class Pages:
         if leader:
             lead_card = Safe('<a class="card link-card" href="/leader/invites"><h3>Invites</h3>'
                              '<p>Make links for each place you share, and QR codes for events.</p></a>')
+        refused = Safe(f'<p class="note warn">The place said: {esc(account["kernel_refused"])}</p>') \
+            if account.get("kernel_refused") and not account.get("kernel_person") else Safe("")
         body = Safe(
             f'<section class="panel">'
             f'<p class="kicker">You\'re in</p>'
             f'<h1>Hi, {esc(first_name(account))}</h1>'
             f'<p class="lead">The feed will live here: announcements at the top, then what neighbours post. '
-            f'It is being built now.</p>'
+            f'It is being built now.</p>{refused}'
             f'</section>'
             f'<div class="cards two">{lead_card}'
             f'<a class="card link-card" href="/account"><h3>Your details</h3>'
@@ -325,15 +334,17 @@ class Pages:
                 f'<span class="sub">{"Event QR" if inv["kind"] == "event" else "Link"} · made by '
                 f'{esc(inv["maker_name"] or inv["maker_email"] or "someone")} · until {esc(day(inv["expires_at"]))}</span></div>'
                 f'<div class="right"><span class="chip-s {esc(inv["status"])}">{esc(STATUS_LABEL[inv["status"]])}</span>'
-                f'<span class="sub">{esc(uses)}</span></div></a></li>'))
-        listing = join(rows) if rows else Safe('<li class="empty">No invites yet. Make the first one above.</li>')
+                f'<span class="sub">{esc(uses)}</span>{_last_hour(inv["last_hour"])}</div></a></li>'))
+        listing = join(rows) if rows else Safe('<li class="empty">No invites yet. Make the first one below.</li>')
         expiry = join(Safe(f'<option value="{d}"{" selected" if str(d) == pick("expires_days", "1" if kind == "event" else "30") else ""}>'
                            f'{esc(_days_label(d))}</option>') for d in self.app.expiry_choices())
         err = Safe(f'<p class="field-error" role="alert">{esc(error)}</p>') if error else Safe("")
-        body = Safe(
+        # The list comes first: a leader opening this on a phone mostly comes to check on the links,
+        # and a link that is suddenly busy must be seen without scrolling (the scripted evening's flood).
+        make = Safe(
             f'<section class="panel">'
-            f'<h1>Invites</h1>'
-            f'<p class="lead">Make one link for each place you share it, so if one gets out of hand you can '
+            f'<h2>Make an invite</h2>'
+            f'<p class="lead">One link for each place you share it, so if one gets out of hand you can '
             f'freeze it alone.</p>'
             f'<form method="post" action="/leader/invites" class="stack" novalidate>'
             f'<input type="hidden" name="csrf" value="{esc(self.app.csrf_token(req))}">'
@@ -353,8 +364,9 @@ class Pages:
             f'<select class="input" id="expires_days" name="expires_days">{expiry}</select></div>'
             f'</div>{err}'
             f'<button class="btn primary" type="submit">Make invite</button>'
-            f'</form></section>'
-            f'<section class="panel quiet"><h2>All invites</h2><ul class="invite-list">{listing}</ul></section>')
+            f'</form></section>')
+        listed = Safe(f'<section class="panel"><h1>Invites</h1><ul class="invite-list">{listing}</ul></section>')
+        body = Safe(make + listed) if error else Safe(listed + make)
         return self.page(req, "Invites", body, status="400 Bad Request" if error else "200 OK")
 
     def leader_invite(self, req, state):
@@ -446,6 +458,12 @@ class Pages:
                     f'<p class="lead">Email the site would have sent, newest first. Nothing leaves this computer.</p>'
                     f'<ul class="outbox">{listing}</ul></section>')
         return self.page(req, "Outbox", body)
+
+
+def _last_hour(n: int) -> Safe:
+    if not n:
+        return Safe("")
+    return Safe(f'<span class="sub{" hot" if n >= 10 else ""}">{n} in the last hour</span>')
 
 
 def _days_label(d: int) -> str:
