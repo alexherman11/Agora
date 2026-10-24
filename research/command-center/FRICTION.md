@@ -1547,6 +1547,15 @@ a6970 · family=host · status=active
 
 Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
 
+## landed (1)
+
+### The dictionary needed source: an entry is a word the desk reads
+
+a13518 · family=desk · status=landed
+
+Claude, 23 Oct (a13316): the dictionary needed source. Missing world-level word: an entry, a note that says what kind of word it is (word= do, see, hear, hold) and what it is bound to (from= bound=), read by help, examine and dispatch. Before, a help note's title words were read only by help: adding inspect to examine's title changed help and never what the desk answered, and aliases lived in code (COMMAND_ALIAS, moo.SYNONYMS). Source added once (8d3978f): dictionary.py, sources/dictionary.py (rows dictionary), and small hooks in desk_knife (repl, help, examine), verbs (builtin_words, _world_word, describe) and helpnotes (lookup by bound=, check). From now on renaming, aliasing, rewriting help, translating and who may are edits to notes. Still missing: a host word's alias reaching the home base (lens lines send host words as written), and binding a kernel alias in a stored line at save (a1156 binds only world verbs). help dictionary says how it works.
+Second edit, 23 Oct (3165466), found by the lending shelf trial: a verb note's ## es section printed inline among its help, and its takes read as $1 $2. Missing world-level word: a translation section in a verb note, and its takes said in its own first line. Now help names the section (read <verb> #es prints it) and takes come from the first # line.
+
 ## live-freshness-checked (1)
 
 ### Guard-context freshness — independent sampler and age evidence
