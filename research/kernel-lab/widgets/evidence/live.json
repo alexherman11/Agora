@@ -1,0 +1,65 @@
+{
+  "tasks": 26,
+  "windows": [
+    {
+      "id": "dk202",
+      "kind": "window",
+      "name": "Widget \u00b7 Task board \u00b7 JavaScript",
+      "shows": "taskboard-js",
+      "target": null,
+      "edge": "",
+      "box": [
+        1540,
+        220,
+        1508,
+        1828
+      ],
+      "shown": true,
+      "front": false,
+      "z": 8
+    },
+    {
+      "id": "dk114",
+      "kind": "window",
+      "name": "Task board",
+      "shows": "taskboard",
+      "target": null,
+      "edge": "",
+      "box": [
+        16,
+        220,
+        1508,
+        1828
+      ],
+      "shown": true,
+      "front": false,
+      "z": 10
+    }
+  ],
+  "holds": [
+    {
+      "lease": "h1",
+      "word": "window.overlay",
+      "by": "guy",
+      "since": "13:24:26"
+    },
+    {
+      "lease": "h2",
+      "word": "window.surface",
+      "by": "taskboard-js",
+      "since": "13:24:28"
+    },
+    {
+      "lease": "h4",
+      "word": "window.bar",
+      "by": "now-playing",
+      "since": "13:24:28"
+    }
+  ],
+  "descriptions": {
+    "taskboard-js": "Task board: 26 tasks. Backlog: 22; Now: 3; Done: 1. Filter all.",
+    "desktop-guy": "Moss walks over the desktop and hops onto real window tops. Mood calm, speed 34. Clicks pass through. Coat #9EBDA7, face #F3DEC0, scarf #D9A689.",
+    "guy-editor": "Guy editor: Moss, calm, speed 34. Coat #9EBDA7, face #F3DEC0, scarf #D9A689. Phrases: A little room to think.\nOne good thing at a time.\nShall we take a small step?",
+    "now-playing": "Now playing: All My Friends by LCD Soundsystem. Paused."
+  }
+}

@@ -57,8 +57,23 @@ class Media:
         s = (st or {}).get("s") if (st or {}).get("ok") else None
         if not s or not (s.get("title") or "").strip():
             return None
+        art = ''
+        path = Path(s.get('art') or '')
+        if path.is_file() and media.ART.resolve() in path.resolve().parents:
+            import base64
+            import io
+            from PIL import Image
+            try:
+                with Image.open(path) as image:
+                    image.thumbnail((72,72))
+                    output = io.BytesIO()
+                    image.convert('RGB').save(output, 'JPEG', quality=85)
+                    art = 'data:image/jpeg;base64,' + base64.b64encode(output.getvalue()).decode('ascii')
+            except (OSError, ValueError):
+                pass
         return {"player": media.player_of(s.get("app")) or "", "title": s.get("title") or "",
-                "artist": s.get("artist") or "", "playing": bool(s.get("playing"))}
+                "artist": s.get("artist") or "", "playing": bool(s.get("playing")), 'art': art,
+                'position': s.get('position', 0), 'duration': s.get('end', 0), 'updated': s.get('updated', 0)}
 
     def call(self, msg):
         word = msg["word"]

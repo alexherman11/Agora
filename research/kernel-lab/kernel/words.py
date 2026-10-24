@@ -90,6 +90,11 @@ KERNEL_ENTRIES = [
             "You may undo your own acts; leaders, the acts in their groups; stewards, any."),
     _k("off", "do", "<module>", "stewards", "yes",
        help="off <module>: stop a module and take back every grant it holds, in one act. undo turns it on again."),
+    _k("widget", "do", "<id> grants=<words> [surface=window|top|bottom|overlay] [only=kind:...]", "stewards", "yes",
+       help="widget <thing> grants=\"...\" surface=window|top|bottom|overlay: activate in-page code with ordinary grants. "
+            "Copying code grants no power. off <widget> stops it; undo restores its activation."),
+    _k("describe", "do", "<id> text=<text>", "anyone", "yes",
+       help="describe <widget> text=...: a running widget describes its own display for look; no other facts change."),
     _k("status", "see", "<module>", "anyone", "no",
        help="status <module>: what a running module says it is doing."),
     _k("rows", "see", "[<kind>] [k=<v> ...]", "anyone", "no", aliases="find",
@@ -156,7 +161,7 @@ def _post_row(k, t, a):
 
 def _module_of(k, st):
     m = st.target or (k.module_named(st.words.split()[0]) if st.words else None)
-    if not m or k.state.get(m, "kind") != "module":
+    if not m or k.state.get(m, "kind") not in ("module", "widget"):
         raise Refused(f"no module called {st.target or st.words or '(nothing)'} here")
     return m
 
@@ -177,16 +182,19 @@ def look(k, actor, st, entry, tx, group, saw=None):
         kind = a.get("kind")
         if kind == "post":
             return {"text": _post_line(k, actor.person, t, a), "rows": [_post_row(k, t, a)]}
-        if kind == "module":
+        if kind in ("module", "widget") and (kind == 'module' or a.get('code')):
             grants = [g for g in k.things("grant") if k.state.get(g, "to") == t]
             live = [k.state.get(g, "words") for g in grants if not k.state.get(g, "revoked")]
             words = [k.state.get(e, "word") for e in k.entries() if k.state.get(e, "from") == f"module:{a.get('name')}"]
             on = "on" if a.get("on") else "off"
             run = "running" if k.modules and k.modules.running(t) else "not running"
-            return {"text": f"{a.get('name')} ({t}), a module: {on}, {run}; publishes {a.get('publishes')}; "
+            if kind == 'widget':
+                run = 'running' if any(h['by']==t for h in k.leases.values()) else 'not mounted'
+            description = a.get('description', '') if kind == 'widget' else ''
+            return {"text": f"{a.get('name')} ({t}), a {kind}: {on}, {run}; {description}; publishes {a.get('publishes')}; "
                             f"grants: {', '.join(live) or 'none'}; words: {', '.join(words) or 'none'}",
-                    "rows": [{"id": t, "kind": "module", "name": a.get("name"), "on": bool(a.get("on")),
-                              "grants": live, "words": words}]}
+                    "rows": [{"id": t, "kind": kind, "name": a.get("name"), "on": bool(a.get("on")),
+                              "description": description, "grants": live, "words": words}]}
         if kind in ("person", "agent"):
             answers = {x[7:]: v for x, v in a.items() if x.startswith("answer:")}
             text = f"{k.name(t)} ({t}), {'an agent' if kind == 'agent' else 'a person'}"
@@ -388,10 +396,21 @@ def off(k, actor, st, entry, tx, group, saw=None):
 def status(k, actor, st, entry, tx, group, saw=None):
     m = _module_of(k, st)
     name = k.state.get(m, "name")
+    if k.state.get(m, 'kind') == 'widget':
+        return {'text': f"{name}: {'on' if k.state.get(m, 'on') else 'off'} · " + str(k.state.get(m, 'description') or 'no description yet')}
     if not k.modules or not k.modules.running(m):
         return {"text": f"{name} is not running ({'on' if k.state.get(m, 'on') else 'off'})"}
     said = k.modules.status(m)
     return {"text": f"{name}: {said}" if said else f"{name} did not say what it is doing within 2 s"}
+
+
+def describe(k, actor, st, entry, tx, group, saw=None):
+    if actor.kind != 'module' or actor.module != st.target or k.state.get(st.target, 'kind') != 'widget':
+        raise Refused('a widget may describe only itself')
+    text = str(st.kv.get('text', ''))[:2000]
+    if text != k.state.get(st.target, 'description'):
+        tx.set(st.target, 'description', text)
+    return {'text': 'ok describe [r?]'}
 
 
 def _writable(k, kv):
@@ -683,8 +702,9 @@ def history(k, actor, st, entry, tx, group, saw=None):
 
 from .dictionary import word_set, word_rename, language
 from .kits import kit, take, rename, module
+from .inpage import widget
 
-KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module,
+KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "widget": widget, "describe": describe,
           'word-set': word_set, 'word-rename': word_rename, 'history': history, 'rule': rule,
           'language': language,
           **{w: panes if w == "panes" else arrange for w in PANE_HELP},

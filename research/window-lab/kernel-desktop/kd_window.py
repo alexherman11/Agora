@@ -271,6 +271,8 @@ class GuiScreen(Screen):
         self.taskbar_lease = Lease()
 
     def start(self, then):
+        import widget_guard
+        widget_guard.install()
         # pywebview needs a window before start: a hidden one that holds the loop and shows nothing
         self.anchor = self.webview.create_window("Agora window host", html="<html></html>", hidden=True,
                                                  width=200, height=100)
@@ -498,6 +500,7 @@ class WindowHost:
         self.rows = {}                 # wid -> the window thing as last read
         self.applied = {}              # wid -> the box last put on the screen (or recorded from a drag)
         self.settle = {}               # wid -> (box, polls seen) while a drag settles
+        self.widget_codes = {}
         self.opened = 0
         self.lock = threading.RLock()
         self.dirty = threading.Event()
@@ -542,6 +545,10 @@ class WindowHost:
             {"word": "window.overlay", "kind": "hold", "takes": "", "may": "stewards",
              "help": "window.overlay: a see-through surface over this desktop, held while something runs (the little "
                      "guy holds it). Held by grant; holds lists who holds it, and off <module> ends the hold."},
+            {"word": "window.surface", "kind": "hold", "takes": "", "may": "anyone",
+             "help": "window.surface: a widget's page in a normal window, listed by holds and ended by off."},
+            {"word": "window.bar", "kind": "hold", "takes": "", "may": "anyone",
+             "help": "window.bar: a widget's slot inside an existing desktop bar, listed by holds and ended by off."},
         ]
 
     def hello(self, msg):
@@ -639,9 +646,12 @@ class WindowHost:
                 return {"refused": "window.open needs a view: " + ", ".join(v for v in VIEWS if v != "taskbar")}
             view = words[0].lower()
             lens = None
+            widget = None
             if view not in VIEWS:
                 lens = self.lens_named(view, use)
-                if lens is None:
+                wr = self.m.see('rows widget name=' + view, use=use)
+                widget = next((r for r in wr.get('rows', []) if r.get('code') and r.get('on') and r.get('surface') == 'window'), None)
+                if lens is None and widget is None:
                     return {"refused": f"no lens or view called {view}; rows lens lists the lenses, and the views are "
                                        f"{', '.join(v for v in VIEWS if v != 'taskbar')}"}
             thing = target or (words[1] if len(words) > 1 else "")
@@ -659,10 +669,11 @@ class WindowHost:
             if taken:
                 return {"refused": f"the {edge} edge holds {taken[0].get('name')} already; window.close it first"}
             box = self.box_for(view, dict(kv, edge=edge), n)
-            base = (lens.get("title") or view.capitalize()) if lens else VIEWS[view][0]
+            base = (lens.get("title") or view.capitalize()) if lens else ('Widget · '+widget.get('title', view) if widget else VIEWS[view][0])
             name = base + (f" {n + 1}" if n and view != "taskbar" else "")
-            line = (f'make kind=window shows={view} name="{name}" at={box[0]},{box[1]} size={box[2]},{box[3]}'
+            line = (f'make kind=window shows={view} name={json.dumps(name,ensure_ascii=False)} at={box[0]},{box[1]} size={box[2]},{box[3]}'
                     + (f" lens={view}" if lens else "") + (f" target={thing}" if thing else "")
+                    + (f" widget={widget['id']}" if widget else "")
                     + (f" edge={edge}" if edge else ""))
             return {"lines": [line], "saw": {}}
         if word in ("window.move", "window.close", "window.focus"):
@@ -763,6 +774,9 @@ class WindowHost:
             log(f"reconcile: {r.get('text') or r.get('refused')}")
             return
         want = {row["id"]: row for row in r.get("rows") or []}
+        widgets = self.m.see('rows widget')
+        active = {w['id']:w['code'] for w in widgets.get('rows',[]) if w.get('on') and w.get('code') and not w.get('forgotten')}
+        want = {wid:row for wid,row in want.items() if not row.get('widget') or row['widget'] in active}
         with self.lock:
             if not any(row.get("shows") == "taskbar" for row in want.values()) and not getattr(self, "made_bar", False):
                 self.made_bar = True
@@ -777,7 +791,11 @@ class WindowHost:
                 self.applied.pop(wid, None)
             for wid, row in want.items():
                 box = parse_box(row) or self.box_for(row.get("shows"), {}, 0)
+                if row.get('widget') and wid in self.screen.wins and self.widget_codes.get(wid)!=active[row['widget']]:
+                    self.screen.close(wid)
+                    continue
                 if wid not in self.screen.wins:
+                    if row.get('widget'):self.widget_codes[wid]=active[row['widget']]
                     self._open(wid, row, box)
                 elif self.applied.get(wid) != box and not row.get("edge"):
                     self.screen.place(wid, box)
@@ -785,9 +803,12 @@ class WindowHost:
             self.rows = want
 
     def _open(self, wid, row, box):
-        if row.get("lens") and row.get("edge"):
+        if row.get('widget'):
+            view = 'widget'
+            path = f"/desk/widget.html?win={wid}&widget={quote(str(row['widget']))}"
+        elif row.get("lens") and row.get("edge"):
             view = "bar"                                  # a bar is the lens alone: no strip to drag or close by
-            path = f"/desk/bar.html?win={wid}&lens={quote(str(row['lens']))}"
+            path = f"/desk/bar.html?win={wid}&lens={quote(str(row['lens']))}&edge={row['edge']}"
         elif row.get("lens"):
             view = "frame"
             path = f"/desk/frame.html?win={wid}&lens={quote(str(row['lens']))}&name={quote(str(row.get('name') or ''))}"

@@ -293,3 +293,17 @@ A button's `does` runs as whoever presses it. A pinned thing (`make kind=pin bar
 - Nothing starts the desktop when Windows starts. Adding it to the Startup folder (as Agora.lnk does for the home base) is one line, left for Alex or the coordinator to decide.
 - The taskbar is not a lens yet: it needs a clock and "which window is in front" as rows the painter can read. Posting from the Feed lens needs the composer, which the facade does not carry; posting is a line in Lines.
 - Window things are visible to the whole place (the kernel reserves `sees` for itself). On a desktop of one person that is only Alex; in a shared world windows should be the person's view (SHAPE 2).
+
+## JavaScript widget path (builder handoff, 24 October)
+
+**Built and ran:** world-owned JavaScript modules now mount in opaque sandboxed frames, with a trusted bridge narrowed to the viewer and ordinary grants. Normal windows, bar slots and a full-desktop alpha overlay use the same bridge. The kernel addition is an in-page principal plus widget activation/description and definition-only kit support; earlier "kernel unchanged" statements above describe the preceding desktop builds.
+
+The task board JS view uses the lens board's existing facts and words. Guy studio changes ordinary profile facts read by the JS companion; the Python guy stays as fallback and word provider. The media pill reads artwork and reported progress through media words. Off revokes a widget's grants and ends its holds. No shared lens.js, taskboard source or model-module source was edited.
+
+**Ran:** `79 passed, 30 subtests passed in 109.00s`; `Ran 42 tests in 158.795s`, `OK`; `23 of 23 widget checks passed`; native window and nested bar sandbox checks each `10/10`. The native message test uses the installed pywebview packet format, with a working trusted native positive control. All six kernel proofs passed.
+
+**Live:** v2 installed without reseeding; all 25 original card identities, facts and history prefixes preserved. Both boards are arranged side by side, with Guy studio, the JS companion and the media pill. One own completion card was subsequently added. Existing user windows were preserved and may cover the boards. The planned one restart became an initial restart plus one recovery restart for renderer defects; the handoff records this explicitly.
+
+Contracts, sandbox limits, source-friction ledger and sharing instructions: [WIDGETS](../../kernel-lab/widgets/WIDGETS.md). Exact evidence, corrections, off words and deployment boundary: [WIDGET-PROOF](../../kernel-lab/widgets/WIDGET-PROOF.md).
+
+**Final readback:** the JS companion and Guy studio were subsequently switched off in the world and left off. The original Python guy is active. The two boards and media pill remain live; 26 cards include the builder's Done card, with all 25 originals preserved.

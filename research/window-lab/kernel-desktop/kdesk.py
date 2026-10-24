@@ -33,6 +33,7 @@ from kernel.kernel import Kernel  # noqa: E402
 from kernel import painter as KP  # noqa: E402
 sys.path.insert(0, str(HERE))
 import live  # noqa: E402
+from widgets import Widgets  # noqa: E402
 
 live.install(KP.Facade)            # widgets carry live readings when painted (live.py), never recorded
 
@@ -42,7 +43,7 @@ BASE_PY = Path(getattr(sys, "_base_executable", sys.executable))
 STEWARD_ACCOUNT = "desktop:alex"
 
 WINDOW_GRANTS = "window.* make set forget rows look hear:make hear:set hear:forget hear:undo hear:off"
-GUY_GRANTS = "guy.* window.list window.overlay rows look hear:window.opened"
+GUY_GRANTS = "guy.* window.list window.overlay rows look holds hear:window.opened"
 SYSTEM_GRANTS = "system.* rows look"
 MEDIA_GRANTS = "media.* rows look"
 SUMMARIZE_GRANTS = "summarize.* rows make set"
@@ -104,6 +105,11 @@ def after_genesis(k, headless=False):
                 for g in k.things("grant"):
                     if k.state.get(g, "to") == m and not k.state.get(g, "only"):
                         todo.append((g, "only", "kind:window"))
+            if name == 'guy':
+                for g in k._grants_to(m):
+                    words=k.state.get(g,'words') or ''
+                    if 'holds' not in words.split():
+                        todo.append((g,'words',words+' holds'))
             if ABOUT.get(name) and not k.state.get(m, "about"):
                 todo.append((m, "about", ABOUT[name]))
         if not todo and not new:
@@ -200,8 +206,30 @@ class DesktopServer(KD.Server):
 
 def make_desk_handler(kernel, entry):
     Base = KD.make_handler(kernel, entry, "")
+    widgets = Widgets(kernel)
 
     class Handler(Base):
+        widget_broker = widgets
+
+        def do_POST(self):
+            path = urlsplit(self.path).path
+            if path.startswith('/desk/widget/'):
+                if self._cross_site():
+                    return self._send(403, {'ok': False, 'text': 'foreign origin'})
+                if not secrets.compare_digest(self.headers.get('X-Agora-Widget-Host') or '', widgets.guard_key):
+                    return self._send(403, {'ok': False, 'text': 'widgets need a guarded desktop host'})
+                actor, why = self._actor()
+                if actor is None:
+                    return self._send(401, {'ok': False, 'text': why})
+                if int(self.headers.get('Content-Length') or 0) > 100000:
+                    return self._send(413, {'ok': False, 'text': 'bridge message too large'})
+                try:
+                    out = widgets.request(actor, path.rsplit('/', 1)[-1], self._body() or {})
+                except (KD.Refused, ValueError, KeyError, TypeError) as e:
+                    out = {'ok': False, 'text': 'refused: ' + str(e)}
+                return self._send(200, out)
+            return super().do_POST()
+
         def do_GET(self):
             path = urlsplit(self.path).path
             if path == '/desk/window-origin':
@@ -254,11 +282,16 @@ def start(world=DEFAULT_WORLD, port=8810, modules=True, headless=False):
     handler = make_desk_handler(k, entry)
     srv = DesktopServer(("127.0.0.1", port), handler)
     srv.window_origins = handler.window_origins = WindowOrigins(k, handler)
+    os.environ['AGORA_WIDGET_HOST_KEY'] = handler.widget_broker.guard_key
     os.environ["AGORA_KDESK_PORT"] = str(srv.server_address[1])     # the modules (children) read where the door is
     host = KM.Host(k, HERE)
     threading.Thread(target=srv.serve_forever, daemon=True, name="door").start()
     if modules:
         host.reconcile()
+    if modules and not headless:
+        from widget_overlay import Overlays
+        srv.widget_overlays = Overlays(k, f'http://127.0.0.1:{srv.server_address[1]}', entry)
+        threading.Thread(target=srv.widget_overlays.loop, daemon=True, name='widget-surfaces').start()
     return k, srv, host, entry
 
 
@@ -279,10 +312,13 @@ def main():
     try:
         while True:
             time.sleep(2)
+            srv.RequestHandlerClass.widget_broker.reap()
             host.reconcile()                        # a module that died is started again (after the kernel's rest)
     except KeyboardInterrupt:
         pass
     finally:
+        if hasattr(srv, 'widget_overlays'):
+            srv.widget_overlays.close()
         host.stop_all()
         srv.shutdown()
         srv.server_close()

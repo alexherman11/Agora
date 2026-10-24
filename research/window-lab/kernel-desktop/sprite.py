@@ -50,6 +50,7 @@ user32.GetDC.argtypes = [wt.HWND]
 user32.ReleaseDC.argtypes = [wt.HWND, wt.HDC]
 user32.ShowWindow.argtypes = [wt.HWND, ctypes.c_int]
 user32.DestroyWindow.argtypes = [wt.HWND]
+user32.UnregisterClassW.argtypes = [wt.LPCWSTR, wt.HINSTANCE]
 gdi32.CreateCompatibleDC.restype = wt.HDC
 gdi32.CreateCompatibleDC.argtypes = [wt.HDC]
 gdi32.CreateDIBSection.restype = wt.HBITMAP
@@ -76,7 +77,7 @@ def premultiplied_bgra(img):
 
 
 class Sprite:
-    def __init__(self, title="Agora guy"):
+    def __init__(self, title="Agora guy", hit_test=None, on_pointer=None):
         self.title = title
         self.hwnd = None
         self.want = None                  # (image key, image, x, y) asked for
@@ -86,6 +87,7 @@ class Sprite:
         self.ready = threading.Event()
         self.stop_ev = threading.Event()
         self.lock = threading.Lock()
+        self.hit_test, self.on_pointer = hit_test, on_pointer
 
     def start(self):
         threading.Thread(target=self._loop, daemon=True, name="sprite").start()
@@ -131,12 +133,22 @@ class Sprite:
         user32.ReleaseDC(None, screen)
 
     def _loop(self):
-        self._proc = WNDPROC(lambda h, m, w, l: user32.DefWindowProcW(h, m, w, l))
+        def dispatch(h, m, w, l):
+            if m == 0x84 and self.hit_test:  # WM_NCHITTEST, screen coordinates
+                x,y=ctypes.c_short(l & 65535).value,ctypes.c_short((l >> 16) & 65535).value
+                return 1 if self.hit_test(x,y) else -1  # HTCLIENT / HTTRANSPARENT
+            if m in (0x201,0x202,0x200) and self.on_pointer:
+                p=wt.POINT();user32.GetCursorPos(ctypes.byref(p))
+                self.on_pointer(m,p.x,p.y)
+                return 0
+            return user32.DefWindowProcW(h,m,w,l)
+        self._proc = WNDPROC(dispatch)
         wc = WNDCLASS()
-        wc.lpfnWndProc, wc.lpszClassName = self._proc, "AgoraSprite"
+        class_name = f'AgoraSprite{id(self)}'
+        wc.lpfnWndProc, wc.lpszClassName = self._proc, class_name
         wc.hInstance = kernel32.GetModuleHandleW(None)
         user32.RegisterClassW(ctypes.byref(wc))
-        self.hwnd = user32.CreateWindowExW(WS_EX, "AgoraSprite", self.title, WS_POPUP, 0, 0, 1, 1, None, None,
+        self.hwnd = user32.CreateWindowExW(WS_EX & ~0x20 if self.hit_test else WS_EX, class_name, self.title, WS_POPUP, 0, 0, 1, 1, None, None,
                                            wc.hInstance, None)
         self.ready.set()
         msg = wt.MSG()
@@ -156,5 +168,6 @@ class Sprite:
                 was_visible = self.visible
             time.sleep(0.012)
         user32.DestroyWindow(self.hwnd)
+        user32.UnregisterClassW(class_name,wc.hInstance)
         for hbm, _, _ in self.cache.values():
             gdi32.DeleteObject(hbm)

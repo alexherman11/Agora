@@ -14,6 +14,7 @@ FIELDS = {
     "style": set("name title text".split()),
     "rule": set("name title on on_entry do do_bound off of_kind".split()),
     "kind": set("name title help fields".split()),
+    "widget": set("name title code style help".split()),
 }
 REF = re.compile(r"(?<![\w])([a-z]{2,4}\d+)(?![\w])")
 

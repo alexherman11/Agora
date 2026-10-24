@@ -1,0 +1,27 @@
+{
+  "cards": 26,
+  "preserved": 25,
+  "histories_preserved": true,
+  "shown": [
+    {
+      "id": "dk114",
+      "kind": "window",
+      "name": "Task board",
+      "shows": "taskboard",
+      "target": null,
+      "edge": "",
+      "box": [
+        16,
+        220,
+        1508,
+        1828
+      ],
+      "shown": true,
+      "front": false,
+      "z": 10
+    }
+  ],
+  "module_status": "summarize: Local task summaries; literal fallback; no private storage",
+  "model_cards": 0,
+  "fallback_cards": 26
+}

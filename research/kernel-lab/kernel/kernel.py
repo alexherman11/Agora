@@ -30,6 +30,7 @@ class Actor:
 
     def __init__(self, id, person, kind, module=None, caller=None):
         self.id, self.person, self.kind, self.module, self.caller = id, person, kind, module, caller
+        self.seen_key = id   # hosts may separate observations without changing lasting authorship
 
     def __repr__(self):
         return f"Actor({self.id} for {self.person}, {self.kind})"
@@ -269,7 +270,7 @@ class Kernel:
         return a.get("name") or t
 
     def module_named(self, name):
-        for m in self.things("module"):
+        for m in self.things("module") + self.things("widget"):
             if self.state.get(m, "name") == name or m == name:
                 return m
         return None
@@ -356,7 +357,7 @@ class Kernel:
             raise Refused(self.state.get(st.target, "refusal", "That does not fit yet. Please try again."))
 
     def _sees(self, reader, rule, thing):
-        if reader and self.state.get(reader, "kind") == "module":
+        if reader and self.state.get(reader, "kind") in ("module", "widget"):
             # a module reading on its own: as the person it is installed for, else as the place sees
             p = self.state.get(reader, "for")
             if p:
@@ -547,7 +548,7 @@ class Kernel:
 
     # ------------------------------------------------------------------ the fence
     def mark(self, actor, t, shown):
-        m = self.seen.setdefault(actor.id, {}).setdefault(t, {})
+        m = self.seen.setdefault(actor.seen_key, {}).setdefault(t, {})
         for a in shown:
             m[a] = self.state.last_seq(t, a)
         m["*"] = self.state.rev.get(t, 0)
@@ -573,7 +574,7 @@ class Kernel:
             if self.state.rev.get(t, 0) > int(s):
                 raise Refused(f"stale: {t} changed since it was read (now at r{self.state.rev.get(t)}); nothing was done")
             return
-        m = self.seen.get(actor.id, {}).get(t)
+        m = self.seen.get(actor.seen_key, {}).get(t)
         if m is None:
             raise Refused(f"you have not looked at {t} yet; look {t} first")
         for a in aspects:
@@ -598,6 +599,11 @@ class Kernel:
         rec = self.log.append(rec)
         for p in rec["parts"]:
             self.state.apply(p["facts"], rec["seq"])
+        # In-page modules have no child process to reap their leases.
+        for mid in {h['by'] for h in self.leases.values()}:
+            if self.state.get(mid, 'kind') == 'widget' and (not self.state.get(mid, 'on') or
+                                                          self.state.get(mid, 'forgotten')):
+                self.release(mid=mid)
         for p in rec["parts"]:
             if rec.get("entry") or rec.get("via") in ("offer", "sign-in"):
                 # a part that made things (make, post) is about what it made, so who-sees applies to its hearing: with
@@ -841,7 +847,7 @@ class Kernel:
         rec = self._commit_use_record(tx, actor, words, entry, press, saw, st)
         # your own act marks what it wrote as seen (the desk's rule): a thing it made, whole; a thing you had looked
         # at, the aspects it changed. A thing you never looked at stays unlooked.
-        marks = self.seen.setdefault(actor.id, {})
+        marks = self.seen.setdefault(actor.seen_key, {})
         for p in tx.parts:
             for f in p["facts"]:
                 if f[0] in tx.made or f[0] in marks:
@@ -1124,7 +1130,7 @@ class Kernel:
             return Actor(who, who, "person")
         if kind == "agent":
             return Actor(who, self.state.get(who, "for"), "agent")
-        if kind == "module":
+        if kind in ("module", "widget"):
             return Actor(who, who, "module", module=who, caller=None)
         return None
 
@@ -1263,7 +1269,7 @@ class Kernel:
         for row in r.get("rows") or []:
             t = row.get("id") if isinstance(row, dict) else None
             if t in marks:
-                self.seen.setdefault(caller.id, {})[t] = dict(marks[t])
+                self.seen.setdefault(caller.seen_key, {})[t] = dict(marks[t])
         return r
 
     def on_offer(self, mid, words):

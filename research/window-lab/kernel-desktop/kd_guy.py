@@ -124,6 +124,7 @@ class Guy:
             if not words:
                 return {"refused": "guy.say needs words"}
             self.say(words[:120])
+            self.m.happen('guy.say', text=words[:120])
             return {"text": f"the guy says “{words[:120]}” (for {who})"}
         if word == "guy.sit":
             with self.lock:
@@ -131,6 +132,7 @@ class Guy:
                     self.state, self.until = "sit", time.time() + 12
             return {"text": "the guy sits down for a bit"}
         if word == "guy.hop":
+            self.m.happen('guy.hop', target=args.get('target'))
             want = args.get("target") or (args.get("words") or "").strip()
             p = self.pick(want)
             if p is None and want:
@@ -168,6 +170,11 @@ class Guy:
 
     # -- where the windows are
     def look_around(self):
+        # Python remains the fallback and word provider. JS takes the drawing
+        # only while its real overlay lease is alive, not merely installed.
+        held = self.m.see('holds')
+        self.js_active = any(r.get('by') == 'desktop-guy' and r.get('word') == 'window.overlay'
+                             for r in held.get('rows', []))
         r = self.m.see("window.list all")
         rows = r.get("rows") or []
         if r.get("refused") or not rows:
@@ -315,7 +322,7 @@ class Guy:
                 threading.Thread(target=self.look_around, daemon=True).start()
             self.tick(min(0.1, now - last))
             last = now
-            hide = self.fullscreen_app()
+            hide = self.fullscreen_app() or getattr(self, 'js_active', False)
             if hide != self.hidden:
                 self.hidden = hide
                 self.sprite.hide(hide)
