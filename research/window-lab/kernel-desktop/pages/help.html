@@ -11,6 +11,7 @@
 <main>
   <h1>Words you may use here</h1>
   <div class="card"><pre id="one">Click a word to read its help.</pre></div>
+  <input id="filter" type="search" placeholder="Find a word…" aria-label="Find a word">
   <div id="list"></div>
 </main>
 <script src="kd.js"></script>
@@ -23,10 +24,11 @@ async function draw() {
   const lines = (r.text || "").split("\n").filter((l) => l.startsWith("  "));
   const first = Object.fromEntries(lines.map((l) => { const m = l.trim().match(/^(\S+) \((\w+)\): (.*)$/); return m ? [m[1], [m[2], m[3]]] : [l, ["", ""]]; }));
   document.getElementById("list").replaceChildren(...(r.rows || []).map((w) =>
-    el("div", { cls: `word${w.yours ? "" : " not"}`, on: { click: async () => { document.getElementById("one").textContent = (await KD.see(`help ${w.word}`)).text; } } },
+    el("button", { cls: `word${w.yours ? "" : " not"}`, on: { click: async () => { document.getElementById("one").textContent = (await KD.see(`help ${w.word}`)).text; } } },
       el("b", {}, w.word), el("span", { cls: "meta" }, w.kind), el("span", {}, (first[w.word] || ["", w.yours ? "" : "not yours here"])[1]))));
 }
 KD.stream((h) => { if (h.word === "hello" || h.word === "world") draw(); });
 draw();
+document.getElementById("filter").oninput = (e) => { for(const w of document.querySelectorAll(".word")) w.hidden = !w.textContent.toLowerCase().includes(e.target.value.toLowerCase()); };
 </script>
 </body></html>

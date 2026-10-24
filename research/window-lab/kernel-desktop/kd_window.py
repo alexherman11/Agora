@@ -50,7 +50,8 @@ HEADLESS = "--headless" in sys.argv
 PORT = int(os.environ.get("AGORA_KDESK_PORT", "8810"))
 LENS_SIZE = (1180, 1500)        # a lens window's first size, in real pixels
 VIEWS = {"lines": ("Lines", (1500, 760)), "thing": ("Thing", (1000, 820)),
-         "help": ("Help", (1200, 1300)), "taskbar": ("Agora taskbar", (0, 0))}
+         "help": ("Help", (1200, 1300)), "tasks": ("Running windows", (1100, 1000)),
+         "taskbar": ("Agora taskbar", (0, 0))}
 BAR_H = 66                 # the Agora strip along the bottom, in pixels
 TOP_H = 60                 # a bar along the top (window.open <lens> edge=top)
 
@@ -123,11 +124,20 @@ class AppBar:
         self.height, self.placed, self.hwnd, self.rect, self.full = height, placed, None, None, False
         self.edge = edge                                      # "bottom" (ABE_BOTTOM 3) or "top" (ABE_TOP 1)
         self.ready = threading.Event()
+        self.error = None
         self.stop_ev = threading.Event()
         shell32.SHAppBarMessage.restype = ctypes.c_size_t
         shell32.SHAppBarMessage.argtypes = [wt.DWORD, ctypes.POINTER(self.DATA)]
-        threading.Thread(target=self._loop, daemon=True, name="appbar").start()
-        self.ready.wait(5)
+        threading.Thread(target=self._run, daemon=True, name="appbar").start()
+        if not self.ready.wait(5) or self.error:
+            raise RuntimeError(f'AppBar did not reserve its edge: {self.error or "timeout"}')
+
+    def _run(self):
+        try:
+            self._loop()
+        except Exception as exc:
+            self.error = exc
+            self.ready.set()
 
     def _data(self):
         d = self.DATA()
@@ -170,16 +180,18 @@ class AppBar:
                         ("hCursor", wt.HANDLE), ("hbrBackground", wt.HBRUSH), ("lpszMenuName", wt.LPCWSTR),
                         ("lpszClassName", wt.LPCWSTR)]
         wc = WNDCLASS()
-        wc.lpfnWndProc, wc.lpszClassName = self._proc, "AgoraKernelAppBar"
+        class_name = f'AgoraKernelAppBar{self.edge}{id(self)}'
+        wc.lpfnWndProc, wc.lpszClassName = self._proc, class_name
         wc.hInstance = kernel32.GetModuleHandleW(None)
         user32.RegisterClassW(ctypes.byref(wc))
         user32.CreateWindowExW.restype = wt.HWND
         user32.CreateWindowExW.argtypes = [wt.DWORD, wt.LPCWSTR, wt.LPCWSTR, wt.DWORD, ctypes.c_int, ctypes.c_int,
                                            ctypes.c_int, ctypes.c_int, wt.HWND, wt.HMENU, wt.HINSTANCE, wt.LPVOID]
-        self.hwnd = user32.CreateWindowExW(WS_EX_TOOLWINDOW, "AgoraKernelAppBar", "Agora taskbar strip", 0, 0, 0, 0, 0,
+        self.hwnd = user32.CreateWindowExW(WS_EX_TOOLWINDOW, class_name, "Agora taskbar strip", 0, 0, 0, 0, 0,
                                            None, None, wc.hInstance, None)
         d = self._data()
-        shell32.SHAppBarMessage(0, ctypes.byref(d))           # ABM_NEW
+        if not self.hwnd or not shell32.SHAppBarMessage(0, ctypes.byref(d)):  # ABM_NEW
+            raise RuntimeError('Windows refused the AppBar')
         self._setpos()
         self.ready.set()
         msg = wt.MSG()
@@ -255,6 +267,8 @@ class GuiScreen(Screen):
         self.closing = set()
         self.bars, self.bar_hidden = {}, {}     # wid -> AppBar, and whether it stepped back for a full-screen program
         self.lock = threading.Lock()
+        from taskbar_guard import Lease
+        self.taskbar_lease = Lease()
 
     def start(self, then):
         # pywebview needs a window before start: a hidden one that holds the loop and shows nothing
@@ -299,12 +313,16 @@ class GuiScreen(Screen):
             b = self.bars.pop(wid, None)
             if b:
                 b.remove()
+            if bar == 'bottom':
+                self.taskbar_lease.release()
             if not mine:
                 on_closed()
         win.events.loaded += loaded
         win.events.closed += closed
 
     def _make_bar(self, wid, hwnd, edge):
+        if edge == 'bottom':
+            self.taskbar_lease.acquire()
         ex = user32.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)
         user32.ShowWindow(hwnd, SW_HIDE)
         user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (ex | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW)
@@ -315,7 +333,11 @@ class GuiScreen(Screen):
             if not self.bar_hidden.get(wid):
                 user32.ShowWindow(hwnd, SW_SHOWNOACTIVATE)
         self.bar_hidden[wid] = False
-        self.bars[wid] = AppBar(TOP_H if edge == "top" else BAR_H, placed, edge)
+        try:
+            self.bars[wid] = AppBar(TOP_H if edge == "top" else BAR_H, placed, edge)
+        except Exception:
+            self.taskbar_lease.release()
+            raise
         threading.Thread(target=self._step_back, args=(wid, hwnd), daemon=True, name="full-screen").start()
 
     def _step_back(self, wid, hwnd):
@@ -487,6 +509,16 @@ class WindowHost:
     def offer(self):
         spots = "left, right, center, big, top-left, top-right, bottom-left, bottom-right"
         return [
+            {"word": "window.desktop", "kind": "see", "takes": "", "may": "anyone",
+             "help": "window.desktop: running Windows task buttons, including minimized windows, with executable icons. Live only; no titles enter the log."},
+            {"word": "window.activate", "kind": "do", "takes": "handle=<handle>", "may": "anyone",
+             "help": "window.activate handle=<handle>: bring a current Windows task button forward, or minimize it. External screen effect."},
+            {"word": "window.start", "kind": "do", "takes": "", "may": "anyone",
+             "help": "window.start: open Windows Start (Ctrl+Esc)."},
+            {"word": "window.settings", "kind": "do", "takes": "which=network|volume|battery|time", "may": "anyone",
+             "help": "window.settings which=network|volume|battery|time: open the corresponding Windows settings."},
+            {"word": "window.launch", "kind": "do", "takes": "path=<exe>", "may": "anyone",
+             "help": "window.launch path=<absolute executable>: launch a pinned Windows program. A pin is a button with bar=taskbar, path=<exe> and does=window.launch."},
             {"word": "window.list", "kind": "see", "takes": "[all]", "may": "anyone",
              "help": "window.list [all]: the Agora windows open on this desktop now, front first. With all, other "
                      "programs' windows too, as boxes and program ids, never their titles."},
@@ -529,6 +561,9 @@ class WindowHost:
                 self.screen.close(wid)
             for b in list(getattr(self.screen, "bars", {}).values()):
                 b.remove()
+            lease = getattr(self.screen, 'taskbar_lease', None)
+            if lease:
+                lease.release()
             time.sleep(0.3)
         finally:
             os._exit(0)             # whatever failed above, off always ends the process
@@ -571,6 +606,34 @@ class WindowHost:
         refused = self._owner_only(caller)
         if refused:
             return refused
+        if word == 'window.desktop':
+            if HEADLESS:
+                return {'rows': [], 'text': 'no Windows tasks (headless)'}
+            import native_shell
+            mine = [r['hwnd'] for r in self.screen.wins.values() if r.get('hwnd')]
+            rows = native_shell.windows(mine)
+            pins = self.m.see('rows any bar=taskbar', use=use)
+            for pin in pins.get('rows') or []:
+                if pin.get('path'):
+                    rows.append(dict(kind='pin-icon', id=pin['id'], icon=native_shell.executable_icon(pin['path'])))
+            return {'rows': rows, 'text': f'{len(rows)} Windows task buttons'}
+        if word in ('window.activate', 'window.start', 'window.settings', 'window.launch'):
+            if HEADLESS:
+                return {'external': True, 'text': f'{word} (headless: nothing pressed)'}
+            import native_shell
+            if word == 'window.activate':
+                mine = [r['hwnd'] for r in self.screen.wins.values() if r.get('hwnd')]
+                ok = native_shell.activate(kv.get('handle'), mine)
+            elif word == 'window.start':
+                ok = native_shell.start_menu()
+            elif word == 'window.settings':
+                ok = native_shell.settings(kv.get('which'))
+            else:
+                path = Path(kv.get('path', ''))
+                ok = path.is_absolute() and path.is_file() and path.suffix.lower() == '.exe'
+                if ok:
+                    os.startfile(str(path))
+            return {'external': True, 'text': f'{word}: done'} if ok else {'refused': 'that Windows target is not available now'}
         if word == "window.open":
             if not words:
                 return {"refused": "window.open needs a view: " + ", ".join(v for v in VIEWS if v != "taskbar")}

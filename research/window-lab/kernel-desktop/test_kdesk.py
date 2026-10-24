@@ -19,7 +19,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import kdesk  # noqa: E402
 
-SEE = {"help", "look", "rows", "holds", "status", "window.list", "system.now", "media.now"}
+SEE = {"help", "look", "rows", "holds", "status", "window.list", "window.desktop", "system.now", "media.now"}
 FEED = ("root : column, role sheet, of tag:post as p, each card\n"
         "card : column, role card\n"
         "  t : text \"$text\"\n"
@@ -37,6 +37,10 @@ class Desk:
         self.url = f"http://127.0.0.1:{self.srv.server_address[1]}"
         self.wait(lambda: "window.list" in self.say("help", "alex")["text"] and
                   "holds window.overlay" in self.say("status guy", "alex")["text"], 20)
+        # Offers arrive asynchronously. Wait for every publisher before measuring
+        # an unchanged log; late dictionary-install records are not telemetry.
+        self.wait(lambda: all(w in self.say('help')['text'] for w in ('system.now','media.now','media.prev'))
+                  and self.window('taskbar'), 20)
 
     def say(self, line, who="claude"):
         route = "/see" if line.split()[0] in SEE else "/do"
@@ -207,6 +211,11 @@ class DesktopTest(unittest.TestCase):
         r = k.run(Actor(pid, pid, "person"), "window.open lines")
         self.assertFalse(r["ok"])
         self.assertIn("only for this desktop's owner", r["text"])
+        for word in ('window.desktop', 'window.start', 'window.activate handle=123', 'window.settings which=volume',
+                     'window.launch path=C:/Windows/notepad.exe'):
+            r = k.run(Actor(pid, pid, 'person'), word)
+            self.assertFalse(r['ok'], word)
+            self.assertIn("only for this desktop's owner", r['text'])
 
     def test_the_stream_carries_happenings(self):
         d = self.d
@@ -298,7 +307,7 @@ class DesktopTest(unittest.TestCase):
         self.assertIn('"2" [value]', text)                               # two posts not read yet
         cpu = next(r for r in d.say("rows widget")["rows"] if r.get("shows") == "cpu")
         self.assertTrue(d.say(f"set {cpu['id']} order=5 side=left")["ok"])          # moved across, by a line
-        self.assertIn("[pill] row · only when $bar = \"top\" and $side = \"left\" ($bar=top, $side=left)",
+        self.assertIn("[pill] row tip \"CPU: 12% \" · only when $bar = \"top\" and $side = \"left\" ($bar=top, $side=left)",
                       self.scene("topbar"))
         self.assertTrue(d.say(f"forget {cpu['id']}")["ok"])
         self.assertNotIn('"CPU"', self.scene("topbar"))
@@ -322,6 +331,123 @@ class DesktopTest(unittest.TestCase):
         from kernel.store import Log
         again = Log(Path(d.dir) / "world").replay()
         self.assertEqual(again.snapshot(), d.k.state.snapshot())
+
+    def test_native_words_remain_words_and_are_owner_only(self):
+        d = self.d
+        d.wait(lambda: 'window.desktop' in d.say('help')['text'])
+        self.assertEqual(d.say('window.desktop')['rows'], [])
+        for word in ('window.start', 'window.activate handle=123', 'window.settings which=volume',
+                     'window.launch path=C:/Windows/notepad.exe'):
+            out = d.say(word)
+            self.assertTrue(out['ok'], out)
+            self.assertIn('headless', out['text'])
+            self.assertIn('undo cannot take it back', out['text'])
+
+    def test_v2_definitions_are_world_things_and_feed_actions_survive(self):
+        d = self.d
+        from restyle import install
+        install(d.entry.token('claude'), d.srv.server_address[1])
+        slots = {r['slot']:r for r in d.say('rows any bar=taskbar')['rows'] if r.get('slot')}
+        self.assertEqual(set(slots), {'start','agora','network','volume','battery','clock','off','holds'})
+        self.assertEqual(slots['start']['does'], 'window.start')
+        self.assertEqual(slots['off']['confirm'], 'yes')
+        self.assertTrue(d.say(f"set {slots['start']['id']} label=Launcher icon=layout-grid")['ok'])
+        self.assertEqual(next(r for r in d.say('rows button')['rows'] if r.get('slot')=='start')['label'], 'Launcher')
+        d.say('post A useful post')
+        text = self.scene('feed')
+        self.assertIn('A useful post', text)
+        self.assertIn('like ', text)
+        self.assertIn('pin ', text)
+        self.assertIn('make kind=pin bar=taskbar', text)
+        d.say('make kind=widget bar=top side=right shows=cpu order=40')
+        d.say('make kind=widget bar=top side=right shows=media order=30 does="media.play"')
+        text = self.scene('topbar')
+        self.assertIn('[icon] picture', text)
+        self.assertIn('tip "Cpu:', text)
+        self.assertNotIn('fonts.googleapis', (HERE / 'pages' / 'taskbar.html').read_text())
+
+
+class RecoveryTest(unittest.TestCase):
+    """Real separate watchdog processes; only a hidden surrogate HWND is touched.
+
+    Enabled/disabled stands in for shown/hidden, keeping every test invisible.
+    The production lease/owner-identity/death/recovery code is otherwise identical.
+    """
+    def setUp(self):
+        import ctypes as C
+        from ctypes import wintypes as W
+        import subprocess
+        import taskbar_guard as guard
+        self.C, self.W, self.guard = C, W, guard
+        self.tmp = tempfile.TemporaryDirectory(prefix='taskbar-probe-', dir=HERE / 'state')
+        self.lease = Path(self.tmp.name) / 'lease.json'
+        self.u = C.WinDLL('user32')
+        self.u.CreateWindowExW.argtypes = [W.DWORD,W.LPCWSTR,W.LPCWSTR,W.DWORD,C.c_int,C.c_int,C.c_int,C.c_int,W.HWND,W.HMENU,W.HINSTANCE,W.LPVOID]
+        self.u.CreateWindowExW.restype = W.HWND
+        self.u.IsWindowEnabled.argtypes = [W.HWND]
+        self.u.DestroyWindow.argtypes = [W.HWND]
+        self.hwnd = self.u.CreateWindowExW(0, 'STATIC', 'Invisible taskbar surrogate', 0, 0, 0, 10, 10, None, None, None, None)
+        self.assertTrue(self.hwnd)
+        self.owner = subprocess.Popen([sys.executable, '-c', 'import time;time.sleep(60)'], creationflags=0x08000000)
+        self.worker = subprocess.Popen([sys.executable, str(HERE / 'taskbar_guard.py'), '--owner', str(self.owner.pid),
+                                        '--lease', str(self.lease), '--probe', str(self.hwnd)], creationflags=0x08000000)
+        self.wait(lambda: self.data().get('ready'))
+        self.assertFalse(self.u.IsWindowEnabled(self.hwnd))
+        self.assertFalse(guard.u.IsWindowVisible(self.hwnd))
+
+    def data(self):
+        try:
+            return json.loads(self.lease.read_text())
+        except (OSError,ValueError):
+            return {}
+
+    def wait(self, cond):
+        end = time.monotonic()+10
+        while time.monotonic()<end:
+            msg = self.W.MSG()
+            while self.u.PeekMessageW(self.C.byref(msg),None,0,0,1):
+                self.u.TranslateMessage(self.C.byref(msg))
+                self.u.DispatchMessageW(self.C.byref(msg))
+            if cond():
+                return
+            time.sleep(.02)
+        self.fail('watchdog did not acknowledge hidden probe')
+
+    def tearDown(self):
+        self.owner.terminate()
+        if self.worker.poll() is None:
+            self.worker.terminate()
+        self.worker.wait(timeout=5)
+        self.owner.wait(timeout=5)
+        self.u.DestroyWindow(self.hwnd)
+        self.tmp.cleanup()
+
+    def test_hard_owner_death_restores_taskbar(self):
+        self.owner.kill()
+        self.wait(lambda: self.data().get('restored'))
+        self.assertTrue(self.u.IsWindowEnabled(self.hwnd))
+        self.assertFalse(self.guard.u.IsWindowVisible(self.hwnd))
+
+    def test_off_release_restores_taskbar(self):
+        data = self.data()
+        data['release'] = True
+        self.guard.write(self.lease, data)
+        self.wait(lambda: self.data().get('restored'))
+        self.assertTrue(self.u.IsWindowEnabled(self.hwnd))
+
+    def test_signin_recovers_stale_lease_and_leaves_active_owner_alone(self):
+        self.assertFalse(self.guard.restore(self.lease))
+        self.worker.kill()
+        self.worker.wait(timeout=5)
+        self.owner.kill()
+        self.owner.wait(timeout=5)
+        self.assertTrue(self.guard.restore(self.lease))
+        self.assertTrue(self.u.IsWindowEnabled(self.hwnd))
+
+    def test_reused_pid_does_not_keep_stale_lease(self):
+        data = self.data()
+        data['created'] += 1
+        self.assertFalse(self.guard.owner_alive(data))
 
 
 if __name__ == "__main__":

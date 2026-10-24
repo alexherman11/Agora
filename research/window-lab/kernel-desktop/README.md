@@ -1,5 +1,86 @@
 > Written by Claude (PROOF a13428, epic a13308), 23 October 2026. Claims are labelled **ran** (executed here, numbers as printed), **read** (from source, with what I read) or **imagined**. Alex's words are in quotation marks.
 
+# Desktop bars and tiles v2 — current, 24 October 2026
+
+Builder update by Codex for Claude's review. No git state changed. All source/assets are confined to this directory; the kernel and `lens.js` are unchanged.
+
+## What Alex sees
+
+- **One bottom bar** replaces the Windows taskbar while the window module runs: Windows Start, Agora/Lines, world-made pins/buttons, running Windows windows (including minimized ones), Agora app windows, network, volume, battery when present, clock and a two-press off icon. Windows icons come from their executables through `SHGetFileInfoW` and `DrawIconEx`, cached in memory. Unavailable icons get a local outline. Active windows have an underline. A crowded dock compresses, then opens **Running windows** from an overflow icon; neither bar scrolls.
+- **Both bars use icons**, with warm paper, slate, sage and rose tints. Numbers remain data; song titles truncate at 32 characters; words/details live in tooltips. The focused application's executable icon appears at the top. Both edges still reserve space through AppBars and step back for full-screen programs. Hover changes colour without motion.
+- **Feed** uses `tiles.style` and the same lens painter, with roomy cards and Like, Pin and Keep in dock actions. **Help**, **Lines**, **Thing** and **Running windows** share a matching host skin. Help is searchable and keyboard accessible. Thing shows readable facts rather than raw protocol receipts. Wave remains its existing action: the guy says “hi Alex!”; it was never a separate app window.
+
+Lucide **0.468.0**, ISC, is vendored in `pages/icons/` with its [complete licence](pages/icons/LICENSE), from [the tagged Lucide source](https://github.com/lucide-icons/lucide/tree/0.468.0). No komorebi or Zebar code is used. No icon is fetched at runtime. The desktop response omits the shared lens HTML's optional external Google font and uses installed system type, keeping the shared painter unchanged.
+
+## Taskbar recovery and off
+
+`taskbar_guard.py` owns a lease. Before hiding Explorer it saves its original AppBar state to `state/taskbar-lease.json` and registers **Agora taskbar recovery** in the current user's `HKCU/Software/Microsoft/Windows/CurrentVersion/Run`. The guard starts through WMI **outside the kernel process tree**. Auto-hide releases Explorer's reserved strip, its primary and secondary bars are hidden, and Agora reserves its own strip.
+
+The guard restores Explorer's original state and shows its taskbars on host death or explicit release. The host watches the guard and restores Explorer if the guard dies. Closing the bottom bar or `off window` releases the lease; `kdesk_off.py` additionally restores it after stopping the process tree. Sign-in recovery only restores a stale lease, **never starts Agora**, checks creation time as well as PID, and removes its own Run entry after restoration. A still-running owner is left alone. Recovery waits briefly if Explorer is not ready.
+
+**Off:** the existing **Agora desktop off** shortcut; bottom power icon twice; `off window` in Lines; or pinned Python running `kdesk_off.py`. **On:** the existing **Agora desktop on** shortcut / `kdesk_on.py --wait`, detached under pythonw through WMI.
+
+## Still made with words
+
+Existing pins/buttons/widgets, grants, media words and `window.list [all]` keep their contracts. New owner-only words are `window.desktop` (live task rows), `window.activate handle=...`, `window.start`, `window.settings which=network|volume|battery|time` and `window.launch path=<absolute.exe>`. Screen effects are external acts; receipts correctly refuse undo. Task titles and icons never become world facts.
+
+```text
+make kind=widget bar=top side=right shows=cpu icon=cpu order=40
+make kind=button bar=taskbar label=Feed icon=rss does="window.open feed"
+make kind=button bar=taskbar label=Notepad path=C:/Windows/notepad.exe does="window.launch path=C:/Windows/notepad.exe"
+```
+
+Optional `icon=` chooses a local icon; otherwise the reading/view selects it. A pinned executable's `path=` supplies its real icon. Start, Lines, tray readings, clock, holds and off are also world buttons/widgets: `slot=` places their controls, `side=right` places a bottom reading, and `confirm=yes` gives a button two-press confirmation. `restyle.py` installs missing default slots and updates named v2 styles/lenses through ordinary undoable door words **once**, without rewriting them at boot. Later world edits remain authoritative.
+
+## Verification and evidence
+
+**Ran**, final full suite: pinned Python, hidden fresh worlds, real module processes: `Ran 31 tests in 100.114s`, `OK`; `50 worker calls: handles 332 -> 332`. The original 25 checks remain, plus native-word permissions/receipts, v2 lens actions and four recovery cases. The former exact scene-string assertion now includes the new tooltip. Test startup waits for every module's dictionary offers before asserting the telemetry does not grow the log; otherwise late installation records could be mistaken for readings. A fresh suite passed against the concurrently updated shared kernel; intermediate runs during its dictionary-binding edits did not all pass, and no kernel changes were made here.
+
+Recovery tests use real watchdog processes against a **hidden surrogate HWND**. Enabled/disabled represents restored/hidden so tests never alter Explorer. They cover hard owner death, off release, stale sign-in recovery, active-owner protection and PID reuse. This tests the lease paths, not a real Windows sign-out/sign-in.
+
+`hidden_evidence.py` renders actual HTTP pages with the unchanged painter in headless Edge, exercises button/Feed actions and crowded layout, and saves:
+
+- [Top bar](evidence/bars-v2-top.png), [bottom bar](evidence/bars-v2-bottom.png).
+- [Feed](evidence/tiles-v2-feed.png), [Help](evidence/tiles-v2-help.png), [Lines](evidence/tiles-v2-lines.png), [Thing](evidence/tiles-v2-thing.png), [Running windows](evidence/tiles-v2-tasks.png).
+- [Wave](evidence/tiles-v2-wave.png): the actual sprite renderer, hidden, with its speech bubble.
+
+The bottom screenshot uses real executable icon samples in a hidden layout fixture. It is not a live-desktop screenshot. Images are opened and inspected before delivery. **Ran**, read-only on the real machine: 15 eligible Windows task windows, 15 executable icons returned, including minimized windows.
+
+**Ran**, final browser check: `Hidden browser: Start, Wave, Help search, Lines, Like, Pin, Keep in dock, 80-window overflow, 8 concurrent pages/streams: OK; 8 images saved.` It also adds and removes a bottom CPU widget by one line and verifies it appears. All eight saved images were opened and inspected.
+
+**Ran**, live restart with `kdesk_off.py`, then detached `kdesk_on.py --wait`: off printed `kdesk off: stopped 6 process(es); 0 left; the work area ends at 2088 of 2160; Windows taskbar visible=True`; on printed `kdesk: 0 pid 78192` and `kdesk: answering, 117 records`. V2 definitions/default controls were then installed through words (27 successful readings/acts). The world's current five windows, including the other builder's Task board, were preserved.
+
+**Ran**, `verify_live.py`, read-only, after installation:
+
+```text
+LIVE OK: kernel answering; 5 Agora windows; 11 Windows task buttons; 11 executable icons; 5 minimized windows included.
+LIVE OK: top/bottom AppBars; work area (0, 60, 3840, 2094); Windows taskbar hidden; independent recovery guard; sign-in recovery registered; fresh system readings; Feed/topbar scenes compiled.
+```
+
+This confirms running processes, native window geometry, shell state and compiled scenes; hidden Edge supplies the visual evidence. It does not claim a live WebView pixel inspection or a Windows sign-in cycle.
+
+**Ran**, final shutdown/start after the caption-control adjustment: the active v2 lease restored Explorer (`stopped 6 process(es); 0 left; the work area ends at 2088 of 2160; Windows taskbar visible=True`). Detached start printed `kdesk: 0 pid 72792` and `kdesk: answering, 129 records`. `verify_live.py` again printed both `LIVE OK` lines above with the same five Agora windows, eleven Windows tasks/icons and reserved work area. No definition installer was needed on this start: the world kept its v2 controls and styles. Minimize/close retain standard text glyphs; the bars use the local icon set.
+
+**Not verified:** actual Windows sign-out/sign-in; a second monitor; a real full-screen game; live clicks on Windows Start/settings. No Windows session is ended for testing. Agora's bars remain on the existing primary-monitor host. The compact tray is the requested network/volume/battery/clock, not a reimplementation of third-party notification-area icons.
+
+## Rough spots for Claude
+
+- `native_shell.py`, `kd_window.py`: missing world words for Windows task buttons, Start, activation, launch and settings are now module words. `window.list all` stays unchanged for the guy. AppBars use distinct native classes per edge.
+- `taskbar_guard.py`, `kdesk_off.py`: missing lifetime-bound taskbar lease; its recovery must survive the kernel. A future kernel hold could replace this host adapter.
+- `icons.py`, `live.py`, `kd_system.py`: missing live icon aspect. Symbols/readings remain unrecorded; world widget facts still choose what to show.
+- `pages/bar.html`: generic painter tooltips cannot fit inside a short edge window. The host promotes the same tips to native HTML titles, without a painter fork.
+- Shared host CSS/JS and Help/Thing/tasks/taskbar pages: a consistent host skin. Lines/Help/Thing remain the existing host pages; a full form/input lens vocabulary would let more of this chrome become lenses.
+- `restyle.py`, `lenses/*`: styles/lenses installed through words, retaining history and undo. No source-over-world boot synchronization.
+- `kdesk.py`: missing host preference for local-only fonts; omit the optional remote font link in the desktop response.
+- `pages/stream.js`, `stream-worker.js`, `kdesk.py`: hidden browser testing exposed HTTP/1's six-connections-per-origin limit: six independent event streams could starve an icon request. A host-loaded SharedWorker shares one native event stream across desktop pages/lenses and fans out the unchanged world/happen events. The shared `lens.js` and the kernel door remain unchanged; page exit releases its subscription. This is a host transport/lifetime adapter, not a new app API.
+- `test_kdesk.py`, `hidden_evidence.py`, `verify_live.py`: isolated recovery/rendering evidence plus bounded read-only live verification, without touching the other builder's apps.
+
+---
+
+## Earlier implementation and evidence (v1, retained history)
+
+The following account is historical. Its second strip above the Windows taskbar, text pills, missing Windows task buttons and missing sign-in recovery are superseded by v2 above.
+
 # Your desktop, on the new kernel
 
 Alex, before leaving on 23 Oct: "When i get back i hope that some agora native windows are running in my windows desktop, and they use the new code." This folder is that: real windows on the Windows desktop, drawn from the new kernel (`research/kernel-lab`), not from frontier.

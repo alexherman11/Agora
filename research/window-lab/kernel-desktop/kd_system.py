@@ -101,6 +101,12 @@ class System:
 
     def write(self):
         self.last = shape(self.read())
+        if not HEADLESS:
+            import native_shell
+            path = native_shell.program_path(native_shell.u.GetForegroundWindow())
+            symbol = native_shell.executable_icon(path)
+            if symbol:
+                self.last['focused']['symbol'] = symbol
         if not self.home:
             return
         tmp = self.home / "live.json.tmp"

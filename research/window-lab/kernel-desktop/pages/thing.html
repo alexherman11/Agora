@@ -18,12 +18,22 @@ async function draw() {
   if (!t) { document.getElementById("title").textContent = "No thing named"; return; }
   const r = await KD.see(`look ${t}`);
   const row = (r.rows || [])[0] || {};
-  const name = row.name || row.label || (row.text || "").slice(0, 40) || t;
+  const name = row.name || row.label || (row.text || "").slice(0, 48) || "Thing";
   document.getElementById("title").textContent = name;
   strip.querySelector(".name").textContent = name;
   document.title = `${name} · Agora`;
-  document.getElementById("said").textContent = r.text || "";
-  document.getElementById("aspects").textContent = Object.entries(row).filter(([k]) => !k.startsWith("like:")).map(([k, v]) => `${k} = ${typeof v === "object" ? JSON.stringify(v) : v}`).join("\n");
+  document.getElementById("said").textContent = row.text || row.name || row.label || "No text yet.";
+  const facts = Object.entries(row).filter(([k]) => !["id","rev","in","text","name","label"].includes(k) && !k.startsWith("like:"));
+  const readable = async (v) => {
+    if(typeof v === "boolean") return v ? "Yes" : "No";
+    if(Array.isArray(v)) return (await Promise.all(v.map(readable))).join(", ");
+    if(typeof v === "string" && /^dk\d+$/.test(v)) {
+      const reply = await KD.see(`look ${v}`), thing = (reply.rows || [])[0] || {};
+      return thing.name || thing.label || (thing.text || "").slice(0,48) || "Thing";
+    }
+    return typeof v === "object" ? JSON.stringify(v) : String(v);
+  };
+  document.getElementById("aspects").textContent = (await Promise.all(facts.map(async ([k,v]) => `${k.charAt(0).toUpperCase()+k.slice(1).replace(/_/g," ")}: ${await readable(v)}`))).join("\n");
 }
 KD.stream((h) => { if (h.word === "hello" || h.word === "world") draw(); });
 draw();

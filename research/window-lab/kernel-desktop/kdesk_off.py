@@ -50,9 +50,13 @@ def main():
     for pid, _ in left:
         subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, creationflags=0x08000000)
     time.sleep(1.0)
+    from taskbar_guard import restore
+    restore(force=True)
     left = processes()
     bottom, full = work_area()
-    print(f"kdesk off: stopped {len(procs)} process(es); {len(left)} left; the work area ends at {bottom} of {full}")
+    from taskbar_guard import taskbars, u
+    visible = all(u.IsWindowVisible(h) for h in taskbars())
+    print(f"kdesk off: stopped {len(procs)} process(es); {len(left)} left; the work area ends at {bottom} of {full}; Windows taskbar visible={visible}")
 
 
 if __name__ == "__main__":

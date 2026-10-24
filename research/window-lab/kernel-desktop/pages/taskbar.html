@@ -1,117 +1,13 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>Agora taskbar</title>
-<link rel="stylesheet" href="kd.css">
-<style>
-  /* 24 Oct: restyled to match the top bar (lenses/bars.style): a warm paper strip of pills. Same parts as before. */
-  body { flex-direction: row; align-items: center; gap: 8px; padding: 0 10px; border: 0; border-top: 1px solid var(--faint);
-         background: #F4F1EA; user-select: none; }
-  .mark-btn { font-weight: 700; letter-spacing: .04em; color: var(--accent); border: 1px solid rgba(63, 93, 115, .25);
-              background: rgba(63, 93, 115, .12); padding: 3px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; height: 32px; }
-  .mark-btn:hover { background: rgba(63, 93, 115, .20); }
-  .sep { width: 1px; align-self: stretch; margin: 12px 2px; background: var(--faint); }
-  .group { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
-  .chip { display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 8px;
-          border: 1px solid rgba(31, 42, 51, .10); background: #FFFFFF; cursor: pointer; color: rgba(31, 42, 51, .82);
-          font-size: 13.5px; white-space: nowrap; }
-  .chip:hover { background: rgba(63, 93, 115, .08); }
-  .chip.front { border-color: rgba(63, 93, 115, .35); color: #1F2A33; box-shadow: inset 0 -2px 0 var(--accent); }
-  .chip.tucked { color: rgba(31, 42, 51, .55); font-style: italic; background: transparent; }
-  .chip .dot { width: 8px; height: 8px; border-radius: 2px; background: var(--accent); opacity: .8; }
-  .chip.pin { background: rgba(168, 93, 110, .10); border-color: rgba(168, 93, 110, .25); color: #7E3F4F; }
-  .chip.pin .dot { background: #A85D6E; border-radius: 50%; }
-  .chip.btn { background: rgba(94, 125, 99, .12); border-color: rgba(94, 125, 99, .28); color: #3E5A43; }
-  .chip.btn .dot { background: #5E7D63; }
-  .grow { flex: 1; }
-  .hold { font-size: 12px; color: var(--mark); background: rgba(122, 92, 46, .10); padding: 4px 10px; border-radius: 8px; cursor: default; }
-  .clock { text-align: right; line-height: 1.15; padding: 3px 12px; color: var(--accent); cursor: default; border-radius: 8px;
-           background: rgba(63, 93, 115, .12); }
-  .clock b { display: block; font-size: 14px; font-weight: 600; }
-  .clock span { font-size: 11px; color: rgba(31, 42, 51, .62); }
-  .off { border: 0; background: transparent; color: rgba(31, 42, 51, .62); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 15px; }
-  .off:hover { background: #FBF1EC; color: var(--warn); }
-  .off.ask { background: #FBF1EC; color: var(--warn); width: auto; padding: 0 10px; font-size: 12.5px; }
-  .say { position: fixed; left: 50%; transform: translateX(-50%); bottom: 4px; font: 12px var(--mono); color: var(--hush); pointer-events: none; }
-</style></head>
-<body>
-  <button class="mark-btn" id="agora" title="Agora: open the lines window">Agora</button>
-  <div class="sep"></div>
-  <div class="group" id="pins"></div>
-  <div class="sep" id="sep2"></div>
-  <div class="group" id="wins"></div>
-  <div class="grow"></div>
-  <div class="group" id="holds"></div>
-  <div class="clock" id="clock"><b></b><span></span></div>
-  <button class="off" id="off" title="turn the Agora windows off (the Agora desktop off shortcut turns them on)">⏻</button>
-  <div class="say" id="say"></div>
-<script src="kd.js"></script>
-<script>
-"use strict";
-const { el, see, doLine } = KD;
-const say = (t) => { const s = document.getElementById("say"); s.textContent = t || ""; clearTimeout(say.t); say.t = setTimeout(() => s.textContent = "", 6000); };
-
-async function pins() {
-  // whatever is placed on the taskbar: a thing with bar=taskbar. A button runs its line; anything else opens.
-  const r = await see("rows any bar=taskbar");
-  const box = document.getElementById("pins");
-  const named = {};
-  for (const row of r.rows || []) {            // a pinned thing with no label is called by its own words
-    if (row.shows && !row.label && !row.name) {
-      const s = await see(`look ${row.shows}`);
-      const t = ((s.rows || [])[0] || {});
-      named[row.id] = (t.name || t.text || row.shows).slice(0, 28) + ((t.text || "").length > 28 ? "…" : "");
-    }
-  }
-  box.replaceChildren(...(r.rows || []).map((row) => {
-    const label = row.label || row.name || named[row.id] || row.text || row.kind;
-    const kind = row.does ? "btn" : "pin";
-    const run = row.does || (row.shows ? `window.open thing ${row.shows}` : `window.open thing ${row.id}`);
-    return el("button", { cls: `chip ${kind}`, title: `${row.does ? "runs: " + row.does : "opens " + label} (made by ${row.by || "?"})`,
-      on: { click: async () => { const out = await doLine(run); say(out.text.split("\n")[0]); } } },
-      el("span", { cls: "dot" }), label);
-  }));
-  document.getElementById("sep2").style.display = (r.rows || []).length ? "" : "none";
-}
-
-async function wins() {
-  const r = await see("window.list");
-  const num = (id) => parseInt(String(id).replace(/\D/g, ""), 10) || 0;
-  const rows = (r.rows || []).filter((w) => w.kind === "window" && w.shows !== "taskbar" && !w.edge).sort((a, b) => num(a.id) - num(b.id));   // a steady order, as Windows keeps its own
-  const box = document.getElementById("wins");
-  box.replaceChildren(...rows.map((w) => el("button", {
-      cls: `chip${w.front ? " front" : ""}${w.shown ? "" : " tucked"}`, title: `${w.name}: click to bring forward or tuck away`,
-      on: { click: async () => { const out = await doLine(`window.focus ${w.id}`); say(out.text); setTimeout(wins, 250); } } },
-    el("span", { cls: "dot" }), w.name)));
-}
-
-async function holds() {
-  const r = await see("holds");
-  document.getElementById("holds").replaceChildren(...(r.rows || []).map((h) =>
-    el("span", { cls: "hold", title: `${h.by} holds ${h.word} since ${h.since}; "off ${h.by}" ends it` }, `${h.by} · ${h.word}`)));
-}
-
-function clock() {
-  const d = new Date();
-  const c = document.getElementById("clock");
-  c.querySelector("b").textContent = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  c.querySelector("span").textContent = d.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
-}
-
-function all() { pins(); wins(); holds(); }
-let pending = null;
-function soon() { clearTimeout(pending); pending = setTimeout(all, 120); }
-
-document.getElementById("agora").onclick = async () => { const out = await doLine("window.open lines"); say(out.text.split("\n")[0]); };
-const off = document.getElementById("off");
-off.onclick = async () => {
-  if (!off.classList.contains("ask")) { off.classList.add("ask"); off.textContent = "off? click again"; setTimeout(() => { off.classList.remove("ask"); off.textContent = "⏻"; }, 4000); return; }
-  await doLine("off window");
-};
-KD.stream((h) => {
-  if (["hello", "world", "hold.began", "hold.ended", "window.opened"].includes(h.word)) soon();
-});
-clock();
-setInterval(clock, 1000);
-setInterval(wins, 3000);           // which window is in front is the screen's, not a happening: read it now and then
-all();
-</script>
+<html lang="en"><head><meta charset="utf-8"><title>Agora taskbar</title>
+<link rel="stylesheet" href="kd.css"><link rel="stylesheet" href="bars.css">
+</head><body class="dock">
+  <div class="group" id="shell"></div>
+  <div class="sep"></div><div class="group" id="pins" aria-label="Pinned things"></div>
+  <div class="sep"></div><div class="group tasks" id="wins" aria-label="Running windows"></div>
+  <div class="grow"></div><div class="group" id="holds"></div>
+  <div class="group tray" id="tray" aria-label="System tray"></div>
+  <div class="group" id="clock-slot"></div><div class="group" id="off-slot"></div>
+  <div class="say" id="say" role="status"></div>
+<script src="kd.js"></script><script src="taskbar.js"></script>
 </body></html>

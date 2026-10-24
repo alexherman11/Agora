@@ -73,8 +73,8 @@ const KD = (() => {
     const strip = el("header", { cls: "strip" },
       el("span", { cls: "name pywebview-drag-region" }, name),
       el("span", { cls: "grow pywebview-drag-region" }),
-      el("button", { title: "tuck away", on: { click: () => api() && api().minimize() } }, "–"),
-      el("button", { title: "close (undo opens it again)", on: { click: () => win && doLine(`window.close ${win}`) } }, "×"));
+      el("button", { title: "tuck away", "aria-label":"Minimize", on: { click: () => api() && api().minimize() } }, "−"),
+      el("button", { title: "close (undo opens it again)", "aria-label":"Close", on: { click: () => win && doLine(`window.close ${win}`) } }, "×"));
     document.body.prepend(strip);
     const grip = el("div", { cls: "grip", title: "drag to resize", on: { mousedown: (e) => { e.preventDefault(); api() && api().resize(); } } });
     document.body.append(grip, el("div", { id: "receipt", cls: "receipt" }));

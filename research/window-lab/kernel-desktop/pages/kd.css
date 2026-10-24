@@ -35,3 +35,31 @@ input:focus, textarea:focus { outline: 2px solid rgba(63, 93, 115, .35); border-
 h1 { font-size: 20px; margin: 4px 0 12px; font-weight: 600; }
 h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--hush); margin: 18px 0 8px; font-weight: 600; }
 pre { font: 13.5px/1.45 var(--mono); white-space: pre-wrap; margin: 0; }
+
+/* Desktop v2: shared host skin; the Feed uses the corresponding tiles.style roles. */
+:root { --paper:#f4f5f3; --ink:#253645; --accent:#476d86; --line:#d4dee4; --faint:#e1e7ea; --hush:#617484; --quiet:#3b5060; }
+body { border-color:#cbd8df; border-radius:12px; }
+.strip { height:44px; padding:0 8px 0 20px; background:#fdfefd; }
+.strip .name { letter-spacing:.015em; color:#4b6477; }
+.strip button { width:30px;height:30px;display:flex;align-items:center;justify-content:center; }
+.strip button img { width:16px;height:16px;opacity:.7;pointer-events:none; }
+.strip button:last-child:hover { background:#fae8e5; }
+main { padding:24px 26px 38px; }
+h1 { font-size:24px;letter-spacing:-.025em;margin:0 0 12px; }
+h2 { margin-top:24px; }
+.card { border-radius:14px;padding:20px 22px;margin-bottom:14px;box-shadow:0 3px 10px #263d4c05; }
+.act { border-radius:9px;min-height:34px;padding:6px 14px;background:#eaf0f4;border-color:#d4e0e8;color:#3d6078;font-weight:600; }
+.act:hover { background:#dde9f1; }
+input,textarea { border-radius:10px;padding:10px 13px;border-color:#cbd9e2; }
+input::placeholder { color:#7a8c98; }
+button:focus-visible { outline:2px solid #6e99b6;outline-offset:2px; }
+pre { line-height:1.65;overflow-wrap:anywhere; }
+.hint { line-height:1.8; }
+.hint code { padding:3px 7px;background:#e7edf1;border-radius:5px;white-space:nowrap; }
+#log { border-radius:14px!important;padding:16px 18px!important; }
+.said { padding-top:12px;margin-top:12px!important;border-top:1px solid var(--faint); }
+.word { border:1px solid var(--faint)!important;border-radius:12px;padding:13px 16px!important;margin-bottom:8px;background:#fff;text-align:left;width:100%; }
+.word:hover { border-color:#a5bfce!important;background:#f6fafc; }
+.word b { min-width:138px!important; }
+#filter { width:100%;margin:4px 0 16px; }
+[hidden] { display:none!important; }

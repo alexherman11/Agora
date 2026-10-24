@@ -13,7 +13,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-SEE = {"help", "?", "look", "l", "rows", "holds", "status", "window.list"}
+SEE = {"help", "?", "look", "l", "rows", "holds", "status", "window.list", "window.desktop", "system.now", "media.now"}
 
 
 def say(line, token, port=8810):

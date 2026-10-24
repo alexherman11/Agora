@@ -1,0 +1,10 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Running windows</title><link rel="stylesheet" href="kd.css">
+<style>.task{display:flex;align-items:center;gap:14px;text-align:left;width:100%;padding:14px;margin-bottom:8px}.task img{width:28px;height:28px}.task span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}</style></head>
+<body><main><h1>Running windows</h1><p class="meta">Choose a window to bring it forward.</p><input id="filter" placeholder="Find a window" aria-label="Find a window"><div id="tasks"></div></main><script src="kd.js"></script><script>
+KD.chrome("Running windows");let tasks=[];
+function draw(){const q=document.getElementById("filter").value.toLowerCase();document.getElementById("tasks").replaceChildren(...tasks.filter(t=>t.name.toLowerCase().includes(q)).map(t=>KD.el("button",{cls:"card act task",on:{click:()=>KD.doLine(t.line)}},KD.el("img",{src:t.icon||"icons/app-window.svg",alt:""}),KD.el("span",{},t.name))));}
+async function read(){const [a,b,p]=await Promise.all([KD.see("window.list"),KD.see("window.desktop"),KD.see("rows any bar=taskbar")]);
+const pins=await Promise.all((p.rows||[]).filter(t=>!t.slot&&t.kind!=="widget").map(async t=>{let name=t.label||t.name||t.text;if(!name&&t.shows){const r=await KD.see(`look ${t.shows}`);const x=(r.rows||[])[0]||{};name=x.name||x.text;}return {name:"Pinned · "+(name||"Saved thing"),icon:"icons/pin.svg",line:t.does||`window.open thing ${t.shows||t.id}`};}));
+tasks=[...pins,...(a.rows||[]).filter(t=>t.kind==="window"&&!t.edge&&t.shows!=="taskbar").map(t=>({...t,line:`window.focus ${t.id}`})),...(b.rows||[]).filter(t=>t.handle).map(t=>({...t,line:`window.activate handle=${t.handle}`}))];draw();}
+document.getElementById("filter").oninput=draw;read();setInterval(read,3000);
+</script></body></html>

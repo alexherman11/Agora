@@ -6,14 +6,16 @@ root : row, role bar
 wl : row, role pill
   only when $bar = "top" and $side = "left"
   on click when $does != "" do $does
-  l : text "$label", role label
+  tip "$tooltip"
+  l : text "$symbol", picture, role icon
   v : text "$value", role focus
+    only when $shows != "apps" and $shows != "focused"
 wr : row, role pill
   role pill.time when $shows = "time"
   role pill.feed when $shows = "feed"
   role pill.play when $shows = "media"
   only when $bar = "top" and $side = "right" and not ($shows = "battery" and $value = "")
   on click when $does != "" do $does
-  l : text "$label", role label
+  tip "$tooltip"
+  l : text "$symbol", picture, role icon
   v : text "$value", role value
-  d : text "$detail", role detail

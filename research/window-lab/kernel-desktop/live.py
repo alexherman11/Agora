@@ -17,6 +17,7 @@ lacks: a live (unrecorded) aspect a module may supply for things that ask for it
 import json
 import re
 import time
+import icons
 from pathlib import Path
 
 STALE_S = 15                      # a reading older than this is shown as gone, not as the last number
@@ -80,6 +81,11 @@ def install(facade_cls):
                              upto=f"s{max((_num(t) for t in k.things('post')), default=0)}")
             elif key in live:
                 props.update(_flat(live[key]))
+            props['symbol'] = props.get('symbol') or icons.svg(props.get('icon') or key)
+            props['tooltip'] = (props.get('label') or key.capitalize()) + ': ' + props.get('value', '') + ' ' + props.get('detail', '')
+            if key == 'media':
+                value = props.get('value', '')
+                props['value'] = value[:32] + ('…' if len(value) > 32 else '')
         return d
     desk_for.live = True
     facade_cls.desk_for = desk_for

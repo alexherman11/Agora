@@ -1,0 +1,38 @@
+24 October 2026 — Codex builder handoff
+
+Pinned interpreter: C:/Projects/Agora4/.venv/Scripts/python.exe
+Command: -m unittest test_kdesk test_sysread -v
+Ran 31 tests in 100.114s
+OK
+50 worker calls: handles 332 -> 332
+
+Hidden browser: Start, Wave, Help search, Lines, Like, Pin, Keep in dock, 80-window overflow, 8 concurrent pages/streams: OK; 8 images saved.
+Also verified: a one-line bottom CPU widget appears; removing it is a word.
+All eight images inspected. Bottom icons are live executable samples in a hidden
+layout fixture. Wave is the real sprite renderer, not a browser window.
+
+Hidden watchdog probes: hard owner death, off release, stale sign-in recovery,
+active-owner protection and reused PID detection. No actual Explorer changes
+were made in these tests. A real Windows sign-out/sign-in was not performed.
+
+Live restart:
+kdesk off: stopped 6 process(es); 0 left; the work area ends at 2088 of 2160; Windows taskbar visible=True
+kdesk: 0 pid 78192
+kdesk: answering, 117 records
+V2 definitions installed through words: 27 successful readings/acts
+
+Read-only live verification:
+LIVE OK: kernel answering; 5 Agora windows; 11 Windows task buttons; 11 executable icons; 5 minimized windows included.
+LIVE OK: top/bottom AppBars; work area (0, 60, 3840, 2094); Windows taskbar hidden; independent recovery guard; sign-in recovery registered; fresh system readings; Feed/topbar scenes compiled.
+
+Not exercised: actual sign-out/sign-in, second monitor, real full-screen game,
+live Start/settings clicks, or live WebView pixel inspection. Other builder's
+Task board preserved. No git add/commit/push or git state changes.
+
+Final v2 shutdown/start after caption adjustment:
+kdesk off: stopped 6 process(es); 0 left; the work area ends at 2088 of 2160; Windows taskbar visible=True
+kdesk: 0 pid 72792
+kdesk: answering, 129 records
+verify_live.py again printed the same two LIVE OK lines above.
+This shutdown exercised restoration of the active v2 lease, not only an old host.
+The final hidden browser rerun again reported all checks OK and 8 images saved.

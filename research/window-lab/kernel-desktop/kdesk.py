@@ -17,6 +17,7 @@ import json
 import mimetypes
 import os
 import secrets
+import re
 import sys
 import time
 from pathlib import Path
@@ -149,6 +150,13 @@ def make_desk_handler(kernel, entry):
             path = urlsplit(self.path).path
             if path.startswith("/desk/"):
                 return self._file(path[6:])
+            if path == '/lens.html':
+                # Desktop hosts use local system type. Keep the shared painter
+                # unchanged, but do not let its optional Google font hit the network.
+                content, ctype = KP.static_file(path)
+                content = re.sub(rb'<link[^>]+href="https://fonts\.googleapis\.com/[^>]+>', b'', content)
+                content = content.replace(b'<head>', b'<head><script src="/desk/stream.js"></script>', 1)
+                return self._raw(200, content, ctype)
             return super().do_GET()
 
         def _file(self, rel):
@@ -158,7 +166,10 @@ def make_desk_handler(kernel, entry):
             ctype = mimetypes.guess_type(p.name)[0] or "application/octet-stream"
             if ctype.startswith("text/") or ctype.endswith("javascript"):
                 ctype += "; charset=utf-8"
-            self._raw(200, p.read_bytes(), ctype)
+            content = p.read_bytes()
+            if p.suffix == '.html':
+                content = content.replace(b'<head>', b'<head><script src="/desk/stream.js"></script>', 1)
+            self._raw(200, content, ctype)
 
     return Handler
 
