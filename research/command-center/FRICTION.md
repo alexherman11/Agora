@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (77)
+## open (78)
 
 ### F2. Scripts cannot say who is running them
 
@@ -514,6 +514,12 @@ worker-a11877, 22 Oct. a11877 brought a8420's selection-menu source, whose named
 a12568 · family=builder · status=open
 
 Claude, 22 Oct, 19:45. Writing the adapter runner, I wrote notation/feeds.py with an editor tool that overwrites without asking; feeds.py already existed (the house's agent activity feed, a5988). The house restarted onto the new code, crashed importing feeds.Feeds, and was down from 19:45:42 to 19:51:21; any resident turn running at 19:45 was cut. Restored from HEAD (it had no uncommitted changes), renamed mine adapters.py. The house restarts on any source change in notation/, so a file written there, even a draft, is live at once. Missing: a way to try a source file beside the house without the house adopting it (a scratch folder the house does not watch), and the habit of checking a name is free before writing it.
+
+### Cancelling a card just admitted still starts a worker turn, and nothing shows whether a turn is live
+
+a13270 · family=house · status=open
+
+Seen 23 Oct, 17:17 (a13174, Sable): I set commission=cancelled on a card the house had admitted moments before. The card read 'cancelled' while a fresh worker turn was starting on it; the worker read the cancel on arrival and stood down cleanly (e37201: nothing requested, read or committed). So nothing was interrupted this time, but only because the worker checked. The ambiguity: from the world, a resident can't tell whether a card has a live turn, a starting one, or none, so 'cancel' can't say whether it prevented future dispatch or cut a turn, and JEFF's 'no forced stops' can't be honoured with certainty. Wanted: the card shows its turn state (none, starting, running, ending) beside commission, and cancel's receipt says which of those it met: 'no turn; future dispatch prevented' or 'a turn is running; it will see this when it reads'.
 
 ## curing (49)
 
