@@ -49,7 +49,8 @@ class Page:
 
     async def start_drag(self, selector, receiver):
         a = await self.point(selector, .5, .15)
-        b = await self.point(receiver, .5, .7)
+        # Tall lanes extend below the viewport; release near their visible top.
+        b = await self.point(receiver, .5, .07)
         await self.call('Input.dispatchMouseEvent', type='mouseMoved', **a)
         await self.call('Input.dispatchMouseEvent', type='mousePressed', button='left', clickCount=1, **a)
         for i in range(1, 9):
@@ -89,7 +90,7 @@ class Browser:
         self.pages.append(p)
         await p.call('Network.enable')
         await p.call('Network.setCookie', name='agora_session', value=door.token, url=door.url, httpOnly=True, sameSite='Lax')
-        await p.call('Emulation.setDeviceMetricsOverride', width=1380, height=920, deviceScaleFactor=1, mobile=False)
+        await p.call('Emulation.setDeviceMetricsOverride', width=1600, height=1000, deviceScaleFactor=1, mobile=False)
         await p.call('Page.enable')
         await p.call('Page.navigate', url=door.url+path)
         try:

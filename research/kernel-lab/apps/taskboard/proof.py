@@ -156,5 +156,9 @@ def run():
     print(f'{len(checks)} of {len(checks)} checks passed', flush=True)
 
 
+# v1 scenario above is retained as historical evidence; v2 is the acceptance,
+# including when another proof imports this module's run function.
+from proof_v2 import run
+
 if __name__ == '__main__':
     run()

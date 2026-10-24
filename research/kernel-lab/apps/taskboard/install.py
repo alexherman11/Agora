@@ -112,14 +112,41 @@ def install(door):
                     door.say('set ' + previous[0]['id'] + ' name=taskboard')
                     made += 1
                     continue
-            if door.rows(facts['kind'], name=facts['name']):
-                skipped += 1
+            existing = door.rows(facts['kind'], name=facts['name'])
+            if existing:
+                # Upgrade only authored definitions. Settings and existing tasks
+                # are world data; never reset them on a later install.
+                updates = {k: v for k, v in facts.items() if k not in ('kind', 'name')
+                           and str(existing[0].get(k, '')) != v}
+                if facts['kind'] not in ('lens', 'style', 'rule') or not updates:
+                    skipped += 1
+                    continue
+                door.say('look ' + existing[0]['id'])
+                door.say('set ' + existing[0]['id'] + ' ' + ' '.join(k+'='+quote(v) for k,v in updates.items()))
+                made += 1
                 continue
         # A stable press makes a lost response safe to retry, including across a restart.
         import hashlib
         door.say(line, press='taskboard-install-' + hashlib.sha256(line.encode()).hexdigest())
         made += 1
     return made, skipped
+
+
+def migrate(door):
+    """Add missing v2 facts, never recreate a card or rewrite a previous fact."""
+    changed = 0
+    for task in door.rows('taskboard-task'):
+        defaults = dict(priority='4', colour='paper', note_colour='paper', note_style='normal', note='')
+        missing = {k: v for k, v in defaults.items() if k not in task}
+        # Empty values remove facts, so absent empty notes stay absent.
+        missing = {k:v for k,v in missing.items() if v}
+        if missing:
+            door.say('look ' + task['id'])
+            door.say('set ' + task['id'] + ' ' + ' '.join(k+'='+quote(v) for k,v in missing.items()))
+            changed += 1
+        if not task.get('short'):
+            door.say('summarize.task ' + task['id'])
+    return changed
 
 
 def frontier(line):
@@ -201,6 +228,7 @@ def main():
     if not args.no_seed:
         added, total = seed(d)
         print(f'Seed: {added} added, {total} current source tasks', flush=True)
+    print(f'V2: {migrate(d)} existing cards gained missing defaults; identities/history retained', flush=True)
     if not args.no_open:
         print(open_board(d), flush=True)
 

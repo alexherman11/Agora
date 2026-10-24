@@ -4,7 +4,7 @@
   "ran": "every check, count and timing below",
   "imagined": "the people, their words, the agenda (modules/agenda/agenda-oct28.json) and the summaries; no model was called"
  },
- "when": "2026-10-24T17:55Z",
+ "when": "2026-10-24T19:09Z",
  "world": {
   "records": 144,
   "persons": 41,
@@ -34,7 +34,7 @@
   {
    "check": "twelve riders press for nine carpool seats at once",
    "ok": true,
-   "detail": "9 seats taken, 3 told the car is full: refused: sb102 is taken (3 seats, all claimed); look shows what is open"
+   "detail": "9 seats taken, 3 told the car is full: refused: sb101 is taken (3 seats, all claimed); look shows what is open"
   },
   {
    "check": "sixteen sign up at once for twelve two-minute slots",
@@ -49,7 +49,7 @@
   {
    "check": "undo gives a slot back, and the next neighbour takes it",
    "ok": true,
-   "detail": "Bea gave theirs back; Priya took it"
+   "detail": "Bea gave theirs back; Ines took it"
   },
   {
    "check": "sign-up closes at a time of day",
@@ -99,7 +99,7 @@
   {
    "check": "thirty phones follow every 'now speaking'",
    "ok": true,
-   "detail": "5 moves × 30 phones; seen within p50 201.2 ms, p95 395.1 ms, max 446.4 ms; 0 missed"
+   "detail": "5 moves × 30 phones; seen within p50 275.8 ms, p95 519.6 ms, max 560.4 ms; 0 missed"
   },
   {
    "check": "the outcome is a pinned announcement, with the staff report linked",
@@ -126,14 +126,14 @@
  "of": 21,
  "timing_ms": {
   "acts": 114,
-  "act_p50": 18.9,
-  "act_p95": 88.3,
-  "typed_p50": 22.4,
-  "pressed_p50": 18.8,
-  "follow_p50": 201.2,
-  "follow_p95": 395.1,
-  "phone_redraws": 399,
-  "whole_run_s": 29.2
+  "act_p50": 22.9,
+  "act_p95": 160.2,
+  "typed_p50": 22.9,
+  "pressed_p50": 21.3,
+  "follow_p50": 275.8,
+  "follow_p95": 519.6,
+  "phone_redraws": 393,
+  "whole_run_s": 14.3
  },
  "refused_acts": [
   {
@@ -141,47 +141,47 @@
    "how": "typed",
    "line": "agenda.load in=sb39",
    "ok": false,
-   "ms": 2.3,
+   "ms": 3.0,
    "said": "refused: agenda.load is for leaders of Council watch; help agenda.load says more"
+  },
+  {
+   "who": "Luis",
+   "how": "pressed",
+   "line": "do claim a816",
+   "ok": false,
+   "ms": 28.8,
+   "said": "refused: sb102 is taken (3 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Raul",
+   "how": "pressed",
+   "line": "do claim a808",
+   "ok": false,
+   "ms": 34.1,
+   "said": "refused: sb101 is taken (3 seats, all claimed); look shows what is open"
   },
   {
    "who": "Mei",
    "how": "pressed",
    "line": "do claim a824",
    "ok": false,
-   "ms": 19.8,
+   "ms": 28.2,
    "said": "refused: sb103 is taken (3 seats, all claimed); look shows what is open"
   },
   {
-   "who": "Kiko",
+   "who": "Ines",
    "how": "pressed",
-   "line": "do claim a816",
+   "line": "do claim a784",
    "ok": false,
-   "ms": 23.0,
-   "said": "refused: sb102 is taken (3 seats, all claimed); look shows what is open"
-  },
-  {
-   "who": "Fern",
-   "how": "pressed",
-   "line": "do claim a808",
-   "ok": false,
-   "ms": 22.3,
-   "said": "refused: sb101 is taken (3 seats, all claimed); look shows what is open"
+   "ms": 12.6,
+   "said": "refused: sb98 is taken (12 seats, all claimed); look shows what is open"
   },
   {
    "who": "Hana",
    "how": "pressed",
    "line": "do claim a784",
    "ok": false,
-   "ms": 6.8,
-   "said": "refused: sb98 is taken (12 seats, all claimed); look shows what is open"
-  },
-  {
-   "who": "Priya",
-   "how": "pressed",
-   "line": "do claim a784",
-   "ok": false,
-   "ms": 1.8,
+   "ms": 2.4,
    "said": "refused: sb98 is taken (12 seats, all claimed); look shows what is open"
   },
   {
@@ -189,7 +189,7 @@
    "how": "pressed",
    "line": "do claim a784",
    "ok": false,
-   "ms": 1.8,
+   "ms": 2.9,
    "said": "refused: sb98 is taken (12 seats, all claimed); look shows what is open"
   },
   {
@@ -197,7 +197,7 @@
    "how": "pressed",
    "line": "do claim a784",
    "ok": false,
-   "ms": 1.4,
+   "ms": 2.8,
    "said": "refused: sb98 is taken (12 seats, all claimed); look shows what is open"
   },
   {
@@ -205,7 +205,7 @@
    "how": "typed",
    "line": "claim sb98",
    "ok": false,
-   "ms": 1.2,
+   "ms": 2.4,
    "said": "refused: you have already said claim on sb98; once each. undo takes yours back"
   },
   {
@@ -213,7 +213,7 @@
    "how": "typed",
    "line": "claim sb98",
    "ok": false,
-   "ms": 17.0,
+   "ms": 1.8,
    "said": "refused: sign-up for sb98 closed at 2026-10-29T00:45Z"
   },
   {
@@ -221,7 +221,7 @@
    "how": "typed",
    "line": "post one more thing about parking",
    "ok": false,
-   "ms": 1.2,
+   "ms": 1.7,
    "said": "refused: you have said post 5 times today, the most it takes from one person in a day"
   },
   {
@@ -229,15 +229,15 @@
    "how": "typed",
    "line": "vote sb111 no",
    "ok": false,
-   "ms": 2.1,
+   "ms": 13.8,
    "said": "refused: you have already said vote on sb111; once each. undo takes yours back"
   },
   {
-   "who": "Dana",
+   "who": "Alex",
    "how": "pressed",
    "line": "do agenda.next a760",
    "ok": false,
-   "ms": 27.2,
+   "ms": 29.6,
    "said": "refused: stale: sb95 changed since it was painted (now, r140); nothing was done. The view will repaint."
   },
   {
@@ -245,7 +245,7 @@
    "how": "pressed",
    "line": "do agenda.next a760",
    "ok": false,
-   "ms": 2.6,
+   "ms": 2.8,
    "said": "refused: agenda.next is for leaders of Council watch; help agenda.next says more"
   },
   {
@@ -253,24 +253,9 @@
    "how": "typed",
    "line": "pin sb118",
    "ok": false,
-   "ms": 3.3,
+   "ms": 3.2,
    "said": "refused: pin is for leaders of Seabright; help pin says more"
   }
  ],
- "shots": {
-  "council-phone.png": {
-   "who": "Sam",
-   "lens": "council",
-   "size": "390x2000",
-   "ok": true,
-   "said": " (2)\nRuth\nParking on Murray will be gone by 6, walk if you can (3)\nRuth\nParking on Murray will be gone by 6, walk if you can (4)\nRuth\nParking on Murray will be gone by 6, walk if you can (5)\nSam\nThanks to everyone who drove\nMurray & 5th to City Hall · leaves 5:30 pm · 0 left\nride\nSeabright & Logan to City Hall · leaves 5:30 pm · 0 left\nride\nMott & Effey to City Hall · leaves 5:30 pm · 0 left\nride\n"
-  },
-  "floor-phone.png": {
-   "who": "Dana",
-   "lens": "floor",
-   "size": "390x844",
-   "ok": true,
-   "said": "to order and roll call\n2. Consent calendar\n3. Public hearing: 41 homes at Murray & 5th\nSpeakers, in order: Maya, Omar, Sam, Gus, Tom, Raul, Wes, Lena, Ruth, Ines, Priya\nCall-backs: Maya 831-555-1001, Omar 831-555-1007, Sam 831-555-1005, Gus 831-555-1011, Tom 831-555-1009, Raul 831-555-1015, Wes 831-555-1013, Priya 831-555-2000\n4. Staff report and council discussion\n5. Council vote, or continuance\n"
-  }
- }
+ "shots": {}
 }

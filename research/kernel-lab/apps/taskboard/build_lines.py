@@ -77,7 +77,8 @@ role refusal : text down, warn, on warn at 8%, pad gap
 '''
 
 def main():
-    lines = ['# Task board: literal world lines. No module, host patch or executable app code.',
+    from v2 import lens, style, VERBS
+    lines = ['# Task board v2: structure, appearance and actions are world definitions; summarize is a separate process.',
              '# Say each non-comment physical line through /do. install.py skips existing definitions.']
     for kind in ('taskboard-task', 'taskboard-lane'):
         lines.append('make kind=kind name=' + kind + ' help=' + quote('Task board ' + kind.removeprefix('taskboard-')))
@@ -100,10 +101,13 @@ def main():
          'set $1 note=$text',
          'task-note <task> text="A note": record a note on the card. History keeps earlier notes. Undo takes it back.'),
     ]
+    verbs += [(n, t, s, 'task-' + n + ' ' + t + ': ' + h) for n, t, s, h in VERBS]
     for name, takes, steps, help_ in verbs:
         lines.append(f'verb task-{name} takes={quote(takes)} steps={quote(steps)} help={quote(help_.replace("task.", "task-"))}')
-    lines.append('make kind=style name=taskboard text=' + quote(STYLE))
-    lines.append('make kind=lens name=taskboard style=taskboard text=' + quote(LENS))
+    lines.append('make kind=taskboard-settings name=taskboard filter=all model=qwen2.5:3b')
+    lines.append('make kind=style name=taskboard text=' + quote(style(STYLE)))
+    lines.append('make kind=lens name=taskboard style=taskboard text=' + quote(lens()))
+    lines.append('make kind=rule name="Task board automatic summaries" on=make of_kind=taskboard-task do=' + quote('summarize.task $target'))
     lines.append('make kind=rule name="Task board Done announcement" on=task-done of_kind=taskboard-task do=' + quote('post "Task completed" about=$target'))
     HERE.joinpath('install.lines').write_text('\n'.join(lines) + '\n', encoding='utf-8')
     print(f'{len(lines)-2} install lines written')

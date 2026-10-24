@@ -1,5 +1,23 @@
 # Task board: missing world words
 
+## Version 2: current composition boundaries (Codex, 24 Oct 2026)
+
+**Read and ran:** the v2 lens, styles and verb notes use the unchanged painter/kernel. Items 1–7 below are historical, including the now-resolved drag/history/date limits. New gaps found by actual editor input:
+
+8. **Lossless multiline text at the kernel/painter seam.** `lens.js`'s `TEXT.esc` turns line breaks into backslash-n. The kernel's shlex line parser preserves that escape literally. An unquoted `text=$value` additionally saves just the first word; all v2 edit/menu values are now explicitly quoted. **Ran:** the real Bold/Italic/Save UI initially stored only `##`, then quoted saves stored literal backslash-n. **Nearest available composition:** `summarize.save` is an explicit, task-only module word converting those escapes back to actual line breaks before answering ordinary `set` lines. Native multiline notes, checklist lines and formatting now round-trip through actual input. **Remaining limit:** literal backslash followed by n is ambiguous through this adapter; the general transport needs a lossless value convention. Typed `task-note` with actual quoted newlines remains available. No painter/kernel source was edited.
+
+9. **Checklist toolbar command.** The painter's `press` vocabulary offers Ctrl+B/I/K/E/S; no checklist insertion key. **Nearest existing word:** “Checklist / source” presses Ctrl+E, with visible `- [ ] item` help. Rendered checkboxes and multi-line editing are existing Markdown. A single press that inserts checklist syntax at the caret still needs a general editor command.
+
+10. **Quick-add suffix parsing.** Verb notes cannot split a text value or remove a trailing p1–p4. `summarize.add` parses only that optional trailing suffix and returns one ordinary `make` line; the rule on task creation supplies `short`. Empty descriptions refuse. This parsing is explicitly in the module, rather than hidden in a lens or host.
+
+11. **Scoped module registration in an already-running desktop.** The current `module` word cannot express `only=kind:taskboard-task`. Registration therefore uses `kdesk.module_specs` and its existing `after_genesis` path, including the new spec's `only` when adding its grant. This needs a desktop restart to adopt on the live kernel; no unscoped live grant is used. World words for installing a scoped module without restarting its host would remove this operational step.
+
+12. **Undo across automatic follow-up acts.** The creation rule's summary is a separate recorded act. Built-in `undo` selects the caller's latest own act, including automatic acts owned by that person. Immediately after adding a task, undo may therefore undo its automatic summary first; removing the task itself is the separate explicit Remove action, whose undo is proved. Cards fall back to the original description whenever short is absent. Grouping a user act with its automatic follow-ups, or an explicit latest-human-intent reading, still needs a general word. The app does not bypass record dependency checks.
+
+**Rough spots / source edit ledger:** `modules/summarize/summarize.py` supplies missing local summary and text parsing/save words in a separate process, with make/set limited to tasks, caller-filtered rows, and honest undo. `kernel-desktop/kdesk.py` only registers this module and carries its scope into upgrade-time grants. App Python serializes/installs world definitions and supplies proofs; `v2.py` is authored lens/style text, not a second painter. Model selection is the settings thing's `model` fact; unavailable/slow/invalid responses are labelled `short version, no model`. Calls have a bounded budget and never download a model.
+
+Priorities use flags from Lucide **0.468.0**, matching the desktop's pinned local set, with ISC licence in `icons/LICENSE`. The extra flag SVG was copied from the same tagged release; no runtime network/font/icon fetch is added by the app. The shared painter's optional font remains its own existing behaviour.
+
 > **Builder update, 24 Oct 2026:** kernel requests 1–5 below are now implemented and proved in a fresh scratch kernel. The board uses real drag, `history` rows, record dates and a `task-done` announcement rule. World verbs keep bare names; dotted names remain for modules, superseding item 4's proposed dotted workaround. `21 of 21 checks passed` through real HTTP and hidden lens.js pages. [KERNEL-WORDS-HANDOFF](../../KERNEL-WORDS-HANDOFF.md) and [NEEDS-FROM-DESKTOP](../../NEEDS-FROM-DESKTOP.md) describe adoption. The old live installation/native visibility was not changed or reverified. The original observations below remain as history.
 
 Builder findings, 24 October 2026. No kernel or desktop source was changed.

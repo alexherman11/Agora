@@ -45,6 +45,7 @@ WINDOW_GRANTS = "window.* make set forget rows look hear:make hear:set hear:forg
 GUY_GRANTS = "guy.* window.list window.overlay rows look hear:window.opened"
 SYSTEM_GRANTS = "system.* rows look"
 MEDIA_GRANTS = "media.* rows look"
+SUMMARIZE_GRANTS = "summarize.* rows make set"
 
 
 def module_specs(headless=False):
@@ -53,6 +54,10 @@ def module_specs(headless=False):
     py = str(BASE_PY)            # the real interpreter, so the pid the kernel holds is the module's own (gotchas note)
     tail = ["--headless"] if headless else []
     return [
+        {"name": "summarize", "run": [str(HERE.parents[2] / '.venv/Scripts/python.exe'),
+         str(HERE.parents[1] / 'kernel-lab/modules/summarize/summarize.py')],
+         "publishes": "summarize.*", "grants": SUMMARIZE_GRANTS,
+         "only": "kind:taskboard-task", "for": "steward"},
         {"name": "window", "run": [py, str(HERE / "kd_window.py")] + tail, "publishes": "window.*",
          "grants": WINDOW_GRANTS, "only": "kind:window", "for": "steward"},
         {"name": "guy", "run": [py, str(HERE / "kd_guy.py")] + tail, "publishes": "guy.*", "grants": GUY_GRANTS,
@@ -77,7 +82,8 @@ ABOUT = {"window": "the window host: it makes the Agora windows on this desktop 
                 "window.list",
          "system": "what this machine is doing (CPU, memory, network, volume, battery, the window in front), for the "
                    "bars' widgets and system.now",
-         "media": "the media words (media.play, media.next, media.prev, media.now) through Windows' media session"}
+         "media": "the media words (media.play, media.next, media.prev, media.now) through Windows' media session",
+         "summarize": "local task summaries with honest literal fallback; off summarize stops it"}
 
 
 def after_genesis(k, headless=False):
@@ -115,6 +121,8 @@ def after_genesis(k, headless=False):
             g = tx.mint()
             for a, v in (("kind", "grant"), ("to", mid), ("words", spec["grants"]), ("where", k.place), ("by", steward)):
                 tx.set(g, a, v)
+            if spec.get('only'):
+                tx.set(g, 'only', spec['only'])
         k._commit(tx, by="kernel", words="install: what each module is, whose, and the window grant's narrowing")
 
 
