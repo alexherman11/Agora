@@ -517,13 +517,15 @@ class WindowHost:
         self.dirty.set()
 
     def off(self):
-        log("off: closing every Agora window")
-        for wid in list(self.screen.wins):
-            self.screen.close(wid)
-        if getattr(self.screen, "bar", None):
-            self.screen.bar.remove()
-        time.sleep(0.3)
-        os._exit(0)
+        try:
+            log("off: closing every Agora window")
+            for wid in list(self.screen.wins):
+                self.screen.close(wid)
+            if getattr(self.screen, "bar", None):
+                self.screen.bar.remove()
+            time.sleep(0.3)
+        finally:
+            os._exit(0)             # whatever failed above, off always ends the process
 
     def status(self):
         n = len(self.screen.wins)

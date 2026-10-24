@@ -16,7 +16,10 @@ import uuid
 
 
 def log(*a):
-    print(*a, file=sys.stderr, flush=True)
+    try:
+        print(*a, file=sys.stderr, flush=True)
+    except (OSError, ValueError):
+        pass                    # the kernel is gone and stderr with it: a module still goes quietly
 
 
 class Module:

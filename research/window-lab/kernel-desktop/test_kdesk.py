@@ -68,8 +68,11 @@ class Desk:
         return next((w for w in self.windows() if w["shows"] == shows), None)
 
     def close(self):
-        self.host.stop_all()
+        # door first, then unhook the modules from the kernel, then stop them: every kernel act ends with a reconcile,
+        # so an act still running (a module's own, a request) would otherwise start a module after stop_all
         self.srv.shutdown()
+        self.k.modules = None
+        self.host.stop_all()
         self.srv.server_close()
         shutil.rmtree(self.dir, ignore_errors=True)
 

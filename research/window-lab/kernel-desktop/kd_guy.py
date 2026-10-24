@@ -155,10 +155,12 @@ class Guy:
                 + (f"; saying “{self.bubble}”" if time.time() < self.bubble_until else ""))
 
     def off(self):
-        if self.sprite is not None:
-            self.sprite.close()
-            time.sleep(0.1)
-        os._exit(0)
+        try:
+            if self.sprite is not None:
+                self.sprite.close()
+                time.sleep(0.1)
+        finally:
+            os._exit(0)
 
     def say(self, words):
         self.bubble, self.bubble_until = words, time.time() + 6
