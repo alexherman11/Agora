@@ -308,6 +308,8 @@ The skeleton the task names, in `research/kernel-lab/`, on loopback (not 8794), 
 
 ### The door
 
+**Web host (builder, 24 Oct; a13322).** `GET /web/` (`/web` also) and `/web/host.js`, `/web/host.css` serve a thin tiling host. Each pane loads the desktop's same `/lens.html?lens=<name>&inspect=0`; lens.js is served unchanged. The shell is public static chrome; all content and layout reads require the existing session through the ordinary door. `panes` reads the person's layout and revision; `pane.split <name> lens=<lens> [axis=row|column]`, `pane.close <name>`, `pane.move <name> to=<name>`, `pane.focus <name>` and `pane.resize <name> ratio=<10..90> [at=root|<binary split path>]` are dictionary words with help. Repeated panes get names such as `Feed 2`. Geometry is a kernel-owned `web-layout` thing with an immutable owner and `sees=person:<owner>`; lenses, posts and groups never acquire geometry. One transaction stores its binary split tree, proportions and focused pane, undoably; page writes carry that layout's revision. Other neighbours cannot read, overwrite or hear its contents. Default Feed/Council/Help geometry is a reading until the person arranges it. The host listens to world notifications and reads its own layout again, keeping simultaneous devices in step. Below 600px it shows only the focused pane, with a switcher and swipes. Lens definitions come from the world, not the host. Proof, exact evidence and limits: [[WEB-HOST]].
+
 | Route | Who | Answer |
 |---|---|---|
 | `POST /do {line, press?, saw?}` | a session | `{ok, text, rows, records, made, as}`; a refusal is `ok: false` with `refused: …` in `text` |

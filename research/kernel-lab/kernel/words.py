@@ -18,7 +18,11 @@ def _k(word, kind, takes, may, undo, help, **more):
             "bound": word, "help": help, **more}
 
 
+from hosts.web.layout import HELP as PANE_HELP, panes, arrange
+
 KERNEL_ENTRIES = [
+    *[_k(w, "see" if w == "panes" else "do", "[<words>]", "members", "no" if w == "panes" else "yes", help=h)
+      for w, h in PANE_HELP.items()],
     _k("kit", "do", "<id> [name=<text>]", "leaders", "yes",
        help="kit <group> [name=<text>]: gather its verb notes, dictionary entries, lenses, styles, rules and kind "
             "declarations as one definition-only thing. Referenced module words travel too, without code or grants. "
@@ -101,7 +105,7 @@ KERNEL_ENTRIES = [
 ]
 
 # aspects no line may write with make or set: what the kernel itself keeps, or derives
-RESERVED_KINDS = {"person", "agent", "module", "grant", "word", "invite", "world", "place", "group", "kit"}
+RESERVED_KINDS = {"person", "agent", "module", "grant", "word", "invite", "world", "place", "group", "kit", "web-layout"}
 RESERVED = {"kind", "made_by", "for", "pinned", "forgotten", "sees", "lives", "from", "bound", "origin", "bundle"}
 SEES_SAID = {"me", "leaders", "group", "place"}      # what `make … sees=` may say (section 7: it may narrow)
 RESERVED_PREFIX = ("in:", "like:", "member:", "answer:", "sees.", "vote:", "claim:", "contact:")
@@ -618,6 +622,7 @@ def holds(k, actor, st, entry, tx, group, saw=None):
 from .kits import kit, take, rename, module
 
 KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module,
+          **{w: panes if w == "panes" else arrange for w in PANE_HELP},
           "counts": counts, "test": test, "look": look, "help": help_, "post": post, "like": like, "pin": pin, "undo": undo, "off": off,
           "status": status, "make": make, "set": set_, "forget": forget, "holds": holds, "claim": claim,
           "vote": vote, "role": role, "rows": rows, "find": rows, "verb": verb}

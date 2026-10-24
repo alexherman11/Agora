@@ -81,7 +81,10 @@ def make_handler(kernel, entry, secret):
             self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
-            self.wfile.write(data)
+            try:
+                self.wfile.write(data)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                pass                                    # a pane closed while its read was being painted
 
         def _body(self):
             n = int(self.headers.get("Content-Length") or 0)
@@ -122,7 +125,10 @@ def make_handler(kernel, entry, secret):
             for k, v in extra:
                 self.send_header(k, v)
             self.end_headers()
-            self.wfile.write(data)
+            try:
+                self.wfile.write(data)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                pass                                    # navigation cancelled an asset request
 
         def _stream(self, since):
             """Server-sent events: one `world` message per record, carrying only its number (what changed is read
@@ -175,6 +181,11 @@ def make_handler(kernel, entry, secret):
                     "Set-Cookie", f"agora_session={tok}; HttpOnly; SameSite=Lax; Path=/")])
             if u.path == "/api/version":
                 return self._send(200, painter.version_info())
+            if u.path in ("/web", "/web/", "/web/host.js", "/web/host.css"):
+                page = {"/web": "index.html", "/web/": "index.html"}.get(u.path, u.path.rsplit("/", 1)[-1])
+                from .painter import LAB, TYPES
+                file = LAB / "hosts" / "web" / page
+                return self._raw(200, file.read_bytes(), TYPES[file.suffix])
             if u.path in ("/api/scene", "/api/style"):
                 actor, why = self._actor()
                 if actor is None:

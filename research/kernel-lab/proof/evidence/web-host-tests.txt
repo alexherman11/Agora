@@ -1,0 +1,196 @@
+test_the_guide_uses_ordinary_genesis_things_and_stays_in_sync (test_byo_agent.BYOStory.test_the_guide_uses_ordinary_genesis_things_and_stays_in_sync) ... ok
+test_the_neighbour_builds_and_lends_over_real_mcp (test_byo_agent.BYOStory.test_the_neighbour_builds_and_lends_over_real_mcp) ... ok
+test_credentials_are_headers_and_the_body_is_only_the_line (test_byo_agent.DoorBoundary.test_credentials_are_headers_and_the_body_is_only_the_line) ... ok
+test_only_loopback_origins_and_one_private_credential_are_accepted (test_byo_agent.DoorBoundary.test_only_loopback_origins_and_one_private_credential_are_accepted) ... ok
+test_bad_json_invalid_requests_and_eof (test_byo_agent.MCPWire.test_bad_json_invalid_requests_and_eof) ... ok
+test_initialize_notifications_errors_and_unicode_are_real_wire (test_byo_agent.MCPWire.test_initialize_notifications_errors_and_unicode_are_real_wire) ... ok
+test_unknown_tools_and_extra_arguments_do_not_reach_the_door (test_byo_agent.MCPWire.test_unknown_tools_and_extra_arguments_do_not_reach_the_door) ... ok
+test_the_evening_works_as_a_whole (test_council_night.CouncilNight.test_the_evening_works_as_a_whole) ... ok
+test_a_module_reading_for_you_counts_as_your_look (test_desktop_words.DesktopWords.test_a_module_reading_for_you_counts_as_your_look) ... ok
+test_a_personal_module_acts_reads_and_hears_as_its_person (test_desktop_words.DesktopWords.test_a_personal_module_acts_reads_and_hears_as_its_person) ... ok
+test_a_verb_note_is_one_act_and_never_adds_power (test_desktop_words.DesktopWords.test_a_verb_note_is_one_act_and_never_adds_power) ... ok
+test_a_world_from_before_a_word_gets_it_on_start (test_desktop_words.DesktopWords.test_a_world_from_before_a_word_gets_it_on_start) ... ok
+test_module_words_in_verb_notes (test_desktop_words.DesktopWords.test_module_words_in_verb_notes) ... ok
+test_rules_answer_what_their_maker_may_hear (test_desktop_words.DesktopWords.test_rules_answer_what_their_maker_may_hear) ... ok
+test_sees_on_make_narrows_and_never_widens (test_desktop_words.DesktopWords.test_sees_on_make_narrows_and_never_widens) ... ok
+test_the_block_plays_together (test_hidden_hunt.HiddenHunt.test_the_block_plays_together) ... ok
+test_a_private_workshop_cannot_be_opened_by_a_true_condition (test_hidden_hunt.ReaderConditions.test_a_private_workshop_cannot_be_opened_by_a_true_condition) ... ok
+test_a_sealed_use_unlocks_only_its_reader_and_agents_and_undo_relocks (test_hidden_hunt.ReaderConditions.test_a_sealed_use_unlocks_only_its_reader_and_agents_and_undo_relocks) ... ok
+test_bad_nonboolean_mutating_missing_and_recursive_conditions_fail_closed (test_hidden_hunt.ReaderConditions.test_bad_nonboolean_mutating_missing_and_recursive_conditions_fail_closed) ... ok
+test_count_projection_exposes_only_published_buckets_and_ignores_forged_sources (test_hidden_hunt.ReaderConditions.test_count_projection_exposes_only_published_buckets_and_ignores_forged_sources) ... ok
+test_policy_references_bind_ids_not_renamable_spellings (test_hidden_hunt.ReaderConditions.test_policy_references_bind_ids_not_renamable_spellings) ... ok
+test_wrapped_ballot_checks_answers_and_once_under_concurrency (test_hidden_hunt.ReaderConditions.test_wrapped_ballot_checks_answers_and_once_under_concurrency) ... ok
+test_data_references_are_refused_and_internal_definition_references_remap (test_kits.Kits.test_data_references_are_refused_and_internal_definition_references_remap) ... ok
+test_import_refuses_forged_data_kinds_authority_and_implementation (test_kits.Kits.test_import_refuses_forged_data_kinds_authority_and_implementation) ... ok
+test_kernel_entry_references_rebind_to_destination_dictionary (test_kits.Kits.test_kernel_entry_references_rebind_to_destination_dictionary) ... ok
+test_module_entries_have_help_and_stay_unbound_without_installation (test_kits.Kits.test_module_entries_have_help_and_stay_unbound_without_installation) ... ok
+test_no_live_data_or_authority_is_gathered (test_kits.Kits.test_no_live_data_or_authority_is_gathered) ... ok
+test_permissions_collisions_and_origin_are_protected (test_kits.Kits.test_permissions_collisions_and_origin_are_protected) ... ok
+test_take_can_be_undone_as_one_act_and_local_kit_can_be_taken (test_kits.Kits.test_take_can_be_undone_as_one_act_and_local_kit_can_be_taken) ... ok
+test_take_is_atomic_independent_undoable_and_remembers_origin (test_kits.Kits.test_take_is_atomic_independent_undoable_and_remembers_origin) ... ok
+test_two_communities_over_http (test_kits.KitsProof.test_two_communities_over_http) ...   ok   real MCP initialization and exactly two tools · initialize, initialized, tools/list over stdio
+  ok   the first guide is an ordinary seeded world thing · guide text equals the checked-in copy; onboarding reads write 0 records
+  ok   help and the dictionary describe available words · no code inspection for the scripted agent
+  ok   three useful words are verb notes, with no module · lend, return, who-has-it; 0 modules
+  ok   a composed lend is one signed act · r14; agent for Lena
+  ok   who has it resolves a claim to a neighbour · Cordless drill: Lena, from tool and person rows
+  ok   the neighbour's page names the agent and the holder · scene built by the real painter facade
+  ok   a painted lend cannot take an occupied tool · refused: sb39 is taken (1 seat, all claimed); look shows what is open
+  ok   return undoes the specific loan · r14 returned; unrelated acts left intact
+  ok   a neighbour borrows from the painted page · Cordless drill (sb39), a tool by agent for Lena
+  title=Cordless drill
+  seats=1
+  seats_left=1
+ok claim sb39 [r16] · yours; 0 seats left
+~ lend, one act [r16]
+  ok   the page now says who has it · Cordless drill: Noor
+  ok   a member cannot return another person's loan · refused: r17 is Lena's; you may undo your own acts, leaders the acts in their groups, stewards any
+  ok   a returned tool can be borrowed again · Noor returned using the printed receipt, then pressed Lend again
+  ok   the injection is visible data, with no act · read the stranger's exact request; 0 records, 0 changed facts
+  ok   the scripted agent continues only Lena's task · stranger and Lena remain non-stewards; next act returns the stepladder
+  ok   even a deliberately attempted escalation is refused · refused: role is for leaders of Seabright; help role says more
+  ok   see cannot become an act · a post through /see is refused
+  ok   guide edits obey ordinary thing rights · Lena leads her group, not the place; her set is refused
+  ok   the right words improve the world guide · ordinary set, visible to the agent; no source edit
+  ok   a session cookie preserves agent identity too · AGORA_SESSION through a second real stdio process
+  ok   an invalid key is an MCP tool error · HTTP 401 forwarded with isError; 0 records
+  ok   all admitted agent acts retain authorship · 11 acts by the agent for Lena
+  ok   the log rebuilds the same world · 24 records replayed; equal snapshot
+  ok   a restart keeps the edited guide and composed words · same guide id with the community edit; same three dictionary words
+  ok   the adapter exits cleanly on EOF · exit 0, no stderr; only JSON-RPC on stdout
+25 of 25 checks passed
+founding: forty neighbours and three agents sign in (1 pm)
+  ok   forty people and three agents · 41 persons (Alex and 40 neighbours), 3 agents
+  ok   the agenda module brings the agenda in as one act · 1 record, 6 things, by the agenda module for Dana
+  ok   only a leader may load an agenda · refused: agenda.load is for leaders of Council watch; help agenda.load says more
+before: carpools and comment slots (3 pm to 5:50 pm)
+  ok   twelve riders press for nine carpool seats at once · 9 seats taken, 3 told the car is full: refused: sb97 is taken (3 seats, all claimed); look shows what is open
+  ok   sixteen sign up at once for twelve two-minute slots · 12 slots claimed, 4 told it is taken
+  ok   once each: a second sign-up is refused · refused: you have already said claim on sb93; once each. undo takes yours back
+  ok   undo gives a slot back, and the next neighbour takes it · Bea gave theirs back; Ines took it
+  ok   sign-up closes at a time of day · refused: sign-up for sb93 closed at 2026-10-29T00:45Z (a seat was free)
+  ok   speakers' phone numbers are seen only by leaders · absent from a neighbour's look and both of their pages; present in Dana's look and floor page
+  ok   the feed is a slow lane · refused: you have said post 5 times today, the most it takes from one person in a day
+during: thirty phones follow the meeting (6 pm)
+  ok   forty vote at once in a sealed pulse poll · yes 32 · no 8; 20 typed, 20 pressed
+  ok   no record and no view says who voted how · 40 vote records, all by 'sealed', none naming a voter
+  ok   one vote each; undo lets a neighbour change theirs · a second vote: 'refused: you have already said vote on sb106; once each. undo takes yours back'; Maya changed hers; still 40 votes
+  ok   two leaders press Next at once: the meeting moves one item · one moved it; the other: 'refused: stale: sb90 changed since it was painted (now, r140); nothing was done. The view will repaint.'
+  ok   a neighbour's Next is refused · refused: agenda.next is for leaders of Council watch; help agenda.next says more
+  ok   agents' summaries are labelled as agents · 7 summaries, each made by an agent for its person; the page says 'agent for Maya' on hers
+  ok   thirty phones follow every 'now speaking' · 5 moves × 30 phones; seen within p50 185.7 ms, p95 341.2 ms, max 386.8 ms; 0 missed
+after: the outcome, pinned (7:30 pm)
+  ok   the outcome is a pinned announcement, with the staff report linked · two records from one line (r142, r143); first in a neighbour's feed
+  ok   a neighbour may not pin · refused: pin is for leaders of Seabright; help pin says more
+  ok   the tally module (Node) reads the feed as Sam may see it · most liked:
+the whole: replay and timings
+  ok   replaying the log gives the same world · 144 records replayed
+21 of 21 checks passed · 144 records · acts p50 16.6 ms · evidence in C:\Users\Alex\AppData\Local\Temp\council-evidence-rqn5oh8p\council-night.json
+  ok   twelve kids, three parents and one labelled agent over HTTP · 16 persons including the founding steward; 1 neighbour agent
+  ok   shared instruction stays data; no kid becomes a leader · only Rowan leads the hunt
+  ok   everyone begins with just the first map pin
+  ok   guessing a locked id says no more than an absent id
+  ok   wrong answers are kind; direct vote and injected answer cannot bypass the check · refused: Good try! Look around once more and try another answer.
+  ok   twelve simultaneous discoveries count once each
+  ok   two simultaneous presses by one kid count once
+  ok   visibility follows the reader's own progress
+  ok   sealed leaderboard publishes counts of hidden targets, no identities · sealed counts: 1: 12 · 2: 5 · 3: 3
+  ok   undo relocks the dependent clue for that reader
+  ok   the unchanged painter omits locked text and coordinates
+  ok   no solve record names a child or agent · 20 sealed discovery records
+  ok   the hold word acquires a real kernel lease
+  ok   the stop word releases it
+  ok   replay restores exactly the world · 56 records
+  ok   off ends the module and every hold
+16 of 16 checks passed · 57 records
+founding: forty neighbours and three agents sign in (1 pm)
+  ok   forty people and three agents · 41 persons (Alex and 40 neighbours), 3 agents
+  ok   the agenda module brings the agenda in as one act · 1 record, 6 things, by the agenda module for Dana
+  ok   only a leader may load an agenda · refused: agenda.load is for leaders of Council watch; help agenda.load says more
+before: carpools and comment slots (3 pm to 5:50 pm)
+  ok   twelve riders press for nine carpool seats at once · 9 seats taken, 3 told the car is full: refused: sb97 is taken (3 seats, all claimed); look shows what is open
+  ok   sixteen sign up at once for twelve two-minute slots · 12 slots claimed, 4 told it is taken
+  ok   once each: a second sign-up is refused · refused: you have already said claim on sb93; once each. undo takes yours back
+  ok   undo gives a slot back, and the next neighbour takes it · Bea gave theirs back; Priya took it
+  ok   sign-up closes at a time of day · refused: sign-up for sb93 closed at 2026-10-29T00:45Z (a seat was free)
+  ok   speakers' phone numbers are seen only by leaders · absent from a neighbour's look and both of their pages; present in Dana's look and floor page
+  ok   the feed is a slow lane · refused: you have said post 5 times today, the most it takes from one person in a day
+during: thirty phones follow the meeting (6 pm)
+  ok   forty vote at once in a sealed pulse poll · yes 32 · no 8; 20 typed, 20 pressed
+  ok   no record and no view says who voted how · 40 vote records, all by 'sealed', none naming a voter
+  ok   one vote each; undo lets a neighbour change theirs · a second vote: 'refused: you have already said vote on sb106; once each. undo takes yours back'; Maya changed hers; still 40 votes
+  ok   two leaders press Next at once: the meeting moves one item · one moved it; the other: 'refused: stale: sb90 changed since it was painted (now, r140); nothing was done. The view will repaint.'
+  ok   a neighbour's Next is refused · refused: agenda.next is for leaders of Council watch; help agenda.next says more
+  ok   agents' summaries are labelled as agents · 7 summaries, each made by an agent for its person; the page says 'agent for Maya' on hers
+  ok   thirty phones follow every 'now speaking' · 5 moves × 30 phones; seen within p50 195.6 ms, p95 371.3 ms, max 434.8 ms; 0 missed
+after: the outcome, pinned (7:30 pm)
+  ok   the outcome is a pinned announcement, with the staff report linked · two records from one line (r142, r143); first in a neighbour's feed
+  ok   a neighbour may not pin · refused: pin is for leaders of Seabright; help pin says more
+  ok   the tally module (Node) reads the feed as Sam may see it · most liked:
+the whole: replay and timings
+  ok   replaying the log gives the same world · 144 records replayed
+21 of 21 checks passed · 144 records · acts p50 17.4 ms · evidence in C:\Users\Alex\AppData\Local\Temp\council-night-id6s9d1d\evidence\council-night.json
+01 ok Seabright runs the original Council night · original 21 checks, unchanged assertions
+02 ok one kit gathers every definition class · 11 definitions: ['kind', 'lens', 'rule', 'style', 'word']
+03 ok sharing a kit is ordinary posting · ordinary post points to the kit
+04 ok taking places new definitions in one act · 11 fresh wt things, one record
+05 ok no source people, posts, phones or votes crossed · 15 Watsonville people, zero imported posts/polls/claims/contacts
+06 ok every definition remembers its origin · source genesis digest and source definition id on every fresh copy
+07 ok agenda.load arrives unbound · agenda.load (wt55), a do word · takes: [<words>] [in=<group>] · who may: leaders · undo: yes · from: module:agenda · unbound: this community must grant and run the module
+08 ok agenda.next arrives unbound · agenda.next (wt56), a do word · takes: <id> · who may: leaders · undo: yes · from: module:agenda · unbound: this community must grant and run the module
+09 ok local rename and Spanish aliases leave Seabright alone · three local names; source snapshot unchanged
+10 ok a group leader cannot run a module · refused: module is for stewards; help module says more
+11 ok this community grants and runs its own module · local steward supplied executable and grants; none came from the kit
+12 ok Spanish alias loads Watsonville's own evening · new meeting and three items from Watsonville fixture
+13 ok fifteen neighbours sign up for twelve comment slots · 12 admitted, 3 full refusals
+14 ok fifteen sealed votes through the copied word · counts {'kind': 'poll', 'title': 'Ask for tenant protections?', 'options': 'yes no', 'made_by': 'wt34', 'in:wt33': 34, 'votes_yes': 11, 'votes_no': 4, 'votes': 15}, admitted 15, sealed records 15
+15 ok copied words retain once-each · refused: you have already said pulse on wt66; once each. undo takes yours back
+16 ok Watsonville pins its own outcome · local post pinned by Lucia
+17 ok the copied rule answers as its local maker · local acknowledgement rule read the local pinned outcome
+18 ok copied phone views paint local activity · existing council and floor lenses, unchanged text
+19 ok source remains independent after the evening · all source facts equal the snapshot before taking
+20 ok Seabright replay is identical · 153 records replayed, exact snapshot equality
+21 ok Watsonville replay is identical · 54 records replayed, exact snapshot equality
+21 of 21 checks passed
+ok
+test_a_lens_made_by_a_line_paints_kernel_things_and_takes_presses (test_painter.Painter.test_a_lens_made_by_a_line_paints_kernel_things_and_takes_presses) ... ok
+test_a_press_painted_before_a_change_to_what_it_read_is_refused (test_painter.Painter.test_a_press_painted_before_a_change_to_what_it_read_is_refused) ... ok
+test_nothing_is_written_into_the_desks_folder (test_painter.Painter.test_nothing_is_written_into_the_desks_folder) ... ok
+test_the_rest_of_what_lens_js_asks (test_painter.Painter.test_the_rest_of_what_lens_js_asks) ... ok
+test_a_module_that_dies_mid_call (test_skeleton.RealUse.test_a_module_that_dies_mid_call) ... ok
+test_a_restart_rebuilds_from_the_log (test_skeleton.RealUse.test_a_restart_rebuilds_from_the_log) ... ok
+test_many_people_at_once (test_skeleton.RealUse.test_many_people_at_once) ... ok
+test_a_cut_short_last_line_never_happened (test_skeleton.Skeleton.test_a_cut_short_last_line_never_happened) ... ok
+test_a_module_answer_is_admitted_only_if_what_it_read_still_holds (test_skeleton.Skeleton.test_a_module_answer_is_admitted_only_if_what_it_read_still_holds) ... ok
+test_a_renamed_module_word_still_reaches_its_module (test_skeleton.Skeleton.test_a_renamed_module_word_still_reaches_its_module) ... ok
+test_composed_undo_accepts_receipts_and_keeps_undo_rights (test_skeleton.Skeleton.test_composed_undo_accepts_receipts_and_keeps_undo_rights) ... ok
+test_every_word_has_an_entry_with_help (test_skeleton.Skeleton.test_every_word_has_an_entry_with_help) ... ok
+test_like_is_sealed_and_once_each (test_skeleton.Skeleton.test_like_is_sealed_and_once_each) ... ok
+test_module_publishes_and_answers_with_lines (test_skeleton.Skeleton.test_module_publishes_and_answers_with_lines) ... ok
+test_off_takes_every_grant_and_undo_turns_it_on (test_skeleton.Skeleton.test_off_takes_every_grant_and_undo_turns_it_on) ... ok
+test_person_and_agent_use_it_over_http (test_skeleton.Skeleton.test_person_and_agent_use_it_over_http) ... ok
+test_pin_is_for_leaders_and_needs_a_look (test_skeleton.Skeleton.test_pin_is_for_leaders_and_needs_a_look) ... ok
+test_replay_checks_the_chain_and_survives_redaction (test_skeleton.Skeleton.test_replay_checks_the_chain_and_survives_redaction) ... ok
+test_the_feed_takes_a_few_posts_a_day (test_skeleton.Skeleton.test_the_feed_takes_a_few_posts_a_day) ... ok
+test_the_seam_and_the_door_trust_only_the_session (test_skeleton.Skeleton.test_the_seam_and_the_door_trust_only_the_session) ... ok
+test_undo_has_its_own_may (test_skeleton.Skeleton.test_undo_has_its_own_may) ... ok
+test_who_sees_applies_at_every_read (test_skeleton.Skeleton.test_who_sees_applies_at_every_read) ... ok
+test_a_real_session_reaches_the_kernel (test_skeleton.WithTheRealEntryService.test_a_real_session_reaches_the_kernel) ... ok
+test_no_invite_from_the_entry_service_means_no_person (test_skeleton.WithTheRealEntryService.test_no_invite_from_the_entry_service_means_no_person) ... ok
+test_a_module_holds_only_its_grants (test_skeleton.WithoutAPinGrant.test_a_module_holds_only_its_grants) ... ok
+test_bad_words_refuse_atomically_and_last_pane_stays (test_web_host.WebHost.test_bad_words_refuse_atomically_and_last_pane_stays) ... ok
+test_default_is_a_read_not_shared_geometry (test_web_host.WebHost.test_default_is_a_read_not_shared_geometry) ... ok
+test_hidden_lens_cannot_be_opened (test_web_host.WebHost.test_hidden_lens_cannot_be_opened) ... ok
+test_host_assets_routes_authentication_and_origin (test_web_host.WebHost.test_host_assets_routes_authentication_and_origin) ... ok
+test_layout_is_kernel_owned_and_cannot_be_forged (test_web_host.WebHost.test_layout_is_kernel_owned_and_cannot_be_forged) ... ok
+test_personal_layout_is_private_in_rows_look_and_scenes (test_web_host.WebHost.test_personal_layout_is_private_in_rows_look_and_scenes) ... ok
+test_private_layout_happenings_do_not_reach_another_neighbour (test_web_host.WebHost.test_private_layout_happenings_do_not_reach_another_neighbour) ... ok
+test_replay_preserves_layout_and_private_visibility (test_web_host.WebHost.test_replay_preserves_layout_and_private_visibility) ... ok
+test_split_close_move_focus_resize_and_undo (test_web_host.WebHost.test_split_close_move_focus_resize_and_undo) ... ok
+test_stale_tab_cannot_overwrite_layout (test_web_host.WebHost.test_stale_tab_cannot_overwrite_layout) ... ok
+test_words_are_dictionary_entries_with_help (test_web_host.WebHost.test_words_are_dictionary_entries_with_help) ... ok
+
+----------------------------------------------------------------------
+Ran 67 tests in 103.810s
+
+OK
