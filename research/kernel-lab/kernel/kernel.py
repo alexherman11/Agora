@@ -88,12 +88,41 @@ class Kernel:
         self.leases, self.leases_made = {}, []         # holds: momentary, in memory (SHAPE section 5)
         self.dev_sessions = None                       # start_kernel.py --dev-entry: a callable -> {token: session}
         self.clock = None                              # a callable -> aware datetime, for a run with its own time
+        self._local = threading.local()                # this thread's verb and rule depth, and the rule it runs
+        self._rules_q = None                           # rules' own thread, started by the first happening one answers
+        self.rules_fired = []                          # the last rules that ran: (rule, happening n, what it said)
         if not self.log.records:
             if genesis is None:
                 raise ValueError("an empty world needs a genesis")
             self._genesis(genesis)
         self.tag = self.state.get("world", "tag")
         self.place = self.state.get("world", "place")
+        self._new_kernel_words()
+
+    def _new_kernel_words(self):
+        """A world founded before a kernel word existed gets its entry, by one record of the kernel's own. A word the
+        world renamed is found by its bound name, so nothing is added twice."""
+        from .words import KERNEL_ENTRIES
+        with self.lock:
+            have = {self.state.get(e, "bound") or self.state.get(e, "word") for e in self.things("word")
+                    if self.state.get(e, "from") == "kernel"}
+            missing = [e for e in KERNEL_ENTRIES if e["bound"] not in have]
+            if not missing:
+                return
+            said = "the kernel's new words: " + " ".join(e["word"] for e in missing)
+            tx = Tx(self)
+            tx.part("words", None, said)
+            for e in missing:
+                eid = tx.mint()
+                tx.set(eid, "kind", "word")
+                e = dict(e)
+                if e.get("aliases"):        # an alias the world already answers to stays with what answers to it
+                    e["aliases"] = " ".join(a for a in e["aliases"].split() if not self.find_entry(a))
+                for k, v in e.items():
+                    if v != "":
+                        tx.set(eid, k, v)
+                tx.set(eid, "lives", self.place)
+            self._commit(tx, by="kernel", words=said)
 
     def now(self):
         """The kernel's time (UTC). A run may give it a clock of its own; records are stamped with it."""
@@ -216,10 +245,14 @@ class Kernel:
             tx.set(mid, "run", m["run"])
             tx.set(mid, "publishes", m["publishes"])
             tx.set(mid, "on", True)
+            if m.get("for") == "steward":
+                tx.set(mid, "for", steward)         # a module installed for a person reads and hears as that person
             gr = tx.mint()
             tx.set(gr, "kind", "grant")
             tx.set(gr, "to", mid)
             tx.set(gr, "words", m.get("grants", ""))
+            if m.get("only"):
+                tx.set(gr, "only", m["only"])       # e.g. kind:window: its make, set and forget reach only those
             tx.set(gr, "where", place)
             tx.set(gr, "by", steward)
         self._commit(tx, by="kernel", words="genesis")
@@ -273,6 +306,12 @@ class Kernel:
 
     # ------------------------------------------------------------------ who sees
     def _sees(self, reader, rule, thing):
+        if reader and self.state.get(reader, "kind") == "module":
+            # a module reading on its own: as the person it is installed for, else as the place sees
+            p = self.state.get(reader, "for")
+            if p:
+                return self._sees(p, rule, thing)
+            return any(tok.strip() in ("public", "place") for tok in str(rule).split("|"))
         for tok in str(rule).split("|"):
             tok = tok.strip()
             if tok == "public":
@@ -410,8 +449,12 @@ class Kernel:
         """A live grant to `who` for `word` reaching `group`, whose grantor still may use the word (SHAPE section 6)."""
         if depth > 4:
             return False
+        e0 = self.find_entry(word)
+        names = {word} | ({self.state.get(e0, "word"), self.state.get(e0, "bound")} |
+                          set(str(self.state.get(e0, "aliases") or "").split()) if e0 else set())
         for g in self._grants_to(who):
-            if not self._matches(self.state.get(g, "words"), word):
+            # a grant reaches a word by any name it answers to: its word, an alias, or its bound name
+            if not any(self._matches(self.state.get(g, "words"), n) for n in names if n):
                 continue
             if self.state.get(g, "where") not in self.up(group):
                 continue
@@ -422,6 +465,11 @@ class Kernel:
         return False
 
     def may(self, actor, entry, target, group):
+        if actor.kind == "module" and actor.caller is None:
+            # a module on its own (SHAPE section 6, last row): its grants, and its person's rights if it has one
+            on, p = self.state.get(actor.module, "on"), self.state.get(actor.module, "for")
+            return bool(on) and self._granted(actor.module, entry["word"], group) and (
+                not p or self._may_person(p, entry, target, group))
         if actor.kind == "module":
             # a module answering a call: the caller's rights, narrowed to the module's grants. Both must allow it.
             on = self.state.get(actor.module, "on")
@@ -484,7 +532,11 @@ class Kernel:
             self.state.apply(p["facts"], rec["seq"])
         for p in rec["parts"]:
             if rec.get("entry") or rec.get("via") in ("offer", "sign-in"):
-                self._happen({"word": p["word"], "target": p.get("target"), "by": rec["by"], "for": rec.get("for"),
+                # a part that made things (make, post) is about what it made, so who-sees applies to its hearing: with
+                # no target, a private note's words reached everyone who hears `make` (found 23 Oct)
+                made = [f[0] for f in p["facts"] if f[1] == "kind" and f[2] == "0"]
+                self._happen({"word": p["word"], "target": p.get("target") or (made[0] if made else None),
+                              "made": made, "by": rec["by"], "for": rec.get("for"),
                               "text": p.get("words", ""), "record": rec["seq"]})
         with self.changed:
             self.changed.notify_all()                    # pages' streams wake on every record
@@ -497,6 +549,12 @@ class Kernel:
         del self.happenings[:-2000]                      # momentary: the last 2000 are kept for streams catching up
         if self.modules:
             self.modules.deliver(h)
+        if self._rule_wants(h):
+            if self._rules_q is None:
+                import queue as _q
+                self._rules_q = _q.Queue()
+                threading.Thread(target=self._rule_loop, daemon=True, name="rules").start()
+            self._rules_q.put((dict(h), getattr(self._local, "rule_depth", 0)))
         with self.changed:
             self.changed.notify_all()
 
@@ -509,6 +567,36 @@ class Kernel:
                 target = None
             self._happen({"word": word, "target": target, "by": mid, "text": str(text)[:500], "announced": True})
         return "ok"
+
+    def reaches(self, actor, word, kind):
+        """A module's grant may be narrowed to kinds (`only=kind:window,pin`): refuse its `word` on another kind."""
+        if actor.kind != "module":
+            return
+        fits = [g for g in self._grants_to(actor.module) if self._matches(self.state.get(g, "words"), word)]
+        onlys = [str(self.state.get(g, "only") or "") for g in fits]
+        if fits and all(onlys) and not any(o.startswith("kind:") and kind in o[5:].split(",") for o in onlys):
+            raise Refused(f"{self.name(actor.module)}'s grant for {word} reaches only "
+                          f"{', '.join(o[5:] for o in onlys)} things, not a {kind}; nothing was done")
+
+    def hello_for(self, mid):
+        """What a module is told when it starts: who it is, what it may do, whose it is, and a folder of its own."""
+        with self.lock:
+            grants = [self.state.get(g, "words") for g in self._grants_to(mid)]
+            owner = next((t for t in self.things("person") if self.is_steward(t)), None)
+            home = self.dir / "modules" / str(self.state.get(mid, "name") or mid)
+            home.mkdir(parents=True, exist_ok=True)
+            return {"t": "hello", "module": self.state.get(mid, "name"), "id": mid, "grants": grants,
+                    "owner": owner, "place": self.place, "for": self.state.get(mid, "for"), "home": str(home)}
+
+    def module_own(self, mid, line, mode="do", saw=None):
+        """A module acting or reading on its own, outside any call: its grants alone (and its person's rights)."""
+        actor = Actor(mid, mid, "module", module=mid, caller=None)
+        try:
+            if saw is not None:
+                saw = {t: (v if isinstance(v, dict) else int(v)) for t, v in dict(saw).items()}
+            return self.run(actor, line, saw=saw, mode=mode)
+        except (Refused, ValueError, TypeError) as exc:
+            return {"ok": False, "text": f"refused: {exc}", "rows": [], "records": [], "made": []}
 
     def _grant_names(self, who, word):
         return [g for g in self._grants_to(who) if self._matches(self.state.get(g, "words"), word)]
@@ -523,16 +611,15 @@ class Kernel:
                 "record": h.get("record"), "announced": bool(h.get("announced"))}
 
     def module_hears(self, mid, h):
-        """A module hears a word its grants name as `hear:<word or pattern>`, about a thing everyone in the place may
-        see (a module has no person of its own to see more as)."""
+        """A module hears a word its grants name as `hear:<word or pattern>`, about a thing it may see: what its
+        person sees if it is installed for one, else what the whole place sees. Its own acts come back as `done`."""
         if h.get("by") == mid or not self.state.get(mid, "on"):
             return False
         if not any(self._matches(" ".join(w[5:] for w in (self.state.get(g, "words") or "").split()
                                           if w.startswith("hear:")), h["word"]) for g in self._grants_to(mid)):
             return False
         t = h.get("target")
-        return t is None or (self.state.things.get(t) is not None and
-                             str(self.state.get(t, "sees", "place")) in ("place", "public"))
+        return t is None or self.shown(mid, t) is not None
 
     # ------------------------------------------------------------------ hold (SHAPE section 5)
     def hold(self, mid, word):
@@ -657,6 +744,8 @@ class Kernel:
                 res["made"] = tx.made
                 res["text"] = res["text"].replace("[r?]", f"[r{rec['seq']}]")
                 return res
+        if src == "verb":
+            return self.verb_note(actor, st, entry, group, text, press, saw, mode)
         if src == "module":
             return self.module_word(actor, st, entry, group, text, press, saw)  # no lock held while the module works
         raise Refused(f"{st.word} is unbound: its entry says it comes from {src}, which this kernel does not run yet")
@@ -688,9 +777,133 @@ class Kernel:
             return self._commit(tx, by="sealed", words=words, entry=entry["id"], seal=seal, press=press)
         by = actor.module if actor.kind == "module" else actor.id
         return self._commit(tx, by=by, words=words, entry=entry["id"], press=press, undoes=undoes,
+                            rule=getattr(self._local, "rule", None),         # a rule ran it (never on a sealed act)
                             **{"for": actor.person if by != actor.person else None,
                                "via": "module" if actor.kind == "module" else ("agent" if actor.kind == "agent" else None),
                                "saw": saw})
+
+    # ------------------------------------------------------------------ verb notes (SHAPE section 4)
+    def verb_note(self, actor, st, entry, group, text, press=None, saw=None, mode="do"):
+        """A word made of other words. Its steps run as whoever said it (it never adds power). A see verb's steps are
+        readings; a do verb's steps are the kernel's own words and make ONE record, so one undo takes it all back."""
+        from .words import KERNEL
+        depth = getattr(self._local, "verb_depth", 0)
+        if depth > 4:
+            raise Refused(f"{entry['word']} calls words that call it, too deep; nothing was done")
+        args = ([st.target] if st.target else []) + st.words.split()
+
+        def fill(x):
+            x = x.replace("$target", st.target or (args[0] if args else "")).replace("$*", " ".join(args))
+            for i in range(9, 0, -1):
+                x = x.replace(f"${i}", args[i - 1] if len(args) >= i else "")
+            return x
+        steps = [fill(x) for x in L.split_batch(entry.get("steps") or "") if x.strip()]
+        self._local.verb_depth = depth + 1
+        try:
+            if entry.get("word_kind") == "see":
+                said, rows = [], []
+                for x in steps:
+                    r = self.step(actor, x, mode="see")
+                    said.append(r.get("text", ""))
+                    rows += r.get("rows", [])
+                return {"text": "\n".join(t for t in said if t), "rows": rows}
+            with self.lock:
+                tx, notes, handles = Tx(self), [], {}
+                for x in steps:
+                    x = self.fill_handles(x, handles)
+                    s2 = L.parse(x)
+                    if s2.word == "do":
+                        x = x.strip()[2:].strip()
+                        s2 = L.parse(x)
+                    g = s2.kv.get("in") or group
+                    eid = self.find_entry(s2.word, g)
+                    if eid is None:
+                        raise Refused(f"{entry['word']} stopped at '{x}': nothing answers to {s2.word}; nothing was done")
+                    e = self.entry(eid)
+                    if self.source(e)[0] != "kernel":
+                        raise Refused(f"{entry['word']} stopped at '{x}': a verb note's steps are the kernel's own "
+                                      f"words, and {s2.word} comes from {e.get('from')}; nothing was done")
+                    if s2.target and self.takes_id(e.get("takes")) is None:
+                        s2.words, s2.target = (s2.target + " " + s2.words).strip(), None
+                    if s2.target:
+                        if self.shown(actor.person, s2.target) is None:
+                            raise self.no_such(s2.target)
+                        g = s2.kv.get("in") or (self.groups_of(s2.target) or [group])[0]
+                    if e.get("word_kind") == "see":
+                        notes.append(KERNEL[self.source(e)[1]](self, actor, s2, e, None, g).get("text", ""))
+                        continue                    # a reading inside an act: it marks what it read as seen
+                    if not self.may(actor, e, s2.target, g):
+                        raise Refused(f"{entry['word']} stopped at '{x}': {self.refusal_for(e, g)}; nothing was done")
+                    said = self.once(actor, e, s2.target)
+                    if said:
+                        raise Refused(f"{entry['word']} stopped at '{x}': {said}; nothing was done")
+                    made_before = len(tx.made)
+                    tx.part(s2.word, s2.target, x)
+                    res = KERNEL[self.source(e)[1]](self, actor, s2, e, tx, g, saw=saw)
+                    notes.append(res["text"])
+                    self.keep_handle(x, tx.made[made_before:], handles)
+                if tx.empty:
+                    return {"text": "\n".join(n for n in notes if n)}
+                rec = self._commit_use(tx, actor, text, entry, press, saw, st)
+                body = "\n".join(n.replace("[r?]", f"[r{rec['seq']}]") for n in notes if n)
+                return {"text": f"{body}\n~ {entry['word']}, one act [r{rec['seq']}]", "record": rec["seq"],
+                        "made": tx.made}
+        finally:
+            self._local.verb_depth = depth
+
+    # ------------------------------------------------------------------ rules (SHAPE section 5)
+    RULE_DEPTH = 3
+
+    def _rule_wants(self, h):
+        if getattr(self._local, "rule_depth", 0) >= self.RULE_DEPTH:
+            return False                    # a rule's act may wake rules, three deep at most
+        return any(self.state.get(r, "on") == h.get("word") for r in self.things("rule"))
+
+    def _rule_loop(self):
+        import queue as _q
+        while True:
+            try:
+                h, depth = self._rules_q.get(timeout=60)
+            except _q.Empty:
+                continue
+            try:
+                self._fire_rules(h, depth)
+            except Exception as exc:        # noqa: BLE001  a rule never stops the kernel
+                self.notices.append(f"a rule failed on {h.get('word')}: {exc!r}")
+
+    def actor_of(self, who):
+        kind = self.state.get(who, "kind")
+        if kind == "person":
+            return Actor(who, who, "person")
+        if kind == "agent":
+            return Actor(who, self.state.get(who, "for"), "agent")
+        if kind == "module":
+            return Actor(who, who, "module", module=who, caller=None)
+        return None
+
+    def _fire_rules(self, h, depth):
+        """`make kind=rule on=<word> do="<line>"`: after each happening of that word which the rule's maker may hear,
+        the line runs as the maker ($target, $by filled), on the rules' own thread; its records say `rule`."""
+        with self.lock:
+            rules = [(r, dict(self.state.things[r])) for r in self.things("rule")
+                     if self.state.get(r, "on") == h.get("word") and not self.state.get(r, "forgotten")
+                     and str(self.state.get(r, "off") or "") not in ("yes", "True")
+                     and (h.get("record") or 10 ** 12) > self.state.last_seq(r, "kind")]    # not its own making
+        for rid, r in rules:
+            actor = self.actor_of(r.get("made_by"))
+            if actor is None:
+                continue
+            with self.lock:
+                if not self.may_hear(actor.person, h):
+                    continue
+            by = "" if h.get("by") == "sealed" else str(h.get("for") or h.get("by") or "")
+            line = str(r.get("do") or "").replace("$target", h.get("target") or "").replace("$by", by)
+            self._local.rule, self._local.rule_depth = rid, depth + 1
+            try:
+                out = self.run(actor, line)
+            finally:
+                self._local.rule, self._local.rule_depth = None, 0
+            self.rules_fired = (self.rules_fired + [(rid, h.get("n"), out["text"].split("\n")[0])])[-50:]
 
     # ------------------------------------------------------------------ module words
     def module_word(self, actor, st, entry, group, text, press, saw=None):
@@ -720,7 +933,14 @@ class Kernel:
                             f"so undo cannot take it back", "record": rec["seq"], "rows": ans.get("rows", [])}
         if entry.get("word_kind") == "see" or not ans.get("lines"):
             return {"text": ans.get("text", ""), "rows": ans.get("rows", [])}
-        return self.admit(mid, actor, text, entry, ans, press, saw)
+        try:
+            out = self.admit(mid, actor, text, entry, ans, press, saw)
+        except Refused as exc:
+            self.modules.done(mid, ans.get("use"), {"ok": False, "refused": str(exc), "made": [], "text": str(exc)})
+            raise
+        self.modules.done(mid, ans.get("use"), {"ok": True, "made": out.get("made", []), "text": out.get("text", ""),
+                                                **({"record": f"r{out['record']}"} if out.get("record") else {})})
+        return out
 
     def admit(self, mid, caller, text, entry, ans, press=None, press_saw=None):
         """A module's answer: its lines run as one use, one record, as the caller narrowed to the module, and only if

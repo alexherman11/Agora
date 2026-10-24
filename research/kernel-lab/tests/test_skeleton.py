@@ -32,7 +32,8 @@ INVITE = "seabright-flyer-oct"
 class StandInEntry:
     """The entry service's half of the seam, as it is built (research/community-app/site/SEAM.md, 23 Oct): it proves
     accounts and holds sessions; it tells the kernel about a new account (/keep/account) and answers who a session is
-    (POST /internal/session/check, Bearer secret, the account as a record). The class below runs the real one."""
+    (POST /internal/session/check, X-Kernel-Secret, {account: <id>, method, agent, record}). The class below runs
+    the real one."""
 
     def __init__(self, secret):
         self.secret, self.sessions, self.kernel_url = secret, {}, None
@@ -541,7 +542,7 @@ class WithTheRealEntryService(unittest.TestCase):
     def cookie_do(self, token, line):
         req = urllib.request.Request(self.url + "/do", json.dumps({"line": line}).encode(),
                                      {"Content-Type": "application/json",
-                                      "Cookie": "; ".join(f"{c}={token}" for c in ("agora_session", "entry_sid"))})
+                                      "Cookie": f"agora_session={token}"})
         try:
             with urllib.request.urlopen(req, timeout=20) as r:
                 return r.status, json.loads(r.read())
@@ -554,9 +555,9 @@ class WithTheRealEntryService(unittest.TestCase):
         # the record, as the entry service's own seam hands it over
         entry_url = f"http://127.0.0.1:{self.entry_srv.server_address[1]}"
         code, said = post(entry_url + "/internal/session/check", {"token": self.maya_tok},
-                          headers={"X-Kernel-Secret": self.secret, "Authorization": f"Bearer {self.secret}"})
+                          headers={"X-Kernel-Secret": self.secret})
         self.assertEqual(code, 200, said)
-        record = said.get("record") or said.get("account")
+        record = said.get("record")
         joined = post(self.url + "/keep/account",
                       {"account": record["account_id"], "name": record.get("display_name") or "Maya R.",
                        "invite": record.get("invited_through"), "answers": record.get("answers") or {}},

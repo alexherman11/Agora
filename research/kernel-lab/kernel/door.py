@@ -5,7 +5,7 @@
     POST /keep/account {account, name, invite?, answers?, agent?}   the entry service's call (SHAPE section 3)
     GET  /health
 
-Who acts comes only from the session: the entry service's `entry_sid` cookie (or `Authorization: Bearer <token>`, for
+Who acts comes only from the session: the entry service's `agora_session` cookie (or `Authorization: Bearer <token>`, for
 programs), which the kernel asks the entry service about (`POST <entry>/internal/session/check`, cached at most 30 s;
 research/community-app/site/SEAM.md). An `as` in the body is ignored.
 
@@ -32,8 +32,8 @@ SESSION_CACHE_S = 30
 
 class EntryClient:
     """Asks the entry service who a session token belongs to: `POST <entry>/internal/session/check {token}` with
-    `Authorization: Bearer <secret>`, answered `{account: <record> | null, method, agent}` (SEAM.md section 3).
-    -> {account: <account id>, method, agent} or None."""
+    `X-Kernel-Secret: <secret>`, answered `{account: <id> | null, method, agent, record}` (SEAM.md section 3, frozen
+    and committed by the sign-in story in ea15bb2). -> {account: <account id>, method, agent} or None."""
 
     def __init__(self, url, secret, cache_s=SESSION_CACHE_S):
         self.url, self.secret, self.cache_s = url.rstrip("/"), secret, cache_s
@@ -45,11 +45,8 @@ class EntryClient:
             hit = self.cache.get(token)
             if hit and hit[0] > now:
                 return hit[1]
-        # The agreed header is X-Kernel-Secret (SEAM.md, frozen 23 Oct); Bearer is sent too until the entry service's
-        # change to it is committed, and then goes.
         req = urllib.request.Request(f"{self.url}/internal/session/check", json.dumps({"token": token}).encode(),
-                                     {"Content-Type": "application/json", "X-Kernel-Secret": self.secret,
-                                      "Authorization": f"Bearer {self.secret}"})
+                                     {"Content-Type": "application/json", "X-Kernel-Secret": self.secret})
         try:
             with urllib.request.urlopen(req, timeout=5) as r:
                 said = json.loads(r.read())
@@ -57,10 +54,7 @@ class EntryClient:
             said = {}
         except (urllib.error.URLError, OSError):
             return None                             # the entry service is away: no one is signed in, nothing cached
-        # agreed: {account: <id>, method, agent, record}; an older answer put the record itself in `account`
         acct, rec = said.get("account"), said.get("record")
-        if isinstance(acct, dict):
-            acct, rec = acct.get("account_id"), acct
         ans = None
         if isinstance(acct, str) and acct and not (rec or {}).get("disabled"):
             ans = {"account": acct, "method": said.get("method"), "agent": said.get("agent")}
@@ -69,8 +63,8 @@ class EntryClient:
         return ans
 
 
-# the entry service's session cookie, on https and in test mode (agreed: agora_session; entry_sid was its first name)
-SESSION_COOKIES = ("__Host-agora_session", "agora_session", "__Host-entry_sid", "entry_sid")
+# the entry service's session cookie, on https and in test mode
+SESSION_COOKIES = ("__Host-agora_session", "agora_session")
 
 
 def make_handler(kernel, entry, secret):
@@ -200,12 +194,9 @@ def make_handler(kernel, entry, secret):
             if body is None:
                 return self._send(400, {"error": "the body must be a JSON object"})
             if self.path == "/keep/account":
-                # loopback and the shared secret, in X-Kernel-Secret (agreed); `Bearer <secret>` is still accepted
+                # loopback and the shared secret, in X-Kernel-Secret (SEAM.md, frozen)
                 given = (self.headers.get("X-Kernel-Secret") or "").encode()
-                bearer = (self.headers.get("Authorization") or "").encode()
-                if not secret or self.client_address[0] not in ("127.0.0.1", "::1") or not (
-                        hmac.compare_digest(given, secret.encode()) or
-                        hmac.compare_digest(bearer, f"Bearer {secret}".encode())):
+                if not secret or self.client_address[0] not in ("127.0.0.1", "::1") or not hmac.compare_digest(given, secret.encode()):
                     return self._send(403, {"error": "only the entry service may call this"})
                 try:
                     out = kernel.join(body.get("account"), body.get("name"), body.get("invite"),

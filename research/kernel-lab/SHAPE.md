@@ -297,7 +297,7 @@ The skeleton the task names, in `research/kernel-lab/`, on loopback (not 8794), 
 
 ## 17. The contracts, as built (kept current for the builders who depend on them)
 
-*Section 10 and 11 above are the design; this section is what the code answers today. Last checked against `kernel/` on 23 Oct 2026, 25 tests passing, Council night among them (**ran**). Anything not listed here is not built.*
+*Section 10 and 11 above are the design; this section is what the code answers today. Last checked against `kernel/` on 23 Oct 2026, 30 tests passing, Council night and the desktop's words among them, and the desktop's own 12 hidden tests on this tree (**ran**). Anything not listed here is not built.*
 
 ### Running it
 
@@ -322,15 +322,21 @@ The skeleton the task names, in `research/kernel-lab/`, on loopback (not 8794), 
 | `GET /health` | anyone | `{ok, records}` |
 | any other `GET` | anyone | a file of `research/text-desk-lab/notation/desk-shell/`, read-only (`/lens.html`, `/lens.js`, …) |
 
-Who acts: the `agora_session` cookie (`__Host-agora_session` on https), or `Authorization: Bearer <token>` for programs; the kernel asks the entry service. A POST with an `Origin` that is not the kernel's own is refused. A body's `as` is ignored everywhere.
+Who acts: the `agora_session` cookie (`__Host-agora_session` on https), or `Authorization: Bearer <token>` for programs; the kernel asks the entry service (`POST /internal/session/check` with `X-Kernel-Secret`, answered `{account: <id>, method, agent, record}`; the older forms are gone since the sign-in story committed the frozen contract, ea15bb2). A POST with an `Origin` that is not the kernel's own is refused. A body's `as` is ignored everywhere.
 
 **Lines.** `word [target] [k=v …] [words]`; `;` or a newline outside quotes separates lines; a leading `do` is accepted. A value with spaces is quoted, and its own `"` and `\` are escaped (`text="say \"hi\""`), as on the desk. Ids are `<tag><n>` (`sb42`); records are `r<n>`.
 
-**Words** (each has an entry; `help` lists them): `look [<id>]` (a thing's facts as the reader may see them), `help [<word>]`, `find kind=<k> [field=v …]` (rows of the things of a kind the reader may see, in their `order`, then as made), `post <words> [in=<group>] [about=<id>]`, `like <id>`, `pin <id>`, `undo [r<n>]`, `make kind=<k> [in=<group>] [about=<id>] [as=<name>] [k=v …]`, `set <id> k=v …` (`k=` alone takes a fact away), `forget <id>`, `claim <id> [phone=<v>]` (a seat on a thing that says `seats=N` and may say `closes=<UTC, 2026-10-29T00:45Z>`; once each; a phone is seen by the claimer and the thing's leaders), `vote <poll> <option>` (sealed, once each; a poll is `make kind=poll options="yes no"`), `role <person> leader|member|none in=<group>` (leaders appoint), `off <module>`, `status <module>`, `holds`. `make` and `set` may not write `kind made_by for pinned forgotten sees lives from bound` or `in: like: member: answer: sees. vote: claim: contact:` facts.
+**Words** (each has an entry; `help` lists them): `look [<id>]` (a thing's facts as the reader may see them), `help [<word>]`, `rows <kind|any> [field=v …]` (alias `find kind=<k> …`: the things of a kind the reader may see, as rows with `id`, `rev` and `by`, in their `order`, then as made), `post <words> [in=<group>] [about=<id>]`, `like <id>`, `pin <id>`, `undo [r<n>]`, `make kind=<k> [in=<group>] [about=<id>] [as=<name>] [sees=me|leaders|group|place] [k=v …]` (`sees=` may narrow who sees it, never widen: `place` only in the place or an open group; `me` needs a person), `set <id> k=v …` (`k=` alone takes a fact away), `forget <id>`, `claim <id> [phone=<v>]` (a seat on a thing that says `seats=N` and may say `closes=<UTC, 2026-10-29T00:45Z>`; once each; a phone is seen by the claimer and the thing's leaders), `vote <poll> <option>` (sealed, once each; a poll is `make kind=poll options="yes no"`), `role <person> leader|member|none in=<group>` (leaders appoint), `verb <word> steps="<lines>" help="…" [may=…] [kind_of=do|see] [in=<group>]` (a verb note: leaders of the group it lives in make it; it runs as whoever says it; a do verb's steps are the kernel's own words and make one record), `off <module>`, `status <module>`, `holds`. `make` and `set` may not write `kind made_by for pinned forgotten sees lives from bound` or `in: like: member: answer: sees. vote: claim: contact:` facts.
 
 **Handles and groups.** `as=<name>` on a step names what it made for later steps of the same line or module answer: `post … as=o; pin $o`. A line's group is its `in=`, else its target's group, else the place; that group's leaders are the `leaders` of `may`. A group made with `open` (genesis `{name, open: true}`) is a public channel: everyone in the place sees its things and counts as its member; its leaders are still appointed with `role`. Note that a leader of the *place* is a steward, so a night's organisers lead an open group, not the place.
 
 **Who sees, in a rule.** `sees` and `sees.<aspect>` rules are `public | place | leaders | group:<id> | person:<id>` joined by `|`; `leaders` means the leaders of the thing's own groups and those above them (for a thing in no group, the place's).
+
+**Rules.** `make kind=rule on=<word> do="<line>"`: after each happening of that word that the rule's maker may hear, and never its own making, the line runs as the maker (`$target`, `$by` filled) on the kernel's rules thread, at most three deep. Its records carry `rule: <id>`, except sealed ones, which would say who. `off=yes` or `forget` stops a rule.
+
+**Hearing.** A happening of an act that made things (`make`, `post`) names the first thing made as its `target` (and all of them as `made`), so who-sees applies to who hears it. Before 23 Oct evening it had none, and a private thing's words reached every page stream and module hearing `make`.
+
+**A world from before a word.** On start, a kernel word the world has no entry for (by its bound name) gets one, in one record of the kernel's own, `the kernel's new words: …`; an alias the world already answers to is left off.
 
 **Time.** Records are stamped with the kernel's clock (UTC); `closes` and `at most N per day` read it. A run may give the kernel a clock of its own (`kernel.clock`, a callable), as Council night does.
 
@@ -340,15 +346,16 @@ Who acts: the `agora_session` cookie (`__Host-agora_session` on https), or `Auth
 
 | From the kernel | From the module |
 |---|---|
-| `hello {module, grants: ["words …"]}` | `offer {words: [{word, kind: do\|see\|hear\|hold, takes, help, may?, undo?}]}`: published only in its namespace, only with help, only if absent (an existing entry is bound by `from` and `bound`, never overwritten) |
+| `hello {module, id, grants: ["words …"], owner, place, for, home}`: `owner` is the place's steward; `for` the person it is installed for, if any; `home` a folder of its own (`<world>/modules/<name>/`) | `offer {words: [{word, kind: do\|see\|hear\|hold, takes, help, may?, undo?}]}`: published only in its namespace, only with help, only if absent (an existing entry is bound by `from` and `bound`, never overwritten) |
 | `call {use, word: <bound name>, args: {target, words, kv}, caller: {id, person, name}}` | `see {use, line}` → kernel answers `rows {use, text, rows, refused?}` (read as the caller narrowed to the module) |
 | | `answer {use, text?, rows?}` for a see word; `answer {use, lines: […], saw: {<id>: <rev>}}` for a do word (one use, one record, admitted only if `saw` still holds, and, when the word was a painted press, only if what that page showed of a thing the lines write still holds: two leaders pressing Next on one page move the meeting once); lines may use `as=` and `$name`; `answer {use, external: true, text}` for a do word that changed the outside world (a record with words and no facts; undo refuses it); `answer {use, refused}` |
 | `happen {n, word, target, by, text, record, announced}`: words its grants name as `hear:<word or ns.*>`, about things everyone in the place may see | `happen {word, target?, text?}`: announced, delivered, not recorded; needs a grant on that word |
 | `held {use?, word, lease}` or `held {…, refused}` | `hold {use?, word}`: needs a grant on the word; leases are in memory, listed by `holds`, ended by `release {lease}`, by `off`, or by the process ending; `hold.began` / `hold.ended` are happenings |
+| `done {use, ok, record?, made, text \| refused}`: after each answer with lines, whether it was admitted and what it made | `do {id, line, saw?}` → `done {id, ok, text, rows, made, record?, refused?}`; `see {id, line}` → `rows {id, ok, text, rows, refused?}`: the module on its own, outside any call, with its grants alone and, if it is installed `for` a person, that person's rights too; it reads and hears as that person, else as the place |
 | `status? {use}` | `status {use, doing}` (2 s) |
 | `off` | it exits; after 2 s the kernel ends it. A module that dies rests 30 s before it is started again |
 
-Grants are `words` strings on a grant thing (`"look pin tally.* hear:window.* overlay"`); `*` matches all. A call not answered in 10 s is refused.
+Grants are `words` strings on a grant thing (`"look pin tally.* hear:window.* overlay"`); `*` matches all, and a grant reaches a word by any name it answers to (word, alias, bound name). A grant may say `only=kind:window,pin`: its `make`, `set` and `forget` then reach only those kinds. In a genesis a module may say `"for": "steward"` and `"only": "kind:…"`. A call not answered in 10 s is refused. Every message from a module goes through `ModuleProcess.handle(msg)`, so an extension adds a message type by overriding that one method.
 
 ## Appendix A. Notes for the sign-in seam (for `site/SEAM.md`)
 

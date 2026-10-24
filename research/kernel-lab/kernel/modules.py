@@ -3,11 +3,21 @@
 Newline-separated JSON over the module's stdin and stdout. Every message has a type `t`.
 
     kernel -> module            module -> kernel
-    hello {module, grants}      offer {words: [{word, kind, takes, help, may?}]}
+    hello {module, id, grants,  offer {words: [{word, kind, takes, help, may?}]}
+           owner, place, for?,
+           home}
     call {use, word, args,      see {use, line}        -> kernel answers {t: rows, use, text, rows, refused?}
           caller}               answer {use, lines?, text?, rows?, saw?, refused?}
+    done {use, ok, record?,     (after an answer with lines: whether the kernel admitted it, and what it made)
+          made, text}
+                                do {id, line, saw?}    -> {t: done, id, ok, text, rows, record?, made, refused?}
+                                see {id, line}         -> {t: rows, id, ok, text, rows, refused?}
+                                (a module on its own, outside any call: its grants alone, and its person's rights
+                                 when it is installed `for` one)
     status? {use}               status {use, doing}
     off                         (it exits; after 2 s the kernel ends it)
+
+Every message from a module goes through `ModuleProcess.handle`, so an extension adds a message type by overriding it.
 
 The kernel starts the process, so the kernel can always stop it. A module holds no lock of the kernel's: it works while
 the kernel serves others, reads through see words, and hands back lines, which the kernel admits or refuses whole.
@@ -58,42 +68,58 @@ class ModuleProcess:
             self.err = (self.err + [line.rstrip()])[-20:]
 
     def _read(self):
-        k = self.host.kernel
         for line in self.proc.stdout:
             try:
                 msg = json.loads(line)
             except json.JSONDecodeError:
                 self.err = (self.err + [f"not JSON: {line.strip()[:200]}"])[-20:]
                 continue
-            t = msg.get("t")
-            if t == "offer":
-                self.offer_receipt = k.on_offer(self.mid, msg.get("words") or [])
-                self.offered.set()
-            elif t == "see":
-                p = self.pending.get(msg.get("use"))
-                if p is None:
-                    self.send({"t": "rows", "use": msg.get("use"), "refused": "no call of yours is open with that use"})
-                    continue
-                # answered on its own thread, so this reader keeps reading while the kernel works
-                threading.Thread(target=self._see, args=(p["caller"], msg), daemon=True).start()
-            elif t in ("answer", "status"):
-                p = self.pending.get(msg.get("use"))
-                if p is not None:
-                    p["answer"] = msg
-                    p["event"].set()
-            elif t == "happen":
-                said = k.announce(self.mid, str(msg.get("word") or ""), msg.get("target"), msg.get("text") or "")
-                if said != "ok":
-                    self.send({"t": "refused", "about": "happen", "word": msg.get("word"), "why": said})
-            elif t == "hold":
-                lease, why = k.hold(self.mid, str(msg.get("word") or ""))
-                self.send({"t": "held", "use": msg.get("use"), "word": msg.get("word"),
-                           **({"lease": lease} if lease else {"refused": why})})
-            elif t == "release":
-                k.release(lease=msg.get("lease"))
+            try:
+                self.handle(msg)
+            except Exception as exc:                # noqa: BLE001  one bad message never stops the reader
+                self.err = (self.err + [f"{msg.get('t')} failed in the kernel: {exc!r}"])[-20:]
         self.stdout_closed.set()
         for p in list(self.pending.values()):
             p["event"].set()                       # the process ended: every open call is answered by its absence
+
+    def handle(self, msg):
+        """One message from the module. Unknown types are ignored."""
+        k = self.host.kernel
+        t = msg.get("t")
+        if t == "offer":
+            self.offer_receipt = k.on_offer(self.mid, msg.get("words") or [])
+            self.offered.set()
+        elif t == "see" and msg.get("use") in self.pending:
+            # answered on its own thread, so this reader keeps reading while the kernel works
+            threading.Thread(target=self._see, args=(self.pending[msg["use"]]["caller"], msg), daemon=True).start()
+        elif t in ("see", "do") and msg.get("id"):
+            threading.Thread(target=self._own, args=(msg,), daemon=True).start()     # a module on its own
+        elif t == "see":
+            self.send({"t": "rows", "use": msg.get("use"), "refused": "no call of yours is open with that use"})
+        elif t in ("answer", "status"):
+            p = self.pending.get(msg.get("use"))
+            if p is not None:
+                p["answer"] = msg
+                p["event"].set()
+        elif t == "happen":
+            said = k.announce(self.mid, str(msg.get("word") or ""), msg.get("target"), msg.get("text") or "")
+            if said != "ok":
+                self.send({"t": "refused", "about": "happen", "word": msg.get("word"), "why": said})
+        elif t == "hold":
+            lease, why = k.hold(self.mid, str(msg.get("word") or ""))
+            self.send({"t": "held", "use": msg.get("use"), "word": msg.get("word"),
+                       **({"lease": lease} if lease else {"refused": why})})
+        elif t == "release":
+            k.release(lease=msg.get("lease"))
+
+    def _own(self, msg):
+        k = self.host.kernel
+        mode = "see" if msg["t"] == "see" else "do"
+        r = k.module_own(self.mid, str(msg.get("line") or ""), mode=mode, saw=msg.get("saw"))
+        self.send({"t": "rows" if mode == "see" else "done", "id": msg.get("id"), "ok": r["ok"],
+                   "text": r.get("text", ""), "rows": r.get("rows", []), "made": r.get("made", []),
+                   **({"record": r["records"][-1]} if r.get("records") else {}),
+                   **({"refused": r["text"]} if not r["ok"] else {})})
 
     def _see(self, caller, msg):
         r = self.host.kernel.module_see(self.mid, caller, msg.get("line", ""))
@@ -166,10 +192,7 @@ class Host:
                     continue
                 if mid not in self.procs:
                     self.procs[mid] = p = ModuleProcess(self, mid, run, self.root)
-                    with k.lock:
-                        grants = [k.state.get(g, "words") for g in k.things("grant")
-                                  if k.state.get(g, "to") == mid and not k.state.get(g, "revoked")]
-                    p.send({"t": "hello", "module": k.state.get(mid, "name"), "grants": grants})
+                    p.send(k.hello_for(mid))
 
     def deliver(self, h):
         """A happening, to every running module that hears its word (SHAPE section 5)."""
@@ -202,6 +225,12 @@ class Host:
                               f"nothing was done")
             raise Refused(f"{name} did not answer in {CALL_TIMEOUT:g} s; nothing was done")
         return ans
+
+    def done(self, mid, use, said):
+        """After an answer with lines: tell the module whether it was admitted, and what it made."""
+        p = self.procs.get(mid)
+        if p and use:
+            p.send({"t": "done", "use": use, **said})
 
     def status(self, mid):
         p = self.procs.get(mid)

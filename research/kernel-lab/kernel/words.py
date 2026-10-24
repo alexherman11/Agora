@@ -10,7 +10,7 @@ into `tx` and the kernel writes the record.
 import re
 import time
 
-from .kernel import Refused, FLOOR
+from .kernel import Refused, FLOOR, MAY_WORDS
 
 
 def _k(word, kind, takes, may, undo, help, **more):
@@ -39,8 +39,15 @@ KERNEL_ENTRIES = [
        help="off <module>: stop a module and take back every grant it holds, in one act. undo turns it on again."),
     _k("status", "see", "<module>", "anyone", "no",
        help="status <module>: what a running module says it is doing."),
-    _k("find", "see", "kind=<kind> [k=<v> ...]", "anyone", "no",
-       help="find kind=<kind> [field=value …]: the things of a kind you may see: find kind=slot item=sb40."),
+    _k("rows", "see", "[<kind>] [k=<v> ...]", "anyone", "no", aliases="find",
+       help="rows <kind> [field=value …]: the things of a kind you may see, as rows with their revs, in their `order`, "
+            "then as made: rows item meeting=sb40, rows window, rows any.\nfind kind=<kind> … says the same."),
+    _k("verb", "do", "<word> steps=<lines> help=<text> [may=<who>] [kind_of=do|see] [in=<group>]", "leaders", "yes",
+       help="verb <word> steps=\"<lines>\" help=\"<what it does>\": a new word made of other words, a verb note. Its "
+            "steps run as whoever says it, so it never adds power, and a do verb's steps are one act, which one undo "
+            "takes back. $1 $2 … and $* are what follows the word.\n"
+            "e.g. verb stop steps=\"off $1\" help=\"stop <module>: the same as off\". Leaders make words for their "
+            "groups; undo takes the word back."),
     _k("holds", "see", "", "anyone", "no",
        help="holds: what each running module holds now (an overlay, a stream), and since when."),
     _k("make", "do","kind=<kind> [in=<group>] [k=<v> ...]", "members", "yes",
@@ -65,6 +72,7 @@ KERNEL_ENTRIES = [
 # aspects no line may write with make or set: what the kernel itself keeps, or derives
 RESERVED_KINDS = {"person", "agent", "module", "grant", "word", "invite", "world", "place", "group"}
 RESERVED = {"kind", "made_by", "for", "pinned", "forgotten", "sees", "lives", "from", "bound"}
+SEES_SAID = {"me", "leaders", "group", "place"}      # what `make … sees=` may say (section 7: it may narrow)
 RESERVED_PREFIX = ("in:", "like:", "member:", "answer:", "sees.", "vote:", "claim:", "contact:")
 
 FLOOR_HELP = {e["word"]: e["help"] for e in KERNEL_ENTRIES if e["word"] in FLOOR}
@@ -333,10 +341,14 @@ def make(k, actor, st, entry, tx, group, saw=None):
     kv.pop("in", None)
     kv.pop("about", None)                               # checked and set by _about
     kv.pop("as", None)                                  # a handle for later steps of the same line, not a fact
+    sees = kv.pop("sees", None)
     if not re.match(r"^[a-z][a-z0-9_-]{0,31}$", kind or ""):
         raise Refused("make needs kind=<a plain word>: make kind=button name=Feed")
     if kind in RESERVED_KINDS:
         raise Refused(f"a {kind} is made by the kernel, not by make")
+    k.reaches(actor, "make", kind)
+    if sees is not None and sees not in SEES_SAID:
+        raise Refused("sees= says me, leaders, group or place: who besides the kernel may see it")
     _writable(k, kv)
     t = tx.mint()
     tx.set(t, "kind", kind)
@@ -350,13 +362,24 @@ def make(k, actor, st, entry, tx, group, saw=None):
     if actor.id != actor.person:
         tx.set(t, "for", actor.person)
     tx.set(t, f"in:{group}", len(k.log.records) + 1)
-    if group != k.place and not k.state.get(group, "open"):          # an open group's work is seen by all
+    public = group == k.place or k.state.get(group, "open")         # an open group's work is seen by all
+    if sees == "me":
+        who = k.state.get(actor.module, "for") if actor.kind == "module" and actor.caller is None else actor.person
+        if not who or k.state.get(who, "kind") != "person":
+            raise Refused("sees=me needs a person: a module says it only when it is installed for one")
+        tx.set(t, "sees", f"person:{who}")
+    elif sees == "leaders":
+        tx.set(t, "sees", "leaders")
+    elif sees == "place" and not public:
+        raise Refused(f"{k.name(group)} is not open, so what is made in it is seen by its members, not the place")
+    elif not public:
         tx.set(t, "sees", f"group:{group}")
     return {"text": f"ok make {t} [r?] · a{'n' if kind[0] in 'aeiou' else ''} {kind}" + (f" in {k.name(group)}" if group != k.place else "")}
 
 
 def set_(k, actor, st, entry, tx, group, saw=None):
     t = st.target
+    k.reaches(actor, "set", k.state.get(t, "kind"))
     if k.state.get(t, "kind") in RESERVED_KINDS:
         raise Refused(f"{t} is a {k.state.get(t, 'kind')}; set changes only things made with make")
     if not st.kv:
@@ -373,6 +396,7 @@ def set_(k, actor, st, entry, tx, group, saw=None):
 
 def forget(k, actor, st, entry, tx, group, saw=None):
     t = st.target
+    k.reaches(actor, "forget", k.state.get(t, "kind"))
     if k.state.get(t, "kind") in RESERVED_KINDS:
         raise Refused(f"{t} is a {k.state.get(t, 'kind')}, which forget does not take")
     tx.set(t, "forgotten", actor.person)
@@ -447,25 +471,63 @@ def role(k, actor, st, entry, tx, group, saw=None):
                     f"{k.name(g)}"}
 
 
-def find(k, actor, st, entry, tx, group, saw=None):
-    """find kind=<kind> [field=value …]: the things of a kind you may see, in their `order` when they have one."""
+def rows(k, actor, st, entry, tx, group, saw=None):
+    """rows <kind|any> [field=value …] (or find kind=<kind> …): the things of a kind you may see, with their revs, so
+    whoever reads them can act on what it read; in their `order` when they have one, then as made."""
     kv = dict(st.kv)
-    kind = kv.pop("kind", None)
+    kind = kv.pop("kind", None) or (st.words.split() or ["any"])[0].lower()
     kv.pop("in", None)
-    if not kind:
-        raise Refused("find needs kind=<kind>: find kind=slot item=sb40")
     rows = []
-    for t in k.things(kind):
+    for t in (list(k.state.things) if kind == "any" else k.things(kind)):
+        if t == "world":
+            continue
         a = k.shown(actor.person, t)
         if a is None or any(str(a.get(f, "")) != v for f, v in kv.items()):
             continue
-        rows.append(dict(a, id=t, rev=k.state.rev.get(t, 0)))
+        row = {x: v for x, v in a.items() if not x.startswith(("in:", "member:"))}
+        if a.get("made_by"):
+            row["by"] = k.name(a["made_by"])
+        rows.append(dict(row, id=t, rev=k.state.rev.get(t, 0)))
     rows.sort(key=lambda r: (int(r["order"]) if str(r.get("order", "")).isdigit() else 10 ** 9,
                              int(r["id"][len(k.tag):] or 0)))       # then in the order they were made
     for r in rows:
         k.mark(actor, r["id"], r)
-    text = "\n".join(f"  {r['id']} · {r.get('title') or r.get('name') or (r.get('text') or '')[:60]}" for r in rows)
-    return {"text": f"{len(rows)} {kind}{'' if len(rows) == 1 else 's'}" + ("\n" + text if rows else ""), "rows": rows}
+    what = kind if kind != "any" else "thing"
+    text = "\n".join(f"  {r['id']} · {r.get('kind')} · "
+                     f"{r.get('title') or r.get('name') or r.get('word') or (r.get('text') or '')[:60]}" for r in rows)
+    return {"text": f"{len(rows)} {what}{'' if len(rows) == 1 else 's'}" + ("\n" + text if rows else ""),
+            "rows": rows}
+
+
+VERB_NAME = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
+
+
+def verb(k, actor, st, entry, tx, group, saw=None):
+    """verb <word> steps=… help=…: a verb note, its own entry (from=verb) living in the line's group."""
+    kv = dict(st.kv)
+    w = (st.words.split() or [""])[0].lower()
+    if not VERB_NAME.match(w):
+        raise Refused("verb needs a plain word: verb <word> steps=\"<lines>\" help=\"…\" (dotted words belong to "
+                      "modules)")
+    if k.find_entry(w, group):
+        raise Refused(f"{w} already answers here; choose another word, so no word is hidden behind it")
+    steps, help_ = str(kv.get("steps") or ""), str(kv.get("help") or "").strip()
+    if not steps.strip():
+        raise Refused('a verb note needs steps="<lines>", the words it runs')
+    if not help_:
+        raise Refused('a word with no help is not published: add help="<what it does>"')
+    wk = kv.get("kind_of", "do")
+    if wk not in ("do", "see"):
+        raise Refused("a verb note is a do or a see word: kind_of=do|see")
+    may = kv.get("may", "anyone")
+    if not all(t.strip() in MAY_WORDS for t in may.split(" or ")):
+        raise Refused(f"may={may}: say anyone, members, leaders, stewards, maker or nobody, joined by or")
+    e = tx.mint()
+    for a, v in [("kind", "word"), ("word", w), ("word_kind", wk), ("takes", kv.get("takes", "[<words>]")),
+                 ("help", help_), ("may", may), ("undo", "yes" if wk == "do" else "no"), ("from", "verb"),
+                 ("bound", w), ("steps", steps), ("lives", group), ("made_by", actor.id)]:
+        tx.set(e, a, v)
+    return {"text": f"ok verb {w} ({e}) [r?] · a new word in {k.name(group)}: {steps}"}
 
 
 def holds(k, actor, st, entry, tx, group, saw=None):
@@ -476,4 +538,4 @@ def holds(k, actor, st, entry, tx, group, saw=None):
 
 KERNEL = {"look": look, "help": help_, "post": post, "like": like, "pin": pin, "undo": undo, "off": off,
           "status": status, "make": make, "set": set_, "forget": forget, "holds": holds, "claim": claim,
-          "vote": vote, "role": role, "find": find}
+          "vote": vote, "role": role, "rows": rows, "find": rows, "verb": verb}

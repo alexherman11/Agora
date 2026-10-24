@@ -280,11 +280,12 @@ def main(argv=None):
     N.check("sign-up closes at a time of day", give_back2["ok"] and not closed["ok"] and "closed" in closed["text"],
             closed["text"].split("\n")[0] + " (a seat was free)")
 
-    neighbour_look = N.do("Ruth", f"look {hearing}")["text"]
+    bystander = names[30]                                  # signed up for nothing: sees no number, not even their own
+    neighbour_look = N.do(bystander, f"look {hearing}")["text"]
     leader_look = N.do("Dana", f"look {hearing}")["text"]
-    floor_n = N.scene("Ruth", "floor")["text"]
+    floor_n = N.scene(bystander, "floor")["text"]
     floor_d = N.scene("Dana", "floor")["text"]
-    council_n = N.scene("Ruth", "council")["text"]
+    council_n = N.scene(bystander, "council")["text"]
     N.check("speakers' phone numbers are seen only by leaders",
             "831-555" not in neighbour_look and "831-555" not in floor_n and "831-555" not in council_n
             and "831-555" in leader_look and "Call-backs:" in floor_d and "831-555" in floor_d,

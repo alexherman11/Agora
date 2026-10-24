@@ -102,11 +102,17 @@ Two more came from building against the sibling stories' files rather than my ow
 6. **A module must be asked by its bound name.** The dictionary format's `bound` field looked like a frontier detail. It isn't: with one implementation field the kernel sent a module the word as typed, and a rename in the world broke it. The kernel now reads `from` and `bound`, and the bound name always answers too, as the format says.
 7. **Building a seam from both sides at once crosses.** I moved the kernel to the conventions SEAM.md first described while the sign-in story moved its service to the kernel's first ones. We froze on its working tree (`X-Kernel-Secret`, the `agora_session` cookie, `{account: <id>, method, agent, record}`); the kernel accepts the older forms until that is committed. Recorded in SEAM.md's "Notes from the kernel".
 
+Three more came later on 23 Oct. The desktop proof (a13428) ran the kernel as its first real user and asked for its kext.py words to be made the kernel's own. `tests/test_desktop_words.py` uses them the way a desktop does: a personal Python module installed for Alex, beside a neighbour, Sam (5 tests, **ran**, twice):
+
+8. **A made thing's happening had no target, so who-sees never applied to it.** Everyone who heard `make`, through a module's `hear:make` or a page's stream, heard Sam's private note with its words. A happening now names what its act made.
+9. **A rule answered its own making.** Sam's rule `on=make` ran once for the `make` that created it. A rule now answers only what happens after it exists.
+10. **A grant reaches a word by any name it answers to.** When `find` became an alias of `rows`, the agenda module's grant (`find`) stopped reaching it, and Council night caught it.
+
 And two choices made while building: the seam's invite counting is a fact of each world, `invites_counted_by: entry | kernel`, so exactly one side counts; and the seal is keyed by the entry's **id**, not its word, so renaming `like` never stops anyone undoing their own like.
 
 ## Not built, or not yet tested
 
-- *Since this was written (23 Oct, later):* hear, hold, the stream and the painter's routes are built (SHAPE section 17), and the words `find`, `claim`, `vote` and `role`, with handles (`as=`, `$name`) and open groups. Their evidence is the Council night run, [[COUNCIL-NIGHT]], which is also a test. hear and hold are built but not yet tested.
+- *Since this was written (23 Oct, later):* hear, hold, the stream and the painter's routes are built (SHAPE section 17), and the words `rows` (alias `find`), `claim`, `vote` and `role`, with handles (`as=`, `$name`) and open groups. Their evidence is the Council night run, [[COUNCIL-NIGHT]], which is also a test. Later the same evening came verb notes, rules, `sees=` on make, modules acting on their own, modules installed `for` a person, grants narrowed to kinds, and `done`, tested in `test_desktop_words.py`. The desktop proof tests hold and hear in its own folder; this suite does not yet.
 - **Not built:** verb notes (`impl: lines`) and rules; blanks (`$me`, `$new`); selections; snapshots and log segments; the `redact`, `grant`, `freeze` and membership words (redaction is tested in the store only); words that edit an entry (rename, alias, hide); the painter's routes.
 - **Seen marks are in memory**, not in `seen/` beside the world as SHAPE says, so a restart forgets them (the restart test shows it).
 - **The real entry service** is tested in process, against its working tree of 23 Oct evening, which was not yet committed; the two tests may need the frozen contract once it is. It does not yet call `/keep/account` itself, so the test makes that call where it will (SEAM.md section 4). Agent sessions do not exist there yet; the stand-in has them.
