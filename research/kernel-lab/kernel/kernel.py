@@ -153,7 +153,7 @@ class Kernel:
         acts = [r for r in self.log.records if mine(r)]
         for clause in [c.strip() for c in rule.split(";") if c.strip()]:
             if clause == "per person per target":
-                if target and any(target_of(r) == target for r in acts):
+                if target and self.used(actor.person, entry["id"], target):
                     return f"you have already said {entry['word']} on {target}; once each. undo takes yours back"
                 continue
             m = _re.fullmatch(r"at most (\d+) per day per person", clause)
@@ -305,6 +305,56 @@ class Kernel:
         return self.is_leader(person, self.place)
 
     # ------------------------------------------------------------------ who sees
+    def used(self, person, eid, target):
+        """An active use by this person (including their agents), without unsealing anyone else's."""
+        undone = self.undone()
+        for r in self.log.records:
+            if r["seq"] in undone or r.get("undoes") or not r.get("parts"):
+                continue
+            first = r["parts"][0].get("target")
+            own = (r.get("seal") == self.seal(person, r.get("entry"), first) if r.get("by") == "sealed"
+                   else person in (r.get("by"), r.get("for")))
+            if own and ((r.get("entry") == eid and first == target) or any(
+                    p.get("entry") == eid and p.get("target") == target for p in r["parts"])):
+                return True
+        return False
+
+    def bind_policy(self, value, group):
+        """Bind a see word now, so subsequent renaming cannot redirect visibility or admission."""
+        word = str(value).removeprefix("word:")
+        eid = word if self.state.get(word, "kind") == "word" else self.find_entry(word, group)
+        e = self.entry(eid) if eid else {}
+        if e.get("word_kind") != "see" or self.source(e)[0] != "verb":
+            raise Refused("a condition needs word:<see verb>; help test and help verb say how")
+        return f"word:{eid}"
+
+    def predicate(self, person, ref, target, value=""):
+        """Fail closed; never execute module code or an act while deciding visibility/admission."""
+        eid = str(ref).removeprefix("word:")
+        e = self.entry(eid)
+        group = (self.groups_of(target) or [self.place])[0]
+        previous = getattr(self._local, "predicate", None)
+        depth = getattr(self._local, "predicate_depth", 0)
+        if depth >= 4 or e.get("word_kind") != "see" or self.source(e)[0] != "verb":
+            return False
+        actor = Actor(person, person, "person")
+        if not self.may(actor, e, target, group):
+            return False
+        self._local.predicate = (target, value, True)
+        self._local.predicate_depth = depth + 1
+        try:
+            out = self.verb_note(actor, L.parse(e["word"]), e, group, e["word"], mode="see")
+            return out.get("value") is True
+        except (Refused, RecursionError):
+            return False
+        finally:
+            self._local.predicate, self._local.predicate_depth = previous, depth
+
+    def guard(self, actor, entry, st):
+        ref = self.state.get(st.target, "allows." + (entry.get("bound") or entry["word"]))
+        if ref and not self.predicate(actor.person, ref, st.target, st.kv.get("answer", "")):
+            raise Refused(self.state.get(st.target, "refusal", "That does not fit yet. Please try again."))
+
     def _sees(self, reader, rule, thing):
         if reader and self.state.get(reader, "kind") == "module":
             # a module reading on its own: as the person it is installed for, else as the place sees
@@ -335,6 +385,8 @@ class Kernel:
             return None                 # a forgotten thing is out of every view; undo of the forget brings it back
         if not self._sees(reader, a.get("sees", "place"), t):
             return None
+        if a.get("sees_when") and not self.predicate(reader, a["sees_when"], t):
+            return None
         out = {}
         likes, votes, claims, contacts = 0, {}, [], []
         for k, v in a.items():
@@ -344,7 +396,7 @@ class Kernel:
             if k.startswith("vote:"):                    # sealed: only the count of each option is shown
                 votes[v] = votes.get(v, 0) + 1
                 continue
-            if k.startswith("sees.") or k == "sees":     # a rule about who sees, not something to see
+            if k.startswith(("sees.", "allows.")) or k in ("sees", "sees_when"):
                 continue
             if k.startswith("claim:"):
                 claims.append(k[6:])
@@ -721,6 +773,7 @@ class Kernel:
                 if actor.kind == "module" and self._may_person(actor.person, entry, st.target, group):
                     raise Refused(f"{self.name(actor.module)} holds no grant for {st.word}; nothing was done")
                 raise self.refusal_for(entry, group)
+            self.guard(actor, entry, st)
             if entry.get("word_kind") == "do":
                 said = self.once(actor, entry, st.target)
                 if said:
@@ -736,6 +789,7 @@ class Kernel:
                     return fn(self, actor, st, entry, None, group)
                 tx = Tx(self)
                 tx.part(st.word, st.target, text)
+                tx.parts[-1]["entry"] = eid
                 res = fn(self, actor, st, entry, tx, group, saw=saw)
                 if tx.empty:
                     return res
@@ -794,20 +848,41 @@ class Kernel:
         args = ([st.target] if st.target else []) + st.words.split()
 
         def fill(x):
-            x = x.replace("$target", st.target or (args[0] if args else "")).replace("$*", " ".join(args))
-            for i in range(9, 0, -1):
-                x = x.replace(f"${i}", args[i - 1] if len(args) >= i else "")
-            return x
+            # Named values are quoted and inserted in ONE substitution pass: a
+            # supplied '$1', quote or semicolon stays data.
+            import shlex
+            def sub(m):
+                key = m[1]
+                if key == "target":
+                    return st.target or (args[0] if args else "")
+                if key == "*":
+                    return " ".join(args)
+                if key.isdigit():
+                    return args[int(key) - 1] if len(args) >= int(key) else ""
+                return shlex.quote(st.kv[key]) if key in st.kv else m[0]
+            return L.re.sub(r"\$(target\b|[1-9]|\*|[a-z][a-z0-9_]*\b)", sub, x)
         steps = [fill(x) for x in L.split_batch(entry.get("steps") or "") if x.strip()]
         self._local.verb_depth = depth + 1
         try:
             if entry.get("word_kind") == "see":
-                said, rows = [], []
-                for x in steps:
-                    r = self.step(actor, x, mode="see")
-                    said.append(r.get("text", ""))
-                    rows += r.get("rows", [])
-                return {"text": "\n".join(t for t in said if t), "rows": rows}
+                said, rows, values = [], [], []
+                previous = getattr(self._local, "predicate", None)
+                if previous is None and st.target:
+                    self._local.predicate = (st.target, st.kv.get("answer", ""), False)
+                try:
+                    for x in steps:
+                        if getattr(self._local, "predicate_depth", 0):
+                            pe = self.find_entry(L.parse(x).word, group)
+                            if not pe or self.source(self.entry(pe))[0] not in ("kernel", "verb"):
+                                raise Refused("a condition cannot call a module")
+                        r = self.step(actor, x, mode="see")
+                        said.append(r.get("text", ""))
+                        rows += r.get("rows", [])
+                        values.append(r.get("value"))
+                    return {"text": "\n".join(t for t in said if t), "rows": rows,
+                            "value": values[0] if len(values) == 1 else None}
+                finally:
+                    self._local.predicate = previous
             with self.lock:
                 firsts = [L.parse(x) for x in steps]
                 kinds = [self.source(self.entry(e))[0] if e else None for e in
@@ -819,6 +894,9 @@ class Kernel:
             if "module" in kinds:
                 return self._verb_with_modules(actor, st, entry, group, text, steps, press, saw)
             with self.lock:
+                said = self.once(actor, entry, st.target)
+                if said:
+                    raise Refused(said)
                 tx, notes, handles = Tx(self), [], {}
                 for x in steps:
                     x = self.fill_handles(x, handles)
@@ -836,20 +914,22 @@ class Kernel:
                                       f"which a verb note's steps can't run yet; nothing was done")
                     if s2.target and self.takes_id(e.get("takes")) is None:
                         s2.words, s2.target = (s2.target + " " + s2.words).strip(), None
-                    if s2.target:
+                    if s2.target and L.ID.match(s2.target):
                         if self.shown(actor.person, s2.target) is None:
                             raise self.no_such(s2.target)
                         g = s2.kv.get("in") or (self.groups_of(s2.target) or [group])[0]
+                    if not self.may(actor, e, s2.target, g):
+                        raise Refused(f"{entry['word']} stopped at '{x}': {self.refusal_for(e, g)}; nothing was done")
+                    self.guard(actor, e, s2)
                     if e.get("word_kind") == "see":
                         notes.append(KERNEL[self.source(e)[1]](self, actor, s2, e, None, g).get("text", ""))
                         continue                    # a reading inside an act: it marks what it read as seen
-                    if not self.may(actor, e, s2.target, g):
-                        raise Refused(f"{entry['word']} stopped at '{x}': {self.refusal_for(e, g)}; nothing was done")
                     said = self.once(actor, e, s2.target)
                     if said:
                         raise Refused(f"{entry['word']} stopped at '{x}': {said}; nothing was done")
                     made_before = len(tx.made)
                     tx.part(s2.word, s2.target, x)
+                    tx.parts[-1]["entry"] = eid
                     res = KERNEL[self.source(e)[1]](self, actor, s2, e, tx, g, saw=saw)
                     notes.append(res["text"])
                     self.keep_handle(x, tx.made[made_before:], handles)
@@ -888,7 +968,7 @@ class Kernel:
                 e = self.entry(eid)
                 if s2.target and self.takes_id(e.get("takes")) is None:
                     s2.words, s2.target = (s2.target + " " + s2.words).strip(), None
-                if s2.target:
+                if s2.target and L.ID.match(s2.target):
                     if s2.target in tx.made:
                         if self.source(e)[0] == "module":
                             raise stop(x, f"{s2.target} is made by this verb and is not in the world yet, so a "
@@ -899,6 +979,7 @@ class Kernel:
                         g = s2.kv.get("in") or (self.groups_of(s2.target) or [group])[0]
                 if not self.may(actor, e, s2.target, g):
                     raise stop(x, str(self.refusal_for(e, g)))
+                self.guard(actor, e, s2)
                 src, name = self.source(e)
             if src == "module":
                 mid = self.module_named(name)
@@ -931,6 +1012,7 @@ class Kernel:
                     raise stop(x, said)
                 made_before = len(tx.made)
                 tx.part(s2.word, s2.target, x)
+                tx.parts[-1]["entry"] = eid
                 try:
                     res = KERNEL[name](self, actor, s2, e, tx, g, saw=saw)
                 except Refused as exc:
@@ -1107,12 +1189,14 @@ class Kernel:
                         raise Refused(f"{entry['word']} would {st.word} {st.target or ''}, and {self.refusal_for(e, group)}; "
                                       f"nothing was done")
                     raise Refused(f"{self.name(mid)} holds no grant for {st.word}; nothing was done")
+                self.guard(author, e, st)
                 said = self.once(author, e, st.target)
                 if said:
                     raise Refused(f"{said}; nothing was done")
                 if press_saw and st.target in press_saw:
                     self.fence(caller, st.target, [x for x in st.kv if x not in ("in", "as")], press_saw)
                 tx.part(st.word, st.target, line)
+                tx.parts[-1]["entry"] = eid
                 res = KERNEL[self.source(e)[1]](self, author, st, e, tx, group, saw=saw)
                 notes.append(res["text"])
                 self.keep_handle(line, tx.made[made_before:], handles)

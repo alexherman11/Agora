@@ -19,6 +19,19 @@ def _k(word, kind, takes, may, undo, help, **more):
 
 
 KERNEL_ENTRIES = [
+    _k("counts", "see", "<id>", "anyone", "no",
+       help="counts <board>: anonymous totals of active uses of its count_word, grouped by count_bucket. "
+            "A thing explicitly publishes to a board with count_in=<board> count_bucket=<label>; only things "
+            "made by the board's maker count. Buckets are the board's public buckets= list. Counts expose "
+            "neither target ids nor people, including when the target itself is hidden."),
+    _k("test", "see", "[<id>] expr=<boolean> [value=<text>]", "anyone", "no",
+       help="test [<thing>] expr=\"<boolean>\" [value=<text>]: answer yes or no, without changing anything. "
+            "Expressions use literals, and/or/not, ==/!=, field('name') on the target, used('word', target) "
+            "for YOUR active use (your agents count too), and digest(value), a SHA256 of trimmed casefolded text. "
+            "No Python code runs. A see verb may contain one test; make sees_when=word:<see verb> narrows its "
+            "normal visibility. allows.<word>=word:<see verb> also narrows admission of that word on the thing; "
+            "its value is the line's answer=. refusal=<text> supplies a kind refusal. Policies bind entry ids, "
+            "fail closed, and cannot call modules. They may inspect their own target's non-sealed facts."),
     _k("look", "see", "[<id>]", "anyone", "no", aliases="l",
        help="look: the feed, pinned posts first, then the newest.\nlook <thing>: one thing, as you may see it."),
     _k("help", "see", "[<word>]", "anyone", "no", aliases="?",
@@ -47,7 +60,8 @@ KERNEL_ENTRIES = [
             "steps run as whoever says it, so it never adds power, and a do verb's steps are one act, which one undo "
             "takes back. $1 $2 … and $* are what follows the word.\n"
             "e.g. verb stop steps=\"off $1\" help=\"stop <module>: the same as off\". Leaders make words for their "
-            "groups; undo takes the word back."),
+            "groups; undo takes the word back. Named values use $answer (quoted as data); "
+            "once= and sealed= have the same meaning as on dictionary entries."),
     _k("holds", "see", "", "anyone", "no",
        help="holds: what each running module holds now (an overlay, a stream), and since when."),
     _k("make", "do","kind=<kind> [in=<group>] [k=<v> ...]", "members", "yes",
@@ -335,6 +349,12 @@ def _writable(k, kv):
             raise Refused(f"{key} is not a fact a line may write; the kernel keeps it")
 
 
+def _conditions(k, kv, group):
+    for key, value in list(kv.items()):
+        if (key == "sees_when" or key.startswith("allows.")) and value:
+            kv[key] = k.bind_policy(value, group)
+
+
 def make(k, actor, st, entry, tx, group, saw=None):
     kv = dict(st.kv)
     kind = kv.pop("kind", "")
@@ -350,6 +370,7 @@ def make(k, actor, st, entry, tx, group, saw=None):
     if sees is not None and sees not in SEES_SAID:
         raise Refused("sees= says me, leaders, group or place: who besides the kernel may see it")
     _writable(k, kv)
+    _conditions(k, kv, group)
     t = tx.mint()
     tx.set(t, "kind", kind)
     for key, v in kv.items():
@@ -385,6 +406,7 @@ def set_(k, actor, st, entry, tx, group, saw=None):
     if not st.kv:
         raise Refused("set needs k=v: set <thing> label=Feed")
     _writable(k, st.kv)
+    _conditions(k, st.kv, group)
     k.fence(actor, t, list(st.kv), saw)
     for key, v in st.kv.items():
         if v != "":
@@ -527,7 +549,43 @@ def verb(k, actor, st, entry, tx, group, saw=None):
                  ("help", help_), ("may", may), ("undo", "yes" if wk == "do" else "no"), ("from", "verb"),
                  ("bound", w), ("steps", steps), ("lives", group), ("made_by", actor.id)]:
         tx.set(e, a, v)
+    for key in ("once", "sealed", "fence"):
+        if kv.get(key):
+            tx.set(e, key, kv[key])
     return {"text": f"ok verb {w} ({e}) [r?] · a new word in {k.name(group)}: {steps}"}
+
+
+def test(k, actor, st, entry, tx, group, saw=None):
+    from .predicates import evaluate
+    context = getattr(k._local, "predicate", None)
+    target, value, policy = context or (st.target, st.kv.get("value", ""), False)
+    result = evaluate(k, actor.person, target, st.kv.get("expr", ""), value, policy)
+    return {"text": "yes" if result else "no", "value": result, "rows": []}
+
+
+def counts(k, actor, st, entry, tx, group, saw=None):
+    board = k.shown(actor.person, st.target)
+    buckets = str(board.get("buckets", "")).split()
+    eid = k.find_entry(str(board.get("count_word", "")), (k.groups_of(st.target) or [k.place])[0])
+    if not buckets or not eid or k.state.get(eid, "sealed") != "yes":
+        raise Refused("a count board needs buckets= and count_word=<sealed word>")
+    targets = {t: a.get("count_bucket") for t, a in k.state.things.items()
+               if a.get("count_in") == st.target and a.get("made_by") == board.get("made_by")
+               and not a.get("forgotten") and a.get("count_bucket") in buckets}
+    totals = dict.fromkeys(buckets, 0)
+    undone = k.undone()
+    for r in k.log.records:
+        if r["seq"] in undone or r.get("undoes") or not r.get("parts"):
+            continue
+        included = {p.get("target") for p in r["parts"] if p.get("entry") == eid}
+        if r.get("entry") == eid:
+            included.add(r["parts"][0].get("target"))
+        for target in included:
+            bucket = targets.get(target)
+            if bucket in totals:
+                totals[bucket] += 1
+    return {"text": "sealed counts: " + " · ".join(f"{b}: {n}" for b, n in totals.items()),
+            "rows": [{"bucket": b, "count": n} for b, n in totals.items()]}
 
 
 def holds(k, actor, st, entry, tx, group, saw=None):
@@ -536,6 +594,6 @@ def holds(k, actor, st, entry, tx, group, saw=None):
     return {"text": ("holds:\n" + text) if rows else "nothing is held", "rows": rows}
 
 
-KERNEL = {"look": look, "help": help_, "post": post, "like": like, "pin": pin, "undo": undo, "off": off,
+KERNEL = {"counts": counts, "test": test, "look": look, "help": help_, "post": post, "like": like, "pin": pin, "undo": undo, "off": off,
           "status": status, "make": make, "set": set_, "forget": forget, "holds": holds, "claim": claim,
           "vote": vote, "role": role, "rows": rows, "find": rows, "verb": verb}

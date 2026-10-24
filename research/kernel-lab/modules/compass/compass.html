@@ -1,0 +1,44 @@
+<!doctype html>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Block walk</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f8f5ee;color:#243d39;font:16px system-ui}main{max-width:460px;margin:auto;padding:24px}
+h1{font-size:30px;margin:10px 0}h2{font-size:19px}section{background:white;border:1px solid #deded0;border-radius:20px;padding:18px;margin:18px 0}
+.meta{color:#60716b;font-size:13px}svg{width:100%;background:#e6efe4;border-radius:16px}.arrow{text-align:center;font-size:80px;color:#28735d;line-height:1.2}
+button,input{font:inherit;border-radius:12px;padding:10px;border:1px solid #91b1a3}button{background:#d7eadf;color:#244f3e;cursor:pointer}input{width:68%}
+#message{min-height:24px}#arrow{display:inline-block;transition:transform .15s}pre{white-space:pre-wrap;font:inherit;font-size:14px}
+</style>
+<main><p class="meta">NEIGHBOURHOOD EXPLORERS</p><h1 id="title">Block walk</h1><p>One discovery opens the next.</p>
+<section><div class="arrow"><span id="arrow">↑</span></div><p id="direction">Waiting for phone sensors</p><p id="motion" class="meta">Motion is not held</p><button id="stop">Stop sensors</button></section>
+<svg id="map" viewBox="0 0 320 200" aria-label="Map of visible points"></svg>
+<section><h2 id="next">Next discovery</h2><p id="clue"></p><form><input id="answer" aria-label="Your answer" placeholder="Your answer"><button>Try</button></form><p id="message" role="status"></p></section>
+<section><h2>Our progress · sealed</h2><div id="counts"></div><p class="meta">Counts only. Everyone can explore at their own pace.</p></section></main>
+<script>
+const params=new URLSearchParams(location.search), door=params.get('door'), view=params.get('view');
+const $=s=>document.querySelector(s);let cfg,points=[],next=null,heading=0,position=null,sensors=[],held=false;
+window.compassEvidence={orientation:0,motion:0,held:false};
+async function line(text,see=false){const r=await fetch('/line',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({door,line:text,see})});const out=await r.json();if(!r.ok||out.ok===false)throw Error(out.text||out.error);return out}
+function bearing(a,b){const rad=Math.PI/180,p=a.latitude*rad,q=Number(b.lat)*rad,d=(Number(b.lon)-a.longitude)*rad;return (Math.atan2(Math.sin(d)*Math.cos(q),Math.cos(p)*Math.sin(q)-Math.sin(p)*Math.cos(q)*Math.cos(d))/rad+360)%360}
+function aim(){if(!next||!position)return;const b=bearing(position,next),angle=(b-heading+360)%360;$('#arrow').style.transform=`rotate(${angle}deg)`;$('#direction').textContent=`${Math.round(angle)}° toward ${next.title}`;Object.assign(window.compassEvidence,{heading,bearing:b,angle,next:next.id})}
+async function redraw(){const rows=(await line(`rows ${cfg.points_kind}`,true)).rows;points=rows.filter(p=>p['in:'+cfg.in_group]||p.collection===cfg.collection);next=null;
+for(const p of points){const own=await line(`test expr="used('${cfg.solved_word}', '${p.id}')" in=${cfg.in_group}`,true);if(own.text==='no'&&!next)next=p}
+$('#next').textContent=next?next.title:'All discoveries found';$('#clue').textContent=next?next.text:'Meet back at the starting point. Well done!';$('form').hidden=!next;
+const totals=(await line(`counts ${cfg.board}`,true)).rows;
+$('#counts').replaceChildren(...totals.map(p=>{const e=document.createElement('p');e.textContent=`Stop ${p.bucket}: ${p.count} discoveries`;return e}));
+const ns='http://www.w3.org/2000/svg',map=$('#map');map.replaceChildren();
+for(const [x,y,w,h] of [[80,0,26,200],[225,0,26,200],[0,85,320,25]]){const r=document.createElementNS(ns,'rect');for(const [k,v]of Object.entries({x,y,width:w,height:h,fill:'#fffdf7'}))r.setAttribute(k,v);map.append(r)}
+// Local equirectangular projection: schematic streets, actual lat/lon positions; no tile service.
+for(const p of points){const x=160+(Number(p.lon)+122.008)*60000,y=100-(Number(p.lat)-36.969)*60000;const g=document.createElementNS(ns,'g'),c=document.createElementNS(ns,'circle'),t=document.createElementNS(ns,'text');c.setAttribute('cx',x);c.setAttribute('cy',y);c.setAttribute('r',13);c.setAttribute('fill',p===next?'#bf6043':'#28735d');t.setAttribute('x',x);t.setAttribute('y',y+5);t.setAttribute('text-anchor','middle');t.setAttribute('fill','white');t.textContent=p.order;g.append(c,t);map.append(g)}
+aim();window.compassEvidence.visible=points.map(p=>p.id)}
+async function stop(){for(const s of sensors)s.stop();sensors=[];if(held){await line('compass.stop');held=false}window.compassEvidence.held=false;$('#motion').textContent='Sensors stopped';clearInterval(window.compassTimer)}
+$('#stop').onclick=()=>stop().catch(e=>$('#message').textContent=e.message);
+$('form').onsubmit=async e=>{e.preventDefault();if(!next)return;try{const q=JSON.stringify($('#answer').value);await line(`${cfg.action_word} ${next.id} answer=${q} in=${cfg.in_group}`);$('#message').textContent='Found it! Your next discovery is open.';$('#answer').value='';await redraw()}catch(e){$('#message').textContent=e.message}};
+addEventListener('pagehide',()=>{for(const s of sensors)s.stop();if(held)navigator.sendBeacon('/line',new Blob([JSON.stringify({door,line:'compass.stop'})],{type:'application/json'}))});
+(async()=>{try{cfg=(await line(`look ${view}`,true)).rows[0];$('#title').textContent=cfg.title;await redraw();await line('compass.start');held=true;window.compassEvidence.held=true;
+const orientation=new AbsoluteOrientationSensor({frequency:20});orientation.addEventListener('reading',()=>{const [x,y,z,w]=orientation.quaternion;heading=(Math.atan2(2*(w*z+x*y),1-2*(y*y+z*z))*180/Math.PI+360)%360;window.compassEvidence.orientation++;aim()});
+const motion=new LinearAccelerationSensor({frequency:20});motion.addEventListener('reading',()=>{window.compassEvidence.motion++;$('#motion').textContent=`Compass held · motion ${Math.hypot(motion.x,motion.y,motion.z).toFixed(1)} m/s²`});
+for(const sensor of [orientation,motion]){sensor.addEventListener('error',e=>$('#message').textContent=e.error.message);sensor.start();sensors.push(sensor)}
+navigator.geolocation.getCurrentPosition(p=>{position=p.coords;aim()},e=>$('#message').textContent=e.message);
+window.compassTimer=setInterval(()=>redraw().catch(e=>{$('#message').textContent=e.message;stop().catch(()=>{})}),1500);
+}catch(e){$('#message').textContent=e.message;await stop().catch(()=>{})}})();
+</script>

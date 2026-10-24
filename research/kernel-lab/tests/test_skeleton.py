@@ -248,6 +248,24 @@ class Skeleton(unittest.TestCase):
         self.refused(self.alex, "undo r1", "cannot be undone")
         self.replays()
 
+    def test_composed_undo_accepts_receipts_and_keeps_undo_rights(self):
+        # Exercise both the kernel-only and mixed module/kernel composition paths.
+        for word, steps in (("take-back", "undo $1"), ("review-back", "tally.top; undo $1")):
+            with self.subTest(word=word):
+                self.ok(self.alex, f'verb {word} steps="{steps}" may=members help="Undo the supplied receipt"')
+                old = self.ok(self.maya, f"post {word} older note")
+                new = self.ok(self.maya, f"post {word} keep this newer note")
+                receipt = old["records"][0]
+                self.refused(self.bea, f"{word} {receipt}", "is Maya's")
+                self.refused(self.maya, f"{word} r99999", "no act r99999")
+                result = self.ok(self.maya_bot, f"{word} {receipt}")
+                self.assertEqual(len(result["records"]), 1)
+                self.assertEqual(self.k.log.records[-1]["undoes"], int(receipt[1:]))
+                posts = self.ok(self.maya, "rows post")["rows"]
+                self.assertNotIn(old["made"][0], {row["id"] for row in posts})
+                self.assertIn("keep this newer note", self.ok(self.maya, "look " + new["made"][0])["text"])
+        self.replays()
+
     def test_the_feed_takes_a_few_posts_a_day(self):
         for i in range(3):
             self.ok(self.maya, f"post note {i}")
