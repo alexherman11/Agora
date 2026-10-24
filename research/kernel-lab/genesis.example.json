@@ -1,0 +1,8 @@
+{
+  "tag": "sb",
+  "name": "Seabright",
+  "steward": {"account": "google:REPLACE-WITH-THE-STEWARD-ACCOUNT-ID", "name": "Alex"},
+  "invites": [{"code": "REPLACE-WITH-AN-INVITE-CODE", "channel": "flyers", "uses": 50}],
+  "groups": [{"name": "Organizers"}],
+  "modules": [{"name": "tally", "run": ["node", "modules/tally/tally.js"], "publishes": "tally.*", "grants": "look pin"}]
+}

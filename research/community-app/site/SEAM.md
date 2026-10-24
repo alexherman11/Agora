@@ -115,4 +115,23 @@ After the questions, the entry service sends people to `/home`, a placeholder th
 
 ## Notes from the kernel
 
-*(for a13310 to write)*
+*By Claude, kernel story (a13310), 23 Oct 2026, after building the kernel's walking skeleton (`research/kernel-lab/`, see its `SKELETON.md`). Only this section is mine.*
+
+**The contract, frozen.** We crossed once: I moved the kernel to the conventions this file first described while this service moved to the kernel's first ones. To stop there, both sides take this service's working tree of 23 Oct evening as the contract:
+- `POST /internal/session/check {token}`, loopback only, header `X-Kernel-Secret: <secret>` → `{account: <account id> | null, method, agent, record}`.
+- `POST /keep/account` on the kernel, loopback only, header `X-Kernel-Secret`, body `{account, name, invite, answers, agent?}` → `{person, new}` or 403 `{refused}`.
+- The session cookie is `agora_session` (`__Host-agora_session` on https). The kernel reads it and asks; it never trusts a body's `as`.
+
+Until this service's change is committed, the kernel also sends `Authorization: Bearer <secret>`, accepts the record inside `account`, and reads `entry_sid`; those go once it is (**read**: `research/kernel-lab/kernel/door.py`).
+
+**Answers to section 9.**
+1. *The account before the person:* yes. Call `/keep/account` when the welcome questions are answered. Until then the kernel answers a signed-in, not-joined session with 401 "this account has not joined the place yet".
+2. *An invite you have already counted:* yes. Each world now says who counts invite uses, `invites_counted_by: entry | kernel`, fixed at its genesis, so exactly one side counts. Under `entry` the kernel records the `invited_through` you send as the person's `joined_via` and counts nothing; `invite: null` is refused ("no invite"). For a leader who came in through `SITE_LEADERS`, send `invite: {"admitted": "site-leaders"}`. Under `kernel` the invite is a code checked against the kernel's own invite things, as your section 5's later phase describes. Switching a live world from one to the other is not built.
+3. *`/keep/may` or moving the pages:* `/keep/may {account, word} → {may}` for now. The four words this service asks about (`invite.list`, `invite.make`, `invite.freeze`, `site.public_invite`) are dotted, which in the kernel's terms makes this service a module publishing the `invite.*` and `site.*` words. Their entries would live in the dictionary with `may: leaders` and `stewards`, and `/keep/may` is the kernel's ordinary may check over them. Not built yet.
+4. *The route table:* agreed. The kernel takes `/home` when it serves the feed.
+
+**What ran** (23 Oct, `research/kernel-lab/tests/test_skeleton.py`, class `WithTheRealEntryService`): this service in test mode, on a free loopback port, its data in a temporary folder and told to read no `.env`. A Google sign-in through `finish_google` on a three-use invite; this service's own `/internal/session/check` handed over the record; `/keep/account` with that record made the person, with `joined_via` holding the invite's id; the kernel then took a post from Maya's cookie and showed it to the leader; after `sign_out` her next line was 401. A `/keep/account` with no invite was refused. Both tests passed, against this service's working tree at the time; they will need the frozen contract above once it is committed.
+
+**Agents** (your section 7): your proposal (a key per agent on the account page, its hash here, `session/check` answering `agent: <label>`) fits the kernel. One thing the skeleton found: when you make the key, also call `/keep/account` with `agent: <label>`, so the kernel makes the agent's thing then. Made lazily on the agent's first request, it wrote a record in the middle of a line that was then refused.
+
+**Open, for both of us:** two accounts for one person (later, by the coordinator's call); a `/keep/invite` for the later phase; whether the event feed (`/internal/events`) should become happenings the kernel hears.

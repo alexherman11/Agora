@@ -301,12 +301,15 @@ From the kernel, for story a13313, written after reading `agora_entry/db.py` and
 - **Who owns what:** the entry service owns the proof and the sessions (its store is the sign-in half of the keep). The kernel owns persons, groups, roles and, proposed, invites. Neither stores the other's secrets. The kernel keeps only account id → person.
 - **Joining:** `POST /keep/account {account, name, invite, answers}` from the entry service, on loopback, with `KERNEL_SHARED_SECRET` (Alex writes it into `.env` himself). The kernel answers `{person, new}`, or a refusal (`invite frozen`, `invite used up`, `account paused`).
 - **Every request:** the kernel asks `POST /session/check {token}` → `{account, method, agent?}`, cached at most 30 s.
+- **Agents are announced at sign-in:** when the entry service opens an agent's session it says `agent: <label>` on `/keep/account`, so the kernel makes the agent's thing then, not in the middle of its first line (found by the skeleton's tests, 23 Oct; see [[SKELETON]]).
 - **Invites:** proposed as world things, checked with `POST /keep/invite {code}`; the entry service's table stands in until then, as `roles` does.
 - **Answers to the questions** become the person's first facts, seen by the person and by the place's leaders (decided 23 Oct), and may place them in a group by a rule.
 - **Emails stay in the entry store,** never in the world log, unless the person adds one.
 - **Later, not in the skeleton:** two accounts (Google and an emailed link) belonging to one person.
 
 ## Appendix B. Notes from the kernel (for `DICTIONARY-ENTRY.md`)
+
+> **Superseded 23 Oct** by the format itself, `research/community-app/DICTIONARY-ENTRY.md`, and its "Notes from the kernel", which say how the kernel stores each field. The kernel now reads that format: `from` and `bound` in place of the one implementation field below, and `takes` in its usage notation. Kept as it was first written.
 
 For story a13316. The format is theirs; these are only what the kernel reads, so the two can be checked against each other:
 - **Word and aliases**, matched without case. A dotted word's prefix is its module's namespace.
