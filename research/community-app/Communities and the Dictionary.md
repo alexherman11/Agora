@@ -128,6 +128,8 @@ At the front of the dictionary is **How to build here**: the community's own gui
 
 **Modules hold only what they are granted.** A module starts with no power at all, and gets the words and surfaces it is granted. Inside them it can do anything; outside them, nothing. Its grants are narrowed ("only my windows", "at most once a minute") and revoked together, so turning a thing off takes all its powers at once.
 
+Grants contain a module in the world, because the door is the only way in. They do not contain what its process does on the machine: files, network. So modules that have been reviewed run as plain processes, and modules from strangers wait for a sandbox that hands them nothing they were not granted. (Corrected 23 Oct, from the kernel story's shape, a13310; the first draft overclaimed.)
+
 **Commitments**
 
 *Strong*

@@ -198,7 +198,7 @@ There are two tiers of change. The world tier is lenses, styles, verbs, rules an
 
 *Added 23 Oct 2026: drafted by Claude from Alex's words of 23 Oct, at his direction.*
 
-A module starts with no power and holds only what it is granted. That, and not review alone, is what lets code from many people be shared.
+A module starts with no power and holds only what it is granted in the world. Grants are what let code from many people act in a shared world. They do not contain what the code does on the machine it runs on, so code nobody has reviewed runs only inside a sandbox, and waits until one exists.
 
 *Held*
 - A module holds only the words and surfaces it is granted. Turning it off takes all of them at once.
