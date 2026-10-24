@@ -1,0 +1,12 @@
+<div class="ways">
+  {google}
+  <form method="post" action="/signin/email" class="stack" novalidate>
+    <input type="hidden" name="csrf" value="{csrf}">
+    <input type="hidden" name="invite" value="{invite}">
+    <label class="field-label" for="email">Email address</label>
+    <input class="input{error_class}" id="email" name="email" type="email" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false" required placeholder="you@example.com" value="{email}"{error_attrs}>
+    {error}
+    <button class="btn {email_button_class}" type="submit">Email me a sign-in link</button>
+  </form>
+  <p class="fine">No password needed. {fine}</p>
+</div>
