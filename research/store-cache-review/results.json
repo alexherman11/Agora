@@ -1,0 +1,31 @@
+{
+  "journal-cache": {
+    "argv": [
+      "test_journal_cache.py"
+    ],
+    "exit_code": 0
+  },
+  "atomic-world": {
+    "argv": [
+      "test_atomic_world.py"
+    ],
+    "exit_code": 0
+  },
+  "store-quick": {
+    "argv": [
+      "test_store.py",
+      "--quick"
+    ],
+    "exit_code": 0
+  },
+  "log-world": {
+    "argv": [
+      "test_log_world.py"
+    ],
+    "exit_code": 0
+  },
+  "sha256": {
+    "research/text-desk-lab/notation/store.py": "2395bfef20fb4e6883b4f287e99f6cc022f39d98d4c6ecafb130e0c3357eb785",
+    "research/text-desk-lab/notation/test_journal_cache.py": "68aa114ed6264a10372947771f3edb90dabb10f9b8d62096e444ee6385246cd7"
+  }
+}

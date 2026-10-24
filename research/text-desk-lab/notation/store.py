@@ -533,7 +533,15 @@ def facts_of(rec):
     return [f for p in rec.get("parts") or () for f in dec(p.get("facts") or ())]
 
 
-_HEADS = {}     # log path -> (size, seq, state, flat): what this process knows the log says, so a long-lived one reads only the tail
+_HEADS = {}     # log path -> (size, seq, state, flat, file stamp); never reuse on path/length alone
+
+
+def _journal_stamp(stat):
+    """File identity plus version. Birth time is explicit on Windows; ctime is not birth time on Unix."""
+    # Windows Python's path stat may report legacy birth-time ctime while
+    # fstat reports change-time ctime. Those are not comparable versions.
+    return (stat.st_dev, stat.st_ino, getattr(stat, "st_birthtime_ns", getattr(stat, "st_birthtime", None)),
+            stat.st_size, stat.st_mtime_ns, None if os.name == "nt" else stat.st_ctime_ns)
 
 
 class Log:
@@ -560,12 +568,25 @@ class Log:
     def head(self):
         """-> (seq, state) of the last whole record, read from the end of the file; None for no log."""
         if not self.path.exists():
+            _HEADS.pop(str(self.path), None)
             return None
-        size = self.path.stat().st_size
-        known = _HEADS.get(str(self.path))
-        if known and known[0] == size:
-            return known[1], known[2]
+        stamp = _journal_stamp(self.path.stat())
+        size = stamp[3]
+
+        def checked(head):
+            # A cache cannot authenticate itself: always read the actual tail.
+            if _journal_stamp(self.path.stat()) != stamp:
+                _HEADS.pop(str(self.path), None)
+                raise OSError("journal changed while reading its head")
+            known = _HEADS.get(str(self.path))
+            if known and (known[4] != stamp or (known[1], known[2]) != head):
+                _HEADS.pop(str(self.path), None)
+            return head
+
         with open(self.path, "rb") as f:
+            if _journal_stamp(os.fstat(f.fileno())) != stamp:
+                _HEADS.pop(str(self.path), None)
+                raise OSError("journal replaced before reading its head")
             back = 4096
             while True:
                 f.seek(max(0, size - back))
@@ -577,26 +598,35 @@ class Log:
                     last = lines[-1].decode("utf-8")
                     m = re.match(r'\{"seq": (\d+), "shape": \d+, "state": "([0-9a-f]+)"', last)
                     if m:
-                        return int(m.group(1)), m.group(2)
+                        return checked((int(m.group(1)), m.group(2)))
                     rec = json.loads(last)
-                    return rec["seq"], rec.get("state")
+                    return checked((rec["seq"], rec.get("state")))
                 if back >= size:
-                    return None
+                    return checked(None)
                 back *= 16
 
     def flat(self):
-        """-> (flat, seq, state): the log replayed. A process that asked before reads only what was added."""
+        """-> (flat, seq, state). Reuse only a verified current file; otherwise replay from its beginning."""
         key = str(self.path)
-        size = self.path.stat().st_size if self.path.exists() else 0
+        head = self.head()          # checks actual sequence/digest and invalidates changed-file caches
+        if not self.path.exists():
+            return {}, 0, None
+        stamp = _journal_stamp(self.path.stat())
         known = _HEADS.get(key)
-        if known and known[0] == size:
+        if known and known[4] == stamp and (known[1], known[2]) == head:
             return known[3], known[1], known[2]
-        flat, seq, state, start = ({}, 0, None, 0) if not known or known[0] > size else (known[3], known[1], known[2], known[0])
-        end = start
-        for rec, end in self.records(start):
+        # A different version need not be an append: it may have rewritten the
+        # cached prefix. Never extend old facts from an unverified byte offset.
+        _HEADS.pop(key, None)
+        flat, seq, state, end = {}, 0, None, 0
+        for rec, end in self.records(0):
             patch(flat, facts_of(rec))
             seq, state = rec["seq"], rec.get("state")
-        _HEADS[key] = (end, seq, state, flat)
+        if _journal_stamp(self.path.stat()) != stamp or self.head() != head:
+            raise OSError("journal changed while replaying")
+        if (seq, state) != (head or (0, None)):
+            raise ValueError("journal replay and head differ")
+        _HEADS[key] = (end, seq, state, flat, stamp)
         return flat, seq, state
 
     def append(self, rec, flat_after=None):
@@ -624,9 +654,9 @@ class Log:
             f.write(line)
             f.flush()
             os.fsync(f.fileno())
-        size = self.path.stat().st_size
-        if flat_after is not None:
-            _HEADS[str(self.path)] = (size, rec["seq"], rec["state"], flat_after)
+            stamp = _journal_stamp(os.fstat(f.fileno()))
+        if flat_after is not None and _journal_stamp(self.path.stat()) == stamp:
+            _HEADS[str(self.path)] = (stamp[3], rec["seq"], rec["state"], flat_after, stamp)
         else:
             _HEADS.pop(str(self.path), None)
         return rec["seq"]
