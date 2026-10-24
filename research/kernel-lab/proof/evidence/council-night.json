@@ -4,7 +4,7 @@
   "ran": "every check, count and timing below",
   "imagined": "the people, their words, the agenda (modules/agenda/agenda-oct28.json) and the summaries; no model was called"
  },
- "when": "2026-10-24T09:27Z",
+ "when": "2026-10-24T09:35Z",
  "world": {
   "records": 144,
   "persons": 41,
@@ -13,7 +13,7 @@
    "agenda (Node)",
    "tally (Node)"
   ],
-  "things": 104
+  "things": 108
  },
  "checks": [
   {
@@ -34,7 +34,7 @@
   {
    "check": "twelve riders press for nine carpool seats at once",
    "ok": true,
-   "detail": "9 seats taken, 3 told the car is full: refused: sb87 is taken (3 seats, all claimed); look shows what is open"
+   "detail": "9 seats taken, 3 told the car is full: refused: sb91 is taken (3 seats, all claimed); look shows what is open"
   },
   {
    "check": "sixteen sign up at once for twelve two-minute slots",
@@ -44,7 +44,7 @@
   {
    "check": "once each: a second sign-up is refused",
    "ok": true,
-   "detail": "refused: you have already said claim on sb83; once each. undo takes yours back"
+   "detail": "refused: you have already said claim on sb87; once each. undo takes yours back"
   },
   {
    "check": "undo gives a slot back, and the next neighbour takes it",
@@ -54,7 +54,7 @@
   {
    "check": "sign-up closes at a time of day",
    "ok": true,
-   "detail": "refused: sign-up for sb83 closed at 2026-10-29T00:45Z (a seat was free)"
+   "detail": "refused: sign-up for sb87 closed at 2026-10-29T00:45Z (a seat was free)"
   },
   {
    "check": "speakers' phone numbers are seen only by leaders",
@@ -79,12 +79,12 @@
   {
    "check": "one vote each; undo lets a neighbour change theirs",
    "ok": true,
-   "detail": "a second vote: 'refused: you have already said vote on sb96; once each. undo takes yours back'; Maya changed hers; still 40 votes"
+   "detail": "a second vote: 'refused: you have already said vote on sb100; once each. undo takes yours back'; Maya changed hers; still 40 votes"
   },
   {
    "check": "two leaders press Next at once: the meeting moves one item",
    "ok": true,
-   "detail": "one moved it; the other: 'refused: stale: sb80 changed since it was painted (now, r140); nothing was done. The view will repaint.'"
+   "detail": "one moved it; the other: 'refused: stale: sb84 changed since it was painted (now, r140); nothing was done. The view will repaint.'"
   },
   {
    "check": "a neighbour's Next is refused",
@@ -99,7 +99,7 @@
   {
    "check": "thirty phones follow every 'now speaking'",
    "ok": true,
-   "detail": "5 moves × 30 phones; seen within p50 182.3 ms, p95 328.5 ms, max 374.0 ms; 0 missed"
+   "detail": "5 moves × 30 phones; seen within p50 188.8 ms, p95 340.7 ms, max 401.2 ms; 0 missed"
   },
   {
    "check": "the outcome is a pinned announcement, with the staff report linked",
@@ -126,134 +126,134 @@
  "of": 21,
  "timing_ms": {
   "acts": 114,
-  "act_p50": 17.7,
-  "act_p95": 72.0,
-  "typed_p50": 16.6,
-  "pressed_p50": 17.8,
-  "follow_p50": 182.3,
-  "follow_p95": 328.5,
-  "phone_redraws": 380,
+  "act_p50": 17.5,
+  "act_p95": 97.4,
+  "typed_p50": 16.8,
+  "pressed_p50": 17.5,
+  "follow_p50": 188.8,
+  "follow_p95": 340.7,
+  "phone_redraws": 397,
   "whole_run_s": 12.1
  },
  "refused_acts": [
   {
    "who": "Maya",
    "how": "typed",
-   "line": "agenda.load in=sb24",
+   "line": "agenda.load in=sb28",
    "ok": false,
-   "ms": 2.1,
+   "ms": 2.2,
    "said": "refused: agenda.load is for leaders of Council watch; help agenda.load says more"
-  },
-  {
-   "who": "Mei",
-   "how": "pressed",
-   "line": "do claim a704",
-   "ok": false,
-   "ms": 17.7,
-   "said": "refused: sb88 is taken (3 seats, all claimed); look shows what is open"
   },
   {
    "who": "Luis",
    "how": "pressed",
-   "line": "do claim a696",
+   "line": "do claim a728",
    "ok": false,
-   "ms": 19.2,
-   "said": "refused: sb87 is taken (3 seats, all claimed); look shows what is open"
+   "ms": 18.5,
+   "said": "refused: sb91 is taken (3 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Mei",
+   "how": "pressed",
+   "line": "do claim a736",
+   "ok": false,
+   "ms": 18.3,
+   "said": "refused: sb92 is taken (3 seats, all claimed); look shows what is open"
   },
   {
    "who": "Otto",
    "how": "pressed",
-   "line": "do claim a688",
+   "line": "do claim a720",
    "ok": false,
-   "ms": 18.3,
-   "said": "refused: sb86 is taken (3 seats, all claimed); look shows what is open"
+   "ms": 17.8,
+   "said": "refused: sb90 is taken (3 seats, all claimed); look shows what is open"
   },
   {
    "who": "Priya",
    "how": "pressed",
-   "line": "do claim a664",
+   "line": "do claim a696",
    "ok": false,
-   "ms": 6.1,
-   "said": "refused: sb83 is taken (12 seats, all claimed); look shows what is open"
+   "ms": 1.6,
+   "said": "refused: sb87 is taken (12 seats, all claimed); look shows what is open"
   },
   {
    "who": "Hana",
    "how": "pressed",
-   "line": "do claim a664",
+   "line": "do claim a696",
    "ok": false,
-   "ms": 1.7,
-   "said": "refused: sb83 is taken (12 seats, all claimed); look shows what is open"
+   "ms": 1.5,
+   "said": "refused: sb87 is taken (12 seats, all claimed); look shows what is open"
   },
   {
    "who": "Nora",
    "how": "pressed",
-   "line": "do claim a664",
+   "line": "do claim a696",
    "ok": false,
-   "ms": 1.4,
-   "said": "refused: sb83 is taken (12 seats, all claimed); look shows what is open"
+   "ms": 1.7,
+   "said": "refused: sb87 is taken (12 seats, all claimed); look shows what is open"
   },
   {
    "who": "Kiko",
    "how": "pressed",
-   "line": "do claim a664",
+   "line": "do claim a696",
    "ok": false,
-   "ms": 1.4,
-   "said": "refused: sb83 is taken (12 seats, all claimed); look shows what is open"
+   "ms": 1.3,
+   "said": "refused: sb87 is taken (12 seats, all claimed); look shows what is open"
   },
   {
    "who": "Maya",
    "how": "typed",
-   "line": "claim sb83",
+   "line": "claim sb87",
    "ok": false,
-   "ms": 1.3,
-   "said": "refused: you have already said claim on sb83; once each. undo takes yours back"
+   "ms": 1.2,
+   "said": "refused: you have already said claim on sb87; once each. undo takes yours back"
   },
   {
    "who": "Hana",
    "how": "typed",
-   "line": "claim sb83",
+   "line": "claim sb87",
    "ok": false,
    "ms": 1.2,
-   "said": "refused: sign-up for sb83 closed at 2026-10-29T00:45Z"
+   "said": "refused: sign-up for sb87 closed at 2026-10-29T00:45Z"
   },
   {
    "who": "Ruth",
    "how": "typed",
    "line": "post one more thing about parking",
    "ok": false,
-   "ms": 1.3,
+   "ms": 1.2,
    "said": "refused: you have said post 5 times today, the most it takes from one person in a day"
   },
   {
    "who": "Bea",
    "how": "typed",
-   "line": "vote sb96 no",
+   "line": "vote sb100 no",
    "ok": false,
-   "ms": 2.5,
-   "said": "refused: you have already said vote on sb96; once each. undo takes yours back"
+   "ms": 2.4,
+   "said": "refused: you have already said vote on sb100; once each. undo takes yours back"
   },
   {
-   "who": "Dana",
+   "who": "Alex",
    "how": "pressed",
-   "line": "do agenda.next a640",
+   "line": "do agenda.next a672",
    "ok": false,
-   "ms": 25.9,
-   "said": "refused: stale: sb80 changed since it was painted (now, r140); nothing was done. The view will repaint."
+   "ms": 17.5,
+   "said": "refused: stale: sb84 changed since it was painted (now, r140); nothing was done. The view will repaint."
   },
   {
    "who": "Ruth",
    "how": "pressed",
-   "line": "do agenda.next a640",
+   "line": "do agenda.next a672",
    "ok": false,
-   "ms": 1.8,
+   "ms": 1.9,
    "said": "refused: agenda.next is for leaders of Council watch; help agenda.next says more"
   },
   {
    "who": "Sam",
    "how": "typed",
-   "line": "pin sb103",
+   "line": "pin sb107",
    "ok": false,
-   "ms": 2.0,
+   "ms": 2.8,
    "said": "refused: pin is for leaders of Seabright; help pin says more"
   }
  ],

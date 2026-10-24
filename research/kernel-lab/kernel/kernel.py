@@ -765,7 +765,8 @@ class Kernel:
             if st.target and L.ID.match(st.target):
                 if self.shown(actor.person, st.target) is None:
                     raise self.no_such(st.target)                     # the same words as for a thing that isn't there
-                group = group or (self.groups_of(st.target) or [None])[0]
+                group = group or (st.target if self.state.get(st.target, "kind") in ("group", "place")
+                                  else (self.groups_of(st.target) or [None])[0])
             elif takes == "required":
                 raise Refused(f"{st.word} needs a thing: {entry.get('help', '').splitlines()[0]}")
             group = group or self.place
@@ -890,7 +891,8 @@ class Kernel:
                                           f.kv.get("in") or group) for f, x in zip(firsts, steps)]]
             if len(steps) == 1 and kinds[0] == "module":
                 # a one-step verb of a module's word is an alias for it (SHAPE: a room says `play` for media.play)
-                return self.step(actor, steps[0], press=press, saw=saw, mode=mode)
+                line = steps[0] + (f" in={group}" if "in" not in firsts[0].kv else "")
+                return self.step(actor, line, press=press, saw=saw, mode=mode)
             if "module" in kinds:
                 return self._verb_with_modules(actor, st, entry, group, text, steps, press, saw)
             with self.lock:

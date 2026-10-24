@@ -19,6 +19,23 @@ def _k(word, kind, takes, may, undo, help, **more):
 
 
 KERNEL_ENTRIES = [
+    _k("kit", "do", "<id> [name=<text>]", "leaders", "yes",
+       help="kit <group> [name=<text>]: gather its verb notes, dictionary entries, lenses, styles, rules and kind "
+            "declarations as one definition-only thing. Referenced module words travel too, without code or grants. "
+            "Data never travels. Replace references to live data with arguments before sharing. "
+            "look <kit> shows its portable bundle; post <words> about=<kit> shares it normally."),
+    _k("take", "do", "[<id>] [bundle=<JSON>] [in=<group>]", "leaders", "yes",
+       help="take <kit> in=<group>, or take bundle=<quoted JSON> in=<group>: place new definitions here in one act. "
+            "Carry the bundle from look <kit> to another world's door. Each copy remembers its source world and thing. "
+            "References inside the kit are remapped; data references and name collisions refuse the whole take. "
+            "Module entries remain unbound until this world grants and runs that module. Origin is attribution, "
+            "not authenticated authorship. Review shared definitions: rules run with your own rights."),
+    _k("rename", "do", "<id> [word=<name>] [aliases=<names>] [in=<group>]", "leaders", "yes",
+       help="rename <entry> word=<name> aliases=\"<names>\" in=<group>: change this group's dictionary names. "
+            "Look first. The bound name still answers. Copies in other communities are independent."),
+    _k("module", "do", "<name> run=<JSON> grants=<words>", "stewards", "yes",
+       help="module <name> run=<quoted JSON argv> grants=\"<words>\": explicitly install and grant a local module. "
+            "Only stewards may run code. Kits carry neither this command nor its grants. off <module> stops it."),
     _k("counts", "see", "<id>", "anyone", "no",
        help="counts <board>: anonymous totals of active uses of its count_word, grouped by count_bucket. "
             "A thing explicitly publishes to a board with count_in=<board> count_bucket=<label>; only things "
@@ -84,8 +101,8 @@ KERNEL_ENTRIES = [
 ]
 
 # aspects no line may write with make or set: what the kernel itself keeps, or derives
-RESERVED_KINDS = {"person", "agent", "module", "grant", "word", "invite", "world", "place", "group"}
-RESERVED = {"kind", "made_by", "for", "pinned", "forgotten", "sees", "lives", "from", "bound"}
+RESERVED_KINDS = {"person", "agent", "module", "grant", "word", "invite", "world", "place", "group", "kit"}
+RESERVED = {"kind", "made_by", "for", "pinned", "forgotten", "sees", "lives", "from", "bound", "origin", "bundle"}
 SEES_SAID = {"me", "leaders", "group", "place"}      # what `make … sees=` may say (section 7: it may narrow)
 RESERVED_PREFIX = ("in:", "like:", "member:", "answer:", "sees.", "vote:", "claim:", "contact:")
 
@@ -193,6 +210,10 @@ def help_(k, actor, st, entry, tx, group, saw=None):
             if a.get(key):
                 facts.append(f"{key}: {a[key]}")
         facts.append(f"from: {a.get('from')}" + (f" ({a['bound']})" if a.get("bound") and a.get("bound") != a["word"] else ""))
+        if a.get("from", "").startswith("module:"):
+            mid = k.module_named(a["from"][7:])
+            if not mid or not k.state.get(mid, "on") or not k.modules or not k.modules.running(mid):
+                facts.append("unbound: this community must grant and run the module")
         return {"text": a.get("help", "") + "\n" + " · ".join(facts), "rows": [dict(a)]}
     mine, others = [], []
     for e in sorted(k.entries(), key=lambda e: k.state.get(e, "word")):
@@ -594,6 +615,9 @@ def holds(k, actor, st, entry, tx, group, saw=None):
     return {"text": ("holds:\n" + text) if rows else "nothing is held", "rows": rows}
 
 
-KERNEL = {"counts": counts, "test": test, "look": look, "help": help_, "post": post, "like": like, "pin": pin, "undo": undo, "off": off,
+from .kits import kit, take, rename, module
+
+KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module,
+          "counts": counts, "test": test, "look": look, "help": help_, "post": post, "like": like, "pin": pin, "undo": undo, "off": off,
           "status": status, "make": make, "set": set_, "forget": forget, "holds": holds, "claim": claim,
           "vote": vote, "role": role, "rows": rows, "find": rows, "verb": verb}

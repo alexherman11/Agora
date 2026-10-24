@@ -197,7 +197,7 @@ def pct(xs, p):
     return round(xs[min(len(xs) - 1, int(len(xs) * p))], 1) if xs else None
 
 
-def main(argv=None):
+def main(argv=None, night=None, retain=False):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--out", default=str(PROOF / "evidence"))
     ap.add_argument("--shots", action="store_true", help="draw two phone-width pages with headless Chrome")
@@ -206,7 +206,7 @@ def main(argv=None):
     out.mkdir(parents=True, exist_ok=True)
     random.seed(28)
     started = time.perf_counter()
-    N = Night(out)
+    N = night or Night(out)
     k = N.k
     cw = next(g for g in k.things("group") if k.state.get(g, "name") == "Council watch")
 
@@ -222,7 +222,7 @@ def main(argv=None):
     N.do("Alex", f"role {N.pid['Dana']} leader in={cw}")
     for lens in ("council", "floor"):
         text = (PROOF / "lenses" / f"{lens}.lens").read_text(encoding="utf-8")
-        assert N.do("Alex", f"make kind=lens name={lens} text={quoted(text)}")["ok"]
+        assert N.do("Alex", f"make kind=lens name={lens} text={quoted(text)} in={cw}")["ok"]
 
     report = N.do("Dana", f'make kind=research title="Staff report, item 7B" '
                           f'url=https://example.org/seabright/council/7B-staff-report.pdf in={cw}')["made"][0]
@@ -463,9 +463,10 @@ def main(argv=None):
     (out / "council-night.json").write_text(json.dumps(evidence, indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"{evidence['passed']} of {evidence['of']} checks passed · {len(k.log.records)} records · "
           f"acts p50 {evidence['timing_ms']['act_p50']} ms · evidence in {out / 'council-night.json'}")
-    N.srv.shutdown()
-    N.host.stop_all()
-    shutil.rmtree(N.dir, ignore_errors=True)
+    if not retain:
+        N.srv.shutdown()
+        N.host.stop_all()
+        shutil.rmtree(N.dir, ignore_errors=True)
     return 0 if evidence["passed"] == evidence["of"] else 1
 
 
