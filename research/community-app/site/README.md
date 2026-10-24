@@ -97,7 +97,7 @@ The cost is two pieces of the standard library's missing crypto written here and
 
 ## Evidence
 
-**ran** (23 Oct, `scenario/evening.py`, the report is [evidence/evening/report.md](evidence/evening/report.md)): **49 of 49 checks passed**, in two of the last three runs (the third is explained below).
+**ran** (23 Oct, `scenario/evening.py`, the report is [evidence/evening/report.md](evidence/evening/report.md)): **49 of 49 checks passed**, in two of three runs that night (the third is explained below), and again against the kernel's commit 2d872eb, which speaks only the agreed contract.
 - **Setup.** Alex signed in on his phone by emailed link and made three invites: Instagram, a flyer QR code for the Galt Elementary meeting, and a one-use link for Sam. The flyer's QR code was read back from the printed poster's pixels (`scenario/qr_read.py`) and carried the flyer's link.
 - **The kernel.** Its world was founded with Alex as steward, in its own process on its own port.
 - **Joining.** 29 neighbours joined at phone width (390×844), each in a browser of their own, by Google (stand-in), by tapping the emailed link, or by typing the emailed code. The 12 at the meeting shared one wifi address.
