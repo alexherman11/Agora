@@ -1,15 +1,13 @@
-"""Reviewed, stateless task summaries. Only loopback Ollama; no files or downloads.
+"""Task-board adapter; inference delegates to the single model process.
 
-Model selection is taskboard-settings' `model` fact (default qwen2.5:3b).
-All model attempts share a seven-second call budget. Failure is labelled, never
-silently presented as a model result. Undo reverses facts, not model computation.
+Before registration, deterministic literal fallback keeps old boards usable.
+Shared inference is model.preview, admitted here as one act.
 """
 import json
 import re
 import sys
 import threading
 import time
-import urllib.request
 
 pending = {}
 lock = threading.Lock()
@@ -28,7 +26,7 @@ def read(use, line):
     event = threading.Event()
     pending[use] = [event, None]
     send(dict(t='see', use=use, line=line))
-    if not event.wait(2):
+    if not event.wait(9):
         pending.pop(use, None)
         raise ValueError('kernel reading timed out')
     result = pending.pop(use)[1]
@@ -44,27 +42,6 @@ def shorten(text):
         return clause
     cut = clause[:61].rsplit(' ', 1)[0]
     return (cut or clause[:60]).rstrip(' ,:')
-
-
-def summary(text, model, deadline):
-    remaining = deadline - time.monotonic()
-    if remaining > .1:
-        try:
-            payload = dict(model=model, stream=False, keep_alive='5m',
-                prompt='Summarize this task as one short description, at most 60 characters. '
-                       'Preserve intent; no commentary or extra facts. Return only the description.\n'
-                       '<task>' + text[:6000] + '</task>',
-                options=dict(temperature=0, num_predict=48))
-            req = urllib.request.Request('http://127.0.0.1:11434/api/generate',
-                json.dumps(payload).encode(), {'Content-Type': 'application/json'})
-            with urllib.request.urlopen(req, timeout=min(1.5, remaining)) as response:
-                answer = json.load(response)
-            value = ' '.join(answer.get('response', '').split()).strip('"')
-            if value and len(value) <= 90 and answer.get('done'):
-                return value, 'local model · ' + model
-        except (OSError, ValueError, TimeoutError):
-            pass
-    return shorten(text), 'short version, no model'
 
 
 def call(message):
@@ -99,7 +76,7 @@ def call(message):
             ' colour=paper note_colour=paper note_style=normal who=' + quote(message['caller']['name']) +
             ' source=local source_status=open seats=1'], saw={})
     settings = read(use, 'rows taskboard-settings name=taskboard')
-    model = str(settings[0].get('model') or 'qwen2.5:3b') if settings else 'qwen2.5:3b'
+    model_words = read(use, 'rows word bound=model.preview')
     if word == 'summarize.task':
         target = args.get('target')
         if not target:
@@ -123,10 +100,24 @@ def call(message):
         text = str(task.get('title') or '')
         if task.get('text'):
             text += '\n' + str(task['text'])
-        short, provenance = summary(text, model, deadline)
+        if model_words:
+            if time.monotonic() >= deadline:
+                raise ValueError('Summary batch exceeded its budget; summarize a smaller lane')
+            prepared = read(use, 'model.preview ' + task['id'] + ' operation=summarize words=10')
+            if not prepared or not prepared[0].get('lines'):
+                raise ValueError('model did not prepare a summary')
+            lines.extend(prepared[0]['lines'])
+            saw.update(prepared[0]['saw'])
+            short = provenance = None
+        else:
+            # Compatibility before model registration: no second inference path.
+            short, provenance = shorten(text), 'short version, no model'
         defaults = dict(priority='4', colour='paper', note_colour='paper', note_style='normal')
         extra = ''.join(' '+key+'='+quote(value) for key,value in defaults.items() if key not in task)
-        lines.append('set ' + task['id'] + ' short=' + quote(short) + ' short_source=' + quote(provenance) + extra)
+        if short is not None:
+            lines.append('set ' + task['id'] + ' short=' + quote(short) + ' short_source=' + quote(provenance) + extra)
+        elif extra:
+            lines.append('set ' + task['id'] + extra)
     return dict(lines=lines, saw=saw)
 
 
@@ -145,9 +136,9 @@ def main():
         if t == 'hello':
             send(dict(t='offer', words=[
                 dict(word='summarize.task', kind='do', takes='<id>', undo='yes',
-                     help='summarize.task <task>: set short and its provenance. Local Ollama; otherwise a literal short version. Undo restores facts. Set taskboard-settings model= to choose an installed model; off summarize stops it.'),
+                     help='summarize.task <task>: thin adapter to model.summarize via model.preview. Set model-settings model= to choose a model. Undo restores facts. Before model registration: literal fallback. Off model stops inference; off summarize stops board adapters.'),
                 dict(word='summarize.all', kind='do', takes='[<id>] [lane=<name>]', undo='yes',
-                     help='summarize.all [lane=Backlog|Now|Done|board]: summarize visible tasks together, one undoable act. A lane id also works. Unavailable/slow models use labelled deterministic shortening.'),
+                     help='summarize.all [lane=Backlog|Now|Done|board]: delegate visible tasks to model.preview, one undoable act. Per-card model quota applies. Large/slow batches refuse atomically; use a smaller lane. A lane id also works.'),
                 dict(word='summarize.add', kind='do', takes='text=<text>', undo='yes',
                      help='summarize.add text="Fix the bar p1": quick-add a task, stripping an optional trailing p1–p4. Defaults to p4. A world rule supplies short in a separate act. Undo takes back the latest act; later dependent acts must be undone before creation.'),
                 dict(word='summarize.save', kind='do', takes='<id> field=<note|text> text=<text>', undo='yes',

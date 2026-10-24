@@ -39,7 +39,7 @@ def lens():
         s += indent + f'cards : column, of tag:taskboard-task,prop:lane={lane} as task, by priority, each card\n'
     s += '''  help : column, fold "Help & shortcuts", role group
     prose : text "Quick add: description p1–p4 (default p4). Click Details for full text and notes. Right-click a card for priorities, colour, moves, assignment, rename, summary and removal. Drag across lanes. Done folds. All/P1–P4 filter the board. Undo reverses your last act; if another edit depends on it, it refuses safely.", role body
-    notes : text "Notes: Ctrl+B bold · Ctrl+I italic · Ctrl+E Markdown source · Ctrl+S save. Checklist source: - [ ] item. Right-click the note for six colours and three styles. Changes and undo stay in History. Summary labels always name the source. Model setting: taskboard-settings model=qwen2.5:3b. Off: off summarize.", role body
+    notes : text "Notes: Ctrl+B bold · Ctrl+I italic · Ctrl+E Markdown source · Ctrl+S save. Checklist source: - [ ] item. Right-click the note for six colours and three styles. Changes and undo stay in History. Summary labels always name the source. Model setting: model-settings model=qwen2.5:3b. Off: off model stops inference; off summarize stops board adapters.", role body
 card : column, role card, carry
   only when $view.filter = "all" or $priority = $view.filter
   let description = $short when $short != ""

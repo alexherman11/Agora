@@ -78,7 +78,7 @@ role refusal : text down, warn, on warn at 8%, pad gap
 
 def main():
     from v2 import lens, style, VERBS
-    lines = ['# Task board v2: structure, appearance and actions are world definitions; summarize is a separate process.',
+    lines = ['# Task board v2: structure, appearance and actions are world definitions; summarize delegates inference to model.',
              '# Say each non-comment physical line through /do. install.py skips existing definitions.']
     for kind in ('taskboard-task', 'taskboard-lane'):
         lines.append('make kind=kind name=' + kind + ' help=' + quote('Task board ' + kind.removeprefix('taskboard-')))

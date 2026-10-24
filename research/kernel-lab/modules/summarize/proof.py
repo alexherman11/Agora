@@ -17,31 +17,26 @@ class Summaries(unittest.TestCase):
         self.assertLessEqual(len(result), 60)
         self.assertTrue(' '.join(source.split()).startswith(result))
 
-    def test_offline(self):
-        with patch.object(S.urllib.request, 'urlopen', side_effect=OSError('offline')):
-            self.assertEqual(S.summary('Bring tea; keep warm', 'absent', time.monotonic()+2),
-                             ('Bring tea', 'short version, no model'))
+    def task_message(self):
+        return dict(use='proof', word='summarize.task', caller=dict(name='Alex'), args=dict(target='tb1'))
 
-    def test_deadline_never_contacts_model(self):
-        with patch.object(S.urllib.request, 'urlopen') as fetch:
-            self.assertEqual(S.summary('Bring tea', 'absent', 0)[1], 'short version, no model')
-            fetch.assert_not_called()
+    def test_unregistered_model_literal_fallback(self):
+        with patch.object(S, 'read', side_effect=[[], [], [dict(id='tb1', rev=4, title='Bring tea; keep warm')]]):
+            out = S.call(self.task_message())
+        self.assertIn('short="Bring tea"', out['lines'][0])
+        self.assertIn('short version, no model', out['lines'][0])
 
-    def test_model_setting_and_local_only(self):
-        response = io.BytesIO(json.dumps(dict(response='Confirm accessible venue', done=True)).encode())
-        with patch.object(S.urllib.request, 'urlopen', return_value=response) as fetch:
-            self.assertEqual(S.summary('Check the venue and access', 'chosen-instruct', time.monotonic()+2),
-                             ('Confirm accessible venue', 'local model · chosen-instruct'))
-            request = fetch.call_args.args[0]
-            self.assertEqual(request.full_url, 'http://127.0.0.1:11434/api/generate')
-            self.assertEqual(json.loads(request.data)['model'], 'chosen-instruct')
-            self.assertFalse(json.loads(request.data)['stream'])
+    def test_registered_model_delegates(self):
+        prepared = dict(lines=['set tb1 short="Tea" short_source="model"'], saw=dict(tb1=4))
+        with patch.object(S, 'read', side_effect=[[], [dict(id='tb2')], [dict(id='tb1',rev=4)], [prepared]]) as read:
+            out = S.call(self.task_message())
+        self.assertEqual(out['lines'][0], prepared['lines'][0])
+        self.assertEqual(read.call_args.args, ('proof', 'model.preview tb1 operation=summarize words=10'))
 
-    def test_malformed_and_overlong_response(self):
-        for raw in (b'not json', b'{}', json.dumps(dict(response='x'*100, done=True)).encode()):
-            with self.subTest(raw=raw), patch.object(S.urllib.request, 'urlopen', return_value=io.BytesIO(raw)):
-                self.assertEqual(S.summary('Bring tea', 'chosen', time.monotonic()+2),
-                                 ('Bring tea', 'short version, no model'))
+    def test_model_refusal_is_not_bypassed(self):
+        with patch.object(S, 'read', side_effect=[[], [dict(id='tb2')], [dict(id='tb1',rev=4)], ValueError('limit reached')]):
+            with self.assertRaisesRegex(ValueError, 'limit reached'):
+                S.call(self.task_message())
 
     def test_save_is_task_scoped_and_fenced(self):
         msg = dict(use='proof', word='summarize.save', args=dict(target='tb1', kv=dict(field='note', text='one\\ntwo')))

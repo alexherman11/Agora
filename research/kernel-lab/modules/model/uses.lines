@@ -1,0 +1,19 @@
+# Examples: ordinary world words, spoken after registration. Optional demo content.
+# Taskboard's existing make rule calls summarize.task, which delegates to model.
+make kind=taskboard-task title="Repair blocked emergency exit before tonight meeting" priority=1 lane=Now who=Alex
+make kind=taskboard-task title="Choose tea for next month gathering" priority=4 lane=Backlog who=Alex
+summarize.all
+
+# Each new public feed post is classified as the rule's maker (normal rule policy).
+rule on=post kind=post do='model.classify $target options="housing meeting help other" into=topic'
+make kind=style name=topics text="token ink = #263746
+role chip : on ink at 8%, ink, pad 4, corner 4"
+make kind=lens name=topics style=topics text='root : column
+  posts : column, of tag:post as post, each post
+post : column
+  body : text "$text"
+  topic : text "$topic", role chip'
+post "Our landlord raised the rent; tenants need housing advice"
+
+# Run as the asking agent's session, to keep its real caller identity.
+make kind=board name="My board" model_kind=taskboard-task as=board; model.ask "what is most urgent on my board?" about=$board

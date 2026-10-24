@@ -1,0 +1,161 @@
+{
+  "checks": [
+    {
+      "check": "both processes offered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "dictionary may and once held in world",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "real Ollama tags/status",
+      "ok": true,
+      "detail": "local model is up; selected qwen2.5:3b; loaded: qwen2.5:3b"
+    },
+    {
+      "check": "task card real model summary 1",
+      "ok": true,
+      "detail": "Alex tasked to repair blocked exit by tonight."
+    },
+    {
+      "check": "task card real model summary 4",
+      "ok": true,
+      "detail": "Alex tasked with choosing tea for next month."
+    },
+    {
+      "check": "board batch delegates to one model process",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "agent asks about visible board",
+      "ok": true,
+      "detail": "local model · qwen2.5:3b: The most urgent task on your board is \"Repair blocked emergency exit before tonight meeting\" with a priority of \"1\"."
+    },
+    {
+      "check": "new feed post classified by rule",
+      "ok": true,
+      "detail": "housing"
+    },
+    {
+      "check": "topic chip in authored lens scene",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "classification undo restores topic and provenance",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "injection remains quoted data",
+      "ok": true,
+      "detail": "LM2 altered task priorities incorrectly."
+    },
+    {
+      "check": "classification constrained or refused",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "neighbour cannot summarize hidden target",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "hidden about refuses before model transport",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "privacy fixture has positive controls",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "neighbour board context omits hidden things",
+      "ok": true,
+      "detail": "local model · qwen2.5:3b: The tasks visible are: 1. \"Repair blocked emergency exit before tonight meeting\" with priority \"1\" and visible in the \"Now\" lane. 2. \"Choose tea for next month gathering\" with priority \"4\" and visible in the \"Now\" lane."
+    },
+    {
+      "check": "neighbour context omits private fact",
+      "ok": true,
+      "detail": "local model · qwen2.5:3b: The note titled \"Public meeting note\" was created by \"lm2\" on October 24, 2026, at 19:55. It was made by \"Alex\" and has revision number 63."
+    },
+    {
+      "check": "transport boundary inspected",
+      "ok": true,
+      "detail": "10 real requests"
+    },
+    {
+      "check": "facts labelled for caller",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "summary undo restores prior fact",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "dictionary change politely refuses agent sharing person quota",
+      "ok": true,
+      "detail": "refused: model: daily local model limit reached; please try tomorrow or ask a steward"
+    },
+    {
+      "check": "dictionary may refuses before inference",
+      "ok": true,
+      "detail": "refused: model.classify is for no one; help model.classify says more"
+    },
+    {
+      "check": "adapter cannot bypass canonical may",
+      "ok": true,
+      "detail": "refused: summarize: model: model.summarize is not permitted for this caller; nothing was written"
+    },
+    {
+      "check": "offline labelled trimmed fallback",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "offline status plain",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "offline question plain",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "offline classification refuses without writing",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "timings_ms": {
+    "status": 48.6,
+    "card-1": 311.2,
+    "card-4": 404.0,
+    "summarize-all": 582.4,
+    "agent-urgency": 615.7,
+    "feed-rule": 177.2,
+    "injection-summary": 207.0,
+    "injection-classify": 126.6,
+    "hidden-direct": 3.7,
+    "hidden-about": 9.4,
+    "hidden-context": 839.2,
+    "hidden-aspect": 807.1,
+    "rate-limit": 4.7,
+    "may-policy": 2.3,
+    "adapter-may-policy": 33.5,
+    "offline-summary": 14.9,
+    "offline-status": 8.2,
+    "offline-question": 8.0,
+    "offline-classify": 10.6
+  },
+  "offline": "injected transport failure, real Ollama untouched"
+}
