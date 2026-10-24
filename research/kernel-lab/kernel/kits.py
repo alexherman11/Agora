@@ -217,3 +217,20 @@ def module(k, actor, st, entry, tx, group, saw=None):
                  "by": actor.person}.items():
         tx.set(grant, f, v)
     return {"text": f"ok module {name} [r?] · local run command and explicit grants"}
+
+
+def grant(k, actor, st, entry, tx, group, saw=None):
+    """One more grant to a module or widget already here; undo takes it back. Grants are never edited in place,
+    so every widening is its own act with its own author."""
+    m = st.target
+    if k.state.get(m, "kind") not in ("module", "widget"):
+        raise Refused("grant needs a module or widget")
+    words = str(st.kv.get("words", "")).strip()
+    if not words:
+        raise Refused('grant needs words="<words>"')
+    g = tx.mint()
+    for f, v in {"kind": "grant", "to": m, "words": words, "where": k.place, "by": actor.person}.items():
+        tx.set(g, f, v)
+    if st.kv.get("only"):
+        tx.set(g, "only", str(st.kv["only"]))
+    return {"text": f"ok grant {k.name(m)} {words} [r?] · undo takes it back"}

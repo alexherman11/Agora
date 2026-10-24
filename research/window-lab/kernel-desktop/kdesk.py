@@ -46,7 +46,7 @@ WINDOW_GRANTS = "window.* make set forget rows look hear:make hear:set hear:forg
 GUY_GRANTS = "guy.* window.list window.overlay rows look holds hear:window.opened"
 SYSTEM_GRANTS = "system.* rows look"
 MEDIA_GRANTS = "media.* rows look"
-SUMMARIZE_GRANTS = "summarize.* rows make set"
+SUMMARIZE_GRANTS = "summarize.* model.preview rows make set"
 
 
 def module_specs(headless=False):

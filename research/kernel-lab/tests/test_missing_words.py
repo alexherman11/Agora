@@ -310,3 +310,15 @@ def test_translations_and_bound_lines_travel_in_kits(world):
     assert any(k.state.get(t, 'title') == 'Hello' for t in k.things('note'))
     say(k, a, 'verb pin2 steps="make kind=note title=Digits" help="A plain word with digits"')
     say(k, a, 'pin2')
+
+
+def test_grant_adds_one_more_grant_and_undo_takes_it_back(world):
+    k, a, b = world
+    mid = say(k, a, 'module media run=' + quoted('["unused"]') + ' grants="rows"')['made'][0]
+    say(k, b, 'grant ' + mid + ' words="look"', ok=False)          # stewards only
+    out = say(k, a, 'grant ' + mid + ' words="look set" only=kind:note')
+    g = out['made'][0]
+    assert k.state.get(g, 'to') == mid and k.state.get(g, 'words') == 'look set'
+    assert k.state.get(g, 'only') == 'kind:note'
+    say(k, a, 'undo')
+    assert k.state.get(g, 'to') is None

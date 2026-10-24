@@ -59,6 +59,9 @@ KERNEL_ENTRIES = [
     _k("module", "do", "<name> run=<JSON> grants=<words>", "stewards", "yes",
        help="module <name> run=<quoted JSON argv> grants=\"<words>\": explicitly install and grant a local module. "
             "Only stewards may run code. Kits carry neither this command nor its grants. off <module> stops it."),
+    _k("grant", "do", "<id> words=<words> [only=<narrowing>]", "stewards", "yes",
+       help="grant <module or widget> words=\"<words>\" [only=kind:<kind>]: give something already installed one "
+            "more grant, as its own act. holds and look show it; undo or off takes it back."),
     _k("counts", "see", "<id>", "anyone", "no",
        help="counts <board>: anonymous totals of active uses of its count_word, grouped by count_bucket. "
             "A thing explicitly publishes to a board with count_in=<board> count_bucket=<label>; only things "
@@ -701,10 +704,10 @@ def history(k, actor, st, entry, tx, group, saw=None):
 
 
 from .dictionary import word_set, word_rename, language
-from .kits import kit, take, rename, module
+from .kits import kit, take, rename, module, grant
 from .inpage import widget
 
-KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "widget": widget, "describe": describe,
+KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant": grant, "widget": widget, "describe": describe,
           'word-set': word_set, 'word-rename': word_rename, 'history': history, 'rule': rule,
           'language': language,
           **{w: panes if w == "panes" else arrange for w in PANE_HELP},
