@@ -1,0 +1,32 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Help · Agora</title>
+<link rel="stylesheet" href="kd.css">
+<style>
+  .word { display: flex; gap: 10px; align-items: baseline; cursor: pointer; padding: 6px 4px; border-bottom: 1px solid var(--faint); }
+  .word b { font-family: var(--mono); font-weight: 600; color: var(--accent); min-width: 150px; }
+  .word.not b { color: var(--hush); }
+  #one { white-space: pre-wrap; }
+</style></head>
+<body>
+<main>
+  <h1>Words you may use here</h1>
+  <div class="card"><pre id="one">Click a word to read its help.</pre></div>
+  <div id="list"></div>
+</main>
+<script src="kd.js"></script>
+<script>
+"use strict";
+const { el } = KD;
+KD.chrome("Help");
+async function draw() {
+  const r = await KD.see("help");
+  const lines = (r.text || "").split("\n").filter((l) => l.startsWith("  "));
+  const first = Object.fromEntries(lines.map((l) => { const m = l.trim().match(/^(\S+) \((\w+)\): (.*)$/); return m ? [m[1], [m[2], m[3]]] : [l, ["", ""]]; }));
+  document.getElementById("list").replaceChildren(...(r.rows || []).map((w) =>
+    el("div", { cls: `word${w.yours ? "" : " not"}`, on: { click: async () => { document.getElementById("one").textContent = (await KD.see(`help ${w.word}`)).text; } } },
+      el("b", {}, w.word), el("span", { cls: "meta" }, w.kind), el("span", {}, (first[w.word] || ["", w.yours ? "" : "not yours here"])[1]))));
+}
+KD.stream((h) => { if (h.word === "hello" || h.word === "world") draw(); });
+draw();
+</script>
+</body></html>

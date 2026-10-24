@@ -1,0 +1,13 @@
+root : column, role sheet
+  head : text "The feed", role heading
+  hint : text "Posts from the place, in the order they were made. Say post <words> in Lines to add one.", role meta
+  list : column, of tag:post as p, each card
+card : column, role card
+  who : text "$by", role meta
+  pinned : text "pinned by $pinned", role mark
+    only when ($pinned or "") != ""
+  t : text "$text"
+  n : row
+    l : text "♥ $likes", role tool, on click do like $item
+    p : text "pin", role tool, on click do pin $item
+    k : text "to taskbar", role tool, on click do make kind=pin bar=taskbar shows=$item

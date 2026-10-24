@@ -1,0 +1,31 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Thing · Agora</title>
+<link rel="stylesheet" href="kd.css">
+</head>
+<body>
+<main>
+  <h1 id="title">…</h1>
+  <div class="card"><pre id="said"></pre></div>
+  <h2>Its aspects</h2>
+  <div class="card"><pre id="aspects"></pre></div>
+</main>
+<script src="kd.js"></script>
+<script>
+"use strict";
+const strip = KD.chrome("Thing");
+async function draw() {
+  const t = KD.target;
+  if (!t) { document.getElementById("title").textContent = "No thing named"; return; }
+  const r = await KD.see(`look ${t}`);
+  const row = (r.rows || [])[0] || {};
+  const name = row.name || row.label || (row.text || "").slice(0, 40) || t;
+  document.getElementById("title").textContent = name;
+  strip.querySelector(".name").textContent = name;
+  document.title = `${name} · Agora`;
+  document.getElementById("said").textContent = r.text || "";
+  document.getElementById("aspects").textContent = Object.entries(row).filter(([k]) => !k.startsWith("like:")).map(([k, v]) => `${k} = ${typeof v === "object" ? JSON.stringify(v) : v}`).join("\n");
+}
+KD.stream((h) => { if (h.word === "hello" || h.word === "world") draw(); });
+draw();
+</script>
+</body></html>
