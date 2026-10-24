@@ -122,4 +122,31 @@ text:   on <verb>: a rule's trigger; the rule fires on each such event, on the t
 
 ## Notes from the kernel
 
-*(for the kernel builder, story a13310)*
+*By Claude, kernel story (a13310), 23 Oct 2026, after building the kernel's walking skeleton (`research/kernel-lab/`, see its `SKELETON.md`). Only this section is mine. The kernel reads this format; it does not keep one of its own.*
+
+**How the kernel stores each field.** An entry is a world thing of kind `word`; each field is an aspect of it.
+
+| Field | Kernel aspect | Notes |
+|---|---|---|
+| word | `word` | The kernel has no titles, so the word is its own aspect |
+| aliases | `aliases` | Space-separated |
+| kind | `word_kind` | For the same reason frontier writes `word=`: `kind` is the thing's own kind (`word`) |
+| takes | `takes` | In this file's usage notation. The kernel reads `<id>` (a thing, required), `[<id>]` (optional), `k=<v>`, `<words>` |
+| help | `help` | Required: a module's offered word with empty help is not published (**ran**) |
+| who may | `may` | The vocabulary as written here, checked when the word runs (**ran**) |
+| undoes | `undo` | `yes`, `no`, `external` |
+| from, bound | `from`, `bound` | `kernel` + the kernel's name, or `module:<name>` + what the module answers to. The skeleton first had one field, `implementation`, and this file's two are better (below) |
+| status | `status` | `hidden` is left out of lookup; `old` is not yet said |
+| once, sealed | `once`, `sealed` | Both enforced (**ran**: `like` once per person per target across a person and her agent; `post` at most 5 a day; sealed likes keep no person in the log) |
+
+Two aspects the kernel adds, for this file to take or refuse:
+- **`lives`**: the group the entry is found in, nearest first. In frontier that is the room or binder the note is placed in; the kernel has no rooms yet, so it says where outright.
+- **`fence: adds`**: a word that only adds (a like) and never makes anyone's later act on the same thing stale. Frontier's fence knows this as appending to a chat; the kernel needed it said on the entry.
+
+**What building on this format found.**
+1. *`bound` is needed for modules too, not only for the home base.* With one `implementation` field, the kernel sent a module the word as typed. Once the world gave `tally.top` a new word and an alias, tally was asked for `best`, which it doesn't know: "tally has no word best" (**ran**: the test fails that way with the fix taken out). The kernel now asks a module by `bound`.
+2. *"The bound name always answers too" is right,* and the kernel had the opposite: after a rename it refused the old name. It now looks up a word by its entry's word and aliases first, then by `bound`, so a word that worked keeps working (**ran**: `best`, `top` and `tally.top` all answer after the rename).
+3. *A module's offer must not overwrite the world's entry.* When tally starts again it offers `tally.top`, and the kernel finds the entry by `from` and `bound`, not by word, so it binds the renamed entry rather than publishing a second one (**ran**).
+4. *Stored lines bind to the entry's id,* as this file says. The skeleton keys sealed likes by the entry's id too, so renaming `like` never stops anyone undoing their own like.
+
+**Not built in the kernel yet:** translations, `old`, the check that no alias takes a word the code answers to, verb notes as their own entries (`from: verb`), and words to edit an entry (the rename test writes its change as a steward's record directly).
