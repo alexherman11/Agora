@@ -619,11 +619,47 @@ for (const t of ['keydown', 'input', 'mousedown', 'click', 'contextmenu'])
     + log.textContent).slice(0, 600); }, true);</script>"""
 TEST_URL = "data:text/html;base64," + base64.b64encode(TEST_HTML.encode()).decode()
 
-def open_edge(name, url, size="1500x900", tries=2, viewport=True):
+def local_paint_switches(url):
+    """Disposable loopback paint only; suppression requests, NOT a network security boundary.
+
+    Keep the independent native-run verifier: Edge builds may ignore Chromium switches.
+    No proxy, remote exceptions, profile preference or machine setting is installed.
+    """
+    from urllib.parse import urlsplit
+    if not isinstance(url, str) or any(ord(c) <= 32 for c in url) or "\\" in url:
+        raise ValueError("local paint requires a literal loopback HTTP URL")
+    u = urlsplit(url)
+    if (u.scheme != "http" or u.hostname != "127.0.0.1" or u.username is not None
+            or u.password is not None or not u.port or u.netloc != f"127.0.0.1:{u.port}"):
+        raise ValueError("local paint requires http://127.0.0.1:<port> without credentials")
+    return [
+        "--disable-background-networking",
+        "--disable-component-update",
+        "--disable-domain-reliability",
+        "--disable-quic",
+        # The copy and CDP use numeric loopback, so they need no DNS.
+        "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1",
+    ]
+
+
+def open_edge(name, url, size="1500x900", tries=2, viewport=True, job=None, before_cdp=None,
+              local_only=False):
     """Edge as an app window on the sandbox desktop, InPrivate (a fresh Edge profile signs itself into Alex's Microsoft
     account and starts syncing his data into it: seen 16 Oct, a5932), on a DevTools port of its own. size is the page's
     CSS viewport (viewport=False: the outer window, as before a7413). -> the state; st["viewport"] is the page's
-    [innerWidth, innerHeight, devicePixelRatio] as measured. A failed start closes its own sandbox and exits."""
+    [innerWidth, innerHeight, devicePixelRatio] as measured. A failed start closes its own sandbox and exits.
+    job (a10672): a live sandbox_window.job_scope(name), held by the caller through close(name): Edge and every
+    process it starts are in the Job, so cleanup can observe the whole family gone (empty job, active 0), not only
+    the root it started. before_cdp(st), when supplied, must admit the measured
+    birth before any DevTools interaction; refusal uses the same owned cleanup.
+    local_only suppresses background traffic for literal loopback paint, with a
+    held Job, mandatory admission callback and one attempt. It does not certify
+    network isolation or replace the verifier; ordinary launches are unchanged."""
+    extra = []
+    if local_only:
+        extra = local_paint_switches(url)
+        if job is None or not callable(before_cdp) or tries != 1:
+            raise ValueError("local paint requires a held Job, verifier callback and one attempt")
     from sandbox_receipts import update_manifest
     if state_file(name).exists():
         sys.exit(f"sandbox {name!r} is open already (close it, or use --name)")
@@ -640,9 +676,11 @@ def open_edge(name, url, size="1500x900", tries=2, viewport=True):
                            # never started. A window on a desktop no one sees must not depend on his monitor
                            "--disable-features=CalculateNativeWinOcclusion", "--disable-backgrounding-occluded-windows",
                            "--disable-renderer-backgrounding",
-                           f"--window-size={w},{h}", "--window-position=0,0", f"--app={url}"])
+                           *extra,
+                           f"--window-size={w},{h}", "--window-position=0,0", f"--app={url}"], job=job)
         st = update_manifest(state_file(name), {
-            "pid": pid, "port": port, "url": url, "profile": str(prof), "at": time.time()})
+            "pid": pid, "port": port, "url": url, "profile": str(prof), "at": time.time(),
+            **({"local_paint_switches": extra} if local_only else {})})
         if wait_cdp(port, 30):
             break
         # ran 16 Oct: with a profile folder Edge has not seen, the first start exits without a window; the second runs
@@ -657,6 +695,9 @@ def open_edge(name, url, size="1500x900", tries=2, viewport=True):
     # closes what it opened and says how far it got. Nothing is retried.
     stage = "the window"
     try:
+        if before_cdp is not None:
+            stage = "the verifier before DevTools"
+            before_cdp(st)
         for _ in range(50):                        # the window, and the page drawn
             if [x for x in top_windows(name) if x[4] and x[3] and x[5][2] > 50]:
                 break
