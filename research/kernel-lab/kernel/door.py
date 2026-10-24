@@ -16,6 +16,7 @@ import argparse
 import hmac
 import json
 import os
+import sys
 import threading
 import time
 import urllib.error
@@ -119,9 +120,77 @@ def make_handler(kernel, entry, secret):
                 return None, "this account has not joined the place yet"
             return kernel.actor_for(pid, who.get("agent")), None
 
+        def _raw(self, code, data, ctype, extra=()):
+            self.send_response(code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Content-Length", str(len(data)))
+            for k, v in extra:
+                self.send_header(k, v)
+            self.end_headers()
+            self.wfile.write(data)
+
+        def _stream(self, since):
+            """Server-sent events: one `world` message per record, carrying only its number (what changed is read
+            through the scene, with who-sees applied), and the happenings the reader may see as `happen`."""
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            actor, _ = self._actor()
+            seq = since if since is not None else len(kernel.log.records)
+            hap = len(kernel.happenings)
+            try:
+                self.wfile.write(b": the kernel's stream\n\n")
+                self.wfile.flush()
+                while True:
+                    with kernel.changed:
+                        if len(kernel.log.records) == seq and len(kernel.happenings) == hap:
+                            kernel.changed.wait(15)
+                    n = len(kernel.log.records)
+                    out = b""
+                    while seq < n:
+                        seq += 1
+                        out += f"id: {seq}\nevent: world\ndata: {json.dumps({'seq': seq})}\n\n".encode()
+                    for h in kernel.happenings[hap:]:
+                        if actor is not None and kernel.may_hear(actor.person, h):
+                            out += f"event: happen\ndata: {json.dumps(kernel.happening_for(actor.person, h))}\n\n".encode()
+                    hap = len(kernel.happenings)
+                    self.wfile.write(out or b": still here\n\n")
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+                return
+
         def do_GET(self):
-            if self.path == "/health":
+            from urllib.parse import parse_qs, urlparse
+            u = urlparse(self.path)
+            q = {k: v[0] for k, v in parse_qs(u.query).items()}
+            if u.path == "/health":
                 return self._send(200, {"ok": True, "records": len(kernel.log.records)})
+            if u.path in ("/door/stream", "/stream"):
+                last = self.headers.get("Last-Event-ID") or q.get("since")
+                return self._stream(int(last) if last and last.isdigit() else None)
+            if u.path == "/dev/signin" and kernel.dev_sessions is not None:
+                # dev only (start_kernel.py --dev-entry): sets the session cookie on this loopback origin, then goes on
+                tok = q.get("token", "")
+                nxt = q.get("next", "/lens.html")
+                if self.client_address[0] not in ("127.0.0.1", "::1") or tok not in kernel.dev_sessions() \
+                        or not nxt.startswith("/"):
+                    return self._send(403, {"error": "not a dev session"})
+                return self._raw(302, b"", "text/plain", [("Location", nxt), (
+                    "Set-Cookie", f"agora_session={tok}; HttpOnly; SameSite=Lax; Path=/")])
+            if u.path == "/api/version":
+                return self._send(200, painter.version_info())
+            if u.path in ("/api/scene", "/api/style"):
+                actor, why = self._actor()
+                if actor is None:
+                    return self._send(401, {"error": why, "refused": why})
+                fn = painter.scene if u.path == "/api/scene" else painter.style
+                return self._send(200, fn(actor.person, q))
+            from .painter import static_file
+            got = static_file(u.path)
+            if got:
+                return self._raw(200, got[0], got[1])
             self._send(404, {"error": "no such route"})
 
         def do_POST(self):
@@ -155,16 +224,39 @@ def make_handler(kernel, entry, secret):
                                  mode="see" if self.path == "/see" else "do")
                 out["as"] = kernel.name(actor.id)
                 return self._send(200, out)
+            if self.path in ("/api/do", "/api/observe", "/api/selection"):
+                actor, why = self._actor()
+                if actor is None:
+                    return self._send(401, {"error": why})
+                if self.path == "/api/do":
+                    if not str(body.get("line") or "").strip():
+                        return self._send(400, {"error": "an empty line"})
+                    return self._send(200, painter.do(actor, body))
+                if self.path == "/api/observe":
+                    return self._send(200, {"ok": True, "kept": 0})       # a page's report: not kept on the kernel yet
+                return self._send(200, {"error": "selection snapshots are not on the kernel yet"})
+            if self.path == "/api/style":
+                from .painter import desk_modules
+                return self._send(200, desk_modules()["style"].for_painter({"text": str(body.get("text", ""))},
+                                                                         body.get("theme")))
             self._send(404, {"error": "no such route"})
 
+    from .painter import Facade
+    painter = Facade(kernel)
     return Handler
 
 
+class Server(ThreadingHTTPServer):
+    # On Windows SO_REUSEADDR lets a second server bind a port another already holds, and requests then go to either:
+    # a taken port must fail loudly instead (found 23 Oct: a stand-in shared 8818 with the entry service's fake Google)
+    allow_reuse_address = sys.platform != "win32"
+    daemon_threads = True
+
+
 def serve(kernel, entry_url, secret, port, root, cache_s=SESSION_CACHE_S):
+    srv = Server(("127.0.0.1", port), make_handler(kernel, EntryClient(entry_url, secret, cache_s), secret))
     host = Host(kernel, root)
     host.reconcile()
-    srv = ThreadingHTTPServer(("127.0.0.1", port),
-                              make_handler(kernel, EntryClient(entry_url, secret, cache_s), secret))
     srv.daemon_threads = True
     return srv, host
 

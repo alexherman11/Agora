@@ -11,7 +11,7 @@ import json
 import os
 import secrets
 import threading
-import time
+import time  # noqa: F401  (holds keep their start time)
 from pathlib import Path
 
 from . import lines as L
@@ -71,6 +71,7 @@ class Kernel:
     def __init__(self, world_dir, genesis=None):
         self.dir = Path(world_dir)
         self.lock = threading.RLock()
+        self.changed = threading.Condition()
         self.log = Log(self.dir)
         self.state = self.log.replay()
         self.keep_dir = self.dir / "keep"
@@ -83,6 +84,9 @@ class Kernel:
         self.seen = {}                                 # actor id -> {thing: {aspect: seq}}; beside the world
         self.notices = []                              # what stewards should be told (a module offer that no longer fits)
         self.modules = None                            # set by attach_modules
+        self.happenings = []                           # delivered, not recorded (SHAPE section 5); in memory
+        self.leases, self.leases_made = {}, []         # holds: momentary, in memory (SHAPE section 5)
+        self.dev_sessions = None                       # start_kernel.py --dev-entry: a callable -> {token: session}
         if not self.log.records:
             if genesis is None:
                 raise ValueError("an empty world needs a genesis")
@@ -143,6 +147,14 @@ class Kernel:
             tx.set(gid, "name", grp["name"])
             tx.set(gid, f"in:{place}", 1)
             tx.set(gid, f"member:{steward}", "leader")
+        for th in g.get("things", []):
+            # things the steward founds the world with: lenses, styles, a taskbar's buttons. Same rules as `make`.
+            tid = tx.mint()
+            for k2, v in th.items():
+                if k2 not in ("in",):
+                    tx.set(tid, k2, v)
+            tx.set(tid, "made_by", steward)
+            tx.set(tid, f"in:{place}", 1)
         for m in g.get("modules", []):
             mid = tx.mint()
             tx.set(mid, "kind", "module")
@@ -223,8 +235,8 @@ class Kernel:
         """The thing as `reader` (a person id) may see it, or None. Every read passes here (SHAPE section 7). Sealed
         likes are shown only as a count."""
         a = self.state.things.get(t)
-        if a is None or t == "world":
-            return None
+        if a is None or t == "world" or a.get("forgotten"):
+            return None                 # a forgotten thing is out of every view; undo of the forget brings it back
         if not self._sees(reader, a.get("sees", "place"), t):
             return None
         out = {}
@@ -360,7 +372,19 @@ class Kernel:
         if saw is not None:
             if t not in saw:
                 raise Refused(f"{t} was not among what was read before acting on it; nothing was done")
-            if self.state.rev.get(t, 0) > int(saw[t]):
+            s = saw[t]
+            if isinstance(s, dict):
+                # a painted gesture: stale only if what it read, or what it writes, changed since it was painted
+                rev = int(s.get("rev", 0))
+                for a in set(aspects) | set(s.get("aspects") or []):
+                    names = [x for x in self.state.things.get(t, {}) if x.startswith(a[:-1])] if a.endswith("*") \
+                        else [a]
+                    last = max([self.state.last_seq(t, x) for x in names] + [0])
+                    if last > rev:
+                        raise Refused(f"stale: {t} changed since it was painted ({a.rstrip(':*')}, r{last}); "
+                                      f"nothing was done. The view will repaint.")
+                return
+            if self.state.rev.get(t, 0) > int(s):
                 raise Refused(f"stale: {t} changed since it was read (now at r{self.state.rev.get(t)}); nothing was done")
             return
         m = self.seen.get(actor.id, {}).get(t)
@@ -381,7 +405,76 @@ class Kernel:
         rec = self.log.append(rec)
         for p in rec["parts"]:
             self.state.apply(p["facts"], rec["seq"])
+        for p in rec["parts"]:
+            if rec.get("entry") or rec.get("via") in ("offer", "sign-in"):
+                self._happen({"word": p["word"], "target": p.get("target"), "by": rec["by"], "for": rec.get("for"),
+                              "text": p.get("words", ""), "record": rec["seq"]})
+        with self.changed:
+            self.changed.notify_all()                    # pages' streams wake on every record
         return rec
+
+    # ------------------------------------------------------------------ hear (SHAPE section 5)
+    def _happen(self, h):
+        h["n"] = len(self.happenings) + 1
+        self.happenings.append(h)
+        del self.happenings[:-2000]                      # momentary: the last 2000 are kept for streams catching up
+        if self.modules:
+            self.modules.deliver(h)
+        with self.changed:
+            self.changed.notify_all()
+
+    def announce(self, mid, word, target=None, text=""):
+        """A module says something happened outside the world (`window.opened`). Delivered, not recorded."""
+        with self.lock:
+            if not self.state.get(mid, "on") or not self._grant_names(mid, word):
+                return f"refused: {self.name(mid)} holds no grant to say {word}"
+            if target is not None and target not in self.state.things:
+                target = None
+            self._happen({"word": word, "target": target, "by": mid, "text": str(text)[:500], "announced": True})
+        return "ok"
+
+    def _grant_names(self, who, word):
+        return [g for g in self._grants_to(who) if self._matches(self.state.get(g, "words"), word)]
+
+    def may_hear(self, person, h):
+        """Who-sees for a happening: its thing must be one the reader may see."""
+        return h.get("target") is None or self.shown(person, h["target"]) is not None
+
+    def happening_for(self, person, h):
+        by = "someone" if h.get("by") == "sealed" else self.name(h.get("for") or h.get("by")) if h.get("by") else None
+        return {"n": h["n"], "word": h["word"], "target": h.get("target"), "by": by, "text": h.get("text", ""),
+                "record": h.get("record"), "announced": bool(h.get("announced"))}
+
+    def module_hears(self, mid, h):
+        """A module hears a word its grants name as `hear:<word or pattern>`, about a thing everyone in the place may
+        see (a module has no person of its own to see more as)."""
+        if h.get("by") == mid or not self.state.get(mid, "on"):
+            return False
+        if not any(self._matches(" ".join(w[5:] for w in (self.state.get(g, "words") or "").split()
+                                          if w.startswith("hear:")), h["word"]) for g in self._grants_to(mid)):
+            return False
+        t = h.get("target")
+        return t is None or (self.state.things.get(t) is not None and
+                             str(self.state.get(t, "sees", "place")) in ("place", "public"))
+
+    # ------------------------------------------------------------------ hold (SHAPE section 5)
+    def hold(self, mid, word):
+        with self.lock:
+            if not self.state.get(mid, "on") or not self._grant_names(mid, word):
+                return None, f"{self.name(mid)} holds no grant to hold {word}"
+            lease = f"h{len(self.leases_made) + 1}"
+            self.leases_made.append(lease)
+            self.leases[lease] = {"lease": lease, "word": word, "by": mid, "since": time.strftime("%H:%M:%S")}
+            self._happen({"word": "hold.began", "target": None, "by": mid, "text": f"{word} {lease}"})
+            return lease, None
+
+    def release(self, lease=None, mid=None):
+        with self.lock:
+            gone = [l for l, h in self.leases.items() if l == lease or (mid and h["by"] == mid)]
+            for l in gone:
+                h = self.leases.pop(l)
+                self._happen({"word": "hold.ended", "target": None, "by": h["by"], "text": f"{h['word']} {l}"})
+            return gone
 
     def undone(self):
         return {r["undoes"] for r in self.log.records if r.get("undoes")}
@@ -420,6 +513,9 @@ class Kernel:
     def step(self, actor, text, press=None, saw=None, mode="do"):
         from .words import KERNEL
         st = L.parse(text)
+        if st.word == "do" and text.strip()[2:].strip():
+            text = text.strip()[2:].strip()            # the desk's `do <word> …`, which every lens gesture says
+            st = L.parse(text)
         if not st.word:
             raise Refused("an empty line; help lists the words you may use")
         with self.lock:
@@ -456,7 +552,7 @@ class Kernel:
                     return fn(self, actor, st, entry, None, group)
                 tx = Tx(self)
                 tx.part(st.word, st.target, text)
-                res = fn(self, actor, st, entry, tx, group)
+                res = fn(self, actor, st, entry, tx, group, saw=saw)
                 if tx.empty:
                     return res
                 rec = self._commit_use(tx, actor, text, entry, press, saw, st)
@@ -514,6 +610,17 @@ class Kernel:
                                 {"target": st.target, "words": st.words, "kv": st.kv}, caller=actor)
         if ans.get("refused"):
             raise Refused(f"{mname}: {ans['refused']}")
+        if entry.get("word_kind") == "do" and ans.get("external"):
+            # it changed the outside world (a window opened), not the world: an act with its words and no facts,
+            # which undo refuses (SHAPE section 11)
+            with self.lock:
+                tx = Tx(self)
+                tx.part(st.word, st.target, text)
+                rec = self._commit(tx, by=mid, words=text, entry=entry["id"], press=press, external=True,
+                                   **{"for": actor.person, "via": "module"})
+            return {"text": f"ok {st.word} [r{rec['seq']}] · {ans.get('text') or 'done outside the world'}"
+                            f"\n~ by {self.name(mid)} for {self.name(actor.person)}; it touched the outside world, "
+                            f"so undo cannot take it back", "record": rec["seq"], "rows": ans.get("rows", [])}
         if entry.get("word_kind") == "see" or not ans.get("lines"):
             return {"text": ans.get("text", ""), "rows": ans.get("rows", [])}
         return self.admit(mid, actor, text, entry, ans, press)
@@ -586,8 +693,8 @@ class Kernel:
                     out.append(f"bound {word} to {eid}")
                     continue
                 kind = w.get("kind", "do")
-                if kind not in ("do", "see"):
-                    out.append(f"refused: {word} is a {kind} word; this skeleton publishes do and see words only")
+                if kind not in ("do", "see", "hear", "hold"):
+                    out.append(f"refused: {word} is a {kind} word; words are do, see, hear or hold")
                     continue
                 may = w.get("may") or "anyone"
                 if not all(t.strip() in MAY_WORDS for t in may.split(" or ")):
@@ -601,7 +708,8 @@ class Kernel:
                 tx.set(e, "takes", w.get("takes") or "")
                 tx.set(e, "help", w["help"].strip())
                 tx.set(e, "may", may)
-                tx.set(e, "undo", "yes")
+                tx.set(e, "undo", w.get("undo") if w.get("undo") in ("yes", "no", "external") else
+                       ("yes" if kind == "do" else "no"))
                 tx.set(e, "from", f"module:{self.state.get(mid, 'name')}")
                 tx.set(e, "bound", word)            # what the module answers to, whatever the entry is called later
                 tx.set(e, "lives", self.place)

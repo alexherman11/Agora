@@ -39,7 +39,22 @@ KERNEL_ENTRIES = [
        help="off <module>: stop a module and take back every grant it holds, in one act. undo turns it on again."),
     _k("status", "see", "<module>", "anyone", "no",
        help="status <module>: what a running module says it is doing."),
+    _k("holds", "see", "", "anyone", "no",
+       help="holds: what each running module holds now (an overlay, a stream), and since when."),
+    _k("make", "do","kind=<kind> [in=<group>] [k=<v> ...]", "members", "yes",
+       help="make kind=<kind> [in=<group>] [name=… title=… text=…]: make a lasting thing of any kind: a lens, a button, "
+            "a sign-up slot.\nIts other k=v are its first facts. In a group it is seen by the group."),
+    _k("set", "do", "<id> k=<v> ...", "maker or leaders", "yes",
+       help="set <thing> k=v …: change facts on a thing you made (leaders: any in their group). k= with nothing "
+            "after it takes a fact away."),
+    _k("forget", "do", "<id>", "maker or leaders", "yes",
+       help="forget <thing>: take a thing out of every view. It is never erased: undo brings it back."),
 ]
+
+# aspects no line may write with make or set: what the kernel itself keeps, or derives
+RESERVED_KINDS = {"person", "agent", "module", "grant", "word", "invite", "world", "place", "group"}
+RESERVED = {"kind", "made_by", "for", "pinned", "forgotten", "sees", "lives", "from", "bound"}
+RESERVED_PREFIX = ("in:", "like:", "member:", "answer:", "sees.", "vote:", "claim:")
 
 FLOOR_HELP = {e["word"]: e["help"] for e in KERNEL_ENTRIES if e["word"] in FLOOR}
 
@@ -246,6 +261,8 @@ def undo(k, actor, st, entry, tx, group, saw=None):
         raise Refused(f"r{seq} is not an act of a word ({rec.get('words')}); it cannot be undone")
     if rec.get("undoes"):
         raise Refused(f"r{seq} is itself an undo; there is no redo")
+    if rec.get("external"):
+        raise Refused(f"r{seq} touched the outside world ({rec.get('words')}); undo cannot take that back")
     if seq in undone:
         raise Refused(f"r{seq} is already undone")
     if k.state.get(rec["entry"], "undo") in ("no", "external"):
@@ -296,5 +313,66 @@ def status(k, actor, st, entry, tx, group, saw=None):
     return {"text": f"{name}: {said}" if said else f"{name} did not say what it is doing within 2 s"}
 
 
-KERNEL ={"look": look, "help": help_, "post": post, "like": like, "pin": pin, "undo": undo, "off": off,
-          "status": status}
+def _writable(k, kv):
+    for key in kv:
+        if key in RESERVED or key.startswith(RESERVED_PREFIX) or not re.match(r"^[a-z_][a-z0-9_.-]*$", key):
+            raise Refused(f"{key} is not a fact a line may write; the kernel keeps it")
+
+
+def make(k, actor, st, entry, tx, group, saw=None):
+    kv = dict(st.kv)
+    kind = kv.pop("kind", "")
+    kv.pop("in", None)
+    if not re.match(r"^[a-z][a-z0-9_-]{0,31}$", kind or ""):
+        raise Refused("make needs kind=<a plain word>: make kind=button name=Feed")
+    if kind in RESERVED_KINDS:
+        raise Refused(f"a {kind} is made by the kernel, not by make")
+    _writable(k, kv)
+    t = tx.mint()
+    tx.set(t, "kind", kind)
+    for key, v in kv.items():
+        if v != "":
+            tx.set(t, key, v)
+    if st.words and "text" not in kv:
+        tx.set(t, "text", st.words)
+    tx.set(t, "made_by", actor.id)
+    if actor.id != actor.person:
+        tx.set(t, "for", actor.person)
+    tx.set(t, f"in:{group}", len(k.log.records) + 1)
+    if group != k.place:
+        tx.set(t, "sees", f"group:{group}")
+    return {"text": f"ok make {t} [r?] · a {kind}" + (f" in {k.name(group)}" if group != k.place else "")}
+
+
+def set_(k, actor, st, entry, tx, group, saw=None):
+    t = st.target
+    if k.state.get(t, "kind") in RESERVED_KINDS:
+        raise Refused(f"{t} is a {k.state.get(t, 'kind')}; set changes only things made with make")
+    if not st.kv:
+        raise Refused("set needs k=v: set <thing> label=Feed")
+    _writable(k, st.kv)
+    k.fence(actor, t, list(st.kv), saw)
+    for key, v in st.kv.items():
+        if v != "":
+            tx.set(t, key, v)
+        else:
+            tx.set(t, key)                      # k= with nothing after it: the fact goes
+    return {"text": f"ok set {t} [r?] · " + ", ".join(f"{a}={v}" if v else f"{a} taken away" for a, v in st.kv.items())}
+
+
+def forget(k, actor, st, entry, tx, group, saw=None):
+    t = st.target
+    if k.state.get(t, "kind") in RESERVED_KINDS:
+        raise Refused(f"{t} is a {k.state.get(t, 'kind')}, which forget does not take")
+    tx.set(t, "forgotten", actor.person)
+    return {"text": f"ok forget {t} [r?] · out of every view; undo brings it back"}
+
+
+def holds(k, actor, st, entry, tx, group, saw=None):
+    rows = [dict(h, by=k.name(h["by"])) for h in k.leases.values()]
+    text = "\n".join(f"  {r['by']} holds {r['word']} ({r['lease']}) since {r['since']}" for r in rows)
+    return {"text": ("holds:\n" + text) if rows else "nothing is held", "rows": rows}
+
+
+KERNEL = {"look": look, "help": help_, "post": post, "like": like, "pin": pin, "undo": undo, "off": off,
+          "status": status, "make": make, "set": set_, "forget": forget, "holds": holds}

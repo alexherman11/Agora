@@ -81,6 +81,16 @@ class ModuleProcess:
                 if p is not None:
                     p["answer"] = msg
                     p["event"].set()
+            elif t == "happen":
+                said = k.announce(self.mid, str(msg.get("word") or ""), msg.get("target"), msg.get("text") or "")
+                if said != "ok":
+                    self.send({"t": "refused", "about": "happen", "word": msg.get("word"), "why": said})
+            elif t == "hold":
+                lease, why = k.hold(self.mid, str(msg.get("word") or ""))
+                self.send({"t": "held", "use": msg.get("use"), "word": msg.get("word"),
+                           **({"lease": lease} if lease else {"refused": why})})
+            elif t == "release":
+                k.release(lease=msg.get("lease"))
         self.stdout_closed.set()
         for p in list(self.pending.values()):
             p["event"].set()                       # the process ended: every open call is answered by its absence
@@ -148,6 +158,7 @@ class Host:
                     p = self.procs.pop(mid)
                     if mid in want:                    # on, but its process ended by itself: it died
                         self.died[mid] = (time.time(), (p.err[-1] if p.err else ""))
+                    k.release(mid=mid)                 # whatever it held ends with it
                     threading.Thread(target=p.stop, daemon=True).start()
             for mid, run in want.items():
                 d = self.died.get(mid)
@@ -159,6 +170,13 @@ class Host:
                         grants = [k.state.get(g, "words") for g in k.things("grant")
                                   if k.state.get(g, "to") == mid and not k.state.get(g, "revoked")]
                     p.send({"t": "hello", "module": k.state.get(mid, "name"), "grants": grants})
+
+    def deliver(self, h):
+        """A happening, to every running module that hears its word (SHAPE section 5)."""
+        k = self.kernel
+        for mid, p in list(self.procs.items()):
+            if p.alive() and k.module_hears(mid, h):
+                p.send({"t": "happen", **k.happening_for(None, h)})
 
     def wait_offered(self, mid, timeout=10):
         p = self.procs.get(mid)

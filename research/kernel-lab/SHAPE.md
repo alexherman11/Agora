@@ -295,6 +295,55 @@ The skeleton the task names, in `research/kernel-lab/`, on loopback (not 8794), 
 5. **The painter test's timing.** I propose the lens compiler facade as the slice right after the skeleton, because it decides whether this direction holds. Should it come first instead?
 6. **SEAM.md and DICTIONARY-ENTRY.md did not exist when I wrote this.** My notes for both are in the appendices below, and I'll move them into those files once the sibling stories write them.
 
+## 17. The contracts, as built (kept current for the builders who depend on them)
+
+*Section 10 and 11 above are the design; this section is what the code answers today. Last checked against `kernel/` on 23 Oct 2026, 24 tests passing (**ran**). Anything not listed here is not built.*
+
+### Running it
+
+- `python research/kernel-lab/start_kernel.py --world <dir> --genesis <file> --port 8810 [--entry http://127.0.0.1:8817 | --dev-entry 8811]`. Loopback only. A taken port fails loudly (on Windows the kernel turns `SO_REUSEADDR` off, which otherwise lets two servers share a port).
+- An empty `--world` is founded from `--genesis`: `{tag, name, steward: {account, name}, invites_counted_by: entry|kernel, invites?, groups?: [{name}], things?: [{kind, …aspects}], modules?: [{name, run: [argv], publishes: "ns.*", grants: "words …"}]}`. A module's `run` words that name a file beside the genesis file are made absolute.
+- `--dev-entry 8811`: a loopback stand-in for sign-in, reading `<world>/keep/dev-sessions.json` (`{"<token>": {"account": "<id>", "agent": "<label>"?}}`, written by you, never committed). `GET /dev/signin?token=<t>&next=/lens.html?…` sets the session cookie for a page on the kernel's origin. Exists only with `--dev-entry`.
+- A process started from a Claude Code session dies with that session. A kernel meant to outlive it must be started outside the session's job (memory: windows-host-gotchas).
+
+### The door
+
+| Route | Who | Answer |
+|---|---|---|
+| `POST /do {line, press?, saw?}` | a session | `{ok, text, rows, records, made, as}`; a refusal is `ok: false` with `refused: …` in `text` |
+| `POST /see {line}` | a session | the same, for see words only; no record |
+| `GET /stream` and `GET /door/stream` | a session | server-sent events: `event: world` with `{seq}` per record (no content); `event: happen` with `{n, word, target, by, text, record, announced}` for each happening the reader may see |
+| `GET /api/scene?lens=<name>&view=painter[&have=<gen>]` | a session | lens.js's scene, built by the desk's compiler from what the reader may see: `{scene, text, events_total, gen}`, `{same, gen}`, or `{refused}` |
+| `GET /api/style?name=<style>` · `POST /api/style {text}` | a session · anyone | the style's source and `looks` (the desk's `style.py`) |
+| `GET /api/version` | anyone | `{code: "kernel", painter: <hash of desk-shell>, shape: 1}` |
+| `POST /api/do {line, observed, gesture}` | a session | a painted press: its desk ids are put back as kernel ids, `observed` becomes `saw`, `gesture` is the press id. `{text, error, line, events_total, as, created}` |
+| `POST /api/observe` | a session | `{ok, kept: 0}`: accepted, not kept |
+| `POST /keep/account {account, name, invite, answers, agent?}` | the entry service: loopback, `X-Kernel-Secret` | `{person, new, actor}` or 403 `{refused}` |
+| `GET /health` | anyone | `{ok, records}` |
+| any other `GET` | anyone | a file of `research/text-desk-lab/notation/desk-shell/`, read-only (`/lens.html`, `/lens.js`, …) |
+
+Who acts: the `agora_session` cookie (`__Host-agora_session` on https), or `Authorization: Bearer <token>` for programs; the kernel asks the entry service. A POST with an `Origin` that is not the kernel's own is refused. A body's `as` is ignored everywhere.
+
+**Lines.** `word [target] [k=v …] [words]`; `;` or a newline outside quotes separates lines; a leading `do` is accepted. A value with spaces is quoted, and its own `"` and `\` are escaped (`text="say \"hi\""`), as on the desk. Ids are `<tag><n>` (`sb42`); records are `r<n>`.
+
+**Words** (each has an entry; `help` lists them): `look [<id>]`, `help [<word>]`, `post <words> [in=<group>]`, `like <id>`, `pin <id>`, `undo [r<n>]`, `make kind=<k> [in=<group>] [k=v …]`, `set <id> k=v …` (`k=` alone takes a fact away), `forget <id>`, `off <module>`, `status <module>`, `holds`. `make` and `set` may not write `kind made_by for pinned forgotten sees lives from bound` or `in: like: member: answer: sees. vote: claim:` facts.
+
+**A painted view.** A lens is a thing `make kind=lens name=<name> text=<lens text>` (or a genesis `things` entry). In it every kernel thing the reader may see is a desk subject: `title` from its title, name, label or the first line of its text; `text`; tag = its kind; its other facts as props, plus `by` (who made it), `pinned` (by whom) and, for a post, `likes`. Groups and the place are column surfaces; a thing is placed in each group it is in. Desk ids are fixed by kernel numbers: `sb42` is subject `s42`, its appearances `a336…a343`, and a group `f42`. Not carried into a view: events (`by changed`, `age<`), comments, links, the house's rows, promises.
+
+### The module protocol (stdin and stdout, one JSON object per line, each with a type `t`)
+
+| From the kernel | From the module |
+|---|---|
+| `hello {module, grants: ["words …"]}` | `offer {words: [{word, kind: do\|see\|hear\|hold, takes, help, may?, undo?}]}`: published only in its namespace, only with help, only if absent (an existing entry is bound by `from` and `bound`, never overwritten) |
+| `call {use, word: <bound name>, args: {target, words, kv}, caller: {id, person, name}}` | `see {use, line}` → kernel answers `rows {use, text, rows, refused?}` (read as the caller narrowed to the module) |
+| | `answer {use, text?, rows?}` for a see word; `answer {use, lines: […], saw: {<id>: <rev>}}` for a do word (one use, one record, admitted only if `saw` still holds); `answer {use, external: true, text}` for a do word that changed the outside world (a record with words and no facts; undo refuses it); `answer {use, refused}` |
+| `happen {n, word, target, by, text, record, announced}`: words its grants name as `hear:<word or ns.*>`, about things everyone in the place may see | `happen {word, target?, text?}`: announced, delivered, not recorded; needs a grant on that word |
+| `held {use?, word, lease}` or `held {…, refused}` | `hold {use?, word}`: needs a grant on the word; leases are in memory, listed by `holds`, ended by `release {lease}`, by `off`, or by the process ending; `hold.began` / `hold.ended` are happenings |
+| `status? {use}` | `status {use, doing}` (2 s) |
+| `off` | it exits; after 2 s the kernel ends it. A module that dies rests 30 s before it is started again |
+
+Grants are `words` strings on a grant thing (`"look pin tally.* hear:window.* overlay"`); `*` matches all. A call not answered in 10 s is refused.
+
 ## Appendix A. Notes for the sign-in seam (for `site/SEAM.md`)
 
 From the kernel, for story a13313, written after reading `agora_entry/db.py` and `config.py`:
