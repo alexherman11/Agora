@@ -1,0 +1,16 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Agora bar</title>
+<!-- A bar (a lens on a screen edge): lens.js itself, unchanged, in a frame. lens.html keeps a 2em status row under its
+     painting, which would leave a 40px bar 10px to paint in; the frame is made taller than the window so that row falls
+     outside it and the lens has the whole bar. Nothing scrolls: the lens says `scroll none`. (Claude, a13428, 24 Oct) -->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #F4F1EA; }
+  iframe { display: block; border: 0; width: 100%; height: calc(100% + 48px); background: #F4F1EA; }
+</style></head>
+<body>
+<iframe id="lens" title="bar" scrolling="no"></iframe>
+<script>
+const q = new URLSearchParams(location.search);
+document.getElementById("lens").src = `/lens.html?lens=${encodeURIComponent(q.get("lens") || "")}&inspect=0`;
+</script>
+</body></html>

@@ -1,0 +1,19 @@
+root : row, role bar
+  scroll none
+  left : row, role group, of tag:widget as w, by order, each wl
+    share 1
+  right : row, role group, of tag:widget as w, by order, each wr
+wl : row, role pill
+  only when $bar = "top" and $side = "left"
+  on click when $does != "" do $does
+  l : text "$label", role label
+  v : text "$value", role focus
+wr : row, role pill
+  role pill.time when $shows = "time"
+  role pill.feed when $shows = "feed"
+  role pill.play when $shows = "media"
+  only when $bar = "top" and $side = "right" and not ($shows = "battery" and $value = "")
+  on click when $does != "" do $does
+  l : text "$label", role label
+  v : text "$value", role value
+  d : text "$detail", role detail

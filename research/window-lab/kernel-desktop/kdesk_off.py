@@ -14,7 +14,8 @@ import subprocess
 import time
 from ctypes import wintypes as wt
 
-MINE = ("kernel-desktop\\kdesk.py", "kdesk.py --","kernel-desktop\\kd_window.py", "kernel-desktop\\kd_guy.py")
+MINE = ("kernel-desktop\\kdesk.py", "kdesk.py --", "kernel-desktop\\kd_window.py", "kernel-desktop\\kd_guy.py",
+        "kernel-desktop\\kd_system.py", "kernel-desktop\\kd_media.py")
 
 
 def processes():

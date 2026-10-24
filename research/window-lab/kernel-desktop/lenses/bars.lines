@@ -1,0 +1,15 @@
+# The top bar's widgets, said as lines by Alex's agent (Claude, PROOF a13428, 24 Oct 2026). Each is a world thing:
+# `forget <id>` removes one, `set <id> order=<n>` moves it, `set <id> side=left` moves it across.
+# The lens (topbar) and its style (bars) are made from topbar.lens and bars.style beside this file.
+make kind=widget bar=top side=left shows=apps label=Open order=10
+make kind=widget bar=top side=left shows=focused label=Now order=20
+make kind=widget bar=top side=right shows=media label=♫ order=30 does="media.play"
+make kind=widget bar=top side=right shows=next label=⏭ order=31 does="media.next"
+make kind=widget bar=top side=right shows=cpu label=CPU order=40
+make kind=widget bar=top side=right shows=memory label=MEM order=50
+make kind=widget bar=top side=right shows=network label=NET order=60
+make kind=widget bar=top side=right shows=volume label=VOL order=70
+make kind=widget bar=top side=right shows=battery label=BAT order=80
+make kind=widget bar=top side=right shows=feed label=Feed order=90 does="window.open feed"
+make kind=widget bar=top side=right shows=time order=100
+window.open topbar edge=top

@@ -2,28 +2,32 @@
 <html><head><meta charset="utf-8"><title>Agora taskbar</title>
 <link rel="stylesheet" href="kd.css">
 <style>
-  body { flex-direction: row; align-items: center; gap: 6px; padding: 0 10px; border: 0; border-top: 1px solid var(--line);
-         background: linear-gradient(#FFFFFF, var(--paper)); user-select: none; }
-  .mark-btn { font-weight: 700; letter-spacing: .04em; color: var(--accent); border: 0; background: transparent; padding: 4px 10px;
-              border-radius: 6px; cursor: pointer; font-size: 15px; }
-  .mark-btn:hover { background: rgba(63, 93, 115, .10); }
-  .sep { width: 1px; align-self: stretch; margin: 9px 4px; background: var(--faint); }
-  .group { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; }
-  .chip { display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 7px; border: 1px solid transparent;
-          background: transparent; cursor: pointer; color: var(--quiet); font-size: 13.5px; white-space: nowrap; }
-  .chip:hover { background: var(--card); border-color: var(--faint); }
-  .chip.front { background: var(--card); border-color: var(--line); color: var(--ink); }
-  .chip.front::after { content: ""; width: 14px; height: 2px; background: var(--accent); border-radius: 2px; margin-left: -2px; }
-  .chip.tucked { color: var(--hush); font-style: italic; }
+  /* 24 Oct: restyled to match the top bar (lenses/bars.style): a warm paper strip of pills. Same parts as before. */
+  body { flex-direction: row; align-items: center; gap: 8px; padding: 0 10px; border: 0; border-top: 1px solid var(--faint);
+         background: #F4F1EA; user-select: none; }
+  .mark-btn { font-weight: 700; letter-spacing: .04em; color: var(--accent); border: 1px solid rgba(63, 93, 115, .25);
+              background: rgba(63, 93, 115, .12); padding: 3px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; height: 32px; }
+  .mark-btn:hover { background: rgba(63, 93, 115, .20); }
+  .sep { width: 1px; align-self: stretch; margin: 12px 2px; background: var(--faint); }
+  .group { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+  .chip { display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 8px;
+          border: 1px solid rgba(31, 42, 51, .10); background: #FFFFFF; cursor: pointer; color: rgba(31, 42, 51, .82);
+          font-size: 13.5px; white-space: nowrap; }
+  .chip:hover { background: rgba(63, 93, 115, .08); }
+  .chip.front { border-color: rgba(63, 93, 115, .35); color: #1F2A33; box-shadow: inset 0 -2px 0 var(--accent); }
+  .chip.tucked { color: rgba(31, 42, 51, .55); font-style: italic; background: transparent; }
   .chip .dot { width: 8px; height: 8px; border-radius: 2px; background: var(--accent); opacity: .8; }
-  .chip.pin .dot { background: var(--mark); border-radius: 50%; }
-  .chip.btn .dot { background: #5E8C61; }
+  .chip.pin { background: rgba(168, 93, 110, .10); border-color: rgba(168, 93, 110, .25); color: #7E3F4F; }
+  .chip.pin .dot { background: #A85D6E; border-radius: 50%; }
+  .chip.btn { background: rgba(94, 125, 99, .12); border-color: rgba(94, 125, 99, .28); color: #3E5A43; }
+  .chip.btn .dot { background: #5E7D63; }
   .grow { flex: 1; }
-  .hold { font-size: 12px; color: var(--mark); background: rgba(122, 92, 46, .10); padding: 2px 8px; border-radius: 4px; cursor: default; }
-  .clock { text-align: right; line-height: 1.15; padding: 0 6px; color: var(--ink); cursor: default; }
-  .clock b { display: block; font-size: 15px; font-weight: 600; }
-  .clock span { font-size: 11.5px; color: var(--hush); }
-  .off { border: 0; background: transparent; color: var(--hush); width: 30px; height: 30px; border-radius: 6px; cursor: pointer; font-size: 15px; }
+  .hold { font-size: 12px; color: var(--mark); background: rgba(122, 92, 46, .10); padding: 4px 10px; border-radius: 8px; cursor: default; }
+  .clock { text-align: right; line-height: 1.15; padding: 3px 12px; color: var(--accent); cursor: default; border-radius: 8px;
+           background: rgba(63, 93, 115, .12); }
+  .clock b { display: block; font-size: 14px; font-weight: 600; }
+  .clock span { font-size: 11px; color: rgba(31, 42, 51, .62); }
+  .off { border: 0; background: transparent; color: rgba(31, 42, 51, .62); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 15px; }
   .off:hover { background: #FBF1EC; color: var(--warn); }
   .off.ask { background: #FBF1EC; color: var(--warn); width: auto; padding: 0 10px; font-size: 12.5px; }
   .say { position: fixed; left: 50%; transform: translateX(-50%); bottom: 4px; font: 12px var(--mono); color: var(--hush); pointer-events: none; }
@@ -71,7 +75,7 @@ async function pins() {
 async function wins() {
   const r = await see("window.list");
   const num = (id) => parseInt(String(id).replace(/\D/g, ""), 10) || 0;
-  const rows = (r.rows || []).filter((w) => w.kind === "window" && w.shows !== "taskbar").sort((a, b) => num(a.id) - num(b.id));   // a steady order, as Windows keeps its own
+  const rows = (r.rows || []).filter((w) => w.kind === "window" && w.shows !== "taskbar" && !w.edge).sort((a, b) => num(a.id) - num(b.id));   // a steady order, as Windows keeps its own
   const box = document.getElementById("wins");
   box.replaceChildren(...rows.map((w) => el("button", {
       cls: `chip${w.front ? " front" : ""}${w.shown ? "" : " tucked"}`, title: `${w.name}: click to bring forward or tuck away`,

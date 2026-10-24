@@ -6,12 +6,47 @@ Alex, before leaving on 23 Oct: "When i get back i hope that some agora native w
 
 ## What is on the screen
 
-- **The Agora taskbar**, a thin strip along the bottom, just above the Windows taskbar. Left: *Agora* (opens Lines), then the buttons and pinned things that are on it (world things with `bar=taskbar`), then the Agora windows that are open (click: bring forward, or tuck away). Right: who holds a surface (*guy · window.overlay*), a clock, and ⏻ (click twice: `off window`). The strip is reserved through the shell (an AppBar), so maximized windows stop above it; it hides while a program is full screen.
+- **The top bar** (24 Oct), in the manner of the status bars komorebi-bar, YASB and Zebar: a light bar of pills along the top edge. Left: the programs open, grouped (*Terminal 3 · Chrome · …*), and the window in front. Right: the song playing (click: play or pause; ⏭ next), CPU, memory, network, volume, battery when there is one, the Feed's new posts (click: open the Feed), and the date and time. It is **a lens painted by lens.js**, and every pill is **a world thing made by one line** (below). The bar is reserved through the shell like the strip, so maximised windows sit between the two bars.
+- **The Agora taskbar**, restyled on 24 Oct to match the top bar's pills (the same parts as before), a thin strip along the bottom, just above the Windows taskbar. Left: *Agora* (opens Lines), then the buttons and pinned things that are on it (world things with `bar=taskbar`), then the Agora windows that are open (click: bring forward, or tuck away). Right: who holds a surface (*guy · window.overlay*), a clock, and ⏻ (click twice: `off window`). The strip is reserved through the shell (an AppBar), so maximized windows stop above it; it hides while a program is full screen.
 - **The Feed**, an app window: the place's feed as a **lens painted by lens.js itself, unchanged**, through the kernel's own painter routes. ♥ likes (sealed), *pin* pins (leaders), *to taskbar* puts the post on the taskbar.
 - **The little guy**, a 16×16 pixel person in the desk's colours who walks along the top of the taskbar, hops onto the tops of windows (Agora windows and other programs', never reading their titles), and says things in a bubble. He never takes a click or the focus, and hides while a program is full screen.
 - On demand: **Lines** (type any line to the kernel, see receipts and what happens), **Help** (every word you may use, with its help), **Thing** (one thing and its facts).
 
 ![The desktop: the Feed lens, the taskbar with a pinned post, the guy](evidence/desktop-lens-feed-and-taskbar.jpg)
+
+![The top bar's right side, live: the song, CPU, memory, network, volume, the feed, the clock](evidence/bars-top-right.png)
+
+## The bars (24 Oct)
+
+Alex: "Try to emulate or repurpose code from a komorebi style bar for the bottom and top of my homescreen. Preserve existing functionality while adding new functionality."
+
+**Made with words.** As Alex's agent I made the top bar with lines only (**ran**, live world r45 to r61). The style and the lens come from `lenses/bars.style` and `lenses/topbar.lens`, and the widgets from `lenses/bars.lines`:
+
+```
+make kind=style name=bars text="<lenses/bars.style>"
+make kind=lens name=topbar style=bars text="<lenses/topbar.lens>"
+make kind=widget bar=top side=right shows=cpu label=CPU order=40
+make kind=widget bar=top side=right shows=media label=♫ order=30 does="media.play"
+...
+window.open topbar edge=top
+```
+
+To add a pill, say one `make kind=widget ...`. `set <id> order=5 side=left` moves one, and `forget <id>` takes it away (`undo` brings it back). `window.open <lens> edge=top|bottom` makes any lens a bar, one per edge (**ran**, hidden checks).
+
+**Live readings are not facts.** What a pill shows now (CPU 27%, the song) changes every two seconds. Writing it into the log would bury the world. So two new modules write `<world>/modules/<name>/live.json`:
+- `system` (`kd_system.py` over `sysread.py`) for CPU, memory, network, volume, battery, the window in front and the programs open.
+- `media` (`kd_media.py` over window-lab's `media.py`, unchanged) for the song, through Windows' media session.
+
+When the painter builds a scene, `live.py` gives each widget the values of the key it `shows`. The time and the Feed's new-post count are worked out there from the clock and the world. Nothing is recorded (**ran**: the log did not grow while readings arrived). lens.js repaints on its usual 1.5 s check. The modules also answer `system.now` and `media.now` (see), and `media.play`, `media.next` and `media.prev` (do: they touch the outside world, so undo refuses them). The title of the window in front is shown on Alex's own bar and never written into the world.
+
+**The look**, emulated, not copied. komorebi's licence is not open source and Zebar is GPL, so no code of either is here. YASB is MIT; nothing of its code is used either, only the common idea of a bar of rounded pills with a label and a value. The colours are the desk's calm palette on warm paper, with slate, sage and rose tints: light, never black on black. Only the clock and the readings change; the lens says `scroll none`, so nothing scrolls.
+
+**Off, and the screen given back** (**ran**, the work area measured):
+- With the bars: top 60, bottom 2022.
+- After `kdesk_off.py`: 0 and 2088, as before the desktop started.
+- After `stop window`: 0 and 2088; `undo` gives 60 and 2022 again.
+
+`off system` and `off media` stop the readings; their pills then show nothing.
 
 ## On and off
 
@@ -64,15 +99,19 @@ A button's `does` runs as whoever presses it. A pinned thing (`make kind=pin bar
 | File | What it is |
 |---|---|
 | `kdesk.py` | the process: kernel + extension, the door with `/desk/`, the sign-in stand-in, the genesis of Alex's desktop world |
-| `kd_window.py` | the window module and the desktop host: WebView2 windows, the AppBar strip, drags, closes, full-screen step-back |
+| `kd_window.py` | the window module and the desktop host: WebView2 windows, AppBars on the top and bottom edges, drags, closes, full-screen step-back |
+| `kd_system.py`, `sysread.py` | the system module (`system.now`, live readings) and its readings: ctypes only, nothing installed (`sysread.py` written by Codex from Claude's brief, reviewed and run here) |
+| `kd_media.py` | the media module: `media.play/next/prev/now` over window-lab's `media.py` |
+| `live.py` | the live layer: widgets carry module readings when painted, never recorded |
+| `lenses/topbar.lens`, `lenses/bars.style`, `lenses/bars.lines` | the top bar's lens, its style and its widgets, as made in the world |
 | `kd_guy.py`, `sprite.py` | the little guy: his module, his walking and hopping, his picture in a layered (per-pixel alpha) window |
 | `modproto.py` | the module protocol for a Python module |
-| `pages/` | the taskbar, the frame around a lens, Lines, Help, Thing |
+| `pages/` | the taskbar, the frame around a lens, the frame of a bar (`bar.html`), Lines, Help, Thing |
 | `lenses/feed.lens` | the feed lens, as made in the world (the world's copy is the truth) |
 | `kdesk_on.py`, `kdesk_off.py` | start detached (WMI, outside any session's job, under pythonw); stop everything and check the screen |
 | `kd_say.py` | say lines as Alex's agent (or `--as alex`) |
 | `press.py` | a real mouse click or drag, for demos |
-| `test_kdesk.py` | 12 hidden checks: fresh worlds, real HTTP, the modules as real processes in `--headless` mode |
+| `test_kdesk.py`, `test_sysread.py` | 15 + 10 hidden checks: fresh worlds, real HTTP, the modules as real processes in `--headless` mode; the readings' types, ranges and handles |
 | `state/` (ignored) | the live world (`state/world`, log and keep), `kdesk.log`, the modules' logs in `state/world/modules/<name>/stderr.log` |
 
 ## Evidence
@@ -90,6 +129,11 @@ A button's `does` runs as whoever presses it. A pinned thing (`make kind=pin bar
 
 ## What I found (rough spots, for the kernel and the next builder)
 
+- **Live aspects** (24 Oct): the kernel has no word for a value a module supplies that is shown but never recorded. `live.py` wraps the painter's `Facade.desk_for` for widgets; the kernel could carry it as a live aspect a thing asks for (`shows=cpu`).
+- **No install word**: a world founded before a module existed gets it from `after_genesis`, as the kernel's own record. An `install <module>` word for stewards would make that a line.
+- **lens.html keeps a 2em status row** under its painting, which leaves a 40 px bar 10 px to paint in. `pages/bar.html` frames lens.js taller than its window instead of changing lens.html.
+- **A missing value is absence**: a pill with no `shows` vanished under `only when $shows = ...`. Each widget now says what it shows.
+
 - pywebview's colour-key transparency failed after a window moved (a grey box around the guy, twice), so the guy is a layered window with per-pixel alpha, drawn by PIL, with no browser engine.
 - Setting `argtypes` on the shared `ctypes.windll.user32` breaks pywebview's own calls (its drag failed with a TypeError). Use a private `ctypes.WinDLL("user32")`.
 - pywebview enforces a 100-point minimum window height, so a 66-pixel strip came out 150 pixels tall and covered the Windows taskbar until `min_size` was set.
@@ -102,6 +146,8 @@ A button's `does` runs as whoever presses it. A pinned thing (`make kind=pin bar
 - kext.py (what this folder once added to the kernel: `rows`, verb notes, rules, a module acting on its own, narrowed grants, a fuller hello, module log files) was taken into the kernel item by item on 23 Oct and deleted; module logs are in `<world>/modules/<name>/stderr.log`.
 
 ## What is not done
+
+- The bars on a second monitor, and a real full-screen game with both bars, are not tried. The top bar's left side shows the programs open as one pill; one pill per program (click to bring it forward) needs a lens repeat over a live list.
 
 - Nothing starts the desktop when Windows starts. Adding it to the Startup folder (as Agora.lnk does for the home base) is one line, left for Alex or the coordinator to decide.
 - The taskbar is not a lens yet: it needs a clock and "which window is in front" as rows the painter can read. Posting from the Feed lens needs the composer, which the facade does not carry; posting is a line in Lines.

@@ -51,7 +51,8 @@ PORT = int(os.environ.get("AGORA_KDESK_PORT", "8810"))
 LENS_SIZE = (1180, 1500)        # a lens window's first size, in real pixels
 VIEWS = {"lines": ("Lines", (1500, 760)), "thing": ("Thing", (1000, 820)),
          "help": ("Help", (1200, 1300)), "taskbar": ("Agora taskbar", (0, 0))}
-BAR_H = 66
+BAR_H = 66                 # the Agora strip along the bottom, in pixels
+TOP_H = 60                 # a bar along the top (window.open <lens> edge=top)
 
 if sys.platform == "win32":
     # private handles: argtypes set on the shared ctypes.windll.user32 broke pywebview's own calls (ran 23 Oct)
@@ -118,8 +119,9 @@ class AppBar:
 
     CALLBACK = 0x8000 + 0x41
 
-    def __init__(self, height, placed):
+    def __init__(self, height, placed, edge="bottom"):
         self.height, self.placed, self.hwnd, self.rect, self.full = height, placed, None, None, False
+        self.edge = edge                                      # "bottom" (ABE_BOTTOM 3) or "top" (ABE_TOP 1)
         self.ready = threading.Event()
         self.stop_ev = threading.Event()
         shell32.SHAppBarMessage.restype = ctypes.c_size_t
@@ -129,15 +131,19 @@ class AppBar:
 
     def _data(self):
         d = self.DATA()
-        d.cbSize, d.hWnd, d.uCallbackMessage, d.uEdge = ctypes.sizeof(self.DATA), self.hwnd, self.CALLBACK, 3
+        d.cbSize, d.hWnd, d.uCallbackMessage = ctypes.sizeof(self.DATA), self.hwnd, self.CALLBACK
+        d.uEdge = 1 if self.edge == "top" else 3
         return d
 
     def _setpos(self):
         (mx, my, mw, mh), _ = monitor()
         d = self._data()
         d.rc = wt.RECT(mx, my, mx + mw, my + mh)
-        shell32.SHAppBarMessage(2, ctypes.byref(d))           # ABM_QUERYPOS: the shell moves it above its own taskbar
-        d.rc.top = d.rc.bottom - self.height
+        shell32.SHAppBarMessage(2, ctypes.byref(d))           # ABM_QUERYPOS: the shell moves it clear of other bars
+        if self.edge == "top":
+            d.rc.bottom = d.rc.top + self.height
+        else:
+            d.rc.top = d.rc.bottom - self.height
         shell32.SHAppBarMessage(3, ctypes.byref(d))           # ABM_SETPOS
         self.rect = (d.rc.left, d.rc.top, d.rc.right - d.rc.left, d.rc.bottom - d.rc.top)
         self.placed(self.rect, not self.full)
@@ -247,7 +253,7 @@ class GuiScreen(Screen):
         self.webview, self.module = webview, module
         self.wins = {}            # wid -> {"w": pywebview window, "hwnd": int, "view": str}
         self.closing = set()
-        self.bar = None
+        self.bars, self.bar_hidden = {}, {}     # wid -> AppBar, and whether it stepped back for a full-screen program
         self.lock = threading.Lock()
 
     def start(self, then):
@@ -261,7 +267,7 @@ class GuiScreen(Screen):
         x, y, w, h = box
         api = PageApi(self, wid)
         win = self.webview.create_window(title, url, js_api=api, x=int(x / s), y=int(y / s), width=max(200, int(w / s)),
-                                         height=max(30, int(h / s)), frameless=True, easy_drag=False, on_top=bar, min_size=(120, 24),
+                                         height=max(30, int(h / s)), frameless=True, easy_drag=False, on_top=bool(bar), min_size=(120, 24),
                                          background_color="#F6F3EC", text_select=True, hidden=True)
         rec = {"w": win, "hwnd": None, "view": view, "bar": bar}
         with self.lock:
@@ -274,7 +280,7 @@ class GuiScreen(Screen):
                 hwnd = user32.FindWindowW(None, title)
             rec["hwnd"] = hwnd
             if bar:
-                self._make_bar(wid, hwnd)
+                self._make_bar(wid, hwnd, bar)
             else:
                 user32.SetWindowPos(hwnd, None, x, y, w, h, SWP_NOZORDER)
             on_shown()
@@ -290,15 +296,15 @@ class GuiScreen(Screen):
                 self.wins.pop(wid, None)
                 mine = wid in self.closing
                 self.closing.discard(wid)
-            if rec.get("bar") and self.bar:
-                self.bar.remove()
-                self.bar = None
+            b = self.bars.pop(wid, None)
+            if b:
+                b.remove()
             if not mine:
                 on_closed()
         win.events.loaded += loaded
         win.events.closed += closed
 
-    def _make_bar(self, wid, hwnd):
+    def _make_bar(self, wid, hwnd, edge):
         ex = user32.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)
         user32.ShowWindow(hwnd, SW_HIDE)
         user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (ex | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW)
@@ -306,17 +312,17 @@ class GuiScreen(Screen):
         def placed(rect, top):
             x, y, w, h = rect
             user32.SetWindowPos(hwnd, HWND_TOPMOST, x, y, w, h, SWP_NOACTIVATE | SWP_FRAMECHANGED)
-            if not self.bar_hidden:
+            if not self.bar_hidden.get(wid):
                 user32.ShowWindow(hwnd, SW_SHOWNOACTIVATE)
-        self.bar_hidden = False
-        self.bar = AppBar(BAR_H, placed)
-        threading.Thread(target=self._step_back, args=(hwnd,), daemon=True, name="full-screen").start()
+        self.bar_hidden[wid] = False
+        self.bars[wid] = AppBar(TOP_H if edge == "top" else BAR_H, placed, edge)
+        threading.Thread(target=self._step_back, args=(wid, hwnd), daemon=True, name="full-screen").start()
 
-    def _step_back(self, hwnd):
+    def _step_back(self, wid, hwnd):
         """While another program is full screen (a game), the strip is hidden; it comes back when that ends. The
         shell's own notice (ABN_FULLSCREENAPP) did not reach it in a test (ran 23 Oct), so this looks for itself."""
         mine = {hwnd}
-        while self.bar and user32.IsWindow(hwnd):
+        while wid in self.bars and user32.IsWindow(hwnd):
             fg = user32.GetForegroundWindow()
             full = False
             if fg and fg not in mine:
@@ -326,8 +332,8 @@ class GuiScreen(Screen):
                     x, y, w, h = rect_of(fg)
                     (mx, my, mw, mh), _ = monitor()
                     full = x <= mx and y <= my and x + w >= mx + mw and y + h >= my + mh
-            if full != self.bar_hidden:
-                self.bar_hidden = full
+            if full != self.bar_hidden.get(wid):
+                self.bar_hidden[wid] = full
                 if full:
                     user32.ShowWindow(hwnd, SW_HIDE)
                 else:
@@ -521,8 +527,8 @@ class WindowHost:
             log("off: closing every Agora window")
             for wid in list(self.screen.wins):
                 self.screen.close(wid)
-            if getattr(self.screen, "bar", None):
-                self.screen.bar.remove()
+            for b in list(getattr(self.screen, "bars", {}).values()):
+                b.remove()
             time.sleep(0.3)
         finally:
             os._exit(0)             # whatever failed above, off always ends the process
@@ -581,14 +587,20 @@ class WindowHost:
                 said = self.screen.focus(same[0]["id"]) if not self.screen.is_front(same[0]["id"]) else "in front already"
                 return {"text": f"{same[0].get('name')} is open already: {said} (new=yes opens another)"}
             n = sum(1 for r in self.rows.values() if r.get("shows") == view)
-            box = self.box_for(view, kv, n)
-            if view == "taskbar" and n:
-                return {"refused": "the taskbar is open already"}
+            edge = kv.get("edge") or ("bottom" if view == "taskbar" else "")
+            if edge and edge not in ("top", "bottom"):
+                return {"refused": "edge is top or bottom: a bar along that edge of the screen"}
+            if edge and not lens and view != "taskbar":
+                return {"refused": "only a lens (or the taskbar) can be a bar: window.open <lens> edge=top"}
+            taken = [r for r in self.rows.values() if r.get("edge") == edge] if edge else []
+            if taken:
+                return {"refused": f"the {edge} edge holds {taken[0].get('name')} already; window.close it first"}
+            box = self.box_for(view, dict(kv, edge=edge), n)
             base = (lens.get("title") or view.capitalize()) if lens else VIEWS[view][0]
             name = base + (f" {n + 1}" if n and view != "taskbar" else "")
             line = (f'make kind=window shows={view} name="{name}" at={box[0]},{box[1]} size={box[2]},{box[3]}'
                     + (f" lens={view}" if lens else "") + (f" target={thing}" if thing else "")
-                    + (" edge=bottom" if view == "taskbar" else ""))
+                    + (f" edge={edge}" if edge else ""))
             return {"lines": [line], "saw": {}}
         if word in ("window.move", "window.close", "window.focus"):
             row = self.row_for(target, use)
@@ -598,8 +610,8 @@ class WindowHost:
                 return {"text": f"{row.get('name')}: {self.screen.focus(row['id'])}"}
             if word == "window.close":
                 return {"lines": [f"forget {row['id']}"], "saw": {row["id"]: row["rev"]}}
-            if row.get("shows") == "taskbar":
-                return {"refused": "the taskbar keeps its edge; set its height or close it instead"}
+            if row.get("edge"):
+                return {"refused": f"{row.get('name')} keeps its edge ({row.get('edge')}); close it instead"}
             box = self.box_for(row.get("shows"), kv, 0, current=parse_box(row))
             return {"lines": [f"set {row['id']} at={box[0]},{box[1]} size={box[2]},{box[3]}"],
                     "saw": {row["id"]: row["rev"]}}
@@ -616,8 +628,11 @@ class WindowHost:
 
     def box_for(self, view, kv, n, current=None):
         wx, wy, ww, wh = self.screen.work()
-        if view == "taskbar":
+        edge = kv.get("edge") or ("bottom" if view == "taskbar" else "")
+        if edge == "bottom":
             return (wx, wy + wh - BAR_H, ww, BAR_H)
+        if edge == "top":
+            return (wx, wy, ww, TOP_H)
         dw, dh = VIEWS.get(view, ("", LENS_SIZE))[1]
         w, h = (current[2], current[3]) if current else (dw, dh)
         if kv.get("size"):
@@ -661,7 +676,7 @@ class WindowHost:
             box = self.screen.box(wid)
             hwnd = rec.get("hwnd") if isinstance(rec, dict) else None
             rows.append({"id": wid, "kind": "window", "name": row.get("name"), "shows": row.get("shows"),
-                         "target": row.get("target"), "box": list(box) if box else None,
+                         "target": row.get("target"), "edge": row.get("edge") or "", "box": list(box) if box else None,
                          "shown": self.screen.shown(wid), "front": self.screen.is_front(wid),
                          "z": zi.get(hwnd, 9999)})
         if all_:
@@ -701,13 +716,16 @@ class WindowHost:
                 box = parse_box(row) or self.box_for(row.get("shows"), {}, 0)
                 if wid not in self.screen.wins:
                     self._open(wid, row, box)
-                elif self.applied.get(wid) != box and row.get("shows") != "taskbar":
+                elif self.applied.get(wid) != box and not row.get("edge"):
                     self.screen.place(wid, box)
                     self.applied[wid] = box
             self.rows = want
 
     def _open(self, wid, row, box):
-        if row.get("lens"):
+        if row.get("lens") and row.get("edge"):
+            view = "bar"                                  # a bar is the lens alone: no strip to drag or close by
+            path = f"/desk/bar.html?win={wid}&lens={quote(str(row['lens']))}"
+        elif row.get("lens"):
             view = "frame"
             path = f"/desk/frame.html?win={wid}&lens={quote(str(row['lens']))}&name={quote(str(row.get('name') or ''))}"
         else:
@@ -726,14 +744,15 @@ class WindowHost:
             row2 = self.rows.get(wid) or row
             out = self.m.do(f"forget {wid}", saw={wid: row2.get("rev", 0)})
             log(f"{wid} closed on the screen: {out.get('text')}")
-        self.screen.open(wid, view, title, url, box, on_closed, on_shown, bar=(view == "taskbar"))
+        self.screen.open(wid, view, title, url, box, on_closed, on_shown,
+                         bar=row.get("edge") or ("bottom" if view == "taskbar" else None))
 
     def watch_drags(self):
         """Every half second: a window Alex moved or resized and then left alone is recorded where he left it."""
         while True:
             time.sleep(0.5)
             for wid, row in list(self.rows.items()):
-                if row.get("shows") == "taskbar":
+                if row.get("edge") or row.get("shows") == "taskbar":
                     continue
                 box = self.screen.box(wid)
                 if not box or box == self.applied.get(wid):

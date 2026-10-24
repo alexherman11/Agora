@@ -19,7 +19,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import kdesk  # noqa: E402
 
-SEE = {"help", "look", "rows", "holds", "status", "window.list"}
+SEE = {"help", "look", "rows", "holds", "status", "window.list", "system.now", "media.now"}
 FEED = ("root : column, role sheet, of tag:post as p, each card\n"
         "card : column, role card\n"
         "  t : text \"$text\"\n"
@@ -243,6 +243,76 @@ class DesktopTest(unittest.TestCase):
         self.assertIn(b"lens.js itself", r.read())                       # the frame, reached with the cookie set
         sc = json.loads(opener.open(d.url + "/api/scene?lens=feed", timeout=30).read())
         self.assertIn("Council meets Tuesday", sc.get("text", ""), sc)
+
+    # -- the bars (24 Oct): the top bar is a lens on the top edge; widgets are world things painted with live readings
+    def make_top_bar(self):
+        d = self.d
+        lenses = HERE / "lenses"
+        out = d.say(f"make kind=style name=bars text={quoted((lenses / 'bars.style').read_text(encoding='utf-8'))}")
+        self.assertTrue(out["ok"], out["text"])
+        out = d.say(f"make kind=lens name=topbar style=bars "
+                    f"text={quoted((lenses / 'topbar.lens').read_text(encoding='utf-8'))}")
+        self.assertTrue(out["ok"], out["text"])
+
+    def scene(self, lens):
+        d = self.d
+        req = urllib.request.Request(d.url + f"/api/scene?lens={lens}&text=1",
+                                     headers={"Authorization": "Bearer " + d.entry.token("alex")})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            out = json.loads(r.read())
+        return out.get("refused") or out.get("text") or ""
+
+    def test_the_top_bar_is_a_lens_on_the_top_edge(self):
+        d = self.d
+        self.make_top_bar()
+        out = d.say("window.open topbar edge=top")
+        self.assertTrue(out["ok"], out["text"])
+        bar = d.wait(lambda: d.window("topbar"))
+        self.assertEqual(d.k.state.get(bar["id"], "edge"), "top")
+        self.assertEqual(bar["box"][1], 0)                                 # along the top, the whole width
+        self.assertEqual(d.wait(lambda: d.window("taskbar"))["box"][1] > 1000, True)   # the strip keeps the bottom
+        self.assertIn("holds", d.say("window.open topbar edge=top new=yes")["text"])   # one bar per edge
+        self.assertFalse(d.say("window.open lines edge=top")["ok"])        # only a lens can be a bar
+        self.assertIn("keeps its edge", d.say(f"window.move {bar['id']} to=left")["text"])
+        self.assertTrue(d.say(f"window.close {bar['id']}")["ok"])
+        d.wait(lambda: d.window("topbar") is None)
+        self.assertTrue(d.say("undo")["ok"])
+        d.wait(lambda: d.window("topbar"))
+
+    def test_a_widget_is_one_line_and_shows_a_live_reading(self):
+        d = self.d
+        self.make_top_bar()
+        self.assertNotIn("CPU", self.scene("topbar"))
+        out = d.say("make kind=widget bar=top side=right shows=cpu label=CPU order=40")   # one line, as an agent says it
+        self.assertTrue(out["ok"], out["text"])
+        d.wait(lambda: '"12%"' in self.scene("topbar"), 15)               # the system module's (headless) reading
+        n = len(d.k.log.records)
+        time.sleep(4.5)                                                   # two more readings arrive
+        self.assertEqual(len(d.k.log.records), n)
+        d.say("make kind=widget bar=top side=right shows=time order=100")
+        d.say("make kind=widget bar=top side=right shows=feed label=Feed order=90")
+        d.say("post one")
+        d.say("post two")
+        text = self.scene("topbar")
+        self.assertIn(time.strftime("%H:%M"), text)
+        self.assertIn('"2" [value]', text)                               # two posts not read yet
+        cpu = next(r for r in d.say("rows widget")["rows"] if r.get("shows") == "cpu")
+        self.assertTrue(d.say(f"set {cpu['id']} order=5 side=left")["ok"])          # moved across, by a line
+        self.assertIn("[pill] row · only when $bar = \"top\" and $side = \"left\" ($bar=top, $side=left)",
+                      self.scene("topbar"))
+        self.assertTrue(d.say(f"forget {cpu['id']}")["ok"])
+        self.assertNotIn('"CPU"', self.scene("topbar"))
+
+    def test_system_and_media_words(self):
+        d = self.d
+        d.wait(lambda: "media.now" in d.say("help", "alex")["text"] and "system.now" in d.say("help", "alex")["text"], 20)
+        out = d.say("system.now")
+        self.assertTrue(out["ok"], out["text"])
+        self.assertIn("cpu: 12%", out["text"])
+        self.assertIn("nothing is playing", d.say("media.now")["text"])
+        out = d.say("media.play")
+        self.assertTrue(out["ok"], out["text"])
+        self.assertIn("undo cannot take it back", out["text"])            # it touched the outside world
 
     def test_replay_gives_the_same_world(self):
         d = self.d
