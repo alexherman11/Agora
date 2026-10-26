@@ -22,6 +22,7 @@ class Page:
         self.c.call('Emulation.setFocusEmulationEnabled',enabled=True)
         self.c.call('Emulation.setDeviceMetricsOverride',width=width,height=height,deviceScaleFactor=1,mobile=False)
         if clock:self.c.call('Page.addScriptToEvaluateOnNewDocument',source=self.clock_script(clock))
+        self.navigate_at=time.perf_counter()
         self.c.call('Page.navigate',url=url+'/dev/signin?token='+token+'&next='+quote('/desk/widget.html?widget='+widget,safe=''))
         self.c.until('!!document.querySelector("#widget-surface iframe")')
         self.session=None

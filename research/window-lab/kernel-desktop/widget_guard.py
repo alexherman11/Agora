@@ -6,18 +6,43 @@ The guard is mandatory: initialization fails closed if the APIs are unavailable.
 """
 
 
+def choose_download(browser, args, name):
+    """Only a verified trusted-parent Blob reaches this user-initiated chooser."""
+    from System.Windows.Forms import SaveFileDialog, DialogResult
+    from pathlib import Path
+    dialog=SaveFileDialog();dialog.FileName=name;dialog.RestoreDirectory=True
+    dialog.Filter='All files (*.*)|*.*'
+    initial=Path(str(args.ResultFilePath)).parent
+    if initial.is_dir():dialog.InitialDirectory=str(initial)
+    try:
+        if dialog.ShowDialog(browser.form)==DialogResult.OK:args.ResultFilePath=dialog.FileName;return True
+        return False
+    finally:dialog.Dispose()
+
+
 def install():
     from webview.platforms.edgechromium import EdgeChrome
     if getattr(EdgeChrome, '_agora_widget_guard', False):
         return
     original = EdgeChrome.on_webview_ready
     original_notify=EdgeChrome.on_script_notify
+    original_download=EdgeChrome.on_download_starting
+    def download(self,sender,event):
+        import time
+        pending=getattr(self,'_agora_widget_downloads',{})
+        item=pending.pop(str(event.DownloadOperation.Uri),None)
+        if item and item['source']==str(sender.Source) and time.monotonic()<item['until']:
+            event.Handled=True
+            event.Cancel=not choose_download(self,event,item['name'])
+            return
+        original_download(self,sender,event)
+    EdgeChrome.on_download_starting=download
     def notify(self,sender,event):
         import json
         try:
             value=json.loads(str(event.WebMessageAsJson))
             if isinstance(value,str):value=json.loads(value)
-            if isinstance(value,dict) and value.get('agora')=='recover-widget-renderer':return
+            if isinstance(value,dict) and value.get('agora') in ('recover-widget-renderer','prepare-widget-download'):return
         except Exception:pass
         original_notify(self,sender,event)
     EdgeChrome.on_script_notify=notify
@@ -27,6 +52,7 @@ def install():
             core = sender.CoreWebView2
             refs = {}
             self._agora_widget_denials = []
+            self._agora_widget_downloads = {}
 
             def resource(sender, event):
                 from urllib.parse import urlsplit
@@ -133,10 +159,21 @@ def install():
                 try:
                     request=json.loads(str(event.TryGetWebMessageAsString()))
                 except Exception:return  # pywebview's ordinary messages
-                if not isinstance(request,dict) or request.get('agora')!='recover-widget-renderer':return
+                if not isinstance(request,dict) or request.get('agora') not in ('recover-widget-renderer','prepare-widget-download'):return
                 source=urlsplit(str(event.Source))
                 if source.scheme!='http' or source.hostname!='127.0.0.1' or source.path!='/desk/widget.html':return
                 expected=str(event.Source)
+                if request['agora']=='prepare-widget-download':
+                    import time,re
+                    url=str(request.get('url',''));name=str(request.get('name','download'))
+                    for old,item in list(self._agora_widget_downloads.items()):
+                        if time.monotonic()>=item['until']:self._agora_widget_downloads.pop(old,None)
+                    allowed=url.startswith('blob:'+source.scheme+'://'+source.netloc+'/') and len(url)<300 and len(self._agora_widget_downloads)<16
+                    name=re.sub(r'[\\/\x00-\x1f]','_',name)[:160]
+                    if allowed:self._agora_widget_downloads[url]=dict(source=expected,name=name,until=time.monotonic()+15)
+                    detail=json.dumps(dict(id=request.get('id'),ok=allowed))
+                    core.ExecuteScriptAsync("dispatchEvent(new CustomEvent('agora-download-ready',{detail:"+detail+"}))")
+                    return
                 def reply(ok,error=''):
                     detail=json.dumps(dict(ok=ok,error=error))
                     core.ExecuteScriptAsync("dispatchEvent(new CustomEvent('agora-renderer-recovered',{detail:"+detail+"}))")

@@ -169,6 +169,7 @@ RESERVED = {"kind", "made_by", "for", "pinned", "forgotten", "sees", "lives", "f
 SEES_SAID = {"me", "leaders", "group", "place"}      # what `make … sees=` may say (section 7: it may narrow)
 from .blobs import PROTECTED
 RESERVED.update(PROTECTED | {'pin_until', 'forget_reason'})
+RESERVED.add('via_actor')
 RESERVED_PREFIX = ("in:", "like:", "member:", "answer:", "sees.", "vote:", "claim:", "contact:")
 
 FLOOR_HELP = {e["word"]: e["help"] for e in KERNEL_ENTRIES if e["word"] in FLOOR}
@@ -239,13 +240,13 @@ def look(k, actor, st, entry, tx, group, saw=None):
             return {"text": text, "rows": [{"id": t, "kind": kind, "name": k.name(t), "answers": answers}]}
         if kind == "word":
             return {"text": f"{a.get('word')} ({t}), a {a.get('word_kind')} word: {a.get('help', '').splitlines()[0]}",
-                    "rows": [dict(a, id=t)]}
+                    "rows": [dict(a, id=t, rev=k.state.rev.get(t,0))]}
         facts = [f"{x}={v}" for x, v in a.items() if x not in ("kind", "made_by", "for") and
                  not x.startswith(("in:", "member:", "claim:", "contact:"))]
         who = k.name(a.get("made_by")) if a.get("made_by") else None
         return {"text": f"{a.get('title') or k.name(t)} ({t}), a{'n' if str(kind)[:1] in 'aeiou' else ''} {kind}"
                         + (f" by {who}" if who else "") + ("\n  " + "\n  ".join(facts) if facts else ""),
-                "rows": [dict(a, id=t)]}
+                "rows": [dict(a, id=t, rev=k.state.rev.get(t,0))]}
     posts = []
     for t in k.things("post"):
         a = k.shown(actor.person, t)
@@ -324,6 +325,7 @@ def post(k, actor, st, entry, tx, group, saw=None):
             tx.set(p, a, v)
     _within(k, actor, st, tx, p)
     tx.set(p, "made_by", actor.id)
+    _agent_origin(actor, tx, p)
     if actor.id != actor.person:
         tx.set(p, "for", actor.person)
     tx.set(p, f"in:{group}", len(k.log.records) + 1)
@@ -487,6 +489,17 @@ def _conditions(k, kv, group):
             kv[key] = k.bind_policy(value, group)
 
 
+def _agent_origin(actor, tx, target):
+    """Keep verified agent attribution through reviewed module wrappers."""
+    source=actor
+    for _ in range(16):
+        if source.kind=='agent':
+            tx.set(target,'via_actor',source.id)
+            return
+        if source.caller is None:return
+        source=source.caller
+
+
 def make(k, actor, st, entry, tx, group, saw=None):
     kv = dict(st.kv)
     kind = kv.pop("kind", "")
@@ -540,6 +553,7 @@ def make(k, actor, st, entry, tx, group, saw=None):
         tx.set(t, "text", st.words)
     _about(k, actor, st, tx, t)
     tx.set(t, "made_by", actor.id)
+    _agent_origin(actor, tx, t)
     if actor.id != actor.person:
         tx.set(t, "for", actor.person)
     tx.set(t, f"in:{group}", len(k.log.records) + 1)
@@ -653,7 +667,10 @@ def vote(k, actor, st, entry, tx, group, saw=None):
     """vote <poll> <option>: sealed. The world knows you voted; readers see only the counts."""
     t = st.target
     options = str(k.state.get(t, "options") or "").split()
-    choice = (st.words.split() or [""])[0].lower()
+    choice = (st.words.split() or [""])[0]
+    if choice not in options:
+        matches=[option for option in options if option.casefold()==choice.casefold()]
+        if len(matches)==1:choice=matches[0]
     if not options:
         raise Refused(f"{t} is not a poll; make kind=poll title=… options=\"yes no\" makes one")
     if choice not in options:

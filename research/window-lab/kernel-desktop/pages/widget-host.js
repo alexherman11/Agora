@@ -2,9 +2,12 @@
 'use strict';
 (() => {
   const q = new URLSearchParams(location.search), surface = document.querySelector('#widget-surface');
-  let frame, instance, stopped = false, busy = 0, pollTimer;
+  let frame, instance, stopped = false, busy = 0, pollTimer, componentView=false;
   const phases=new Map();let stallTimer,recovering=false,lastPong=performance.now();
   const hooks = new Map();
+  const waiting=[];
+  let nextCall=0;
+  async function callTurn(){const now=performance.now(),at=Math.max(now,nextCall);nextCall=at+40;if(at>now)await new Promise(resolve=>setTimeout(resolve,at-now))}
   const native = {paint:null, hits:[]};
   const post = async (action, data={}) => {
     const r = await fetch('/desk/widget/'+action,{method:'POST',headers:{'Content-Type':'application/json'},
@@ -33,6 +36,8 @@
       const p=pending.get(m.id);if(!p)return;pending.delete(m.id);m.error?p.reject(Error(m.error)):p.resolve(m.result);
     });
     const api={ready,do:(line,saw)=>call('do',{line,saw}),see:line=>call('see',{line}),
+      project:view=>call('project',{view}),file:(target,variant='content')=>call('file',{target,variant}),
+      download:target=>call('download',{target}),downloadReading:line=>call('download-reading',{line}),
       upload:async(file,group)=>{if(!(file instanceof Blob))throw Error('Choose a file');const bytes=new Uint8Array(await file.arrayBuffer());let raw='';for(let i=0;i<bytes.length;i+=32768)raw+=String.fromCharCode(...bytes.subarray(i,i+32768));return call('upload',{name:file.name||'Upload',data:btoa(raw),group})},
       hear:async(word,fn)=>{await call('hear',{word});if(!listeners.has(word))listeners.set(word,[]);listeners.get(word).push(fn);return()=>{listeners.set(word,listeners.get(word).filter(f=>f!==fn))}},
       theme:()=>call('theme').then(r=>r.theme),describe:text=>call('describe',{text}),
@@ -40,7 +45,7 @@
       hitAreas:rects=>call('hits',{rects}),paintArea:rect=>call('paint',{rect})};
     Object.defineProperty(window,'agora',{value:Object.freeze(api),writable:false,configurable:false});
   })();`;
-  const csp = "default-src 'none'; connect-src 'none'; script-src 'unsafe-inline' blob:; style-src 'unsafe-inline'; img-src data: blob:; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src blob:; base-uri 'none'; form-action 'none'";
+  const csp = "default-src 'none'; connect-src 'none'; script-src 'unsafe-inline' blob:; style-src 'unsafe-inline'; img-src data: blob:; font-src 'none'; media-src blob:; object-src 'none'; frame-src 'none'; worker-src blob:; base-uri 'none'; form-action 'none'";
   const rect = r => {
     if(!r||!['x','y','width','height'].every(k=>Number.isFinite(r[k])))throw Error('Invalid surface rectangle');
     return {x:Math.max(0,Math.min(innerWidth,r.x)),y:Math.max(0,Math.min(innerHeight,r.y)),
@@ -56,7 +61,12 @@
       else if(phases.size<150)phases.set(path,{path,component:String(e.data.component||'').slice(0,80),stage:e.data.stage,at:performance.now()});
       return;
     }
-    if(!Number.isSafeInteger(id)||busy>=8)return;
+    if(!Number.isSafeInteger(id))return;
+    if(busy>=8){
+      if(waiting.length>=64){send({agora:1,id,error:'This view is busy. Please try again.'});return}
+      await new Promise(resolve=>waiting.push(resolve));
+      if(stopped){send({agora:1,id,error:'This view has stopped.'});return}
+    }
     busy++;
     try{
       let result;
@@ -66,17 +76,47 @@
         else native.paint=rect(e.data.rect);
         result={ok:true};
       }else{
-        if(!['do','see','hear','theme','describe','upload'].includes(op))throw Error('Unknown bridge call');
-        result=await post('call',{op,line:e.data.line,saw:e.data.saw,word:e.data.word,text:e.data.text,name:e.data.name,data:e.data.data,group:e.data.group});
+        if(!['do','see','hear','theme','describe','upload','project','file','download','download-reading'].includes(op))throw Error('Unknown bridge call');
+        if(componentView)await callTurn();
+        result=await post('call',{op:['file','download'].includes(op)?'file-check':op==='download-reading'?'see':op,line:e.data.line,saw:e.data.saw,word:e.data.word,text:e.data.text,name:e.data.name,data:e.data.data,group:e.data.group,view:e.data.view,target:e.data.target,variant:e.data.variant});
         if(!result.ok)throw Error(result.text||'Refused');
+        if(op==='file'||op==='download'){
+          if(!/^\/files\/[a-zA-Z]+\d+\?variant=(content|thumbnail)$/.test(result.path))throw Error('Invalid file route');
+          const response=await fetch(result.path,{credentials:'same-origin',cache:'no-store',redirect:'error'});
+          if(!response.ok)throw Error('This file is no longer available to you.');
+          const blob=await response.blob();
+          if(op==='file')result={blob};
+          else{
+            const filename=/filename="([^"]+)"/.exec(response.headers.get('Content-Disposition')||'')?.[1]||'download';
+            await downloadBlob(new Blob([blob],{type:'application/octet-stream'}),filename);result={ok:true};
+          }
+        }
+        if(op==='download-reading'){
+          const row=result.rows?.[0];if(!row||typeof row.text!=='string'||row.text.length>1048576)throw Error('This reading is not a downloadable text file.');
+          await downloadBlob(new Blob([row.text],{type:'application/octet-stream'}),row.filename||'download.txt');result={ok:true};
+        }
         if(op==='do'){
           const receipt=document.querySelector('#receipt');if(receipt)receipt.textContent=result.text;
           send({agora:1,event:{word:'widget.changed'}});
         }
       }
       send({agora:1,id,result});
-    }catch(err){send({agora:1,id,error:String(err.message||err)})}finally{busy--}
+    }catch(err){send({agora:1,id,error:String(err.message||err)})}finally{busy--;waiting.shift()?.()}
   });
+  let downloadId=0;
+  async function downloadBlob(blob,name){
+    const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;
+    link.download=String(name).replace(/[\\/\x00-\x1f]/g,'_').slice(0,160);
+    if(window.chrome?.webview){
+      const id=++downloadId;
+      await new Promise((resolve,reject)=>{
+        const timer=setTimeout(()=>{removeEventListener('agora-download-ready',reply);reject(Error('The download chooser is unavailable.'))},4000);
+        const reply=e=>{if(e.detail.id!==id)return;clearTimeout(timer);removeEventListener('agora-download-ready',reply);e.detail.ok?resolve():reject(Error('This download was not authorised.'))};
+        addEventListener('agora-download-ready',reply);window.chrome.webview.postMessage(JSON.stringify({agora:'prepare-widget-download',id,url,name:link.download}));
+      });
+    }
+    link.hidden=true;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
+  }
   async function terminateOwnedRenderer(){
     if(!window.chrome?.webview)throw Error('Native renderer recovery is unavailable; reopen this view');
     return new Promise((resolve,reject)=>{
@@ -137,6 +177,8 @@
     lastPong=performance.now();
     const data=await post('open',{widget:q.get('widget')});if(!data.ok)throw Error(data.text);
     instance=data.instance;
+    componentView=!!data.component_lens;
+    document.body.classList.toggle('quiet-receipts',data.receipts==='quiet');
     document.body.dataset.surface=data.surface;
     if(q.get('slot'))document.body.classList.add('slot');
     else if(data.surface==='overlay'){document.body.classList.add('overlay');document.documentElement.style.background='transparent'}

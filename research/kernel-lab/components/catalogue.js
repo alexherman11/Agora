@@ -42,8 +42,10 @@ export default {mount(api,s){
   }
   if(kind==='table'){
     const table=P.node('table',{'aria-label':label}),cols=String(s.columns).split('|');
-    table.append(P.node('thead',{},P.node('tr',{},...cols.map(x=>P.node('th',{scope:'col'},x)))));
-    const body=P.node('tbody');for(const row of s.data||[])body.append(P.node('tr',{},...cols.map(c=>P.node('td',{},row[c]??''))));
+    const body=P.node('tbody');let data=[...(s.data||[])],direction=1;
+    const draw=()=>{body.replaceChildren();for(const row of data)body.append(P.node('tr',{},...cols.map(c=>P.node('td',{},row[c]??''))))};
+    table.append(P.node('thead',{},P.node('tr',{},...cols.map(x=>P.node('th',{scope:'col'},s.sortable?P.press(x,()=>{data.sort((a,b)=>String(a[x]??'').localeCompare(String(b[x]??''),undefined,{numeric:true})*direction);direction*=-1;draw()}):x)))));
+    draw();
     table.append(body);root.append(table,...children());return root;
   }
   if(kind==='calendar'){

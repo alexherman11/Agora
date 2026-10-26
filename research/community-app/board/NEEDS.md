@@ -76,3 +76,12 @@ source. Taskboard proof.py re-exports proof_v2.run. Default triage is ten minute
 `--minutes 0` is only a labelled development pass. The existing real-model proof
 has a six-second automatic-summary wait and can fail during a cold model load;
 the backend and live desktop were not restarted to deal with that.
+
+## Interface follow-on, 26 October (builder draft)
+
+The earlier numbered list remains the world-layer handoff. The reviewed-host
+candidate now supplies the missing file-byte boundary in item 5, together with
+the board lens, reusable components and hidden interaction/privacy proofs.
+See [UI-HANDOFF.md](UI-HANDOFF.md) for exact results and remaining limits,
+and [UI-HANDLES.md](UI-HANDLES.md) for world-level editing. This is builder
+evidence for Claude's review; it does not change a design document's status.

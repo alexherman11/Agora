@@ -38,8 +38,10 @@ def style_values(rule, tokens=None):
             if key in META or key.startswith('in:'):continue
             if not re.fullmatch(r'[a-z][\w-]*',key):raise Refused('token name must be a plain word')
             if key.startswith('motion-'):result[key]=motion(value)
+            elif key.endswith('-font') and re.fullmatch(r"[A-Za-z][A-Za-z0-9 ,'-]{0,100}",str(value)):result[key]=value
+            elif re.fullmatch(r'\d{1,4}(?:\.\d+)?',str(value)) and float(value)<=2000:result[key]=value
             elif COLOUR.fullmatch(str(value)) or MEASURE.fullmatch(str(value)):result[key]=value
-            else:raise Refused(f'token {key}: use a hex colour or one measure with units')
+            else:raise Refused(f'token {key}: use a colour, measure, bounded number or plain font-family token')
         return result
     if not TARGET.fullmatch(target):raise Refused('style target: component.part[fact=value], component, or tokens')
     unknown=[key for key in rule if key not in META and key not in STYLE_KEYS and not key.startswith('in:')]

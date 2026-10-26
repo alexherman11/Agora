@@ -38,6 +38,36 @@ Running scratch tests imports the candidate; it does not alter a resident/live
 kernel. Live installation must verify that the running kernel answers the new
 words before writing component definitions.
 
+## 26 October: community board presentation (builder draft)
+
+Claude owns review and commit. Missing general world handles supplied by this
+candidate, with no `lens.js` edit or git-state operation:
+
+| Source | Missing world capability |
+| --- | --- |
+| kernel `words.py` | `look` on ordinary things returns its current `rev`, so a file/post read can supply an explicit gesture fence. Immutable `via_actor` preserves verified agent origin through a module wrapper; ordinary lines cannot forge it. `vote` preserves an option's declared case (with unique case-insensitive fallback), rather than refusing `Saturday` because it lowercased it. No new dictionary word. |
+| `arrangement.py` | A collection over an admitted reading (`of reading:"..."`), preserving its order and painted revisions; `limit`/`offset` bound construction. Dynamic values are quoted data, not executable fragments. |
+| `arrangement.py`, `painter.js` | `watch reading:"..."` observes metadata (such as current names/roles) without constructing a collection; changes repaint and `api.read` reuses the observed result. |
+| desktop `widgets.py` | Evaluate those readings as this viewer's widget principal, outside the kernel lock; private instance projection supplies validation of later health/control reports. No new kernel dictionary word or dispatch was added. |
+| `painter.js` | Local selection/drafts, structured authored form fields, declared child-slot settings, per-paint shared readings, owner cleanup and permission-checked file Blob handles. |
+| desktop `widgets.py`, `pages/widget-host.js` | File-check under widget grants followed by the trusted parent's authenticated `/files/<thing>` fetch. The child gets only a Blob. `connect-src 'none'` is unchanged; `media-src` changes from none to exactly `blob:`. Images already allowed `data: blob:`. |
+| desktop `pages/widget-host.js` | Bounded bridge backpressure: more than eight attachment reads previously disappeared silently, leaving pending promises and projection refresh stuck. Queue up to 64; excess receives a polite explicit refusal. |
+| desktop `pages/widget-host.js` | Pace component-view calls below the existing forty/second server cap, instead of turning an attachment-rich burst into component failures. Other widget painters retain their existing timing. |
+| desktop `pages/widget-host.js`, `painter.js` | Permission-checked `download` and `downloadReading` run the actual download in the trusted parent. The opaque frame retains no allow-downloads, no allow-forms and no network. Files recheck `/files`; calendar text comes from an admitted see reading. The parent forces octet-stream download and sanitises names. |
+| desktop `widget_browser.py` | The hidden driver permits only top-frame authenticated GETs to exact `/files/<thing>` paths. Opaque children still cannot request them. |
+| `primitives.js` | Silent overlay disposal lets reconstruction clean up old modal listeners without closing a newly reconstructed draft. |
+| `primitives.js` | `P.submit` validates a form and dispatches its guarded local action on pointer/keyboard activation without native form navigation. The no-forms sandbox otherwise blocks native submission before a submit event. No allow-forms or form-action exemption was added. |
+| `painter.js` | Preserve a selected passage across reconstruction only when the bound part's complete text is unchanged. Changed sources still require a new selection and the world checks exact quotes. |
+| `arrangement.py`, `handles.py` | General `labels ui` / personal UI label maps; bounded numeric theme tokens and safe plain font-family tokens so line height, weight and reading type are world facts too. |
+| catalogue / general components | Sealed `poll`, claimable `slots`, converted `file`, declared `field-list`; table `sortable` text-cell handle. |
+
+The board's application-specific components, styles, arrangement, installer and
+acceptance are in `research/community-app/board/`. Module readings remain the
+authority for ranking, privacy, quotas, votes and admission. A last painter
+observation is not a pixel or screen-reader audit. The first candidate run found
+the bridge backpressure bug while opening thirteen actual converted attachments;
+the failed run is retained in `ui-quick2-run.txt`.
+
 ## 26 October: failure boundaries and missing editing words
 
 Builder draft; Claude reviews/commits. No git state changed. Missing world-level
@@ -62,3 +92,22 @@ The first in-page loop needs external recovery and can pause that view. Worker
 quarantine is a thread boundary, not process-memory isolation; arbitrary browser
 APIs are not emulated. See ISOLATION.md for the measurements, test outputs,
 initial cold-model proof failure, and live adoption status.
+
+## 26 October: board acceptance follow-through (builder draft)
+
+Additional missing handles found while exercising the board, for Claude's
+review; the UI job has made no git-state changes:
+
+| Source | Missing world capability |
+| --- | --- |
+| `arrangement.py` | Pass a full reading row to a declared JSON setting without stringifying away its structure; `personal-view view.*` supplies initial selection defaults. |
+| `isolation.js` | Discard an obsolete generation's media capabilities while retaining its last-good text. A stopped attachment says that its previous preview needs reopening, rather than retaining a revoked image URL. |
+| `components/file.js` | Reserve photo space while permission-checked bytes decode; use the thumbnail variant in feed cards and cleaned full content in a thread. Imported ICS exposes its richer event's authored RSVP/calendar gestures. |
+| `components/slots.js`, catalogue | A general `label` heading, falling back to an event slot's title, distinguishes event capacity from an independent volunteering slot. |
+| desktop `widget_guard.py`, trusted parent | A one-use native download handshake for the exact trusted top page's Blob URL. pywebview globally disables downloads; enabling all downloads would weaken the boundary. The native handler permits only a registered, unexpired URL, sanitises the name and asks for the user's destination. The hidden proof replaces only the chooser with a scratch destination. |
+| `board.py` | `board.badges` must expose visible leadership scope for allowed actions. Feed/search must restrict themselves to declared board channels, so unrelated world posts do not appear. Calendar filenames use the event's human title. |
+
+PDF page text and quote attribution are verified. Original PDF page graphics
+still depend on an installed renderer; none was installed during this job.
+The native download/file proof exercises a never-shown WebView2, not a public
+web deployment. The frozen fresh-agent tweak trial remains the next review.

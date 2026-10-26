@@ -5,6 +5,7 @@ This reviewed process supplies the readings and multi-thing validations that
 the thin composition language cannot yet express.
 """
 from datetime import datetime, timedelta, timezone
+import re
 
 from protocol import hello, line, read, run
 
@@ -58,9 +59,10 @@ def own_marks(use, person):
 
 def visible_posts(use, person, channel=None):
     posts = rows(use, 'post')
+    channels = {r.get('group') for r in rows(use,'board-channel')}
     marks = own_marks(use, person)
     hidden = {r['about'] for r in marks if r.get('action') in ('hide', 'mute')}
-    return [p for p in posts if p['id'] not in hidden and p.get('thread') not in hidden and
+    return [p for p in posts if scope(p) in channels and p['id'] not in hidden and p.get('thread') not in hidden and
             (channel is None or scope(p) == channel)]
 
 
@@ -232,7 +234,8 @@ def call(message):
                 current += c
             folded.append(current)
         text = '\r\n'.join(folded)
-        return dict(text=text, rows=[dict(filename=target + '.ics', mime_type='text/calendar', text=text)])
+        filename=re.sub(r'[\\/:*?"<>|\x00-\x1f]','_',event.get('title') or 'Neighbourhood event').strip()[:120]+'.ics'
+        return dict(text=text, rows=[dict(filename=filename, mime_type='text/calendar', text=text)])
 
     if word == 'badges':
         groups = rows(use, 'group') + rows(use, 'place')
@@ -246,13 +249,14 @@ def call(message):
                 badges.append('steward')
             if any(g.get('member:' + p['id']) == 'leader' and g['kind'] == 'group' for g in groups):
                 badges.append('leader')
-            result.append(dict(id=p['id'], name=p['name'], badges=badges))
+            result.append(dict(id=p['id'], name=p['name'], badges=badges,
+                               leads=[g['id'] for g in groups if g.get('member:'+p['id'])=='leader']))
         names = {p['id']: p['name'] for p in people}
         for agent in agents:
             result.append(dict(id=agent['id'], name='agent for ' + names.get(agent.get('for'), 'a person'), badges=['agent']))
         return dict(text='\n'.join(r['name'] + ': ' + ', '.join(r['badges']) for r in result), rows=result)
 
-    posts = visible_posts(use, person, kv.get('in'))
+    posts = visible_posts(use, person, kv.get('in') or None)
     threads = [p for p in posts if not p.get('reply_to')]
     replies = [p for p in posts if p.get('reply_to')]
     if word == 'why-here':
@@ -269,6 +273,7 @@ def call(message):
         files = {r['id']: r for r in rows(use, 'file')}
         hidden = {r['about'] for r in own_marks(use, person) if r.get('action') in ('hide', 'mute')}
         all_posts = {r['id']: r for r in rows(use, 'post')}
+        board_posts = {p['id'] for p in posts}
         for p in posts:
             if kv.get('kind') and p.get('post_kind') != kv['kind']:
                 continue
@@ -284,6 +289,8 @@ def call(message):
             # Permission was already checked through the file's current parent.
             parent_id = files.get(doc.get('file_source'), {}).get('attached_to')
             parent = all_posts.get(parent_id)
+            if parent_id not in board_posts:
+                continue
             if parent_id in hidden or (parent and parent.get('thread') in hidden):
                 continue
             if kv.get('in') and scope(parent or doc) != kv['in']:

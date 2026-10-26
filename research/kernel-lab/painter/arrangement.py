@@ -91,6 +91,8 @@ def parse(text):
                 trigger, token=line[5:].split(' play ',1)
                 if not re.fullmatch(r'(?:fact [\w.-]+ changes|happening [\w.*-]+)',trigger):raise Refused('when fact <field> changes play <token>, or when happening <word> play <token>')
                 node.setdefault('motions',[]).append(dict(trigger=trigger,token=token))
+            elif line.startswith('watch '):
+                node.setdefault('watches',[]).append(literal(line[6:].removeprefix('reading:')))
             else:
                 raise Refused(f'lens line {number}: unknown arrangement word {line}')
         else:
@@ -114,6 +116,21 @@ def resolve(text, env):
     return REF.sub(value, str(text))
 
 
+def resolve_line(text, env):
+    """One substitution, quoted as data even inside an authored quoted value."""
+    def replace(match):
+        value = resolve(match[0], env)
+        before = text[:match.start()]
+        quoted, escaped = False, False
+        for ch in before:
+            if escaped: escaped = False
+            elif ch == '\\': escaped = True
+            elif ch == '"': quoted = not quoted
+        escaped_value = value.replace('\\', '\\\\').replace('"', '\\"')
+        return escaped_value if quoted else '"' + escaped_value + '"'
+    return REF.sub(replace, text)
+
+
 def condition(text, env):
     # Deliberately small, no eval. Empty fields and literal equality suffice for
     # arrangements; add a composed see word when richer domain meaning is needed.
@@ -131,7 +148,7 @@ def condition(text, env):
     return {'>': lambda: a > b, '<': lambda: a < b, '>=': lambda: a >= b, '<=': lambda: a <= b}[op]()
 
 
-def compile_view(k, actor, target, _trail=()):
+def compile_view(k, actor, target, _trail=(), reader=None, view=None):
     if target in _trail or len(_trail)>16: raise Refused('cyclic view reference')
     visible = {}
     for tid in k.state.things:
@@ -142,7 +159,7 @@ def compile_view(k, actor, target, _trail=()):
     if lens and lens.get('kind') in ('window', 'widget'):
         target = lens.get('component_lens') or lens.get('lens') or lens.get('shows', '')
         if target == lens.get('id'): raise Refused('cyclic view reference')
-        return compile_view(k, actor, target, (*_trail,lens['id']))
+        return compile_view(k, actor, target, (*_trail,lens['id']), reader=reader, view=view)
     if not lens or lens.get('kind') != 'lens' or lens.get('painter') != 'components':
         raise Refused('look-view needs a component lens, its widget or window')
     preferences = [a for a in visible.values() if a.get('kind') == 'view-preference'
@@ -151,6 +168,36 @@ def compile_view(k, actor, target, _trail=()):
     # A viewer may own an arrangement without changing the shared lens.
     source = next((a['text'] for a in reversed(preferences) if 'text' in a), lens.get('text', ''))
     definitions = parse(source)
+    # Reading-backed collections are evaluated by the trusted host, outside the
+    # kernel lock. Reports reuse only that instance's last projection; every id
+    # is intersected with current visibility before it can be painted again.
+    projection = getattr(actor, '_component_projection', {}).get(lens['id'], {})
+    defaults=json.loads(lens.get('view','{}'))
+    for preference in preferences:
+        defaults.update({key[5:]:value for key,value in preference.items() if key.startswith('view.')})
+    view = dict(defaults, **(projection.get('view', {}) if view is None else view))
+    reading_cache = {} if reader else projection.get('readings', {})
+    reading_sources = [];watch_values=[]
+    def read_rows(command):
+        if command.startswith('look-view '): raise Refused('a collection cannot recursively read look-view')
+        if reader:
+            if command not in reading_cache:
+                result = reader(command)
+                if not result.get('ok'): raise Refused(result.get('text', 'reading refused'))
+                reading_cache[command] = result.get('rows', [])
+        result=[]
+        for row in reading_cache.get(command, []):
+            r=dict(row);tid=r.get('id')
+            if tid and tid not in visible:
+                if command != 'forgotten': continue
+                # Notices contain no hidden text; re-read before reusing them.
+                if not reader:
+                    fresh=k.run(actor, 'forgotten', mode='see').get('rows', [])
+                    r=next((x for x in fresh if x.get('id')==tid), None)
+                    if r is None: continue
+            if tid in visible: r.setdefault('rev', visible[tid]['rev'])
+            result.append(r)
+        return result
     components = {a['name']: a for a in visible.values() if a.get('kind') == 'component' and a.get('name')}
     styles = [a for a in visible.values() if a.get('kind') == 'part-style' and a.get('lens') in (lens['id'], lens.get('name'))
               and (not a.get('personal') or a.get('made_by') in (actor.person,actor.id) or a.get('for')==actor.person)]
@@ -162,13 +209,23 @@ def compile_view(k, actor, target, _trail=()):
         if level > 24:
             raise Refused('component arrangement nests too deeply')
         if node.get('when') and not condition(node['when'], env): return None
+        for watch in node.get('watches',[]):
+            command=resolve_line(watch,env)
+            watch_values.append(dict(path=path,line=command,rows=read_rows(command)))
+            reading_sources.append(dict(path=path,line=command,watch=True,observed=command in reading_cache or bool(reader)))
         query = node.get('query')
         query_children = None
         if query:
             query, _, alias = query.partition(' as ')
             clauses = pieces(query)
-            tag = clauses.pop(0).removeprefix('tag:')
-            items = [a for a in visible.values() if a.get('kind') == tag]
+            selector = clauses.pop(0)
+            if selector.startswith('reading:'):
+                command = resolve_line(literal(selector[8:]), env)
+                reading_sources.append(dict(path=path, line=command, observed=command in reading_cache or bool(reader)))
+                items = read_rows(command)
+            else:
+                tag = selector.removeprefix('tag:')
+                items = [a for a in visible.values() if a.get('kind') == tag]
             for clause in clauses:
                 clause = clause.strip()
                 key, _, value = clause.removeprefix('prop:').partition('=')
@@ -177,13 +234,18 @@ def compile_view(k, actor, target, _trail=()):
                 v = a.get(node.get('by', 'order'), '')
                 try: return (0, float(v))
                 except (TypeError, ValueError): return (1, str(v))
-            items.sort(key=order)
+            if not selector.startswith('reading:') or node.get('by'): items.sort(key=order)
+            # Pagination bounds component construction, not just visible pixels.
+            offset = max(0, int(resolve(node['settings'].get('offset', '0'), env) or 0))
+            limit = min(100, max(1, int(resolve(node['settings'].get('limit', '100'), env) or 100)))
+            total = len(items)
+            items = items[offset:offset+limit] if 'limit' in node['settings'] else items
             template = definitions.get(node.get('each'))
             if not template: raise Refused('each needs a named template')
             kids = []
-            for item in items:
+            for index, item in enumerate(items):
                 next_env = dict(env, **{alias or 'item':item, 'item':item})
-                child = expand(template, next_env, path+'/'+item['id'], level+1)
+                child = expand(template, next_env, path+'/'+str(item.get('id') or index), level+1)
                 if child: kids.append(child)
             query_children = kids
         kind = node['component']
@@ -197,7 +259,13 @@ def compile_view(k, actor, target, _trail=()):
                     schema=json.loads(component.get('settings','{}'))
                     if not isinstance(schema,dict) or any(not isinstance(s,dict) for s in schema.values()):raise ValueError()
                 except ValueError:error=f'component {kind} settings must be a JSON type declaration';schema={}
-        settings = {key:resolve(value, env) for key, value in node['settings'].items()}
+        def setting_value(key,value):
+            if schema.get(key,{}).get('type')=='json' and REF.fullmatch(str(value)):
+                result=env
+                for bit in str(value)[1:].split('.'):result=result.get(bit,'') if isinstance(result,dict) else ''
+                if isinstance(result,(dict,list)):return result
+            return resolve(value,env)
+        settings = {key:setting_value(key,value) for key, value in node['settings'].items() if key not in ('limit','offset')}
         for preference in preferences:
             for key, value in preference.items():
                 if key.startswith(node['name']+'.'):
@@ -232,7 +300,7 @@ def compile_view(k, actor, target, _trail=()):
         for key in settings:
             if schema and key not in schema:error=f'{kind} has no setting {key}; help {kind}'
         for key in formats.keys()|labels.keys():
-            if key not in settings:error=f'{kind}: display handle needs an existing setting; unknown {key}'
+            if key not in settings and key!='ui':error=f'{kind}: display handle needs an existing setting; unknown {key}'
         for key,value in settings.items():
             try:
                 mapping=labels.get(key,{})
@@ -241,7 +309,8 @@ def compile_view(k, actor, target, _trail=()):
             except Refused as exc:error=str(exc)
         facts = env.get('item', {})
         reads = {v['id']:dict(rev=v['rev'],participant=True) for v in env.values() if isinstance(v,dict) and 'id' in v and 'rev' in v}
-        for tid in reads: shown[tid] = visible[tid]
+        for tid in reads:
+            if tid in visible: shown[tid] = visible[tid]
         children = query_children if query_children is not None else [x for child in node['children'] if (x := expand(child, env, path+'/'+child['name'], level+1))]
         if not query or kind != 'column': counts[kind] += 1
         report=reports.get(path,{})
@@ -255,15 +324,19 @@ def compile_view(k, actor, target, _trail=()):
         health=dict(health=report.get('health','unobserved'),last_error=report.get('last_error',''),quarantined=bool(report.get('quarantined') or quarantined),
                     painted=report.get('painted',[]),observed_at=report.get('observed_at'),failures=report.get('failures',0),disabled=report.get('disabled',False),action_epoch=report.get('action_epoch',0))
         if error:health.update(health='stopped',last_error=error)
-        settings_seen.append(dict(part=path, name=node['name'],component=kind, settings=settings, display=displays,facts=facts,health=health,
+        settings_seen.append(dict(part=path, name=node['name'],component=kind, settings=settings, display=displays,labels=labels.get('ui',{}),facts=facts,health=health,
                                  parts=declared_parts,gestures=[g['event'] for g in node['gestures']]))
         return dict(component=kind, name=node['name'], path=path, role=node.get('role',''), settings=settings, facts=facts, saw=reads,
-                    definition=component['id'] if component else None,error=error,display=displays,health=health,
+                    collection=dict(total=total, offset=offset, limit=limit) if query else None,
+                    definition=component['id'] if component else None,error=error,display=displays,labels=labels.get('ui',{}),health=health,
                     disabled=str(enabled).lower() in ('no','false','0') or bool(health['disabled']),motions=node.get('motions',[]),
                     gestures=[dict(event=g['event'], line=g['line'], env=env) for g in node['gestures']], children=children)
-    base = dict(viewer=dict(id=actor.person, name=k.name(actor.person)), today=k.now().strftime('%Y-%m-%d'),
+    base = dict(view=view, viewer=dict(id=actor.person, name=k.name(actor.person)), today=k.now().strftime('%Y-%m-%d'),
                 now=k.now().strftime('%Y-%m-%dT%H:%M:%SZ') if '$now' in source else '')
     tree = expand(definitions['root'], base, 'root')
+    if reader:
+        if not hasattr(actor, '_component_projection'): actor._component_projection = {}
+        actor._component_projection[lens['id']] = dict(view=view, readings=reading_cache)
     used = [dict(components[name],trusted=components[name].get('reviewed_code')==hashlib.sha256(components[name].get('code','').encode()).hexdigest()) for name in counts if name in components]
     for a in [lens, *used, *styles, *preferences, *shown.values()]: k.mark(actor, a['id'], a)
     text = f"{lens.get('title') or lens.get('name')}: " + ', '.join(f'{n} {kind}' for kind,n in counts.items())
@@ -279,7 +352,8 @@ def compile_view(k, actor, target, _trail=()):
     if styles:text+='. Style: '+ '; '.join(a.get('target','')+' '+json.dumps(a.get('paint',{})) for a in paint_styles)
     if style_errors:text+='; paint refusals: '+ '; '.join(e['error'] for e in style_errors)
     return dict(text=text, rows=[dict(kind='view-description', lens=lens['id'], tree=tree, counts=dict(counts), parts=settings_seen,
-                                    components=used, styles=paint_styles,tokens=tokens,style_errors=style_errors)])
+                                    components=used, styles=paint_styles,tokens=tokens,style_errors=style_errors,
+                                    readings=reading_sources, watches=watch_values, view=view)])
 
 
 def look_view(k, actor, st, entry, tx, group, saw=None):
@@ -288,6 +362,7 @@ def look_view(k, actor, st, entry, tx, group, saw=None):
         full=out['rows'][0]
         parts=[{key:value for key,value in p.items() if key!='facts'} for p in full['parts']]
         out['rows']=[dict(kind=full['kind'],lens=full['lens'],counts=full['counts'],parts=parts,style_errors=full['style_errors'],
+                          readings=full.get('readings',[]),view=full.get('view',{}),
                           observation='Last painter report, private to this viewer; unobserved is not proof of paint. plan=yes returns the full plan.')]
         out['text']+='\n'+ '\n'.join(p['name']+' ('+p['component']+'): '+p['health']['health']+(' · '+p['health']['last_error'] if p['health']['last_error'] else '') for p in parts if p['health']['health']!='unobserved')
     return out
@@ -315,8 +390,9 @@ def component_card(k, actor, name):
             card = dict(a, id=t, rev=k.state.rev.get(t,0))
             card.update(component_status(k,actor,a.get('name')))
             card.pop('code', None)
+            card['general_handles']='labels ui {"Reply":"Responder"}; personal-view <lens> <part>.labels.ui=<JSON>; personal-style <lens> target=<component.part>; limit/offset on collections'
             return dict(text='\n'.join(str(card.get(key,'')) for key in
-                ('name','purpose','limitations','settings','parts','slots','gestures','example','uses')), rows=[card])
+                ('name','purpose','limitations','settings','parts','slots','gestures','example','uses','general_handles')), rows=[card])
 
 
 def components(k, actor, st, entry, tx, group, saw=None):

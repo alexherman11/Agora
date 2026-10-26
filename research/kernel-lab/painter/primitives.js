@@ -46,6 +46,20 @@ const P = (()=>{
     return node(kind==='code'?'pre':'span',attrs,value);
   };
   const press=(label,fn,cls='')=>node('button',{type:'button',class:cls,on:{click:fn}},label);
+  function selected(root,memory={},version=()=>root.textContent){
+    const capture=()=>{const s=getSelection(),value=s?.toString();if(value&&root.contains(s.anchorNode)&&root.contains(s.focusNode)){memory.passage={value,version:version()};return value}return ''};
+    root.addEventListener('pointerup',capture);
+    return ()=>capture()||(memory.passage?.version===version()?memory.passage.value:'');
+  }
+  function submit(form,fn){
+    // The frame deliberately lacks allow-forms. Native submission can be
+    // blocked before a submit event; keep validation and keyboard activation
+    // local, then invoke the authored guarded word rather than navigation.
+    const send=e=>{e.preventDefault();if(form.checkValidity())return fn(e);form.reportValidity()};
+    const click=e=>{const b=e.target.closest('button[type=submit]');if(b&&form.contains(b))return send(e)};
+    const key=e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey||e.target.matches('input:not([type=file])')))return send(e)};
+    form.addEventListener('click',click,true);form.addEventListener('keydown',key);
+  }
   const input=(kind,attrs={})=>node(kind==='multiline'?'textarea':kind==='choice'?'select':'input',{
     ...(kind==='toggle'?{type:'checkbox'}:{}),...attrs});
   const focusable=n=>[...n.querySelectorAll('button,input,textarea,select,[tabindex="0"],a[href]')].filter(x=>!x.disabled&&!x.hidden);
@@ -65,7 +79,7 @@ const P = (()=>{
     const n=body?.classList?.contains(kind)?body:node('section',attrs,body);
     for(const [key,value] of Object.entries(attrs))n.setAttribute(key,value);veil.append(n);
     let disposed=false;
-    const close=()=>{if(disposed)return;disposed=true;veil.remove();document.removeEventListener('keydown',key);if(previous?.isConnected)previous.focus();closed?.()};
+    const close=(silent=false)=>{if(disposed)return;disposed=true;veil.remove();document.removeEventListener('keydown',key);if(previous?.isConnected)previous.focus();if(silent!==true)closed?.()};
     const key=e=>{if(e.key==='Escape'){e.preventDefault();close()}if(modal&&e.key==='Tab'){
       const items=focusable(n);if(!items.length){e.preventDefault();n.focus();return}
       if(e.shiftKey&&document.activeElement===items[0]){e.preventDefault();items.at(-1).focus()}
@@ -104,5 +118,5 @@ const P = (()=>{
     view.addEventListener('scroll',draw);draw();return view;
   }
   css(`*{box-sizing:border-box}[hidden]{display:none!important}[data-layout]{gap:var(--space,12px);min-width:0}.overlay-anchor{position:fixed;inset:0;pointer-events:none;z-index:100}.overlay-anchor>*{pointer-events:auto}.dialog{margin:auto;background:var(--card);padding:24px;border-radius:12px;min-width:min(420px,90vw);max-width:90vw}.popover,.tooltip{background:var(--card);border:1px solid #e5e8e2;padding:12px;border-radius:10px;box-shadow:0 12px 40px #24352c18}.rich-text p{white-space:pre-wrap}.gallery-example{padding:16px;border:1px solid #e5e8e2;border-radius:12px;background:var(--card)}.catalogue{padding:24px}.catalogue pre{white-space:pre-wrap;font-size:11px}.catalogue>section{padding:18px;margin:14px 0;background:var(--card);border:1px solid #e5e8e2;border-radius:12px}table{border-collapse:collapse;width:100%}td,th{padding:10px;text-align:left;border-bottom:1px solid #e5e8e2}@media(max-width:650px){[data-layout=split],[data-layout=grid],.board{grid-template-columns:1fr!important}body{min-width:0!important;padding:18px!important}.tools,.filters{flex-wrap:wrap}.drawer{width:100%}}`);
-  return {tokens,node,layout,content,press,input,overlay,motion,spring,canvas,virtual,navigation,markdown};
+  return {tokens,node,layout,content,press,selected,submit,input,overlay,motion,spring,canvas,virtual,navigation,markdown};
 })();

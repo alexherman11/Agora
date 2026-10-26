@@ -1,0 +1,531 @@
+{
+  "checks": [
+    {
+      "check": "Feed constructs twelve cards for more than 400 posts",
+      "ok": true,
+      "detail": 409
+    },
+    {
+      "check": "No horizontal overflow feed-catchup 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow feed-catchup 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Board readings exclude another surface\u2019s posts",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-discussion 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-discussion 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-question 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-question 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow decision 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow decision 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-announcement 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-announcement 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-event 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-event 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-poll 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-poll 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-ask 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-ask 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-offer 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-offer 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-document 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-document 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow csv-table 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow csv-table 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-lost-pet 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow kind-lost-pet 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Optional summary is labelled and its context is private",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow compose-event 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow compose-event 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow compose-lost-pet 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow compose-lost-pet 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Pointer and keyboard compose; photo and PDF uploaded and attached",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Second person receives the first person\u2019s post without reload",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Pointer upvote is a sealed world like",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Keyboard reply is present in world readings",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Pointer-selected quotation is admitted with source",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow thread-with-quotes 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow thread-with-quotes 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow photo 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow photo 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "PDF page quote is checked by the world",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow pdf-page 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow pdf-page 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow pdf-page-quote 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow pdf-page-quote 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "RSVP is read back from world facts",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Claim last slot; world reports zero seats",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow event-full-slots 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow event-full-slots 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Calendar button downloads the world\u2019s actual calendar bytes",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Converted calendar RSVP targets its richer event thing",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Converted calendar offers an actual download",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Converted media loads through Blob-only playback",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Pointer poll vote is sealed count in world reading",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow poll-after-closing 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow poll-after-closing 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Leader hide notice contains actual world reason",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow hidden-post-notice 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow hidden-post-notice 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Leader pointer undo restores the post",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow leaders-queue 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow leaders-queue 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow search-results 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow search-results 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow empty-channel 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow empty-channel 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Pointer mark seen clears the actual personal reading",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Plain download crosses trusted host without sandbox relaxation",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Verified agent origin is labelled for its real person",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow agent-badge 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow agent-badge 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Private photo positive owner control content",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Private photo positive owner control ?variant=thumbnail",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Private post and file absent from outsider component page",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "File transport refuses outsider content",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "File transport refuses outsider thumbnail",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "File transport refuses outsider content",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "File transport refuses outsider thumbnail",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Component network remains disabled",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Scrolled every feed page with bounded DOM",
+      "ok": true,
+      "detail": {
+        "cold_start_to_board_ms": 2064.75,
+        "first_paint_upper_bound_ms": 1310.15,
+        "scroll_all_posts_ms": 7467.16,
+        "feed_threads": 331,
+        "pages_scrolled": 28,
+        "max_feed_cards": 12
+      }
+    },
+    {
+      "check": "Broken poll is a stopped part while feed survives",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Throwing file is a stopped part while feed survives",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "New looping component times out independently",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Faults retain compose, upvotes and peer live updates",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow fault-isolation 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow fault-isolation 390",
+      "ok": true,
+      "detail": null
+    }
+  ],
+  "metrics": {
+    "cold_start_to_board_ms": 2064.75,
+    "first_paint_upper_bound_ms": 1310.15,
+    "scroll_all_posts_ms": 7467.16,
+    "feed_threads": 331,
+    "pages_scrolled": 28,
+    "max_feed_cards": 12
+  },
+  "screenshots": [
+    "evidence\\ui\\first-paint-1440.png",
+    "evidence\\ui\\feed-catchup-1440.png",
+    "evidence\\ui\\feed-catchup-390.png",
+    "evidence\\ui\\kind-discussion-1440.png",
+    "evidence\\ui\\kind-discussion-390.png",
+    "evidence\\ui\\kind-question-1440.png",
+    "evidence\\ui\\kind-question-390.png",
+    "evidence\\ui\\decision-1440.png",
+    "evidence\\ui\\decision-390.png",
+    "evidence\\ui\\kind-announcement-1440.png",
+    "evidence\\ui\\kind-announcement-390.png",
+    "evidence\\ui\\kind-event-1440.png",
+    "evidence\\ui\\kind-event-390.png",
+    "evidence\\ui\\kind-poll-1440.png",
+    "evidence\\ui\\kind-poll-390.png",
+    "evidence\\ui\\kind-ask-1440.png",
+    "evidence\\ui\\kind-ask-390.png",
+    "evidence\\ui\\kind-offer-1440.png",
+    "evidence\\ui\\kind-offer-390.png",
+    "evidence\\ui\\kind-document-1440.png",
+    "evidence\\ui\\kind-document-390.png",
+    "evidence\\ui\\csv-table-1440.png",
+    "evidence\\ui\\csv-table-390.png",
+    "evidence\\ui\\kind-lost-pet-1440.png",
+    "evidence\\ui\\kind-lost-pet-390.png",
+    "evidence\\ui\\compose-event-1440.png",
+    "evidence\\ui\\compose-event-390.png",
+    "evidence\\ui\\compose-lost-pet-1440.png",
+    "evidence\\ui\\compose-lost-pet-390.png",
+    "evidence\\ui\\thread-with-quotes-1440.png",
+    "evidence\\ui\\thread-with-quotes-390.png",
+    "evidence\\ui\\photo-1440.png",
+    "evidence\\ui\\photo-390.png",
+    "evidence\\ui\\pdf-page-1440.png",
+    "evidence\\ui\\pdf-page-390.png",
+    "evidence\\ui\\pdf-page-quote-1440.png",
+    "evidence\\ui\\pdf-page-quote-390.png",
+    "evidence\\ui\\event-full-slots-1440.png",
+    "evidence\\ui\\event-full-slots-390.png",
+    "evidence\\ui\\poll-after-closing-1440.png",
+    "evidence\\ui\\poll-after-closing-390.png",
+    "evidence\\ui\\hidden-post-notice-1440.png",
+    "evidence\\ui\\hidden-post-notice-390.png",
+    "evidence\\ui\\leaders-queue-1440.png",
+    "evidence\\ui\\leaders-queue-390.png",
+    "evidence\\ui\\search-results-1440.png",
+    "evidence\\ui\\search-results-390.png",
+    "evidence\\ui\\empty-channel-1440.png",
+    "evidence\\ui\\empty-channel-390.png",
+    "evidence\\ui\\agent-badge-1440.png",
+    "evidence\\ui\\agent-badge-390.png",
+    "evidence\\ui\\fault-isolation-1440.png",
+    "evidence\\ui\\fault-isolation-390.png"
+  ],
+  "seed": {
+    "checks": 61,
+    "people": 32,
+    "posts": 409,
+    "replies": 82,
+    "days": 14,
+    "timings": {
+      "board.feed": {
+        "median_ms": 24.72,
+        "max_ms": 41.96
+      },
+      "catch-up": {
+        "median_ms": 20.59,
+        "max_ms": 23.57
+      },
+      "board.search q=council": {
+        "median_ms": 37.63,
+        "max_ms": 57.82
+      }
+    },
+    "pdf_preview": "no installed PDF renderer",
+    "model": "the local model is not running",
+    "model_attempts": 1,
+    "live_desktop_touched": false
+  },
+  "hidden": true,
+  "live_touched": false
+}

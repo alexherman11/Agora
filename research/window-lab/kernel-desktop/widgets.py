@@ -59,7 +59,8 @@ class Widgets:
                 self.instances[token] = dict(p=p, lease=lease, at=time.monotonic(), cursor=len(self.k.happenings),
                                              words=set(), calls=[], hits=[], paint=None)
                 return dict(ok=True, instance=token, widget=mid, code=self.k.state.get(mid, 'code'),
-                            name=self.k.state.get(mid, 'title') or self.k.name(mid), surface=surface, theme=self.theme(mid, actor.person))
+                            name=self.k.state.get(mid, 'title') or self.k.name(mid), surface=surface, theme=self.theme(mid, actor.person),
+                            component_lens=self.k.state.get(mid,'component_lens',''),receipts=self.k.state.get(mid,'receipts','line'))
             token = str(body.get('instance') or '')
             i = self.instances.get(token)
             if not i or i['p'].viewer.id != actor.id:
@@ -104,6 +105,31 @@ class Widgets:
                 raise Refused('widget is speaking too quickly; try again in a second')
             i['calls'].append(now)
             op = body.get('op')
+            if op == 'project':
+                import json
+                from painter.arrangement import compile_view
+                target = self.k.state.get(p.mid, 'component_lens', '')
+                admitted = p.run('look-view ' + quote(target) + ' plan=yes', mode='see')
+                if not admitted.get('ok'): return admitted
+                view = body.get('view', {})
+                if not isinstance(view, dict) or len(json.dumps(view)) > 8000 or any(
+                        not isinstance(v, (str, int, float, bool)) for v in view.values()):
+                    raise Refused('view state needs a small object of plain values')
+                # Each nested reading uses this exact viewer/instance principal.
+                # No world lock is held while a process module answers.
+                out = compile_view(self.k, p.actor, target,
+                                   reader=lambda command: p.run(command, mode='see'), view=view)
+                return dict(ok=True, **out)
+            if op == 'file-check':
+                target = str(body.get('target', ''))
+                variant = body.get('variant', 'content')
+                if not re.fullmatch(r'[a-zA-Z]+\d+', target) or variant not in ('content', 'thumbnail'):
+                    raise Refused('choose a file thing and content or thumbnail')
+                admitted = p.run('file-read ' + target, mode='see')
+                if not admitted.get('ok'): return admitted
+                # /files authenticates the parent's own cookie and rechecks
+                # current permissions. The component never receives this URL.
+                return dict(ok=True, path='/files/' + target + '?variant=' + variant)
             if op == 'upload':
                 import base64
                 from kernel.blobs import receive, cap

@@ -4,6 +4,7 @@ const {widget} = await agora.ready;
 const definition = (await rows('rows widget')).find(w=>w.id===widget.id||w.id===widget);
 const lensName = definition.component_lens;
 let mounted, dragging=false, refreshTimer, menu, menuReturnFocus, currentPlan;
+let viewState={}, renderReadings=new Map();
 const moduleCache=new Map();
 const interpolate=(text,env)=>String(text).replace(/\$([\w.-]+)/g,(matched,path,offset,source)=>{
   let value=env;for(const bit of path.split('.'))value=value?.[bit];
@@ -24,7 +25,12 @@ function openMenu(node,x,y){
 async function fire(node,event,values={}){
   const gesture=node.gestures.find(g=>g.event===event);
   if(!gesture)throw Error('No gesture '+event+' on '+node.path);
-  const line=interpolate(gesture.line,{...gesture.env,...values});
+  const fields=values.fields;
+  const authored=fields&&typeof fields==='object'?gesture.line.replace(/\$fields\b/g,'__AGORA_FIELD_VALUES__'):gesture.line;
+  let line=interpolate(authored,{...gesture.env,...values});
+  if(fields&&typeof fields==='object')line=line.replace('__AGORA_FIELD_VALUES__',()=>Object.entries(fields).map(([key,value])=>{
+    if(!/^[a-z_][a-z0-9_.-]*$/.test(key))throw Error('Invalid field name');return key+'='+Q(value);
+  }).join(' '));
   const saw={...node.saw,...values.saw};
   const out=await act(line,saw);
   // A previous read may have started before this act. Drain it, then request a
@@ -63,14 +69,28 @@ function renderTrusted(node){
   const module=moduleCache.get(node.component);
   if(!module)throw Error('Component module did not load');
   const owner=componentOwners.get(node.path);
+  const generation=owner.generation;
   const boundP=Object.fromEntries(Object.entries(P).map(([key,value])=>[key,typeof value==='function'?owned(value,owner):value]));
   const api={P:boundP,el:owned(P.node,owner),button:owned(P.press,owner),part:owned((name,tag,attrs,...kids)=>part(node,name,tag,attrs,...kids),owner),palette,flag,Q,
     children:node.children,render,settings:node.settings,facts:node.facts,node,
+    child:(name,settings={})=>{const child=node.children.find(c=>c.name===name);if(!child)throw Error('Arrange child slot '+name);return render({...child,settings:{...child.settings,...settings},display:{...child.display,...settings}})},
     display:key=>node.display?.[key]??node.settings[key],guard:fn=>owned(fn,owner),
     setTimeout:(fn,ms)=>scoped(owner,()=>setTimeout(fn,ms)),setInterval:(fn,ms)=>scoped(owner,()=>setInterval(fn,ms)),
     requestAnimationFrame:fn=>scoped(owner,()=>requestAnimationFrame(fn)),
     fire:(event,values)=>fire(node,event,values),openMenu,closeMenu,rows,tell,
     fireLatest:(latest,event,values)=>fire(latest,event,values),
+    view:()=>({...viewState}), select:values=>{viewState={...viewState,...values};return refresh()},
+    read:line=>{if(!renderReadings.has(line))renderReadings.set(line,rows(line));return renderReadings.get(line)},
+    draft:owner.draft||(owner.draft={}),
+    cleanup:fn=>{if(owner.closed||owner.generation!==generation)fn();else owner.dispose.push(fn)},
+    file:async(target,variant='content')=>{
+      const {blob}=await agora.file(target,variant);const url=URL.createObjectURL(blob);
+      if(owner.closed||owner.generation!==generation){URL.revokeObjectURL(url);throw Error('This file view changed. Please open it again.')}
+      owner.dispose.push(()=>URL.revokeObjectURL(url));return {blob,url};
+    }, upload:(file,group)=>agora.upload(file,group),
+    download:target=>agora.download(target),downloadReading:line=>agora.downloadReading(line),
+    downloadGesture:(event,values={})=>{const gesture=node.gestures.find(g=>g.event===event);if(!gesture)throw Error('Arrange a '+event+' gesture');return agora.downloadReading(interpolate(gesture.line,{...gesture.env,...values}))},
+    label:(key,fallback=key)=>{if(node.labels?.[key]||node.labels?.[fallback])return node.labels[key]||node.labels[fallback];try{return JSON.parse(api.display('labels')||'{}')[key]||fallback}catch{return fallback}},
     beginDrag:(event,card)=>beginDrag(event,card,node),
     latest:()=>findNode(currentPlan.tree,node.path)||node,
     redraw:refresh};
@@ -116,6 +136,19 @@ function applyStyles(plan){
   const style=el('style',{id:'part-styles'},rules.join('\n'));document.head.append(style);
 }
 let refreshInFlight,refreshAgain=false;
+function keepTextSelection(){
+  const selection=getSelection();if(!selection||selection.isCollapsed)return;
+  const root=selection.anchorNode?.parentElement?.closest('[data-path][data-part]');
+  if(!root||!root.contains(selection.focusNode))return;
+  const offset=(node,n)=>{const range=document.createRange();range.selectNodeContents(root);range.setEnd(node,n);return range.toString().length};
+  return {path:root.dataset.path,part:root.dataset.part,text:root.textContent,anchor:offset(selection.anchorNode,selection.anchorOffset),focus:offset(selection.focusNode,selection.focusOffset)};
+}
+function restoreTextSelection(saved){
+  if(!saved)return;const root=[...document.querySelectorAll('[data-path][data-part]')].find(n=>n.dataset.path===saved.path&&n.dataset.part===saved.part);
+  if(!root||root.textContent!==saved.text)return;
+  const at=offset=>{const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node,last;while(node=walker.nextNode()){last=node;if(offset<=node.length)return [node,offset];offset-=node.length}return last?[last,last.length]:[root,0]};
+  getSelection().setBaseAndExtent(...at(saved.anchor),...at(saved.focus));
+}
 function refresh(){
   if(refreshInFlight){refreshAgain=true;return refreshInFlight}
   refreshInFlight=refreshOnce().finally(()=>{refreshInFlight=null;if(refreshAgain){refreshAgain=false;queueMicrotask(()=>refresh().catch(tell))}});
@@ -123,7 +156,8 @@ function refresh(){
 }
 async function refreshOnce(){
   if(dragging)return;
-  const plan=(await rows('look-view '+Q(lensName)+' plan=yes'))[0];
+  const plan=(await agora.project(viewState)).rows[0];
+  viewState={...plan.view,...viewState};
   // A read begun before pointer capture may finish during a drag. Never replace
   // that captured DOM; its old facts must survive until the fenced drop.
   if(dragging)return;
@@ -139,10 +173,15 @@ async function refreshOnce(){
     catch(error){moduleCache.set(c.name,{mount(){throw error},_source:c.code})}finally{URL.revokeObjectURL(url);agora.componentPhase?.({path:importing.part,end:true})}
   }
   if(dragging)return;
-  const previousPlan=currentPlan;currentPlan=plan;
+  const previousPlan=currentPlan;currentPlan=plan;renderReadings=new Map((plan.watches||[]).map(w=>[w.line,Promise.resolve(w.rows)]));
   const focus=document.activeElement;const focused=focus?.dataset.path;const focusedPart=focus?.dataset.part;const selection=focus?.selectionStart;const value=focus?.value;
+  const passage=keepTextSelection();
   const next=render(plan.tree);mounted?.remove();document.body.append(next);mounted=next;
+  mounted.dataset.view=JSON.stringify(plan.view||{});
+  for(const [key,value] of Object.entries({...P.tokens,...theme,...plan.tokens}))if(typeof value==='string')document.documentElement.style.setProperty('--'+key,value);
+  document.documentElement.dataset.painter='components';
   if(focused){const n=[...document.querySelectorAll('[data-path]')].find(n=>n.dataset.path===focused&&n.dataset.part===focusedPart);if(n){if(value!==undefined)n.value=value;n.focus();if(typeof selection==='number'&&n.setSelectionRange)n.setSelectionRange(selection,selection)}}
+  restoreTextSelection(passage);
   applyStyles(plan);
   for(const owner of componentOwners.values())if(owner.element?.isConnected){
     if(!owner.failed&&!owner.node.disabled){
@@ -155,7 +194,7 @@ async function refreshOnce(){
         if(match&&old&&old.facts[match[1]]!==owner.node.facts[match[1]])playMotion(owner,binding.token);
       }
     }
-  }else if(!findNode(plan.tree,owner.node.path)){for(const dispose of owner.dispose.splice(0))try{dispose()}catch{};componentOwners.delete(owner.node.path)}
+  }else if(!findNode(plan.tree,owner.node.path)){owner.closed=true;for(const dispose of owner.dispose.splice(0))try{dispose()}catch{};componentOwners.delete(owner.node.path)}
   for(const owner of componentOwners.values())for(const m of owner.node.motions||[])if(m.trigger.startsWith('happening ')){
     try{await hearMotion(m.trigger.slice(10))}catch(e){observeComponent(owner,'healthy','Motion subscription refused: '+String(e.message||e))}
   }

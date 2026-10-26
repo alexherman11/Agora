@@ -150,7 +150,8 @@ class Browser:
                 p = event['params']
                 url = urlsplit(p['request']['url'])
                 local = url.scheme + '://' + url.netloc == self.allowed_origin
-                path_ok = url.path in ('/desk/widget.html', '/desk/kd.css', '/desk/kd.js', '/desk/widget-host.js', '/dev/signin') or url.path.startswith('/desk/widget/')
+                path_ok = url.path in ('/desk/widget.html', '/desk/kd.css', '/desk/kd.js', '/desk/widget-host.js', '/dev/signin') or url.path.startswith('/desk/widget/') or (
+                    p['request'].get('method') == 'GET' and __import__('re').fullmatch(r'/files/[a-zA-Z]+\d+',url.path))
                 if p.get('frameId') == main and local and path_ok:
                     headers=dict(p['request'].get('headers') or {})
                     if url.path.startswith('/desk/widget/'):

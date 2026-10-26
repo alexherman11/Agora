@@ -228,3 +228,12 @@ Departures/limits from MESSAGE-BOARD.md:
 
 Primary implementation references: [pypdf extraction](https://pypdf.readthedocs.io/en/stable/user/extract-text.html),
 [Pillow EXIF orientation](https://pillow.readthedocs.io/en/stable/reference/ImageOps.html#PIL.ImageOps.exif_transpose).
+
+## Interface follow-on, 26 October (builder draft)
+
+The earlier world-only scope above records that job's boundary. The component
+painter interface now has its own [handoff and evidence](UI-HANDOFF.md) and
+[discoverable handles](UI-HANDLES.md). `ui_proof.py` builds only a disposable
+scratch world and runs hidden Chromium. `ui_live.py --live` is the separate
+screen-gated adoption path; it installs an empty board and dock entry without
+opening a window. Claude owns review and commit.

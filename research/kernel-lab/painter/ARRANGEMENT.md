@@ -104,6 +104,51 @@ component isolation boundary or an independent capability for each nested piece.
 See REACH.md for the map, primitives.js for the small core, and catalogue.py for
 the first-party cards. Native host functions and domain modules remain separate.
 
+## Reading collections and files (community board candidate)
+
+`posts : list, of reading:"board.feed order=$view.order in=$view.channel" as p,
+limit 12, offset $view.offset, each post` arranges an admitted reading. The
+trusted widget host evaluates each reading with its viewer/instance principal,
+outside the kernel lock. Results retain their ordering unless `by` is authored.
+Bound rows carry their own revisions. Dynamic substitutions are quoted data.
+`watch reading:"board.badges"` beneath a part observes a viewer-admitted reading
+without constructing rows. A changed result invalidates the projection, and
+`api.read` reuses that exact observation. Use this for role/name/label inputs
+that affect a component without being its main collection. Watched values are
+described in `look-view plan=yes`; no module runs in a default kernel reading.
+`limit` (1..100) and nonnegative `offset` bound component construction; they are
+collection handles, not component settings. `look-view` without a host's
+projection reports unobserved reading sources instead of inventing rows.
+
+The lens's JSON `view` fact supplies initial local selection values. Reviewed
+components use `api.view()`/`api.select({...})` for transient selection and
+`api.draft` for unsaved input. Durable personal choices still use `personal-view`
+and `personal-style`. `api.read(line)` shares a viewer-checked reading within a
+paint; `api.child(slot, settings)` supplies data to an authored child slot.
+`api.cleanup(fn)` disposes resources on reconstruction/removal. Structured
+`$fields` in an authored gesture expands validated plain field names and quoted
+values in one pass, preserving user text containing dollar signs and semicolons.
+
+`api.file(thing, 'content'|'thumbnail')` returns `{blob,url}`. The trusted parent
+first checks `file-read` under widget grants, then fetches `/files/<thing>` with
+its own authenticated session. Components receive neither a route nor a session,
+token or network capability. URLs are revoked on component disposal. The frame
+keeps `connect-src 'none'`; media allows exactly `blob:` (images already allowed
+`data: blob:`). The general file component displays extracted PDF pages when a
+PDF renderer is unavailable; it never embeds a PDF/plugin or active upload.
+
+`labels ui {"Reply":"Responder","compose":"Escribir"}` provides a component's
+UI words without changing domain values. Components call `api.label(key,fallback)`.
+The personal handle is `<part>.labels.ui=<JSON>`. It is exposed on every component
+help card and in `look-view`. Theme tokens may also be bounded nonnegative
+numbers (0..2000) for weights/line heights; names ending `-font` accept plain
+font-family names, never CSS text or URLs.
+
+Use `api.P.submit(form, callback)` for local forms. It checks native field
+validity, handles submit-button pointer/keyboard activation and Ctrl+Enter, then
+calls the guarded action. The frame keeps its no-forms sandbox and
+`form-action 'none'`. Native form navigation is never the action transport.
+
 ## 26 October: isolation and general editing handles
 
 Builder draft for Claude's review. This section supersedes the earlier

@@ -88,10 +88,15 @@ function stoppedCard(owner,error,off=false){
 }
 function componentFailed(owner,error){
   if(!owner)return console.error(error);
+  if(owner.element?.isConnected&&!owner.element.classList.contains('component-stopped')&&(!owner.worker||owner.workerPainted))owner.lastGood=owner.element.cloneNode(true);
   owner.failed=true;owner.failures++;owner.error=error;
   for(const dispose of owner.dispose.splice(0))try{dispose()}catch{}
   const shell=stoppedCard(owner,error);
-  if(owner.lastGood){const stale=owner.lastGood.cloneNode(true);stale.dataset.stale='true';stale.inert=true;stale.setAttribute('aria-label','Last good rendering, stale');shell.prepend(el('small',{},'Last good rendering · stale'),stale)}
+  if(owner.lastGood){const stale=owner.lastGood.cloneNode(true);stale.dataset.stale='true';stale.inert=true;stale.setAttribute('aria-label','Last good rendering, stale');
+    // File URLs are revoked when their owner stops. Keep the readable stale
+    // content, with an honest placeholder rather than a broken/revoked player.
+    for(const media of stale.querySelectorAll('img,audio,video'))if((media.getAttribute('src')||'').startsWith('blob:'))media.replaceWith(el('p',{class:'component-stale-media'},'Previous attachment preview · retry to reopen'));
+    shell.prepend(el('small',{},'Last good rendering · stale'),stale)}
   owner.element?.replaceWith(shell);owner.element=shell;
   observeComponent(owner,'stopped',error);return shell;
 }
@@ -101,6 +106,7 @@ function renderBoundary(node){
   const source=JSON.stringify([definition?.code,node.settings,node.display,node.facts,node.error,node.disabled,node.health?.action_epoch,node.health?.quarantined]);
   if(owner.failed&&owner.source===source)return owner.element;
   if(owner.worker&&owner.source===source)return owner.element;
+  owner.generation=(owner.generation||0)+1;owner.closed=false;
   owner.source=source;owner.sourceTag=definition?.reviewed_code||'unreviewed';owner.failed=false;
   for(const dispose of owner.dispose.splice(0))try{dispose()}catch{}
   if(node.disabled){owner.element=stoppedCard(owner,'Turned off for this viewer.',true);return owner.element}
