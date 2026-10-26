@@ -30,9 +30,11 @@ def word_set(k, actor, st, entry, tx, group, saw=None):
     t = st.target
     if k.state.get(t, 'kind') != 'word':
         raise Refused('word-set needs a dictionary entry')
-    if not k.is_steward(actor.person):
-        raise Refused('only stewards edit dictionary entries')
+    scope = k.state.get(t, 'lives')
+    if not k.is_steward(actor.person) and not (scope and k.is_leader(actor.person, scope)):
+        raise Refused('stewards edit place words; group leaders edit their scoped entries')
     values = dict(st.kv)
+    values.pop('in', None)
     allowed = {'help', 'aliases', 'may', 'undo', 'takes', 'once', 'sealed', 'status'}
     if not values or any(f not in allowed and not re.fullmatch(r'(label|help)\.[a-z][a-z0-9-]*', f)
                          for f in values):

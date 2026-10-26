@@ -2,7 +2,7 @@
 export default {mount(api,s){
   const {P}=api,kind=api.node.component,children=()=>api.children.map(api.render);
   const root=api.part('body','section',{'aria-label':s.label||kind});
-  const label=s.label||kind;
+  const label=api.display('label')||kind;
   const fire=event=>values=>api.fire(event,values).catch(api.tell);
   if(kind==='button')return api.part('control','button',{type:'button',on:{click:()=>fire('press')({})}},label);
   if(['input','editor','choice','switch'].includes(kind)){
@@ -15,7 +15,7 @@ export default {mount(api,s){
   }
   if(['text-block','markdown','code','icon','image','avatar','player'].includes(kind)){
     const type=({'text-block':'text',player:'media'})[kind]||kind;
-    root.append(P.content(type,s.value||s.label,{'aria-label':label}));return root;
+    root.append(P.content(type,api.display('value')||label,{'aria-label':label}));return root;
   }
   if(['badge','progress','empty-state'].includes(kind)){
     if(kind==='progress')root.append(P.node('progress',{max:s.max,value:s.value,'aria-label':label}),P.content('text',label));

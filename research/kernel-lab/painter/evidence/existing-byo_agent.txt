@@ -5,15 +5,15 @@
   ok   a composed lend is one signed act · r14; agent for Lena
   ok   who has it resolves a claim to a neighbour · Cordless drill: Lena, from tool and person rows
   ok   the neighbour's page names the agent and the holder · scene built by the real painter facade
-  ok   a painted lend cannot take an occupied tool · refused: sb50 is taken (1 seat, all claimed); look shows what is open
+  ok   a painted lend cannot take an occupied tool · refused: sb62 is taken (1 seat, all claimed); look shows what is open
   ok   return undoes the specific loan · r14 returned; unrelated acts left intact
-  ok   a neighbour borrows from the painted page · Cordless drill (sb50), a tool by agent for Lena
+  ok   a neighbour borrows from the painted page · Cordless drill (sb62), a tool by agent for Lena
   title=Cordless drill
   seats=1
   seats_left=1
-  made=2026-10-24T21:41:41Z
-  changed=2026-10-24T21:41:41Z
-ok claim sb50 [r16] · yours; 0 seats left
+  made=2026-10-26T19:18:43Z
+  changed=2026-10-26T19:18:43Z
+ok claim sb62 [r16] · yours; 0 seats left
 ~ lend, one act [r16]
   ok   the page now says who has it · Cordless drill: Noor
   ok   a member cannot return another person's loan · refused: r17 is Lena's; you may undo your own acts, leaders the acts in their groups, stewards any

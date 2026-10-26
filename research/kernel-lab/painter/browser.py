@@ -14,6 +14,11 @@ from widget_browser import Browser
 class Page:
     def __init__(self,url,token,widget,width=1600,height=1040,clock=None):
         self.browser=Browser(url,test_flags=['--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']);self.c=self.browser.__enter__()
+        self.errors=[];previous=self.c.on_event
+        def capture(e):
+            previous(e)
+            if e.get('method') in ('Runtime.exceptionThrown','Log.entryAdded'):self.errors.append(e)
+        self.c.on_event=capture;self.c.call('Runtime.enable');self.c.call('Log.enable')
         self.c.call('Emulation.setFocusEmulationEnabled',enabled=True)
         self.c.call('Emulation.setDeviceMetricsOverride',width=width,height=height,deviceScaleFactor=1,mobile=False)
         if clock:self.c.call('Page.addScriptToEvaluateOnNewDocument',source=self.clock_script(clock))
@@ -33,7 +38,7 @@ class Page:
         if self.session:return self.session
         targets=[t for t in c.call('Target.getTargets')['targetInfos'] if t['type']=='iframe' and t['url']=='about:srcdoc']
         if targets:
-            self.session={'_session':c.call('Target.attachToTarget',targetId=targets[0]['targetId'],flatten=True)['sessionId']}
+            self.session={'_session':c.call('Target.attachToTarget',targetId=targets[-1]['targetId'],flatten=True)['sessionId']}
             return self.session
         tree=c.call('Page.getFrameTree')['frameTree'];child=next((f for f in tree.get('childFrames',[]) if f['frame'].get('name')=='agora-widget'),None)
         if not child:raise RuntimeError('widget frame not ready')
@@ -62,7 +67,7 @@ class Page:
                 if self.js(expression):return
             except (RuntimeError,AssertionError,StopIteration) as e:last=e
             time.sleep(.08)
-        raise AssertionError(expression+'\n'+str(last)+'\n'+str(self.js('document.body.innerText')))
+        raise AssertionError(expression+'\n'+str(last)+'\n'+str(self.js('document.body.innerText'))+'\n'+str(self.errors)[-8000:])
 
     def shot(self,path):
         self.c.call('Page.captureScreenshot',format='png',captureBeyondViewport=False);time.sleep(.1)

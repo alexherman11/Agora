@@ -11,6 +11,16 @@ def install():
     if getattr(EdgeChrome, '_agora_widget_guard', False):
         return
     original = EdgeChrome.on_webview_ready
+    original_notify=EdgeChrome.on_script_notify
+    def notify(self,sender,event):
+        import json
+        try:
+            value=json.loads(str(event.WebMessageAsJson))
+            if isinstance(value,str):value=json.loads(value)
+            if isinstance(value,dict) and value.get('agora')=='recover-widget-renderer':return
+        except Exception:pass
+        original_notify(self,sender,event)
+    EdgeChrome.on_script_notify=notify
 
     def ready(self, sender, args):
         if args.IsSuccess:
@@ -94,7 +104,71 @@ def install():
 
             core.FrameCreated += frame_created
             core.Settings.AreDefaultScriptDialogsEnabled = False
-            self._agora_guard_refs = (frame_created, any_frame_navigation, resource, refs)
+            self._agora_renderer_failures=[]
+            def process_failed(sender,event):
+                import time
+                kind=str(event.ProcessFailedKind)
+                if kind=='FrameRenderProcessExited':
+                    # The parent and its watchdog are alive. Let them attribute
+                    # the failure to an active part, without reloading bars.
+                    core.ExecuteScriptAsync("dispatchEvent(new Event('agora-frame-failed'))")
+                    return
+                if kind not in ('RenderProcessExited','RenderProcessUnresponsive'):return
+                now=time.monotonic()
+                self._agora_renderer_failures[:]=[t for t in self._agora_renderer_failures if now-t<60]
+                self._agora_renderer_failures.append(now)
+                from gaming_gate import reasons
+                if reasons():return  # defer live navigation while the screen gate is closed
+                if len(self._agora_renderer_failures)==1:
+                    core.Reload()
+                else:
+                    # A bounded restart, then a trusted calm replacement, never
+                    # an endless crash/reload loop or another window's process.
+                    core.NavigateToString('<!doctype html><meta charset="utf-8"><body style="background:#FAF9F6;color:#35433D;font:14px Segoe UI;padding:24px"><strong>This part stopped</strong><p>This window could not keep responding. Close and reopen it to try again.</p>')
+            core.ProcessFailed += process_failed
+            recovery_tasks=[]
+            def recovery_message(sender,event):
+                import json
+                from urllib.parse import urlsplit,parse_qs
+                try:
+                    request=json.loads(str(event.TryGetWebMessageAsString()))
+                except Exception:return  # pywebview's ordinary messages
+                if not isinstance(request,dict) or request.get('agora')!='recover-widget-renderer':return
+                source=urlsplit(str(event.Source))
+                if source.scheme!='http' or source.hostname!='127.0.0.1' or source.path!='/desk/widget.html':return
+                expected=str(event.Source)
+                def reply(ok,error=''):
+                    detail=json.dumps(dict(ok=ok,error=error))
+                    core.ExecuteScriptAsync("dispatchEvent(new CustomEvent('agora-renderer-recovered',{detail:"+detail+"}))")
+                task=core.Environment.GetProcessExtendedInfosAsync()
+                from System import Action
+                def finish():
+                    try:
+                        matches=[]
+                        for process in task.Result:
+                            if str(process.ProcessInfo.Kind)!='Renderer':continue
+                            frames=list(process.AssociatedFrameInfos)
+                            def mine(frame):
+                                parent=frame.ParentFrameInfo
+                                return str(frame.Name)=='agora-widget' and parent is not None and str(parent.Source)==expected
+                            if frames and any(mine(frame) for frame in frames):
+                                if not all(mine(frame) for frame in frames):
+                                    reply(False,'Renderer is shared with another view; no process was killed');return
+                                matches.append(int(process.ProcessInfo.ProcessId))
+                        if len(matches)!=1:
+                            reply(False,'No uniquely owned widget renderer; no process was killed');return
+                        from gaming_gate import reasons
+                        if reasons():reply(False,'Screen gate is closed; recovery is deferred');return
+                        from System.Diagnostics import Process as NativeProcess
+                        NativeProcess.GetProcessById(matches[0]).Kill()
+                        reply(True)
+                    except Exception as exc:reply(False,str(exc))
+                    finally:
+                        if task in recovery_tasks:recovery_tasks.remove(task)
+                recovery_tasks.append(task)
+                task.GetAwaiter().OnCompleted(Action(lambda:self.webview.BeginInvoke(Action(finish))))
+            core.WebMessageReceived += recovery_message
+            self._agora_guard_refs = (frame_created, any_frame_navigation, resource, refs, process_failed,recovery_message,recovery_tasks)
         original(self, sender, args)
         if args.IsSuccess:
             sender.CoreWebView2.Settings.AreDefaultScriptDialogsEnabled = False

@@ -60,13 +60,16 @@ def local(path, payload=None, timeout=7):
         conn.close()
 
 
-def generate(model, prompt, tokens=96):
+def generate(model, prompt, tokens=96, images=None):
     # Refuse concurrent GPU work instead of queueing past the kernel's deadline.
     if not inference_lock.acquire(blocking=False):
         raise ValueError('the local model is busy; please try again shortly')
     try:
-        data = local('/api/generate', dict(model=model, prompt=prompt, stream=False, think=False,
-            keep_alive='5m', options=dict(temperature=0, num_predict=tokens)))
+        payload = dict(model=model, prompt=prompt, stream=False, think=False,
+            keep_alive='5m', options=dict(temperature=0, num_predict=tokens))
+        if images:
+            payload['images'] = images
+        data = local('/api/generate', payload)
         if not data.get('done') or not isinstance(data.get('response'), str) or not data['response'].strip():
             raise OSError('local model returned no complete answer')
         return ' '.join(data['response'].split())
@@ -161,7 +164,22 @@ def plan(message, operation=None):
         if not question:
             raise ValueError('model.ask needs a question')
         try:
-            value = generate(model, prompt + 'Answer this question briefly using the facts: ' + question[:2000])
+            instruction = prompt + 'Answer this question briefly using the facts: ' + question[:2000]
+            if rows and rows[0].get('kind') == 'photo':
+                # Explicit photo context needs its ordinary file-read grant. Only
+                # cleaned, caller-visible bytes can reach the vision model.
+                import base64
+                import hashlib
+                converted = read(use, 'file-read ' + target)
+                digest = converted[0].get('thumbnail') if converted else None
+                if not home or not re.fullmatch('[0-9a-f]{64}', str(digest)):
+                    raise ValueError('photo has no cleaned thumbnail')
+                data = (home.parents[1] / 'blobs' / digest).read_bytes()
+                if len(data) > 4 * 1024 * 1024 or hashlib.sha256(data).hexdigest() != digest:
+                    raise ValueError('photo thumbnail failed integrity or size checks')
+                value = generate(model, instruction, images=[base64.b64encode(data).decode('ascii')])
+                return dict(text='local model · ' + model + ' · suggested photo description: ' + value)
+            value = generate(model, instruction)
             return dict(text='local model · ' + model + ': ' + value)
         except (OSError, http.client.HTTPException):
             return dict(text='the local model is not running')

@@ -67,6 +67,24 @@ class Widgets:
             p = i['p']
             p.check()
             i['at'] = time.monotonic()
+            if action == 'stall':
+                # The trusted parent watchdog remains responsive when its
+                # opaque renderer hangs. Persist quarantine BEFORE replacing it.
+                from painter.arrangement import compile_view
+                plan=compile_view(self.k,p.actor,self.k.state.get(p.mid,'component_lens',''))['rows'][0]
+                path=str(body.get('path',''))
+                part=next((a for a in plan['parts'] if a['part']==path),None)
+                if not part:raise Refused('stalled part is no longer in this view')
+                candidates=[a for a in plan['parts'] if a['component']==part['component']] if body.get('stage')=='module' else [part]
+                elapsed=body.get('elapsed_ms',2500)
+                if not isinstance(elapsed,(float,int)) or not 0<=elapsed<=1e8:raise Refused('invalid watchdog elapsed time')
+                reports=[dict(path=a['part'],health='stopped',last_error=f'Native parent watchdog: no response for {elapsed:g} ms',elapsed_ms=elapsed,painted=[]) for a in candidates]
+                # Two observations represent a blocked operation and the failed
+                # heartbeat. Each is an ordinary, viewer-scoped kernel act.
+                for _ in range(2):
+                    out=p.run('component-health '+plan['lens']+' data='+quote(__import__('json').dumps(reports)))
+                    if not out.get('ok'):return out
+                return {'ok':True}
             if action == 'close':
                 self.close(token)
                 return {'ok': True}
@@ -86,6 +104,18 @@ class Widgets:
                 raise Refused('widget is speaking too quickly; try again in a second')
             i['calls'].append(now)
             op = body.get('op')
+            if op == 'upload':
+                import base64
+                from kernel.blobs import receive, cap
+                encoded = body.get('data')
+                if not isinstance(encoded, str) or len(encoded) > 4 * ((cap(self.k) + 2) // 3):
+                    raise Refused('file exceeds the steward size setting')
+                try:
+                    data = base64.b64decode(encoded, validate=True)
+                except ValueError:
+                    raise Refused('invalid upload bytes')
+                # receive runs as this viewer narrowed to this widget's grants.
+                return receive(self.k, p.actor, data, body.get('name', 'Upload'), body.get('group'))
             if op in ('do', 'see'):
                 line = body.get('line')
                 if not isinstance(line, str) or len(line) > 64000:

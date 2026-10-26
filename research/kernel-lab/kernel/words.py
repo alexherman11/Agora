@@ -21,17 +21,39 @@ def _k(word, kind, takes, may, undo, help, **more):
 from hosts.web.layout import HELP as PANE_HELP, panes, arrange
 
 KERNEL_ENTRIES = [
+    _k('upload', 'do', 'name=<name> [in=<group>]', 'members', 'yes', once='at most 40 per day per person',
+       help='upload: send bytes through POST /upload or agora.upload(file). Private file until attach. Size/type/hash are kernel facts; undo removes the file, retaining unreachable bytes.'),
+    _k('attach', 'do', '<id> to=<id>', 'members', 'yes',
+       help='attach <file> to=<thing>: the uploader shares a file with their visible parent. Look at both first. Permissions follow the parent, including later hiding. Undo restores the old attachment.'),
+    _k('file-result', 'do', '<id> manifest=<hash>', 'members', 'yes',
+       help='file-result <file> manifest=<hash>: only the granted files process publishes verified conversion blobs and richer things. Undo removes the conversion.'),
+    _k('file-read', 'see', '<id> [page=<number>]', 'anyone', 'no',
+       help='file-read <file or richer thing> [page=N]: read extracted pages, table columns/rows, calendar facts or conversion failure. Permissions follow the attachment. Page numbers start at 1.'),
+    _k('dictionary-copy', 'do', '<id> word=<name> [in=<group>]', 'leaders', 'yes',
+       help='dictionary-copy <kernel entry> word=<name> in=<group>: copy a kernel word into this group, with its own help, may and once. Leaders can word-set their local copy. Undo removes it.'),
+    _k('group', 'do', '[<id>] [name=<name>] [open=yes|no] [in=<group>]', 'leaders', 'yes',
+       help='group name=… [open=yes] in=<parent>: make a group led by you. group <group> name=… renames it; open=yes|no changes membership visibility. Only its leaders may change it; undo restores it.'),
+    _k('clock', 'see', '', 'anyone', 'no', help='clock: the kernel UTC time as plain data; no changes.'),
+    _k('forgotten', 'see', '', 'members', 'no', help='forgotten: visible moderation notices, with reason and leader, without hidden contents. undo the hiding receipt restores the thing.'),
     _k('components', 'see', '[for="purpose"]', 'anyone', 'no',
        help='components [for="a calendar of events"]: discover components grouped by category, with honest limits. help <component> reads its full typed card and example.'),
     _k('component', 'do', '<id>', 'stewards', 'yes',
-       help='component <thing>: explicitly review the current inline JavaScript module bytes. A later code edit needs review again. Components share a painter page and its viewer-narrowed grants; this is trusted code.'),
+       help='component <thing>: review the current inline JavaScript bytes for trusted in-page execution. Changed or unreviewed code starts in Worker quarantine. Repeated failures also quarantine a part; component-action <lens> path=<part> action=clear is steward-only. Component gestures retain viewer-narrowed widget grants.'),
     _k('look-view', 'see', '<window or lens>', 'anyone', 'no',
-       help='look-view <window, widget or component lens>: fresh description, typed settings, rendered parts, visible facts, gesture lines and arrangement tree. No component code runs to produce this reading.'),
+       help='look-view <window, widget or component lens> [plan=yes]: compact settings, parts, gestures, health and last painted observations; plan=yes adds full bindings/modules/tree. help personal-view explains just for me; help part-style explains validated styles.'),
+    _k('component-health', 'do', '<lens> data=<JSON>', 'anyone', 'no',
+       help='Painter instance reports its own bounded paint observations and failures. Reports are private to its viewer; they are observations, not verified pixels.'),
+    _k('component-action', 'do', '<lens> path=<part> action=retry|previous|off|clear', 'anyone', 'yes',
+       help='Recover one part: retry, undo its latest code/setting field change, or turn it off for me. clear removes quarantine and requires a steward. Concurrent edits refuse previous. No unrelated world fields change.'),
+    _k('personal-view','do','<lens> [part.setting=value] [text=<arrangement>]','members','yes',
+       help='Just for me: personal-view <lens> part.setting=value. Also part.format.setting=initials|relative-date|count and part.labels.setting=<JSON map>, or text=<personal arrangement>. Owned private preference; shared facts stay shared. undo removes it.'),
+    _k('personal-style','do','<lens> target=<part> [color=...]','members','yes',
+       help='Just for me: personal-style <lens> target=card padding="4px 8px". Private owned validated style; undo removes it. help part-style lists allowed values.'),
     _k('language', 'do', '<code>', 'members', 'yes',
        help='language <code>: choose your language (for example es). Help uses that label and help text '
             'on each entry when supplied, with the original as fallback. Your agent uses your language too.'),
-    _k('word-set', 'do', '<id> [help=<text>] [aliases=<names>] [may=<who>] [undo=yes|no|external]', 'stewards', 'yes',
-       help='word-set <entry> help=… aliases="…" may=… undo=yes|no|external: steward edits to dictionary data. '
+    _k('word-set', 'do', '<id> [help=<text>] [aliases=<names>] [may=<who>] [undo=yes|no|external]', 'maker or leaders', 'yes',
+       help='word-set <entry> help=… aliases="…" may=… undo=yes|no|external: stewards edit place words; leaders edit their group copies. '
             'Also takes takes=, once=, sealed=yes|no, status=live|old|hidden, label.<lang>= and help.<lang>=. '
             'Translations label this same entry. Look first. Implementation cannot be edited.'),
     _k('word-rename', 'do', '<id> to=<name>', 'stewards', 'yes',
@@ -140,10 +162,13 @@ KERNEL_ENTRIES = [
 ]
 
 # aspects no line may write with make or set: what the kernel itself keeps, or derives
-RESERVED_KINDS = {"person", "agent", "module", "grant", "word", "invite", "world", "place", "group", "kit", "web-layout"}
+RESERVED_KINDS = {"person", "agent", "module", "grant", "word", "invite", "world", "place", "group", "kit", "web-layout", "paint-report"}
+RESERVED_KINDS.add('file')
 RESERVED = {"kind", "made_by", "for", "pinned", "forgotten", "sees", "lives", "from", "bound", "origin", "bundle",
             "made", "changed", "made_at", "changed_at", "steps_bound", "do_bound", "on_entry", "reviewed_code"}
 SEES_SAID = {"me", "leaders", "group", "place"}      # what `make … sees=` may say (section 7: it may narrow)
+from .blobs import PROTECTED
+RESERVED.update(PROTECTED | {'pin_until', 'forget_reason'})
 RESERVED_PREFIX = ("in:", "like:", "member:", "answer:", "sees.", "vote:", "claim:", "contact:")
 
 FLOOR_HELP = {e["word"]: e["help"] for e in KERNEL_ENTRIES if e["word"] in FLOOR}
@@ -244,6 +269,8 @@ def help_(k, actor, st, entry, tx, group, saw=None):
         w = st.words.split()[0].lower()
         e = k.find_entry(w, group)
         if e is None:
+            if w=='part-style':
+                return dict(text='make kind=part-style lens=<lens> target=component.part[fact=value] color=... background=... radius=... padding=... gap=... glow=... lines=1..9 emphasis=normal|bold. Colour tokens or #rgb/#rgba/#rrggbb/#rrggbbaa. Spacing uses 1..4 measures (gap 1..2), including CSS shorthand padding. target=tokens defines colour/spacing and motion-<name> JSON tokens. Invalid writes refuse. personal-style applies just for me.')
             card = component_card(k, actor, w)
             if card: return card
             if w in FLOOR_HELP:
@@ -279,18 +306,33 @@ def help_(k, actor, st, entry, tx, group, saw=None):
 
 
 def post(k, actor, st, entry, tx, group, saw=None):
-    text = st.words.strip()
+    text = str(st.kv.get('text') or st.words).strip()
     if not text:
         raise Refused("post needs words: post <words> [in=<group>]")
+    kv = {a: v for a, v in st.kv.items() if a not in ('text', 'in', 'as', 'about', 'within', 'sees')}
+    sees = st.kv.get('sees')
+    if sees is not None and sees not in SEES_SAID:
+        raise Refused('sees says me, leaders, group or place')
+    if sees == 'place' and group != k.place and not k.state.get(group, 'open'):
+        raise Refused('a closed group cannot publish to the whole place')
+    _writable(k, kv)
     p = tx.mint()
     tx.set(p, "kind", "post")
     tx.set(p, "text", text)
+    for a, v in kv.items():
+        if v != '':
+            tx.set(p, a, v)
+    _within(k, actor, st, tx, p)
     tx.set(p, "made_by", actor.id)
     if actor.id != actor.person:
         tx.set(p, "for", actor.person)
     tx.set(p, f"in:{group}", len(k.log.records) + 1)
     if group != k.place and not k.state.get(group, "open"):
         tx.set(p, "sees", f"group:{group}")
+    if sees == 'me':
+        tx.set(p, 'sees', 'person:' + actor.person)
+    elif sees == 'leaders':
+        tx.set(p, 'sees', 'leaders')
     _about(k, actor, st, tx, p)
     where = "" if group == k.place else f" in {k.name(group)} (seen by its members)"
     return {"text": f"ok post {p} [r?]{where}"}
@@ -316,6 +358,10 @@ def pin(k, actor, st, entry, tx, group, saw=None):
     if tx.get(t, "pinned"):
         return {"text": f"{t} is already pinned (by {k.name(tx.get(t, 'pinned'))}); nothing changed"}
     tx.set(t, "pinned", actor.person)
+    if st.kv.get('until'):
+        from .world_words import utc
+        utc(st.kv['until'])
+        tx.set(t, 'pin_until', st.kv['until'])
     return {"text": f"ok pin {t} [r?] · it stays at the top of the feed"}
 
 
@@ -447,16 +493,36 @@ def make(k, actor, st, entry, tx, group, saw=None):
     kv.pop("in", None)
     kv.pop("about", None)                               # checked and set by _about
     kv.pop("as", None)                                  # a handle for later steps of the same line, not a fact
+    kv.pop('within', None)
     sees = kv.pop("sees", None)
     if not re.match(r"^[a-z][a-z0-9_-]{0,31}$", kind or ""):
         raise Refused("make needs kind=<a plain word>: make kind=button name=Feed")
     if kind in RESERVED_KINDS:
         raise Refused(f"a {kind} is made by the kernel, not by make")
+    if kind == 'post':
+        # Keep make kind=post compatible, while applying the same scoped post
+        # policy and rate limit. Its post part counts inside this make act.
+        eid = k.find_entry('post', group)
+        e = k.entry(eid)
+        if not k.may(actor, e, None, group):
+            raise k.refusal_for(e, group)
+        said = k.once(actor, e, None, tx)
+        if said:
+            raise Refused(said)
+        from .lines import Step
+        tx.part(e['word'], None, st.text)
+        tx.parts[-1]['entry'] = eid
+        return post(k, actor, Step(st.text, e['word'], None,
+            {a: v for a, v in st.kv.items() if a != 'kind'}, st.words), e, tx, group, saw)
+    if kind == 'file-settings' and not k.is_steward(actor.person):
+        raise Refused('file-settings belongs to stewards')
     k.reaches(actor, "make", kind)
     if sees is not None and sees not in SEES_SAID:
         raise Refused("sees= says me, leaders, group or place: who besides the kernel may see it")
     _writable(k, kv)
     _conditions(k, kv, group)
+    from painter.handles import validate_write
+    validate_write(k, actor, kind, kv, tx)
     if kind == 'rule':
         from .dictionary import bind
         eid = k.find_entry(kv.get('on', ''), group)
@@ -466,6 +532,7 @@ def make(k, actor, st, entry, tx, group, saw=None):
         kv['do_bound'] = bind(k, kv.get('do', ''), group)
     t = tx.mint()
     tx.set(t, "kind", kind)
+    _within(k, actor, st, tx, t)
     for key, v in kv.items():
         if v != "":
             tx.set(t, key, v)
@@ -493,6 +560,8 @@ def make(k, actor, st, entry, tx, group, saw=None):
 
 def set_(k, actor, st, entry, tx, group, saw=None):
     t = st.target
+    if k.state.get(t, 'kind') == 'file-settings' and not k.is_steward(actor.person):
+        raise Refused('file-settings belongs to stewards')
     k.reaches(actor, "set", k.state.get(t, "kind"), target=t, fields=st.kv)
     if k.state.get(t, "kind") in RESERVED_KINDS:
         raise Refused(f"{t} is a {k.state.get(t, 'kind')}; set changes only things made with make")
@@ -500,6 +569,12 @@ def set_(k, actor, st, entry, tx, group, saw=None):
         raise Refused("set needs k=v: set <thing> label=Feed")
     _writable(k, st.kv)
     _conditions(k, st.kv, group)
+    from painter.handles import validate_write
+    previous=dict(k.state.things.get(t,{}))
+    previous.update({a:v for (thing,a),v in tx.over.items() if thing==t})
+    candidate={**previous,**st.kv}
+    candidate={a:v for a,v in candidate.items() if v!=''}
+    validate_write(k,actor,k.state.get(t,'kind'),candidate,tx)
     if k.state.get(t, 'kind') == 'rule':
         from .dictionary import bind
         values = dict(st.kv)
@@ -526,6 +601,8 @@ def forget(k, actor, st, entry, tx, group, saw=None):
     if k.state.get(t, "kind") in RESERVED_KINDS:
         raise Refused(f"{t} is a {k.state.get(t, 'kind')}, which forget does not take")
     tx.set(t, "forgotten", actor.person)
+    if st.kv.get('reason'):
+        tx.set(t, 'forget_reason', st.kv['reason'])
     return {"text": f"ok forget {t} [r?] · out of every view; undo brings it back"}
 
 
@@ -538,6 +615,14 @@ def _about(k, actor, st, tx, t):
     if k.shown(actor.person, a) is None:
         raise k.no_such(a)
     tx.set(t, "about", a)
+
+
+def _within(k, actor, st, tx, t):
+    parent = st.kv.get('within')
+    if parent:
+        if k.shown(actor.person, parent) is None:
+            raise k.no_such(parent)
+        tx.set(t, 'visibility_of', parent)
 
 
 def claim(k, actor, st, entry, tx, group, saw=None):
@@ -569,11 +654,12 @@ def vote(k, actor, st, entry, tx, group, saw=None):
     t = st.target
     options = str(k.state.get(t, "options") or "").split()
     choice = (st.words.split() or [""])[0].lower()
-    if k.state.get(t, "kind") != "poll" or not options:
+    if not options:
         raise Refused(f"{t} is not a poll; make kind=poll title=… options=\"yes no\" makes one")
     if choice not in options:
         raise Refused(f"vote {t} needs one of: {' '.join(options)}")
-    if k.state.get(t, "closed"):
+    from .world_words import utc
+    if k.state.get(t, "closed") or (k.state.get(t, 'closes') and k.now() >= utc(k.state.get(t, 'closes'))):
         raise Refused(f"the poll {t} is closed")
     seal = k.seal(actor.person, entry["id"], t)
     tx.set(t, f"vote:{seal}", choice)
@@ -611,6 +697,7 @@ def rows(k, actor, st, entry, tx, group, saw=None):
         if a is None or any(str(a.get(f, "")) != v for f, v in kv.items()):
             continue
         row = {x: v for x, v in a.items() if not x.startswith(("in:", "member:"))}
+        row['groups'] = k.groups_of(t)
         if a.get("made_by"):
             row["by"] = k.name(a["made_by"])
         rows.append(dict(row, id=t, rev=k.state.rev.get(t, 0)))
@@ -719,10 +806,17 @@ def history(k, actor, st, entry, tx, group, saw=None):
 from .dictionary import word_set, word_rename, language
 from .kits import kit, take, rename, module, grant
 from .inpage import widget
+from .blobs import upload, attach, file_result, file_read
+from .world_words import dictionary_copy, group_word, clock, forgotten
 from painter.arrangement import component, look_view, components, component_card
+from painter.health import component_health, component_action, personal_view, personal_style
 
 KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant": grant, "widget": widget, "describe": describe,
+          'upload': upload, 'attach': attach, 'file-result': file_result, 'file-read': file_read,
+          'dictionary-copy': dictionary_copy, 'group': group_word, 'clock': clock, 'forgotten': forgotten,
           'component': component, 'look-view': look_view, 'components': components,
+          'component-health': component_health, 'component-action': component_action,
+          'personal-view': personal_view, 'personal-style': personal_style,
           'word-set': word_set, 'word-rename': word_rename, 'history': history, 'rule': rule,
           'language': language,
           **{w: panes if w == "panes" else arrange for w in PANE_HELP},

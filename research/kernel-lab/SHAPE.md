@@ -360,6 +360,45 @@ New verb notes save authored `steps` and executable `steps_bound` with entry ids
 
 **A painted view.** A lens is a thing `make kind=lens name=<name> text=<lens text>` (or a genesis `things` entry). In it every kernel thing the reader may see is a desk subject: `title` from its title, name, label or the first line of its text; `text`; tag = its kind; its other facts as props, plus `by` (who made it), `pinned` (by whom) and, for a post, `likes`. A fact that names another thing the reader may see (`about=`, `meeting=`, `now=`) becomes that thing's desk id (`s42`, so `meeting=$m.id` compares in a selection) plus `<key>_title` to print. Derived, never written: `claims`, `claimed_by` (names in claim order), `seats_left`, `contacts` (only those the reader may see), and a poll's `votes_<option>` and `votes`; `pinned` is present only on a pinned post, so `by pinned` puts those first. Groups and the place are column surfaces; a thing is placed in each group it is in. Desk ids are fixed by kernel numbers: `sb42` is subject `s42`, its appearances `a336…a343`, and a group `f42`. Not carried into a view: events (`by changed`, `age<`), comments, links, the house's rows, promises.
 
+### Board/file contracts (builder draft, 26 Oct 2026)
+
+Awaiting coordinator review; built and tested on scratch kernels, not installed
+in Alex's live desktop. The complete word/file contract, conversion limits and
+interface handoff are in `research/community-app/board/README.md` and `NEEDS.md`.
+
+- `POST /upload?in=<group>` accepts authenticated raw bytes with `X-Filename`
+  (percent-encoded display name). It runs the dictionary `upload` word's may and
+  once; default size is 25 MiB in steward-owned `file-settings.max_bytes`.
+  Only the kernel writes a file's hash, size, sniffed MIME and uploader. Bytes
+  and extracted text are CAS blobs beside the world, never log payloads.
+- `attach <file> to=<thing>` is uploader-owned, fenced and undoable. Uploaded
+  files are private until attached. `within=<thing>` on make/post creates a
+  kernel-owned visibility dependency; readers must see every ancestor. Hiding,
+  deleted parents and cycles fail closed for rows, search, history and files.
+- `file-read <file or richer thing> [page=N]` returns converted content, including
+  table columns/rows and document pages. `file-result <file> manifest=<hash>` is
+  only for the granted files process; it validates addressed bytes and publishes
+  a richer thing. Upload and conversion are separate undoable acts. Undo retains
+  unreachable CAS bytes; garbage collection is not built.
+- `GET /files/<thing>[?variant=thumbnail]` authenticates, rechecks visibility and
+  serves nosniff plus sandbox CSP. Active/unknown/text/PDF uploads download;
+  images always use cleaned metadata-free PNGs. There is no bare-hash route.
+  Widget/component bridge `agora.upload(file, group?)` uses current viewer and
+  grants. To invoke automatic conversion its widget also needs files.convert.
+- `group [<group>] name=… open=yes|no in=<parent>` creates/edits a group under its
+  leaders. `dictionary-copy <kernel entry> word=<name> in=<group>` creates a
+  scoped dictionary entry. Group leaders may word-set scoped metadata; place
+  entries remain steward-held. `rows` includes a derived groups list.
+- `post` accepts ordinary fields and narrow sees=; `make kind=post` applies its
+  group's post may/once too. Modules resolve answer words and grants in the
+  line's group. Once counts component uses and preceding steps in an act.
+  Maker rights include a module-created thing's immutable for person.
+- `pin <post> until=<UTC>` records a deadline; expired pins disappear from
+  readings without a separate timer act. `vote` works on a thing with options
+  and refuses at closes. Counts remain sealed. `forget <thing> reason=…` adds
+  a visible `forgotten` notice without exposing hidden contents; undo restores
+  the thing and inherited children. `clock` reads the kernel's UTC time.
+
 ### The module protocol (stdin and stdout, one JSON object per line, each with a type `t`)
 
 | From the kernel | From the module |

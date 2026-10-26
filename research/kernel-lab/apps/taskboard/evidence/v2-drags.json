@@ -1,17 +1,17 @@
 {
   "first": {
-    "text": "ok set tv74 [r102] \u00b7 lane=Done\n~ task-move, one act [r102]",
+    "text": "ok set tv86 [r102] \u00b7 lane=Done\n~ task-move, one act [r102]",
     "error": null,
-    "line": "do task-move tv74 to=Done",
+    "line": "do task-move tv86 to=Done",
     "events_total": 102,
     "as": "Alex",
     "created": [],
     "code": "kernel"
   },
   "stale": {
-    "text": "refused: stale: tv74 changed since it was painted (lane, r102); nothing was done. The view will repaint.",
-    "error": "refused: stale: tv74 changed since it was painted (lane, r102); nothing was done. The view will repaint.",
-    "line": "do task-move tv74 to=Backlog",
+    "text": "refused: stale: tv86 changed since it was painted (lane, r102); nothing was done. The view will repaint.",
+    "error": "refused: stale: tv86 changed since it was painted (lane, r102); nothing was done. The view will repaint.",
+    "line": "do task-move tv86 to=Backlog",
     "events_total": 102,
     "as": "agent for Alex",
     "created": [],

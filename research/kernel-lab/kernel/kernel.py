@@ -130,7 +130,7 @@ class Kernel:
         from datetime import datetime, timezone
         return self.clock() if self.clock else datetime.now(timezone.utc)
 
-    def once(self, actor, entry, target):
+    def once(self, actor, entry, target, tx=None):
         """The limits an entry's `once` says, read from the log: each clause is checked against this person's live
         acts of the same entry (a sealed act is theirs when its seal is theirs). Clauses are joined by ';':
             per person per target  ·  at most N per day per person  ·  at most N per person per <field>
@@ -142,19 +142,26 @@ class Kernel:
         undone = self.undone()
 
         def mine(r):
-            if r.get("entry") != entry["id"] or r["seq"] in undone or r.get("undoes"):
+            if (r.get("entry") != entry["id"] and not any(p.get('entry') == entry['id'] for p in r.get('parts', []))) or r["seq"] in undone or r.get("undoes"):
                 return False
             if r.get("by") == "sealed":
                 t = r["parts"][0].get("target") if r.get("parts") else None
-                return r.get("seal") == self.seal(actor.person, entry["id"], t)
+                return r.get("seal") == self.seal(actor.person, r.get('entry'), t)
             return actor.person in (r.get("by"), r.get("for"))
 
         def target_of(r):
-            return r["parts"][0].get("target") if r.get("parts") else None
-        acts = [r for r in self.log.records if mine(r)]
+            return r.get('_target')
+        acts = []
+        for r in self.log.records:
+            if mine(r):
+                parts = [p for p in r.get('parts', []) if p.get('entry') == entry['id']]
+                acts.extend(dict(r, _target=p.get('target')) for p in (parts or r.get('parts', [])[:1]))
+        if tx:
+            acts.extend(dict(at=self.now().strftime('%Y-%m-%dT%H:%M:%SZ'), _target=p.get('target'))
+                        for p in tx.parts if p.get('entry') == entry['id'] and p.get('facts'))
         for clause in [c.strip() for c in rule.split(";") if c.strip()]:
             if clause == "per person per target":
-                if target and self.used(actor.person, entry["id"], target):
+                if target and (self.used(actor.person, entry["id"], target) or any(target_of(r) == target for r in acts)):
                     return f"you have already said {entry['word']} on {target}; once each. undo takes yours back"
                 continue
             m = _re.fullmatch(r"at most (\d+) per day per person", clause)
@@ -382,12 +389,25 @@ class Kernel:
         """The thing as `reader` (a person id) may see it, or None. Every read passes here (SHAPE section 7). Sealed
         likes are shown only as a count."""
         a = self.state.things.get(t)
-        if a is None or t == "world" or a.get("forgotten"):
+        if not a or not a.get('kind') or t == "world" or a.get("forgotten"):
             return None                 # a forgotten thing is out of every view; undo of the forget brings it back
         if not self._sees(reader, a.get("sees", "place"), t):
             return None
         if a.get("sees_when") and not self.predicate(reader, a["sees_when"], t):
             return None
+        # An attachment/child never widens its parent's visibility. Walk rather
+        # than recurse so cycles and broken parents fail closed on every route.
+        parent, visited = a.get('visibility_of'), {t}
+        while parent:
+            if parent in visited or len(visited) > 32:
+                return None
+            visited.add(parent)
+            pa = self.state.things.get(parent)
+            if not pa or pa.get('forgotten') or not self._sees(reader, pa.get('sees', 'place'), parent):
+                return None
+            if pa.get('sees_when') and not self.predicate(reader, pa['sees_when'], parent):
+                return None
+            parent = pa.get('visibility_of')
         out = {}
         likes, votes, claims, contacts = 0, {}, [], []
         for k, v in a.items():
@@ -411,7 +431,7 @@ class Kernel:
             out["contacts"] = ", ".join(contacts)                      # only those this reader may see
         if a.get("kind") == "post":
             out["likes"] = likes
-        if a.get("kind") == "poll":
+        if a.get("options"):
             for o in str(a.get("options") or "").split():
                 out[f"votes_{o}"] = votes.get(o, 0)
             out["votes"] = sum(votes.values())
@@ -422,6 +442,10 @@ class Kernel:
             out["seats_left"] = max(0, int(a["seats"]) - len(claims))
         from .history import times
         out.update(times(self, t))
+        if a.get('pin_until'):
+            from .world_words import utc
+            if self.now() >= utc(a['pin_until']):
+                out.pop('pinned', None)
         return out
 
     def trail(self, reader, thing):
@@ -502,8 +526,8 @@ class Kernel:
                 return True
             if tok == "stewards" and self.is_steward(person):
                 return True
-            if tok == "maker" and target and self.state.get(target, "made_by") in (person,) + tuple(
-                    a for a in self.things("agent") if self.state.get(a, "for") == person):
+            if tok == "maker" and target and (self.state.get(target, 'for') == person or self.state.get(target, "made_by") in (person,) + tuple(
+                    a for a in self.things("agent") if self.state.get(a, "for") == person)):
                 return True
         return self._granted(person, word, group, depth)
 
@@ -511,7 +535,7 @@ class Kernel:
         """A live grant to `who` for `word` reaching `group`, whose grantor still may use the word (SHAPE section 6)."""
         if depth > 4:
             return False
-        e0 = self.find_entry(word)
+        e0 = self.find_entry(word, group)
         names = {word} | ({self.state.get(e0, "word"), self.state.get(e0, "bound")} |
                           set(str(self.state.get(e0, "aliases") or "").split()) if e0 else set())
         for g in self._grants_to(who):
@@ -521,7 +545,7 @@ class Kernel:
             if self.state.get(g, "where") not in self.up(group):
                 continue
             grantor = self.state.get(g, "by")
-            e = self.find_entry(word)
+            e = self.find_entry(word, group)
             if grantor and e and self._may_person(grantor, self.entry(e), None, group, depth + 1):
                 return True
         return False
@@ -988,7 +1012,7 @@ class Kernel:
                     if e.get("word_kind") == "see":
                         notes.append(KERNEL[self.source(e)[1]](self, actor, s2, e, None, g).get("text", ""))
                         continue                    # a reading inside an act: it marks what it read as seen
-                    said = self.once(actor, e, s2.target)
+                    said = self.once(actor, e, s2.target, tx)
                     if said:
                         raise Refused(f"{entry['word']} stopped at '{x}': {said}; nothing was done")
                     made_before = len(tx.made)
@@ -1075,7 +1099,7 @@ class Kernel:
                 if e.get("word_kind") == "see":
                     notes.append(KERNEL[name](self, actor, s2, e, None, g).get("text", ""))
                     continue
-                said = self.once(actor, e, s2.target)
+                said = self.once(actor, e, s2.target, tx)
                 if said:
                     raise stop(x, said)
                 made_before = len(tx.made)
@@ -1249,7 +1273,8 @@ class Kernel:
                     line = line.strip()[2:].strip()
                     st = L.parse(line)
                 made_before = len(tx.made)
-                eid = self.find_entry(st.word)
+                group = st.kv.get('in') or ((self.groups_of(st.target) or [self.place])[0] if st.target else self.place)
+                eid = self.find_entry(st.word, group)
                 if eid is None:
                     raise Refused(f"{self.name(mid)} answered with '{st.word}', which nothing answers to; nothing was done")
                 e = self.entry(eid)
@@ -1267,7 +1292,7 @@ class Kernel:
                                       f"nothing was done")
                     raise Refused(f"{self.name(mid)} holds no grant for {st.word}; nothing was done")
                 self.guard(author, e, st)
-                said = self.once(author, e, st.target)
+                said = self.once(author, e, st.target, tx)
                 if said:
                     raise Refused(f"{said}; nothing was done")
                 if press_saw and st.target in press_saw:

@@ -40,7 +40,7 @@ def run():
             check('Sustained 25-task triage duration',elapsed>=args.minutes*60)
             print(f'RAN {elapsed:.2f} seconds of triage; requested {args.minutes:g} minutes',flush=True)
         n=len(k.log.records);install(d);check('Idempotent component installation',len(k.log.records)==n)
-        plan=d.say('look-view taskboard-components')['rows'][0]
+        plan=d.say('look-view taskboard-components plan=yes')['rows'][0]
         check('Painter describes 25 cards and three lanes without executing component JS',plan['counts']['card']==25 and plan['counts']['lane']==3)
         check('Five app components arrange the board',set(plan['counts'])=={'board','lane','card','flag','menu'})
         check('Part reading carries facts, settings and gesture lines',all(n['facts'].get('id') for n in plan['parts'] if n['component']=='card') and 'task-move' in json.dumps(plan['tree']))

@@ -165,6 +165,17 @@ def make_handler(kernel, entry, secret):
             from urllib.parse import parse_qs, urlparse
             u = urlparse(self.path)
             q = {k: v[0] for k, v in parse_qs(u.query).items()}
+            if u.path.startswith('/files/'):
+                actor, why = self._actor()
+                if actor is None:
+                    return self._send(401, {'error': why})
+                from .blobs import served
+                try:
+                    with kernel.lock:
+                        data, mime, headers = served(kernel, actor.person, u.path[len('/files/'):], q.get('variant', 'content'))
+                    return self._raw(200, data, mime, headers)
+                except Refused:
+                    return self._send(404, {'error': 'no such file'})
             if u.path == "/health":
                 return self._send(200, {"ok": True, "records": len(kernel.log.records),
                                         "grant_scopes": ["kind", "thing", "fields"]})
@@ -202,6 +213,24 @@ def make_handler(kernel, entry, secret):
         def do_POST(self):
             if self._cross_site():
                 return self._send(403, {"error": "the door answers only its own pages"})
+            if self.path.split('?')[0] == '/upload':
+                actor, why = self._actor()
+                if actor is None:
+                    return self._send(401, {'error': why})
+                from .blobs import cap, receive
+                from urllib.parse import parse_qs, urlsplit, unquote
+                try:
+                    n = int(self.headers.get('Content-Length') or '-1')
+                    if n < 0 or n > cap(kernel):
+                        return self._send(413, {'error': 'That file is too large. Choose a smaller file or ask a steward.'})
+                    data = self.rfile.read(n)
+                    if len(data) != n:
+                        return self._send(400, {'error': 'incomplete upload'})
+                    q = parse_qs(urlsplit(self.path).query)
+                    out = receive(kernel, actor, data, unquote(self.headers.get('X-Filename', 'Upload')), q.get('in', [None])[0])
+                    return self._send(200, out)
+                except (Refused, ValueError) as exc:
+                    return self._send(400, {'error': str(exc)})
             body = self._body()
             if body is None:
                 return self._send(400, {"error": "the body must be a JSON object"})

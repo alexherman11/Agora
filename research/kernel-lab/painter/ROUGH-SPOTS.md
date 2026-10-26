@@ -37,3 +37,28 @@ New source is a proposed implementation until Claude reviews and adopts it.
 Running scratch tests imports the candidate; it does not alter a resident/live
 kernel. Live installation must verify that the running kernel answers the new
 words before writing component definitions.
+
+## 26 October: failure boundaries and missing editing words
+
+Builder draft; Claude reviews/commits. No git state changed. Missing world-level
+capabilities and the source seams that now supply them:
+
+| Source | Missing word or capability |
+| --- | --- |
+| `kernel/words.py`, `painter/handles.py` | A part-style write that cannot paint must refuse atomically; exact alpha colours, CSS spacing shorthand and safe motion tokens. |
+| `painter/arrangement.py` | Compact `look-view`, full `plan=yes`, node-local validation, display labels/formatters, personal modifiers and declarative event/fact motion. |
+| `painter/health.py`, kernel dispatch | `component-health`, `component-action`, private viewer reports and happening targets, revision-checked previous-version recovery, steward-only quarantine clear; `personal-view`/`personal-style` shortcuts. |
+| `painter/isolation.js`, `painter/painter.js` | One component's stopped card, callback ownership, stale last-good DOM, timing and observed text/computed styles. |
+| `painter/quarantine.js` | A terminable execution thread for a looping part; bounded DOM/control vocabulary when sandboxed sibling frames share a renderer. |
+| `painter/install.py` | Install the new painter support and explicit health/control/hear grants; publish the updated guide. |
+| `components/{card,lane,catalogue}.js` | Visible display values independent of domain settings. No component-specific kernel word was added. |
+| desktop `pages/widget-host.js`, `widgets.py` | A trusted parent's phase/heartbeat watchdog that can record quarantine while its painter thread is frozen; blob Workers inherit the existing no-network CSP. |
+| desktop `widget_guard.py` | Renderer failure recovery and a native ownership check before terminating a hung renderer. No PID comes from JavaScript, no shared renderer is killed, and opaque frames have no native recovery authority. |
+| `painter/process_gate.py` | Remove the old full-screen-browser exception; both games and full-screen foreground programs block live steps. |
+| `painter/browser.py`, proofs, desktop native test | Updated explicit plan contract and hidden/native acceptance seams. Hidden native pointer tests cannot await stopped compositor frames. |
+| kernel building guide, ARRANGEMENT.md, ISOLATION.md | Agent-discoverable handles and a precise separation between projected structure, reported paint, native liveness and live adoption. |
+
+The first in-page loop needs external recovery and can pause that view. Worker
+quarantine is a thread boundary, not process-memory isolation; arbitrary browser
+APIs are not emulated. See ISOLATION.md for the measurements, test outputs,
+initial cold-model proof failure, and live adoption status.

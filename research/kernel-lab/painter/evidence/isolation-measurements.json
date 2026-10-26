@@ -1,0 +1,480 @@
+[
+  {
+    "case": "cost0",
+    "hidden": true,
+    "ready": {
+      "ready-cost0": {
+        "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0"
+      },
+      "cost0": {
+        "startup_ms": 0,
+        "n": 0
+      }
+    },
+    "startup_ms": 0,
+    "n": 0,
+    "runtime_version": "155.0.4283.62",
+    "processes": [
+      {
+        "pid": 67596,
+        "kind": "Renderer"
+      },
+      {
+        "pid": 101128,
+        "kind": "Utility"
+      },
+      {
+        "pid": 102512,
+        "kind": "Utility"
+      },
+      {
+        "pid": 106712,
+        "kind": "Gpu"
+      },
+      {
+        "pid": 109680,
+        "kind": "Browser"
+      }
+    ],
+    "runtime_process_memory": [
+      {
+        "pid": 109680,
+        "private_bytes": 32665600,
+        "working_set": 103907328
+      },
+      {
+        "pid": 108336,
+        "private_bytes": 2453504,
+        "working_set": 10838016
+      },
+      {
+        "pid": 106712,
+        "private_bytes": 61104128,
+        "working_set": 64327680
+      },
+      {
+        "pid": 102512,
+        "private_bytes": 12378112,
+        "working_set": 40632320
+      },
+      {
+        "pid": 101128,
+        "private_bytes": 7593984,
+        "working_set": 21143552
+      },
+      {
+        "pid": 67596,
+        "private_bytes": 20795392,
+        "working_set": 49647616
+      }
+    ],
+    "private_bytes": 136990720,
+    "working_set": 290496512
+  },
+  {
+    "case": "cost5",
+    "hidden": true,
+    "ready": {
+      "ready-cost5": {
+        "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0"
+      }
+    },
+    "startup_ms": 83.20000004768372,
+    "n": 5,
+    "runtime_version": "155.0.4283.62",
+    "processes": [
+      {
+        "pid": 3400,
+        "kind": "Utility"
+      },
+      {
+        "pid": 5228,
+        "kind": "Renderer"
+      },
+      {
+        "pid": 57428,
+        "kind": "Utility"
+      },
+      {
+        "pid": 101648,
+        "kind": "Gpu"
+      },
+      {
+        "pid": 108132,
+        "kind": "Browser"
+      },
+      {
+        "pid": 108304,
+        "kind": "Renderer"
+      }
+    ],
+    "runtime_process_memory": [
+      {
+        "pid": 108132,
+        "private_bytes": 36536320,
+        "working_set": 108695552
+      },
+      {
+        "pid": 55024,
+        "private_bytes": 2449408,
+        "working_set": 10833920
+      },
+      {
+        "pid": 101648,
+        "private_bytes": 61022208,
+        "working_set": 64262144
+      },
+      {
+        "pid": 57428,
+        "private_bytes": 13017088,
+        "working_set": 41308160
+      },
+      {
+        "pid": 3400,
+        "private_bytes": 7696384,
+        "working_set": 21274624
+      },
+      {
+        "pid": 5228,
+        "private_bytes": 22114304,
+        "working_set": 53272576
+      },
+      {
+        "pid": 108304,
+        "private_bytes": 23818240,
+        "working_set": 51179520
+      }
+    ],
+    "private_bytes": 166653952,
+    "working_set": 350826496
+  },
+  {
+    "case": "cost20",
+    "hidden": true,
+    "ready": {
+      "ready-cost20": {
+        "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0"
+      }
+    },
+    "startup_ms": 144.10000002384186,
+    "n": 20,
+    "runtime_version": "155.0.4283.62",
+    "processes": [
+      {
+        "pid": 17732,
+        "kind": "Utility"
+      },
+      {
+        "pid": 29252,
+        "kind": "Browser"
+      },
+      {
+        "pid": 77932,
+        "kind": "Utility"
+      },
+      {
+        "pid": 102020,
+        "kind": "Gpu"
+      },
+      {
+        "pid": 105976,
+        "kind": "Renderer"
+      },
+      {
+        "pid": 107380,
+        "kind": "Renderer"
+      }
+    ],
+    "runtime_process_memory": [
+      {
+        "pid": 29252,
+        "private_bytes": 47034368,
+        "working_set": 118104064
+      },
+      {
+        "pid": 64228,
+        "private_bytes": 2465792,
+        "working_set": 10842112
+      },
+      {
+        "pid": 102020,
+        "private_bytes": 62877696,
+        "working_set": 66002944
+      },
+      {
+        "pid": 17732,
+        "private_bytes": 15339520,
+        "working_set": 43675648
+      },
+      {
+        "pid": 77932,
+        "private_bytes": 7577600,
+        "working_set": 21118976
+      },
+      {
+        "pid": 107380,
+        "private_bytes": 25354240,
+        "working_set": 56193024
+      },
+      {
+        "pid": 105976,
+        "private_bytes": 37810176,
+        "working_set": 65470464
+      }
+    ],
+    "private_bytes": 198459392,
+    "working_set": 381407232
+  },
+  {
+    "case": "cost100",
+    "hidden": true,
+    "ready": {
+      "ready-cost100": {
+        "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0"
+      }
+    },
+    "startup_ms": 681,
+    "n": 100,
+    "runtime_version": "155.0.4283.62",
+    "processes": [
+      {
+        "pid": 50476,
+        "kind": "Browser"
+      },
+      {
+        "pid": 67336,
+        "kind": "Gpu"
+      },
+      {
+        "pid": 99912,
+        "kind": "Utility"
+      },
+      {
+        "pid": 101020,
+        "kind": "Utility"
+      },
+      {
+        "pid": 101864,
+        "kind": "Renderer"
+      },
+      {
+        "pid": 107676,
+        "kind": "Renderer"
+      }
+    ],
+    "runtime_process_memory": [
+      {
+        "pid": 50476,
+        "private_bytes": 100102144,
+        "working_set": 171339776
+      },
+      {
+        "pid": 102264,
+        "private_bytes": 2461696,
+        "working_set": 10846208
+      },
+      {
+        "pid": 67336,
+        "private_bytes": 60596224,
+        "working_set": 64360448
+      },
+      {
+        "pid": 101020,
+        "private_bytes": 26877952,
+        "working_set": 56950784
+      },
+      {
+        "pid": 99912,
+        "private_bytes": 7745536,
+        "working_set": 21262336
+      },
+      {
+        "pid": 101864,
+        "private_bytes": 42795008,
+        "working_set": 75206656
+      },
+      {
+        "pid": 107676,
+        "private_bytes": 100511744,
+        "working_set": 128028672
+      }
+    ],
+    "private_bytes": 341090304,
+    "working_set": 527994880
+  },
+  {
+    "case": "frames",
+    "hidden": true,
+    "ready": {
+      "ready-frames": {
+        "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0"
+      }
+    },
+    "before_hang": {
+      "frames": 3,
+      "good": 3,
+      "bad": 3,
+      "hang-start": 1
+    },
+    "after_hang": {
+      "frames": 6,
+      "good": 3,
+      "bad": 3,
+      "hang-start": 1
+    },
+    "runtime_version": "155.0.4283.62",
+    "processes": [
+      {
+        "pid": 7928,
+        "kind": "Renderer"
+      },
+      {
+        "pid": 60072,
+        "kind": "Gpu"
+      },
+      {
+        "pid": 74368,
+        "kind": "Utility"
+      },
+      {
+        "pid": 93560,
+        "kind": "Utility"
+      },
+      {
+        "pid": 105240,
+        "kind": "Browser"
+      },
+      {
+        "pid": 109872,
+        "kind": "Renderer"
+      }
+    ],
+    "runtime_process_memory": [
+      {
+        "pid": 105240,
+        "private_bytes": 34500608,
+        "working_set": 106795008
+      },
+      {
+        "pid": 98396,
+        "private_bytes": 2453504,
+        "working_set": 10838016
+      },
+      {
+        "pid": 60072,
+        "private_bytes": 61100032,
+        "working_set": 64323584
+      },
+      {
+        "pid": 93560,
+        "private_bytes": 12804096,
+        "working_set": 42745856
+      },
+      {
+        "pid": 74368,
+        "private_bytes": 7610368,
+        "working_set": 21114880
+      },
+      {
+        "pid": 7928,
+        "private_bytes": 23191552,
+        "working_set": 55160832
+      },
+      {
+        "pid": 109872,
+        "private_bytes": 20201472,
+        "working_set": 48467968
+      }
+    ],
+    "private_bytes": 161861632,
+    "working_set": 349446144
+  },
+  {
+    "case": "windows",
+    "hidden": true,
+    "ready": {
+      "ready-other": {
+        "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0"
+      },
+      "ready-loop": {
+        "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0"
+      }
+    },
+    "before_hang": {
+      "loop": 3,
+      "other": 3,
+      "hang-start": 1
+    },
+    "after_hang": {
+      "loop": 3,
+      "other": 6,
+      "hang-start": 1
+    },
+    "runtime_version": "155.0.4283.62",
+    "processes": [
+      {
+        "pid": 26356,
+        "kind": "Renderer"
+      },
+      {
+        "pid": 74924,
+        "kind": "Renderer"
+      },
+      {
+        "pid": 92808,
+        "kind": "Browser"
+      },
+      {
+        "pid": 98568,
+        "kind": "Utility"
+      },
+      {
+        "pid": 102608,
+        "kind": "Gpu"
+      },
+      {
+        "pid": 107860,
+        "kind": "Utility"
+      }
+    ],
+    "runtime_process_memory": [
+      {
+        "pid": 92808,
+        "private_bytes": 37675008,
+        "working_set": 109617152
+      },
+      {
+        "pid": 103716,
+        "private_bytes": 2473984,
+        "working_set": 10838016
+      },
+      {
+        "pid": 102608,
+        "private_bytes": 61386752,
+        "working_set": 64655360
+      },
+      {
+        "pid": 98568,
+        "private_bytes": 12644352,
+        "working_set": 42557440
+      },
+      {
+        "pid": 107860,
+        "private_bytes": 7634944,
+        "working_set": 21184512
+      },
+      {
+        "pid": 74924,
+        "private_bytes": 20660224,
+        "working_set": 51195904
+      },
+      {
+        "pid": 26356,
+        "private_bytes": 20946944,
+        "working_set": 49786880
+      }
+    ],
+    "private_bytes": 163422208,
+    "working_set": 349835264
+  }
+]

@@ -103,3 +103,122 @@ component isolation boundary or an independent capability for each nested piece.
 
 See REACH.md for the map, primitives.js for the small core, and catalogue.py for
 the first-party cards. Native host functions and domain modules remain separate.
+
+## 26 October: isolation and general editing handles
+
+Builder draft for Claude's review. This section supersedes the earlier
+statements about full default look-view, paint-time-only validation and
+unreviewed-code refusal. The earlier description remains as experiment history.
+
+`look-view <lens/widget/window>` is now compact: shown counts, settings, display
+values, declared parts, gestures, health and last painted observations.
+`look-view <target> plan=yes` adds the complete tree, bindings and module bytes.
+Compiling structure executes no component code. `health.painted` is a recent
+painter observation of visible text and computed styles, with `observed_at`;
+`unobserved` means there is no paint evidence. It is not a pixel or accessibility
+audit, and a dishonest component can misdescribe itself.
+
+### Validated styles
+
+Invalid targets or values refuse the entire `make`/`set` at write time, explaining
+the allowed forms. Legacy invalid styles are skipped and reported in
+`look-view.style_errors`; they cannot abort the view. Hex colours accept exactly
+3, 4, 6 or 8 digits. `padding` and `radius` accept CSS's 1–4 measure shorthand;
+`gap` takes 1–2. Measures are nonnegative, with px/rem/em/%/vh/vw or zero.
+Six-digit glow keeps its soft default alpha; explicit four/eight-digit alpha is
+preserved. `help part-style` exposes the contract through words.
+
+### Just for me
+
+Prefer these discoverable shortcuts, listed in ordinary `help`:
+
+```
+personal-view our-evening dates.month=2026-11
+personal-view taskboard-components lane-view.labels.name="{\"Done\":\"Hecho\"}"
+personal-view taskboard-components task-view.format.who=initials
+personal-style taskboard-components target=card padding="4px 8px"
+```
+
+They create private preferences/styles for the caller's person, including when
+that person's agent makes them. They do not edit shared tasks or domain values.
+Personal styles apply after shared styles. `undo` removes the shortcut's act.
+
+### Domain values and displayed words
+
+```
+lane-view : lane, name $lane.name
+  labels name {"Done":"Hecho","Now":"Ahora"}
+task-view : card, who $task.who
+  format who as initials
+stamp : text-block, value $task.due
+  format value as relative-date
+total : badge, label $task.count
+  format label as count
+```
+
+`labels <setting> <JSON map>` and `format <setting> as initials|relative-date|count|text`
+produce `node.display`, leaving `node.settings` and bound facts intact. Components
+use `api.display(key)` for visible words; actions use domain settings and facts.
+First-party lane, card and catalogue content adopt these handles. Initials use
+the first letters of at most two words. Relative dates use the kernel's UTC
+date. Counts format numbers or count a JSON collection.
+
+### Happenings and motion
+
+```
+task-view : card, title $task.title
+  when fact lane changes play settle
+  when happening task-priority play pulse
+```
+
+Triggers apply to this part's projected facts. Initial paint is not a fact
+transition. Happenings must target one of its bound rows and require the widget's
+ordinary `hear:<word>` grant. Default theme motions are `settle` and `pulse`.
+Add a token with `make kind=part-style lens=... target=tokens motion-breathe=<JSON>`:
+`{"from":{"opacity":0.4},"to":{"opacity":1},"duration":250}`.
+Only opacity, translate/scale and a duration of 0–2000 ms are allowed. Reduced
+motion preferences suppress animation. Unknown motion names are visible refusals.
+
+### One stopped part
+
+Mount/update reconstruction, primitive-created event handlers, timers,
+microtasks and animation callbacks carry an owner. Settings are checked before
+mount. Module failures, missing components and bad settings become a calm card;
+siblings continue. A failed part's inert last successful DOM is marked stale.
+The card offers Try again, Use the previous version and Turn it off. Retry keeps
+quarantine; only the steward word below clears it. Previous restores only the
+latest changed code/arrangement/preference field and refuses a stale revision.
+Off affects only this part for this viewer. These are recorded words:
+
+```
+component-action our-evening path=root/dates action=retry
+component-action our-evening path=root/dates action=previous
+component-action our-evening path=root/dates action=off
+component-action our-evening path=root/dates action=clear
+```
+
+Two failures or time-budget violations quarantine a part. New/unreviewed code,
+or a definition with `isolation=worker`, starts quarantined. On this WebView2,
+sandboxed sibling frames share a renderer: they do **not** isolate each other's
+loops. Quarantine therefore uses a terminable Worker, projected facts and a
+bounded DOM vocabulary. It supports content, controls, callbacks and timers;
+arbitrary nested modules, synchronous DOM measurement, shared drag and direct
+reads are explicit limitations. Arrange those functions as trusted siblings or
+wrappers. Unsupported facilities stop only that worker's part.
+
+Use `api.el`, `api.part`, `api.P`, `api.setTimeout`, `api.setInterval`,
+`api.requestAnimationFrame` and `api.guard(callback)` so ownership survives an
+asynchronous continuation. Reviewed in-page JavaScript still has ambient DOM;
+this is fault containment, not protection against deliberately hostile code.
+An in-page loop cannot be interrupted by its own thread. The native parent
+watchdog records quarantine and verifies renderer ownership before restarting
+the view. It refuses to kill a renderer shared with another view. ISOLATION.md
+records actual evidence and the recovery boundary.
+
+`component-health` is a painter-only word restricted to its own lens. Reports
+are private `paint-report` facts for the viewer; component cards and `components`
+derive `health`, `last_error` and `quarantined` from those reports. Each failure
+is a happening without publishing private error text to other viewers. Observed
+paint data is separate from the projected plan and does not cause repaint loops.
+Unreviewed bytes execute only in quarantine. Neither path adds an independent
+world capability per nested piece: gestures use the existing guarded bridge.

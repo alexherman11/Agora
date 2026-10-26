@@ -1,4 +1,4 @@
-"""The commission's explicit running-game gate (a fullscreen browser is not a process match)."""
+"""Screen gate: games AND any full-screen foreground application block adoption."""
 from datetime import datetime,timezone
 import json
 from pathlib import Path
@@ -15,7 +15,7 @@ def check():
         'Get-Process RocketLeague,*game* -ErrorAction SilentlyContinue | Select-Object ProcessName,Id | ConvertTo-Json -Compress'],
         capture_output=True,text=True,creationflags=0x08000000)
     # The existing process scanner knows helper services and more game names.
-    blocked=[r for r in reasons() if r!='full-screen foreground application']
+    blocked=reasons()
     record=dict(at=datetime.now(timezone.utc).isoformat(),blocked=blocked,
                 process_check=json.loads(result.stdout) if result.stdout.strip() else [])
     if blocked:raise RuntimeError('Gaming gate: '+', '.join(blocked))

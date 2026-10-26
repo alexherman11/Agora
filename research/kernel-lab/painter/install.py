@@ -30,7 +30,7 @@ def upsert(door,kind,name,**facts):
 
 def widget_source():
     return '\n\n'.join(p.read_text(encoding='utf-8') for p in
-        [LAB/'widgets/common.js',HERE/'primitives.js',HERE/'theme.js',HERE/'painter.js'])
+        [LAB/'widgets/common.js',HERE/'primitives.js',HERE/'theme.js',HERE/'quarantine.js',HERE/'isolation.js',HERE/'painter.js'])
 
 
 def install(door, board=True):
@@ -72,9 +72,9 @@ def install(door, board=True):
 
 def activate(door,name,title):
     mid=upsert(door,'widget',name,title=title,style='bars',component_lens=name,code=widget_source())
-    grants=('window.surface rows look look-view history components help task-add task-move task-assign task-done '
+    grants=('window.surface rows look look-view history components help component-health component-action task-add task-move task-assign task-done '
             'task-note task-priority task-colour task-note-colour task-note-style task-filter task-rename task-edit task-text task-remove summarize.* make set forget undo '
-            'hear:make hear:set hear:forget hear:undo hear:component')
+            'hear:make hear:set hear:forget hear:undo hear:component hear:component-action hear:task-*')
     current=door.rows('widget',name=name)[0]
     matching=any(g.get('words')==grants and not g.get('revoked') for g in door.rows('grant',to=mid))
     if not current.get('on') or not matching:

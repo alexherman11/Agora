@@ -8,7 +8,7 @@ export default {mount(api,s){
   const more=button('···',e=>{e.stopPropagation();const r=e.currentTarget.getBoundingClientRect();showMenu(r.right,r.bottom)});
   card.append(api.part('top','div',{class:'cardtop'},...api.children.filter(n=>n.component==='flag').map(api.render),more),api.part('title','div',{class:'cardtitle'},s.title||t.title));
   if(s.note)card.append(api.part('note','div',{class:'noteexcerpt',style:{background:api.palette[s.note_colour]||'#f6f6f0'}},s.note.replace(/[*_#]/g,'').slice(0,130)));
-  card.append(api.part('footer','div',{class:'cardfoot'},el('span',{},t.short_source?.startsWith('local')?'✧ Summarized':s.note?'▤ Note':'○ Ready when you are'),api.part('avatar','span',{class:'avatar',title:s.who||'Unassigned'},(s.who||'A').slice(0,2).toUpperCase())));
+  card.append(api.part('footer','div',{class:'cardfoot'},el('span',{},t.short_source?.startsWith('local')?'✧ Summarized':s.note?'▤ Note':'○ Ready when you are'),api.part('avatar','span',{class:'avatar',title:s.who||'Unassigned'},api.display('who')!==s.who?api.display('who'):(s.who||'A').slice(0,2).toUpperCase())));
   for(const child of api.children.filter(n=>!['flag','menu'].includes(n.component)))card.append(api.render(child));
   card.addEventListener('pointerdown',e=>api.beginDrag(e,card));
   if(t.editing==='yes')queueMicrotask(()=>{if(!document.querySelector('.drawer'))details()});

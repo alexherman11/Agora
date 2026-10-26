@@ -23,7 +23,8 @@ def main():
         check('Only steward reviews component code',not peer.request('/do',dict(line='component '+f.ids['card'])).get('ok'))
         check('Ordinary set cannot forge component review',refused('set '+f.ids['card']+' reviewed_code=forged'))
         card=d.rows('component',name='card')[0];d.say('look '+card['id']);d.say('set '+card['id']+' code='+Q(card['code']+'\n// changed bytes'))
-        check('Changed module bytes refuse before execution',not d.request('/see',dict(line='look-view taskboard-components')).get('ok'))
+        changed=d.say('look-view taskboard-components plan=yes')['rows'][0]
+        check('Changed module bytes enter quarantine before execution',all(p['health']['quarantined'] for p in changed['parts'] if p['component']=='card'))
         d.say('component '+card['id']);check('Explicit review restores description',d.say('look-view taskboard-components')['rows'][0]['counts']['card']==25)
         pref=d.say('make kind=view-preference sees=me lens=taskboard-components board-view.title="My board"')['made'][0]
         check('Personal setting applies only to maker','My board' in str(d.say('look-view taskboard-components')) and 'My board' not in str(peer.say('look-view taskboard-components')))
@@ -33,7 +34,7 @@ def main():
         check('Gesture principal cannot write a lens',not p.run('set '+public+' text=oops',saw={public:k.state.rev[public]}).get('ok'))
         check('Gesture principal can execute the composed task word',p.run('task-priority '+task['id']+' priority=2',saw={task['id']:task['rev']}).get('ok'))
         check('Stale painted task refuses',not p.run('task-priority '+task['id']+' priority=3',saw={task['id']:task['rev']}).get('ok'))
-        node=d.say('look-view taskboard-components')['rows'][0]['tree']['children'][0]['children'][0]['children'][0]
+        node=d.say('look-view taskboard-components plan=yes')['rows'][0]['tree']['children'][0]['children'][0]['children'][0]
         # A receiving lane is a participant, even though task-move writes only a card.
         lane=d.rows('taskboard-lane')[0];task=d.rows('taskboard-task')[1]
         d.say('look '+lane['id']);d.say('set '+lane['id']+' name="Changed lane"')

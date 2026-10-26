@@ -69,6 +69,36 @@ Style also lives in things: `make kind=part-style lens=evening target=calendar c
 
 ## When a word is missing
 
+### Component editing update, 26 October (builder draft)
+
+`look-view evening` is compact by default: settings, display values, parts,
+gestures, health and the last painter's visible text/computed styles. Ask for
+`look-view evening plan=yes` for full bindings/tree/module bytes. An unobserved
+part has not been verified as painted. Legacy style refusals are explicit.
+
+Use `help part-style` for the validated style forms. Invalid `make` or `set`
+refuses before writing; alpha hex colours and CSS shorthand padding are accepted.
+For **just me**, use `personal-view evening dates.month=2026-11` or
+`personal-style evening target=calendar padding="4px 8px"`. `help personal-view`
+and `help personal-style` explain owned private preferences, including edits by
+your agent; `undo` removes them without changing shared facts.
+
+Separate visible wording from domain values: an arrangement can say
+`labels name {"Done":"Hecho"}` beneath a lane, and `format who as initials`
+beneath a card. `relative-date`, `count` and `text` are also formatters. Personal
+versions use `part.labels.setting=<JSON map>` and `part.format.setting=initials`.
+`when fact lane changes play settle` or `when happening task-priority play pulse`
+connects a part's facts/happenings to theme motion tokens. Happenings require the
+ordinary hear grant; reduced-motion preferences apply.
+
+A broken component becomes a stopped card, retaining its last good DOM as stale
+when available. Retry, previous version and off are recorded part controls;
+`help component-action` explains them. Repeated failures and unreviewed code use
+Worker quarantine, whose DOM vocabulary intentionally has limits. A steward
+alone can clear quarantine. `components` and `look-view` report health so an agent
+can find and repair the part with words. See the painter's ARRANGEMENT.md and
+ISOLATION.md for the exact contract and native measurements.
+
 Write down the missing word first. If words cannot express it, a builder can supply a module, in any language. Its exports are words with dictionary entries. Bare words come from the world or kernel. Dotted words, such as `tally.top`, come from modules.
 
 A steward installs a reviewed process and grants it words. There is no module-install word yet. In a new world's genesis, a module is `{ "name": "tally", "run": ["node", "modules/tally/tally.js"], "publishes": "tally.*", "grants": "look pin" }`. Do not install a stranger's program just because its entry asks you to.

@@ -38,7 +38,8 @@ function part(node,name,tag='div',attrs={},...kids){
   for(const [key,value]of Object.entries(node.facts))if(/^[a-z][a-z0-9_-]*$/.test(key)&&typeof value!=='object')n.setAttribute('data-fact-'+key,String(value));
   return n;
 }
-function render(node){
+function render(node){return renderBoundary(node)}
+function renderTrusted(node){
   if(['column','row','text','grid','wrap','split','layers','absolute','scroll'].includes(node.component)){
     const n=part(node,node.name,'div',{class:node.component});
     if(node.role&&/^[\w-]+$/.test(node.role))n.classList.add(node.role);
@@ -50,7 +51,7 @@ function render(node){
       for(const key of ['width','height','minHeight','maxHeight','padding']){const val=P.tokens[node.settings[key]]||node.settings[key];if(/^[\d.]+(px|rem|%|vh|vw)$/.test(val||''))n.style[key]=val}
       if(node.component==='absolute')for(const [key,prop] of [['x','left'],['y','top'],['z','zIndex']]){const val=Number(node.settings[key]);if(Number.isFinite(val))n.style[prop]=val+(key==='z'?'':'px')}
     }
-    if(node.component==='text')n.textContent=node.settings.text||'';
+    if(node.component==='text')n.textContent=node.display?.text??node.settings.text??'';
     for(const child of node.children)n.append(render(child));n.dataset.root='true';
     if(node.component==='split'){
       const split=P.layout('split',{},...[...n.children]);for(const attr of n.attributes)if(attr.name!=='style')split.setAttribute(attr.name,attr.value);
@@ -60,8 +61,14 @@ function render(node){
     return n;
   }
   const module=moduleCache.get(node.component);
-  const api={P,el:P.node,button:P.press,part:(name,tag,attrs,...kids)=>part(node,name,tag,attrs,...kids),palette,flag,Q,
+  if(!module)throw Error('Component module did not load');
+  const owner=componentOwners.get(node.path);
+  const boundP=Object.fromEntries(Object.entries(P).map(([key,value])=>[key,typeof value==='function'?owned(value,owner):value]));
+  const api={P:boundP,el:owned(P.node,owner),button:owned(P.press,owner),part:owned((name,tag,attrs,...kids)=>part(node,name,tag,attrs,...kids),owner),palette,flag,Q,
     children:node.children,render,settings:node.settings,facts:node.facts,node,
+    display:key=>node.display?.[key]??node.settings[key],guard:fn=>owned(fn,owner),
+    setTimeout:(fn,ms)=>scoped(owner,()=>setTimeout(fn,ms)),setInterval:(fn,ms)=>scoped(owner,()=>setInterval(fn,ms)),
+    requestAnimationFrame:fn=>scoped(owner,()=>requestAnimationFrame(fn)),
     fire:(event,values)=>fire(node,event,values),openMenu,closeMenu,rows,tell,
     fireLatest:(latest,event,values)=>fire(latest,event,values),
     beginDrag:(event,card)=>beginDrag(event,card,node),
@@ -89,21 +96,20 @@ function beginDrag(e,card,node){
 const defaultTokens=P.tokens;
 function applyStyles(plan){
   document.querySelector('#part-styles')?.remove();
-  const tokens={...defaultTokens,...theme,...Object.fromEntries(plan.styles.filter(s=>s.target==='tokens').flatMap(s=>Object.entries(s).filter(([k])=>!['id','rev','by','kind','lens','target','made_by','made_at','changed_at'].includes(k))))};
+  const tokens={...defaultTokens,...theme,...plan.tokens};
   const rules=[];
   for(const rule of plan.styles){
     if(rule.target==='tokens')continue;
     const m=/^([\w-]+)(?:\.([\w-]+))?(?:\[([\w-]+)=([\w-]+)\])?$/.exec(rule.target||'');
-    if(!m)throw Error('Style target must be component.part[fact=value]');
+    if(!m)continue;
     const [,component,partName,fact,value]=m;
     const selector=`[data-component="${component}"]`+(partName?`[data-part="${partName}"]`:'[data-root]')+(fact?`[data-fact-${fact}="${value}"]`:'');
     const declarations=[];
-    for(const key of ['color','background','radius','padding','gap','glow','lines','emphasis'])if(rule[key]!==undefined){
-      const val=tokens[rule[key]]??rule[key];
-      if(key==='lines'){if(!/^[1-9]$/.test(String(val)))throw Error('lines: 1..9');declarations.push(`display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:${val};overflow:hidden`)}
-      else if(key==='emphasis'){if(!['normal','bold'].includes(val))throw Error('emphasis: normal|bold');declarations.push('font-weight:'+val)}
-      else if(key==='glow'){if(!/^#[\da-f]{6}$/i.test(val))throw Error('glow needs a colour token');declarations.push(`box-shadow:0 0 18px ${val}55`)}
-      else {if(!/^(#[\da-f]{3,8}|\d+(?:\.\d+)?(?:px|rem|%)|transparent)$/i.test(val))throw Error('style needs a colour or measure token');declarations.push(({radius:'border-radius'}[key]||key)+':'+val)}
+    for(const [key,val] of Object.entries(rule.paint||{})){
+      if(key==='lines')declarations.push(`display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:${val};overflow:hidden`);
+      else if(key==='emphasis')declarations.push('font-weight:'+val);
+      else if(key==='glow')declarations.push(`box-shadow:0 0 18px ${val}`);
+      else declarations.push(({radius:'border-radius'}[key]||key)+':'+val);
     }
     rules.push(selector+'{'+declarations.map(d=>d.replace(/;|$/g,m=>m===';'?'!important;':'!important')).join(';')+'}');
   }
@@ -117,27 +123,59 @@ function refresh(){
 }
 async function refreshOnce(){
   if(dragging)return;
-  const plan=(await rows('look-view '+Q(lensName)))[0];
+  const plan=(await rows('look-view '+Q(lensName)+' plan=yes'))[0];
   // A read begun before pointer capture may finish during a drag. Never replace
   // that captured DOM; its old facts must survive until the fenced drop.
   if(dragging)return;
-  if(JSON.stringify(plan)===JSON.stringify(currentPlan))return;
+  const fingerprint=p=>JSON.stringify(p,(key,value)=>key==='parts'?undefined:key==='health'?{quarantined:value.quarantined,action_epoch:value.action_epoch}:value);
+  if(currentPlan&&fingerprint(plan)===fingerprint(currentPlan)){currentPlan=plan;return}
   for(const c of plan.components){
     const old=moduleCache.get(c.name);if(old?._source===c.code)continue;
-    if(!c.reviewed_code)continue;
-    const url=URL.createObjectURL(new Blob([c.code],{type:'text/javascript'}));
-    try{const mod=await import(url);moduleCache.set(c.name,{...mod.default,_source:c.code});if(mod.default.css)css(mod.default.css)}finally{URL.revokeObjectURL(url)}
+    if(!c.trusted||!plan.parts.some(p=>p.component===c.name&&!p.health.quarantined)){moduleCache.delete(c.name);continue}
+    const importing=plan.parts.find(p=>p.component===c.name);
+    agora.componentPhase?.({path:importing.part,component:c.name,stage:'module'});
+    const url=URL.createObjectURL(new Blob([c.code+'\n//# sourceURL=agora-component/'+c.name+'/'+c.reviewed_code+'.js'],{type:'text/javascript'}));
+    try{const mod=await Promise.race([import(url),new Promise((_,reject)=>nativeTimers.setTimeout(()=>reject(Error('Module load exceeded 10000 ms')),10000))]);moduleCache.set(c.name,{...mod.default,_source:c.code});if(mod.default.css)css(mod.default.css)}
+    catch(error){moduleCache.set(c.name,{mount(){throw error},_source:c.code})}finally{URL.revokeObjectURL(url);agora.componentPhase?.({path:importing.part,end:true})}
   }
   if(dragging)return;
-  currentPlan=plan;
+  const previousPlan=currentPlan;currentPlan=plan;
   const focus=document.activeElement;const focused=focus?.dataset.path;const focusedPart=focus?.dataset.part;const selection=focus?.selectionStart;const value=focus?.value;
   const next=render(plan.tree);mounted?.remove();document.body.append(next);mounted=next;
   if(focused){const n=[...document.querySelectorAll('[data-path]')].find(n=>n.dataset.path===focused&&n.dataset.part===focusedPart);if(n){if(value!==undefined)n.value=value;n.focus();if(typeof selection==='number'&&n.setSelectionRange)n.setSelectionRange(selection,selection)}}
   applyStyles(plan);
+  for(const owner of componentOwners.values())if(owner.element?.isConnected){
+    if(!owner.failed&&!owner.node.disabled){
+      if(owner.worker&&!owner.workerPainted)continue;
+      owner.lastGood=owner.element.cloneNode(true);
+      if(!owner.element.dataset.slow)observeComponent(owner,'healthy','',owner.elapsed||0);
+      const old=previousPlan&&findNode(previousPlan.tree,owner.node.path);
+      for(const binding of owner.node.motions||[]){
+        const match=/^fact ([\w.-]+) changes$/.exec(binding.trigger);
+        if(match&&old&&old.facts[match[1]]!==owner.node.facts[match[1]])playMotion(owner,binding.token);
+      }
+    }
+  }else if(!findNode(plan.tree,owner.node.path)){for(const dispose of owner.dispose.splice(0))try{dispose()}catch{};componentOwners.delete(owner.node.path)}
+  for(const owner of componentOwners.values())for(const m of owner.node.motions||[])if(m.trigger.startsWith('happening ')){
+    try{await hearMotion(m.trigger.slice(10))}catch(e){observeComponent(owner,'healthy','Motion subscription refused: '+String(e.message||e))}
+  }
+}
+function playMotion(owner,token){
+  const defaults={settle:{from:{opacity:.5,transform:'translateY(6px)'},to:{opacity:1,transform:'none'},duration:200},pulse:{from:{transform:'scale(.96)'},to:{transform:'scale(1)'},duration:180}};
+  const motion=currentPlan.tokens?.['motion-'+token]||defaults[token];
+  if(!motion){tell('Unknown theme motion '+token);return}
+  P.motion(owner.element,motion);owner.element.dataset.lastMotion=token;
 }
 document.addEventListener('click',e=>{if(menu&&!menu.contains(e.target)&&!e.target.closest('.cardtop'))closeMenu()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();document.querySelector('.veil')?.remove()}if(e.key.toLowerCase()==='n'&&!e.ctrlKey&&!e.metaKey&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)){e.preventDefault();document.querySelector('[aria-label="Add a task"]')?.focus()}});
-for(const word of ['make','set','forget','undo','component'])await agora.hear(word,()=>{clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>refresh().catch(tell),80)});
+const heard=new Set();
+async function hearMotion(word){if(heard.has(word))return;heard.add(word);await agora.hear(word,event=>{
+  for(const owner of componentOwners.values())if(owner.element?.isConnected&&!owner.failed&&Object.hasOwn(owner.node.saw,event.target)){
+    for(const binding of owner.node.motions||[])if(binding.trigger==='happening '+word)playMotion(owner,binding.token);
+  }
+  clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>refresh().catch(tell),80);
+})}
+for(const word of ['make','set','forget','undo','component','component-action'])await hearMotion(word);
 await refresh();
 // A forgotten/private target may no longer be hearable. Time-dependent bindings
 // also have no world happening. Reconcile the visible projection, without

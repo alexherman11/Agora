@@ -13,6 +13,8 @@ HERE=Path(__file__).resolve().parent
 
 
 def child(nested=False):
+    from gaming_gate import assert_clear
+    assert_clear()
     from test_kdesk import Desk,quoted
     import webview
     import widget_guard

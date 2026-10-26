@@ -221,10 +221,15 @@ def make_desk_handler(kernel, entry):
                 actor, why = self._actor()
                 if actor is None:
                     return self._send(401, {'ok': False, 'text': why})
-                if int(self.headers.get('Content-Length') or 0) > 100000:
+                from kernel.blobs import cap
+                body_size = int(self.headers.get('Content-Length') or 0)
+                if body_size > max(100000, 4 * ((cap(kernel) + 2) // 3) + 16384):
                     return self._send(413, {'ok': False, 'text': 'bridge message too large'})
                 try:
-                    out = widgets.request(actor, path.rsplit('/', 1)[-1], self._body() or {})
+                    body = self._body() or {}
+                    if body_size > 100000 and body.get('op') != 'upload':
+                        return self._send(413, {'ok': False, 'text': 'bridge message too large'})
+                    out = widgets.request(actor, path.rsplit('/', 1)[-1], body)
                 except (KD.Refused, ValueError, KeyError, TypeError) as e:
                     out = {'ok': False, 'text': 'refused: ' + str(e)}
                 return self._send(200, out)

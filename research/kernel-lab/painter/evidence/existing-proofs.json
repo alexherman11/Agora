@@ -1,32 +1,26 @@
 [
   {
     "proof": "byo_agent",
-    "exit": 0,
-    "evidence": "existing-byo_agent.txt"
+    "exit": 0
   },
   {
     "proof": "council_night",
-    "exit": 0,
-    "evidence": "existing-council_night.txt"
+    "exit": 0
   },
   {
     "proof": "hidden_hunt",
-    "exit": 0,
-    "evidence": "existing-hidden_hunt.txt"
+    "exit": 0
   },
   {
     "proof": "kits",
-    "exit": 0,
-    "evidence": "existing-kits.txt"
+    "exit": 0
   },
   {
     "proof": "web_host",
-    "exit": 0,
-    "evidence": "existing-web_host.txt"
+    "exit": 0
   },
   {
     "proof": "local_model",
-    "exit": 0,
-    "evidence": "existing-local_model.txt"
+    "exit": 1
   }
 ]
