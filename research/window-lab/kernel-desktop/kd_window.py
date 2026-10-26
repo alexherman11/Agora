@@ -676,7 +676,7 @@ class WindowHost:
             if taken:
                 return {"refused": f"the {edge} edge holds {taken[0].get('name')} already; window.close it first"}
             box = self.box_for(view, dict(kv, edge=edge), n)
-            base = (lens.get("title") or view.capitalize()) if lens else ('Widget · '+widget.get('title', view) if widget else VIEWS[view][0])
+            base = (lens.get("title") or view.capitalize()) if lens else (widget.get('title', view) if widget else VIEWS[view][0])
             name = base + (f" {n + 1}" if n and view != "taskbar" else "")
             line = (f'make kind=window shows={view} name={json.dumps(name,ensure_ascii=False)} at={box[0]},{box[1]} size={box[2]},{box[3]}'
                     + (f" lens={view}" if lens else "") + (f" target={thing}" if thing else "")

@@ -163,6 +163,88 @@ painter observation of visible text and computed styles, with `observed_at`;
 `unobserved` means there is no paint evidence. It is not a pixel or accessibility
 audit, and a dishonest component can misdescribe itself.
 
+### 26 October polish handles (builder draft)
+
+`format stamp as short-relative` displays `2h`, `Tue`, `Oct 22`. Also available:
+`calendar-date`, `month`, `day`, `weekday`, `time`. Existing `relative-date`
+keeps its day-based wording. Initials use the first letter from each of the
+first two words containing letters; numbers supply no initials. In a reviewed
+component, `api.format(setting, value, fallback='text')` applies that setting's shared or personal
+format to asynchronously read values. `api.display` remains the projected
+display value. Client dates use the browser's local zone; projected displays
+use the kernel clock and the supplied ISO zone. `api.node.viewer` exposes only
+the already-bound viewer's id/name, including on parts with no gestures.
+
+The catalogue `date-tile` takes `start`, `end`, `place`, `soonDays` (default 3).
+Its `date`, `month`, `day`, `weekday`, `time` format handles supply each display.
+Parts: `tile month day weekday time place countdown`. Arrange it beside any
+dated thing; it adds no calendar backend. Its default skin travels with the
+component, without loading the board. Shared token handles include
+`date-tile-width`, `date-tile-gap`, `date-tile-radius`, `date-tile-text-size`,
+`date-tile-small-size`, `date-tile-day-size`. Board theme tokens can override
+that skin through its ordinary parts. Example:
+
+```
+meeting : date-tile, start $item.start, end $item.end, place $item.location
+  format date as calendar-date
+  format month as month
+  format day as day
+  format weekday as weekday
+  format time as time
+```
+
+`slots` exposes a `meter` part and `count`, `claim`, `label`. Full or closed
+things have no claim control. `poll` displays large choices before voting and
+percentage bars after voting or closing. Kernel readings include `you_liked`
+and `your_vote` only for the reader; totals remain public and sealed keys never
+leave the kernel. `stamp` is the poll's closing-time format handle. Its labels
+include `voteCount` (singular vote) and `votes` (plural), alongside the option
+labels, whose authored case is preserved.
+
+`file` adds `page` (initial page, default 1) and optional `pageTarget` (apply the
+initial page only to this file). Increment `pageRequest` to re-address a reader
+even when that same page was requested before. A changed external request
+resets the page; unrelated repaints preserve the reader's local page choice.
+Readers clamp to available pages and offer a
+page picker. Photos open a cleaned full-size Blob on pointer or keyboard action;
+only the original poster sees the description editor. `variant=thumbnail`
+shows a document's first text lines and page count instead of its full reader.
+Bind `owner $file.upload_owner` when arranging file metadata separately from
+content. This avoids a late ownership lookup moving a photo card's controls;
+omitting it retains the permission-checked lookup fallback. It grants no edit
+rights and does not change the kernel's admission checks.
+
+`P.parseDateEntry(text, now?)` is a reusable local parser returning
+`{ok, iso, local, label}` or `{ok:false, message}`. Accepted: ISO local dates and
+times, `today`, `tomorrow`, or an English weekday plus a time (`Thu 6pm`). It
+rejects impossible dates/times and does not guess arbitrary natural language,
+use a model, or contact a service. It uses the local browser timezone, including
+its DST rules. Calendar smart entry can reuse it without a board dependency.
+`P.selectionAction(source, draft, version, action, {label})` supplies a floating
+selection-only control, a keyboard-callable `quote` action, and `dispose` for
+`api.cleanup`; authors arrange a More-menu fallback. Committing the action clears
+the consumed browser selection; merely selecting text does not act. It adds no word authority.
+
+`api.fire(event, {…values, select:{…localView}})` applies a local view selection
+after word admission succeeds and before the first resulting repaint. Use it
+to dismiss a one-action dialog atomically with its successful action. Refusal
+leaves the selection and draft intact. It has the same local reach as
+`api.select`, and does not alter the authored world line or its rights/fences.
+
+The board shell's `extras=feed` default flows additional root parts into the
+feed's existing column; a stopped sibling cannot allocate an accidental extra
+reading pane. `extras=alongside` preserves literal sibling grid placement.
+Board `post.layout=compact` and `post.excerptLines=3` choose feed density;
+`detail` selects the reading-pane treatment. `catchup.previewCount=3` bounds
+grouped preview rows, with the full group available by expansion.
+`compose.advancedFields="closes place"` moves those fields under More options.
+World kinds supply `compose_label`, `compose_description`, `compose_icon`,
+`accent`, `field_labels`, `field_types`, `fields` and `required`; neighbour-made
+kinds use the same declarations. The compact phone destination picker uses
+labels `channels`, `yourboard`, `saved` and `queue`, including the admitted queue
+count. Board layout/reading/photo/semantic token names and the fixed responsive
+breakpoint boundary are enumerated in the board's UI-HANDLES.md guide.
+
 ### Validated styles
 
 Invalid targets or values refuse the entire `make`/`set` at write time, explaining

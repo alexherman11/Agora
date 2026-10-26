@@ -6,6 +6,51 @@ const P = (()=>{
     sage:'#EAF3E9',sky:'#E8F1FA',lilac:'#F0EBF8',small:'8px',medium:'12px',large:'16px',soft:'12px',round:'50%',
     ...theme};
   const node=(tag,attrs={},...children)=>el(tag,attrs,...children);
+  // Data-only display formatters; arrangement/personal format handles choose these.
+  function formatValue(value,format='text',now=new Date()){
+    if(format==='initials')return String(value).split(/\s+/u).map(w=>w.match(/\p{L}/u)?.[0]||'').filter(Boolean).slice(0,2).join('').toUpperCase();
+    if(format==='text')return String(value??'');
+    if(!value)return '';
+    if(format==='count')return Number(value).toLocaleString(undefined,{maximumFractionDigits:0});
+    const d=new Date(value);if(!Number.isFinite(+d))return '';
+    const day=new Date(now.getFullYear(),now.getMonth(),now.getDate()),other=new Date(d.getFullYear(),d.getMonth(),d.getDate()),days=Math.round((day-other)/86400000),seconds=(now-d)/1000;
+    if(format==='relative-date')return days===0?'Today':days===-1?'Tomorrow':days===1?'Yesterday':days<0?`In ${-days} days`:`${days} days ago`;
+    if(format==='short-relative')return seconds>=0&&seconds<60?'now':seconds>=0&&seconds<3600?Math.floor(seconds/60)+'m':days===0&&seconds>=0?Math.floor(seconds/3600)+'h':days>=0&&days<7?d.toLocaleDateString(undefined,{weekday:'short'}):d.toLocaleDateString(undefined,{month:'short',day:'numeric',...(d.getFullYear()!==now.getFullYear()?{year:'numeric'}:{})});
+    if(format==='calendar-date')return d.toLocaleDateString(undefined,{day:'numeric',month:'short',...(d.getFullYear()!==now.getFullYear()?{year:'numeric'}:{})});
+    if(format==='month')return d.toLocaleDateString(undefined,{month:'short'});
+    if(format==='day')return String(d.getDate());
+    if(format==='weekday')return d.toLocaleDateString(undefined,{weekday:'short'});
+    if(format==='time')return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}).toLowerCase();
+    return String(value);
+  }
+  // Deliberately bounded English smart entry. No model, network or Date.parse guesses.
+  function parseDateEntry(value,now=new Date()){
+    const text=String(value).trim(),iso=/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{1,2}):(\d{2}))?$/.exec(text);
+    const build=(y,m,d,h=0,min=0)=>{const out=new Date(y,m-1,d,h,min);return out.getFullYear()===y&&out.getMonth()===m-1&&out.getDate()===d&&h<24&&min<60?out:null};
+    let date;
+    if(iso)date=build(...iso.slice(1).map(x=>Number(x||0)).map((x,i)=>i<3?x:x));
+    else{
+      const match=/^(today|tomorrow|sun(?:day)?|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i.exec(text);
+      if(!match)return {ok:false,message:'Try Thu 6pm, tomorrow 9:30am, or 2026-11-04 18:00.'};
+      let [,word,hour,minute,period]=match;word=word.toLowerCase();hour=Number(hour);minute=Number(minute||0);
+      if(period&&(hour<1||hour>12)||hour>23||minute>59)return {ok:false,message:'Check the time.'};
+      if(period)hour=hour%12+(period.toLowerCase()==='pm'?12:0);
+      date=new Date(now.getFullYear(),now.getMonth(),now.getDate(),hour,minute);
+      let delta=word==='today'?0:word==='tomorrow'?1:('sun mon tue wed thu fri sat'.split(' ').indexOf(word.slice(0,3))-now.getDay()+7)%7;
+      if(!['today','tomorrow'].includes(word)&&delta===0&&date<=now)delta=7;
+      date.setDate(date.getDate()+delta);
+    }
+    if(!date||!Number.isFinite(+date))return {ok:false,message:'Check the date and time.'};
+    return {ok:true,iso:date.toISOString(),local:`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}T${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`,label:date.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric',year:'numeric'})+' at '+formatValue(date,'time')};
+  }
+  function selectionAction(source,draft,sourceKey,activate,{label='Quote selection'}={}){
+    const selected= P.selected(source,draft,sourceKey),button=node('button',{type:'button',class:'selection-action',hidden:''},label);
+    const commit=()=>{const value=selected(),result=activate(value);if(value){getSelection()?.removeAllRanges();button.hidden=true}return result};
+    button.addEventListener('pointerdown',e=>{selected();e.preventDefault()});button.addEventListener('click',commit);
+    const update=()=>{const selection=getSelection(),inside=selection&&!selection.isCollapsed&&source.contains(selection.anchorNode)&&source.contains(selection.focusNode);button.hidden=!inside;if(inside){const r=selection.getRangeAt(0).getBoundingClientRect();Object.assign(button.style,{position:'fixed',left:Math.max(8,Math.min(r.left,innerWidth-160))+'px',top:Math.max(8,r.top-44)+'px',zIndex:90})}};
+    document.addEventListener('selectionchange',update);document.addEventListener('scroll',update,true);source.after(button);
+    return {button,selected,quote:commit,dispose:()=>{document.removeEventListener('selectionchange',update);document.removeEventListener('scroll',update,true)}};
+  }
   const layout=(mode,attrs={},...children)=>{
     const n=node('div',attrs,...children);n.dataset.layout=mode;
     Object.assign(n.style,({stack:{display:'flex',flexDirection:'column'},row:{display:'flex',alignItems:'center'},
@@ -118,5 +163,5 @@ const P = (()=>{
     view.addEventListener('scroll',draw);draw();return view;
   }
   css(`*{box-sizing:border-box}[hidden]{display:none!important}[data-layout]{gap:var(--space,12px);min-width:0}.overlay-anchor{position:fixed;inset:0;pointer-events:none;z-index:100}.overlay-anchor>*{pointer-events:auto}.dialog{margin:auto;background:var(--card);padding:24px;border-radius:12px;min-width:min(420px,90vw);max-width:90vw}.popover,.tooltip{background:var(--card);border:1px solid #e5e8e2;padding:12px;border-radius:10px;box-shadow:0 12px 40px #24352c18}.rich-text p{white-space:pre-wrap}.gallery-example{padding:16px;border:1px solid #e5e8e2;border-radius:12px;background:var(--card)}.catalogue{padding:24px}.catalogue pre{white-space:pre-wrap;font-size:11px}.catalogue>section{padding:18px;margin:14px 0;background:var(--card);border:1px solid #e5e8e2;border-radius:12px}table{border-collapse:collapse;width:100%}td,th{padding:10px;text-align:left;border-bottom:1px solid #e5e8e2}@media(max-width:650px){[data-layout=split],[data-layout=grid],.board{grid-template-columns:1fr!important}body{min-width:0!important;padding:18px!important}.tools,.filters{flex-wrap:wrap}.drawer{width:100%}}`);
-  return {tokens,node,layout,content,press,selected,submit,input,overlay,motion,spring,canvas,virtual,navigation,markdown};
+  return {tokens,node,layout,content,press,selected,submit,input,overlay,motion,spring,canvas,virtual,navigation,markdown,formatValue,parseDateEntry,selectionAction};
 })();

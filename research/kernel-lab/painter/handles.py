@@ -85,15 +85,32 @@ def validate_write(k, actor, kind, values, tx=None):
 
 
 def present(value, kind, now):
-    if kind=='initials':return ''.join(word[0] for word in str(value).split() if word)[:2].upper()
+    if kind=='initials':return ''.join(letters[0] for word in str(value).split() if (letters:=''.join(c for c in word if c.isalpha())))[:2].upper()
     if kind=='count':
         if isinstance(value,(list,dict)):return str(len(value))
         try:return f'{float(value):,.0f}'
         except (ValueError,TypeError):raise Refused('count formatter needs a number or JSON collection')
     if kind=='relative-date':
+        if not value:return ''
         try:date=datetime.fromisoformat(str(value).replace('Z','+00:00')).replace(tzinfo=timezone.utc)
         except ValueError:raise Refused('relative-date needs an ISO date')
         days=(date.date()-now.date()).days
         return 'Today' if days==0 else 'Tomorrow' if days==1 else 'Yesterday' if days==-1 else f'In {days} days' if days>0 else f'{-days} days ago'
     if kind=='text':return str(value)
-    raise Refused('format: initials, relative-date, count or text')
+    if kind in ('short-relative','calendar-date','month','day','weekday','time'):
+        if not value:return ''
+        try:
+            date=datetime.fromisoformat(str(value).replace('Z','+00:00'))
+            if date.tzinfo is None:date=date.replace(tzinfo=timezone.utc)
+        except ValueError:raise Refused('date format needs an ISO date')
+        if kind=='month':return date.strftime('%b')
+        if kind=='day':return str(date.day)
+        if kind=='weekday':return date.strftime('%a')
+        if kind=='time':return date.strftime('%I:%M %p').lstrip('0').lower()
+        if kind=='calendar-date':return f'{date.day} '+date.strftime('%b')+(f' {date.year}' if date.year!=now.year else '')
+        seconds=(now-date).total_seconds();days=(now.date()-date.date()).days
+        if 0<=seconds<60:return 'now'
+        if 0<=seconds<3600:return f'{int(seconds//60)}m'
+        if 0<=seconds<86400 and days==0:return f'{int(seconds//3600)}h'
+        return date.strftime('%a') if 0<=days<7 else date.strftime('%b ')+str(date.day)
+    raise Refused('format: initials, relative-date, short-relative, calendar-date, month, day, weekday, time, count or text')

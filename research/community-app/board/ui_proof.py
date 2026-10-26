@@ -21,7 +21,7 @@ sys.path[:0]=[str(HERE),str(LAB),str(DESKTOP),str(LAB/'tests')]
 from proof import Proof,fixtures
 from ui_install import install_ui,taskboard,Q
 from protocol import line
-from painter.browser import Page
+from painter.browser import Page,write_capture
 from kernel.door import EntryClient
 import kdesk
 
@@ -69,13 +69,23 @@ class UI:
             p.js('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))')
             pixels=base64.b64decode(p.c.call('Page.captureScreenshot',format='png',captureBeyondViewport=False)['data'])
             painted_at=time.perf_counter()
-            accent=p.js('getComputedStyle(document.querySelector(".nb-logo")).backgroundColor.match(/\\d+/g).slice(0,3).map(Number)')
+            accent=p.js('getComputedStyle(document.querySelector(".nb-masthead .nb-primary")).backgroundColor.match(/\\d+/g).slice(0,3).map(Number)')
             with Image.open(io.BytesIO(pixels)) as raster:assert sum(pixel==tuple(accent) for pixel in raster.convert('RGB').getdata())>50,'Initial board raster has no brand pixels'
-            path=OUT/'first-paint-1440.png';path.write_bytes(pixels);self.shots.append(str(path.relative_to(HERE)))
+            path=OUT/'first-paint-1440.png';write_capture(path,pixels);self.shots.append(str(path.relative_to(HERE)))
             self.metrics['first_paint_upper_bound_ms']=round((painted_at-p.navigate_at)*1000,2)
         return p
 
-    def wait(self,p,expr,seconds=20):p.until(expr,seconds)
+    def wait(self,p,expr,seconds=20):
+        # Every hidden browser's Fetch interception needs its CDP events
+        # serviced, including the second person's otherwise-idle page.
+        end=time.monotonic()+seconds;last=None
+        while time.monotonic()<end:
+            try:
+                for page in self.pages:page.c.js('0')
+                if p.js(expr):return
+            except (RuntimeError,AssertionError,StopIteration) as exc:last=exc
+            time.sleep(.06)
+        raise AssertionError(expr+'\n'+str(last)+'\n'+str(p.js('document.body.innerText')))
 
     def world_wait(self,condition,seconds=20):
         end=time.monotonic()+seconds
@@ -95,8 +105,8 @@ class UI:
         p.c.call('Input.dispatchMouseEvent',type='mouseReleased',button='left',clickCount=1,**point)
 
     def button(self,p,label,within='document'):
-        self.wait(p,'(()=>{const root='+within+';return !!root&&[...root.querySelectorAll("button")].some(b=>b.textContent.trim()==='+json.dumps(label)+')})()')
-        selector=p.js('(()=>{const list='+within+'.querySelectorAll("button");const b=[...list].find(b=>b.textContent.trim()==='+json.dumps(label)+');if(!b)throw Error("No button '+label+'");b.dataset.proofClick="yes";return "[data-proof-click=yes]"})()')
+        self.wait(p,'(()=>{const root='+within+';return !!root&&[...root.querySelectorAll("button")].some(b=>b.textContent.trim()==='+json.dumps(label)+'&&!b.hidden&&b.getClientRects().length)})()')
+        selector=p.js('(()=>{const list='+within+'.querySelectorAll("button");const b=[...list].find(b=>b.textContent.trim()==='+json.dumps(label)+'&&!b.hidden&&b.getClientRects().length);if(!b)throw Error("No button '+label+'");b.dataset.proofClick="yes";return "[data-proof-click=yes]"})()')
         self.click(p,selector);p.js('document.querySelector("[data-proof-click]")?.removeAttribute("data-proof-click")')
 
     def key(self,p,key,code=None,modifiers=0):
@@ -106,6 +116,13 @@ class UI:
         self.click(p,selector);self.key(p,'a','KeyA',2);p.c.call('Input.insertText',text=value)
 
     def choose(self,p,selector,value):
+        if selector=='[aria-label="Post type"]':
+            if not p.js('document.querySelector(".nb-kind-tiles").hidden'):
+                self.click(p,'[data-post-type='+json.dumps(value)+']')
+            else:
+                self.button(p,'← Choose a different post');self.click(p,'[data-post-type='+json.dumps(value)+']')
+            return
+        self.wait(p,'[...(document.querySelector('+json.dumps(selector)+')?.options||[])].some(o=>o.value==='+json.dumps(value)+'||o.textContent==='+json.dumps(value)+')')
         index=p.js('(()=>{const n=document.querySelector('+json.dumps(selector)+');return [...n.options].findIndex(o=>o.value==='+json.dumps(value)+'||o.textContent==='+json.dumps(value)+')})()');assert index>=0,value
         count=p.js('document.querySelector('+json.dumps(selector)+').options.length')
         self.click(p,selector)
@@ -118,10 +135,22 @@ class UI:
 
     def shot(self,p,name,width,height,focus=None):
         self.resize(p,width,height)
+        self.wait(p,'document.querySelector(".nb-channel-list")?.innerText.includes("Off-topic")',25)
         self.wait(p,'[...document.querySelectorAll(".nb-photo")].filter(i=>!i.closest("[data-stale]")).every(i=>i.complete&&i.naturalWidth>0)',25)
-        time.sleep(.3);p.js('scrollTo(0,0);document.querySelector(".nb-thread").scrollTop=0')
-        if focus:p.js('document.querySelector('+json.dumps(focus)+')?.scrollIntoView({block:"start"})')
-        path=OUT/f'{name}-{width}.png';p.shot(path);self.shots.append(str(path.relative_to(HERE)))
+        self.wait(p,'![...document.querySelectorAll(".nb-file")].some(n=>!n.closest("[data-stale]") && (n.querySelector(".nb-photo-placeholder") || [...n.querySelectorAll("[role=status]")].some(s=>s.textContent.startsWith("Opening attachment"))))',25)
+        time.sleep(.3);p.js('scrollTo(0,0);document.querySelector(".nb-centre").scrollTop=0;if(document.querySelector(".nb-thread"))document.querySelector(".nb-thread").scrollTop=0;if(document.querySelector(".nb-dialog"))document.querySelector(".nb-dialog").scrollTop=0')
+        if focus:
+            p.js('document.activeElement?.blur();document.querySelector('+json.dumps(focus)+')?.scrollIntoView({block:"start"})')
+            p.js('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))')
+            p.js('document.querySelector('+json.dumps(focus)+')?.scrollIntoView({block:"start"})')
+        path=OUT/f'{name}-{width}.png'
+        for attempt in range(4):
+            self.wait(p,'document.querySelector(".nb-channel-list")?.innerText.includes("Off-topic")',25)
+            if focus:p.js('document.querySelector('+json.dumps(focus)+')?.scrollIntoView({block:"start"})')
+            p.shot(path)
+            if p.js('document.querySelector(".nb-channel-list")?.innerText.includes("Off-topic") && !document.querySelector(".nb-photo-placeholder")'):break
+        else:raise AssertionError('Capture never reached a settled navigation/photo state: '+name)
+        self.shots.append(str(path.relative_to(HERE)))
         self.check('No horizontal overflow '+name+' '+str(width),p.js('document.documentElement.scrollWidth<=innerWidth+1'))
 
     def shots_for(self,p,name,focus=None):
@@ -144,7 +173,24 @@ class UI:
         f=self.f;p=self.page()
         self.wait(p,'document.querySelectorAll(".nb-post").length>=12')
         self.check('Feed constructs twelve cards for more than 400 posts',p.js('document.querySelectorAll(".nb-feed>.nb-post").length===12'),self.seed['posts'])
+        self.check('Slim bar; feed occupies unused reading-pane space',p.js('!document.querySelector(".nb-logo")&&!document.querySelector(".nb-thread")&&document.querySelector(".nb-centre").getBoundingClientRect().width>1000'))
         self.shots_for(p,'feed-catchup')
+        self.resize(p,390,844)
+        self.check('Phone first post is visible and catch-up is one collapsed row',p.js('document.querySelector(".nb-feed>.nb-post").getBoundingClientRect().top<innerHeight/2 && getComputedStyle(document.querySelector(".nb-catchup-entries")).display==="none"'))
+        self.choose(p,'.nb-phone-channel','__saved')
+        bookmark_order=next(r['id'] for r in self.d.rows('board-order') if r['rule']=='bookmarks')
+        self.wait(p,'JSON.parse(document.querySelector(".nb-shell").dataset.view).order==='+json.dumps(bookmark_order))
+        self.check('Phone Saved opens the world bookmark ordering',True)
+        self.choose(p,'.nb-phone-channel','')
+        self.wait(p,'JSON.parse(document.querySelector(".nb-shell").dataset.view).order==="" && document.querySelectorAll(".nb-feed>.nb-post").length===12')
+        self.resize(p,1440,900)
+        self.check('Catch-up uses grouped thread rows',p.js('document.querySelectorAll(".nb-catchup .nb-entry").length<=3'))
+        self.check('Catch-up and action text meet WCAG AA',self.contrast(p))
+        self.drag_text(p,'.nb-feed>.nb-post .rich-text p')
+        self.button(p,'Quote selection','document.querySelector(".nb-feed>.nb-post")')
+        self.wait(p,'!!document.querySelector(".nb-thread form blockquote")')
+        self.check('Feed selection opens its thread with the exact quotation and clears selection',p.js('!!JSON.parse(document.querySelector(".nb-shell").dataset.view).quote && getSelection().isCollapsed'))
+        self.navigate(p,thread='',quote='',source='')
         unrelated=f.say('Alex','post text="OTHER-SURFACE-SENTINEL"')['made'][0]
         self.check('Board readings exclude another surface’s posts',unrelated not in {r['id'] for r in f.see('Alex','board.feed')['rows']} and not f.see('Alex','board.search q=OTHER-SURFACE-SENTINEL')['rows'])
         for kind,post in self.examples.items():
@@ -160,19 +206,32 @@ class UI:
                 self.shots_for(p,'csv-table',table)
         if quick:return
         self.navigate(p,thread='',replyTo='')
-        self.button(p,'Optional local summary','document.querySelector(".nb-catchup")')
-        self.wait(p,'document.querySelector(".nb-catchup").innerText.includes("Local model summary")',35)
-        context=next(r for r in self.d.rows('board-catch-up') if r.get('for')==f.people['Alex'] or r.get('made_by')==f.people['Alex'])
-        self.check('Optional summary is labelled and its context is private',not f.raw('Neighbour 02','look '+context['id'],'see')['ok'])
+        model_status=f.see('Alex','model.status')['rows'][0];available=model_status['up'] and model_status['model'] in model_status.get('installed',[])
+        if available:
+            self.button(p,'Summarise','document.querySelector(".nb-catchup")')
+            self.wait(p,'document.querySelector(".nb-catchup").innerText.includes("Local model summary")||JSON.parse(document.querySelector(".nb-shell").dataset.view).summaryUnavailable==="yes"',35)
+            context=next(r for r in self.d.rows('board-catch-up') if r.get('for')==f.people['Alex'] or r.get('made_by')==f.people['Alex'])
+            self.check('Optional summary is labelled or unavailable action hidden; context is private',not f.raw('Neighbour 02','look '+context['id'],'see')['ok'] and p.js('!document.querySelector(".nb-catchup").innerText.includes("local model is not running")'))
+        else:
+            self.check('Unavailable model hides summary and offline explanation',p.js('!document.querySelector(".nb-catchup").innerText.includes("Summarise") && !document.body.innerText.includes("local model is not running")'))
         q=self.page('Neighbour 02')
+        q_origin=q.js('performance.timeOrigin')
+        self.check('Neighbour has no leaders queue',q.js('!document.querySelector(".nb-personal").innerText.includes("Leaders")'))
+        self.check('Phone destinations also conceal the leaders queue from neighbours',q.js('!document.querySelector(".nb-phone-channel option[value=__queue]")'))
         self.navigate(p,thread='',replyTo='',compose='no')
-        self.click(p,'.nb-toolbar .nb-primary');self.wait(p,'!!document.querySelector(".nb-dialog")')
-        self.wait(p,'document.querySelector('+json.dumps('[aria-label="Post kind"]')+').options.length>=10')
-        self.choose(p,'[aria-label="Post kind"]','event');self.wait(p,'!!document.querySelector("[name=start]")')
+        self.click(p,'.nb-masthead .nb-primary');self.wait(p,'!!document.querySelector(".nb-dialog")')
+        self.wait(p,'document.querySelector('+json.dumps('[aria-label="Post type"]')+').options.length>=10')
+        self.check('Compose starts with world-defined friendly tiles',p.js('!document.querySelector(".nb-kind-tiles").hidden&&document.querySelector(".nb-compose-step").hidden&&document.querySelector("[data-post-type=\\"Lost pet\\"]")!==null'))
+        for width,height in [(1440,900),(390,844)]:
+            self.resize(p,width,height);p.shot(OUT/'polish'/f'compose-choose-{width}.png')
+        self.resize(p,1440,900)
+        self.choose(p,'[aria-label="Post type"]','event');self.wait(p,'!!document.querySelector("[name=start]")')
+        self.fill(p,'[name=start]','Thu 6pm')
+        self.check('Typed date is parsed locally and confirmed in plain words',p.js('document.querySelector("[name=start]").validationMessage===""&&document.querySelector(".nb-date-confirm").innerText.includes("6:00 pm")'))
         self.shots_for(p,'compose-event')
-        self.choose(p,'[aria-label="Post kind"]','Lost pet');self.wait(p,'!!document.querySelector("[name=pet_name]")')
+        self.choose(p,'[aria-label="Post type"]','Lost pet');self.wait(p,'!!document.querySelector("[name=pet_name]")')
         self.shots_for(p,'compose-lost-pet')
-        self.choose(p,'[aria-label="Post kind"]','discussion')
+        self.choose(p,'[aria-label="Post type"]','discussion')
         self.fill(p,'[aria-label="Your message"]','A neighbour-led walking visit this Saturday. Bring your questions.')
         self.fill(p,'[aria-label="Title (optional)"]','Walking together')
         paths=[]
@@ -190,7 +249,7 @@ class UI:
         attached=[x for x in self.d.rows('file') if x.get('attached_to')==made['id']]
         self.check('Pointer and keyboard compose; photo and PDF uploaded and attached',len(attached)==2)
         self.wait(q,'document.body.innerText.includes("Walking together")')
-        self.check('Second person receives the first person’s post without reload',q.js('document.body.innerText.includes("Walking together")'))
+        self.check('Second person receives the first person’s post without reload',q.js('document.body.innerText.includes("Walking together")') and q.js('performance.timeOrigin')==q_origin)
         likes=int(made.get('likes',0));self.click(p,'[data-post='+made['id']+'] .nb-upvote')
         self.wait(p,'document.querySelector("[data-post='+made['id']+'] .nb-upvote").innerText.includes("1")')
         self.check('Pointer upvote is a sealed world like',int(next(x for x in self.d.rows('post') if x['id']==made['id'])['likes'])==likes+1)
@@ -229,17 +288,26 @@ class UI:
         self.shots_for(p,'pdf-page-quote','.nb-thread [data-post='+pdf_reply['id']+']')
         # Future event with one independent volunteer slot. The world enforces
         # the last-seat race; the interface reads its resulting full state.
-        event=f.say('Alex',line('board.post',post_kind='event',title='Walk the safe route',text='Meet neighbours by the crossing.',start=(f.at+timedelta(days=2)).isoformat(),seats='10',location='Seabright crossing',**{'in':self.channels['Meetings & events']}))['made'][0]
+        event=f.say('Alex',line('board.post',post_kind='event',title='Walk the safe route',text='Meet neighbours by the crossing.',start=(f.at+timedelta(days=2,hours=14)).isoformat(),end=(f.at+timedelta(days=2,hours=16)).isoformat(),seats='10',location='Seabright crossing',**{'in':self.channels['Meetings & events']}))['made'][0]
         slot=f.say('Alex',line('make',kind='slot',event=event,title='Bring the printed map',seats='1'))['made'][0]
         self.navigate(p,thread=event,replyTo=event)
         self.wait(p,'!!document.querySelector(".nb-thread [data-post='+event+']")')
         self.button(p,'Going','document.querySelector(".nb-thread [data-post='+event+']")')
         self.world_wait(lambda:any(x.get('about')==event for x in self.d.rows('board-rsvp')))
         self.check('RSVP is read back from world facts',any(x.get('about')==event for x in self.d.rows('board-rsvp')))
+        self.wait(p,'JSON.parse(document.querySelector(".nb-thread [data-post='+event+']").dataset.facts).rev==='+str(next(x for x in self.d.rows('post') if x['id']==event)['rev']))
+        self.button(p,'Maybe','document.querySelector(".nb-thread [data-post='+event+']")')
+        self.world_wait(lambda:any(x.get('about')==event and x.get('status')=='maybe' for x in self.d.rows('board-rsvp')))
+        self.wait(p,'document.querySelector(".nb-thread .nb-rsvp button[aria-pressed=true]")?.textContent==="Maybe"')
+        self.check('Going and Maybe toggle a single reservation',next(x for x in self.d.rows('post') if x['id']==event)['seats_left']==9)
+        self.check('Wide reading pane is at least 520 pixels; no nested vertical scroll',p.js('document.querySelector(".nb-thread").getBoundingClientRect().width>=520&&![...document.querySelectorAll(".nb-thread section,.nb-thread [data-component=column]")].some(n=>n.scrollHeight>n.clientHeight+2&&["auto","scroll"].includes(getComputedStyle(n).overflowY))'))
+        self.resize(p,1090,900)
+        self.check('Below 1100 pixels the thread replaces the feed with a back action',p.js('getComputedStyle(document.querySelector(".nb-centre")).display==="none"&&document.querySelector(".nb-thread").innerText.includes("← Back")'))
+        self.resize(p,1440,900)
         event_rev=next(x for x in self.d.rows('post') if x['id']==event)['rev']
         self.wait(p,'JSON.parse(document.querySelector(".nb-thread [data-post='+event+']").dataset.facts).rev==='+str(event_rev))
         self.click(p,'.nb-thread [data-fact-id='+slot+'] button')
-        self.wait(p,'document.querySelector(".nb-thread [data-fact-id='+slot+']").innerText.includes("All places filled")')
+        self.wait(p,'document.querySelector(".nb-thread [data-fact-id='+slot+']").innerText.includes("Place filled")')
         self.check('Claim last slot; world reports zero seats',next(x for x in self.d.rows('slot') if x['id']==slot)['seats_left']==0)
         self.shots_for(p,'event-full-slots')
         downloads=Path(f.tmp.name)/'downloads';downloads.mkdir(exist_ok=True)
@@ -267,37 +335,55 @@ class UI:
         self.click(p,'.nb-thread [data-post='+poll+'] .nb-option')
         self.world_wait(lambda:next(x for x in self.d.rows('post') if x['id']==poll).get('votes_Saturday')==1)
         self.check('Pointer poll vote is sealed count in world reading',next(x for x in self.d.rows('post') if x['id']==poll).get('votes_Saturday')==1)
+        self.wait(p,'document.querySelector(".nb-thread .nb-poll").innerText.includes("Your choice")')
+        self.check('After voting, poll becomes bars and marks only your choice',p.js('document.querySelectorAll(".nb-thread .nb-poll-result").length===2&&!document.querySelector(".nb-thread .nb-poll button")'))
         f.at+=timedelta(days=2);p.set_clock(f.at)
         self.navigate(p,thread=poll,offset=1)
-        self.wait(p,'document.querySelector(".nb-thread .nb-poll").innerText.includes("Poll closed")')
+        self.wait(p,'document.querySelector(".nb-thread .nb-poll").innerText.includes("Closed")')
         self.shots_for(p,'poll-after-closing')
         # Leader hide through its real reason composer and receipt-specific undo.
         self.navigate(p,thread=made['id'],replyTo=made['id'])
-        self.click(p,'.nb-thread [data-post='+made['id']+'] summary')
+        self.click(p,'.nb-thread [data-post='+made['id']+'] > .nb-actions > .nb-more > summary')
         self.button(p,'Hide with a reason','document.querySelector(".nb-thread [data-post='+made['id']+']")')
         self.fill(p,'[aria-label="Reason for hiding"]','Checking the route with the crossing guard.')
         self.button(p,'Save')
         self.wait(p,'document.querySelector(".nb-notice")?.innerText.includes("crossing guard")')
+        self.wait(p,'!document.querySelector(".nb-dialog")')
         self.check('Leader hide notice contains actual world reason',any('crossing guard' in x.get('reason','') for x in f.see('Alex','forgotten')['rows']))
         self.shots_for(p,'hidden-post-notice')
-        self.button(p,'Undo hide','document.querySelector(".nb-notice")')
+        self.resize(p,390,844)
+        self.check('Phone hidden thread retains its reason and Undo without a reply form',p.js('document.querySelector(".nb-thread .nb-notice")?.innerText.includes("crossing guard") && !document.querySelector(".nb-thread form")'))
+        self.button(p,'Undo hide','document.querySelector(".nb-thread .nb-notice")')
         self.wait(p,'!!document.querySelector(".nb-thread [data-post='+made['id']+']")')
         self.check('Leader pointer undo restores the post',any(x['id']==made['id'] for x in self.d.rows('post')))
-        self.navigate(p,thread='',search='',queue='yes')
+        self.resize(p,1440,900)
+        self.navigate(p,thread='',search='')
+        self.resize(p,390,844)
+        self.choose(p,'.nb-phone-channel','__queue')
         self.wait(p,'document.body.innerText.includes("Please verify the signup time")')
+        self.wait(p,'document.querySelector(".nb-phone-channel").selectedOptions[0]?.textContent.includes("(1)")')
+        self.check('Phone leader picker opens the real queue with its count',p.js('document.querySelector(".nb-phone-channel").selectedOptions[0].textContent.includes("(1)")'))
         self.shots_for(p,'leaders-queue')
         self.navigate(p,queue='no',search='council')
         self.wait(p,'document.querySelector(".nb-search")?.innerText.includes("Search results")')
+        self.wait(p,'!!document.querySelector(".nb-search mark")')
+        self.check('Search highlights matches and applies filter chips live',p.js('!!document.querySelector(".nb-search mark")&&document.querySelectorAll(".nb-searchfilters select").length===4&&!document.querySelector(".nb-searchfilters button")'))
         self.shots_for(p,'search-results')
+        self.navigate(p,search='written comments',thread='',queue='no')
+        self.wait(p,'!!document.querySelector(".nb-search .nb-entry-button")')
+        self.click(p,'.nb-search .nb-entry-button')
+        self.wait(p,'document.querySelector(".nb-thread [aria-label=\\"Choose a page\\"]")?.value==="3"')
+        self.check('A document search hit opens its owning thread at the addressed page',True)
         empty=f.say('Alex',line('group',name='Garden ideas',open='yes'))['made'][0]
         f.say('Alex',line('make',kind='board-channel',group=empty,title='Garden ideas'))
         self.navigate(p,channel=empty,search='',queue='no',thread='')
         self.wait(p,'document.body.innerText.includes("Room for a first conversation")')
         self.shots_for(p,'empty-channel')
         self.navigate(p,channel='',thread='',search='',queue='no',offset=0)
-        before=bool(f.see('Alex','catch-up')['rows']);self.button(p,'Mark seen')
+        before=bool(f.see('Alex','catch-up')['rows']);self.button(p,'Mark all seen')
         self.world_wait(lambda:not f.see('Alex','catch-up')['rows'])
-        self.check('Pointer mark seen clears the actual personal reading',before and not f.see('Alex','catch-up')['rows'])
+        self.wait(p,'!document.querySelector(".nb-summary")')
+        self.check('Pointer mark seen clears the actual personal reading and cached summary',before and not f.see('Alex','catch-up')['rows'])
         self.navigate(p,thread=made['id'],replyTo=made['id'])
         self.wait(p,'!!document.querySelector(".nb-thread [data-fact-id='+pdf_file['id']+']")')
         self.button(p,'Download','document.querySelector(".nb-thread [data-fact-id='+pdf_file['id']+']")')
@@ -323,6 +409,9 @@ class UI:
         for i in range(1,9):p.c.call('Input.dispatchMouseEvent',type='mouseMoved',button='left',buttons=1,x=a['x']+(b['x']-a['x'])*i/8,y=a['y'])
         p.c.call('Input.dispatchMouseEvent',type='mouseReleased',button='left',clickCount=1,**b)
         assert p.js('getSelection().toString().length>0'),'No selected passage'
+
+    def contrast(self,p):
+        return p.js('''(()=>{const lum=c=>{const rgb=c.trim().startsWith('#')?c.trim().slice(1).match(/../g).map(v=>parseInt(v,16)):c.match(/[\\d.]+/g).slice(0,3).map(Number);const a=rgb.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});return a[0]*.2126+a[1]*.7152+a[2]*.0722};const root=document.querySelector('.nb-shell'),s=getComputedStyle(root),ratio=(fg,bg)=>{const a=lum(fg),b=lum(bg);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)};return ratio(s.getPropertyValue('--accent'),s.getPropertyValue('--nb-soft'))>=4.5&&ratio(s.getPropertyValue('--ink'),s.getPropertyValue('--nb-soft'))>=4.5&&ratio(s.getPropertyValue('--muted'),s.getPropertyValue('--card'))>=4.5&&['discussion','question','event','poll','ask','offer','document','announcement','decision'].every(k=>ratio(s.getPropertyValue('--nb-kind-'+k),s.getPropertyValue('--card'))>=4.5)})()''')
 
     def privacy(self,p):
         outsider='Neighbour 02';private=next(x for x in self.d.rows('post') if x.get('text')=='PRIVATE-COUNCIL-SENTINEL')
@@ -376,7 +465,7 @@ class UI:
         receipt=self.f.say('Neighbour 02',line('board.post',text='The healthy neighbours can still update this board.',**{'in':self.channels['Off-topic']}))
         self.wait(p,'document.querySelector(".nb-feed").innerText.includes("healthy neighbours")')
         self.click(p,'.nb-feed [data-post='+receipt['made'][0]+'] .nb-upvote')
-        self.click(p,'.nb-toolbar .nb-primary');self.wait(p,'!!document.querySelector(".nb-dialog")')
+        self.click(p,'.nb-masthead .nb-primary');self.wait(p,'!!document.querySelector(".nb-dialog")');self.choose(p,'[aria-label="Post type"]','discussion')
         self.fill(p,'[aria-label="Your message"]','Compose works beside the stopped parts.')
         self.button(p,'Post to neighbours');self.wait(p,'!document.querySelector(".nb-dialog")')
         self.check('Faults retain compose, upvotes and peer live updates',any(x.get('text')=='Compose works beside the stopped parts.' for x in self.d.rows('post')) and next(x for x in self.d.rows('post') if x['id']==receipt['made'][0]).get('likes')==1)

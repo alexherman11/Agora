@@ -182,7 +182,7 @@
     document.body.dataset.surface=data.surface;
     if(q.get('slot'))document.body.classList.add('slot');
     else if(data.surface==='overlay'){document.body.classList.add('overlay');document.documentElement.style.background='transparent'}
-    else {KD.chrome('Widget · '+data.name);document.querySelectorAll('#receipt')[1]?.remove()}
+    else {KD.chrome(data.title||data.name);document.querySelectorAll('#receipt')[1]?.remove()}
     frame=document.createElement('iframe');frame.title=data.name;frame.name='agora-widget';frame.setAttribute('sandbox','allow-scripts');
     frame.setAttribute('referrerpolicy','no-referrer');
     frame.setAttribute('allow',"camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'; fullscreen 'none'");

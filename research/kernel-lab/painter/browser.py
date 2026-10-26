@@ -1,14 +1,31 @@
 """Hidden guarded-widget driver. Uses the existing widget proof's native wall."""
 import base64
 import json
+import os
 from pathlib import Path
 import sys
+import tempfile
 import time
 from urllib.parse import quote
 
 DESKTOP=Path(__file__).resolve().parents[2]/'window-lab/kernel-desktop'
 sys.path.insert(0,str(DESKTOP))
 from widget_browser import Browser
+
+
+def write_capture(path,data):
+    """Publish a complete raster, preserving the prior one on transient locks."""
+    path=Path(path)
+    with tempfile.NamedTemporaryFile(dir=path.parent,prefix=path.stem+'-',suffix='.capture',delete=False) as scratch:
+        scratch.write(data);temporary=Path(scratch.name)
+    try:
+        for attempt in range(20):
+            try:os.replace(temporary,path);return
+            except OSError:
+                if attempt==19:raise
+                time.sleep(.1)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 class Page:
@@ -54,7 +71,7 @@ class Page:
     def js(self,expression):
         try:r=self.c.call('Runtime.evaluate',expression=expression,returnByValue=True,awaitPromise=True,**self.context())
         except RuntimeError as exc:
-            if not any(s in str(exc) for s in ('Cannot find context','No session with given id')):raise
+            if not any(s in str(exc) for s in ('Cannot find context','No session with given id','Session with given id not found')):raise
             self.session=None
             r=self.c.call('Runtime.evaluate',expression=expression,returnByValue=True,awaitPromise=True,**self.context())
         if r.get('exceptionDetails'):raise AssertionError(r['exceptionDetails'])
@@ -72,7 +89,7 @@ class Page:
 
     def shot(self,path):
         self.c.call('Page.captureScreenshot',format='png',captureBeyondViewport=False);time.sleep(.1)
-        Path(path).write_bytes(base64.b64decode(self.c.call('Page.captureScreenshot',format='png',captureBeyondViewport=False)['data']))
+        write_capture(path,base64.b64decode(self.c.call('Page.captureScreenshot',format='png',captureBeyondViewport=False)['data']))
 
     def point(self,selector,rx=.5,ry=.5):
         b=self.js('(()=>{const n=document.querySelector('+json.dumps(selector)+');n.scrollIntoView({block:"center"});const r=n.getBoundingClientRect();return {x:r.x+r.width*'+str(rx)+',y:r.y+r.height*'+str(ry)+'}})()')

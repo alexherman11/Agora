@@ -77,3 +77,64 @@ opaque components cannot register a download.
 Off switch: close the board window or `off seabright-board`. Installing creates
 a dock entry but opens no window. The live installer adds no fixture people or
 posts. Poll counts are sealed; explicit Mark seen is the only catch-up write.
+
+## Polish handles, 26 October (builder draft)
+
+The slim bar uses `root.title` and labels `searchhint`, `compose`. The reading
+pane exists only when `view.thread` is selected. Theme `nb-thread-width`
+(520px), `nb-thread-share` (45%), `nb-nav-width`, `nb-top-height` and
+`nb-phone-compose-room` control the layout. The built-in responsive transition
+is 1100px; phone layout is 650px. Those breakpoints are component CSS, not
+claimed world handles. No board window is opened by an install.
+`root.extras=feed` places additional root parts (including their stopped cards)
+at the top of the feed's existing scroll column, preserving navigation/feed/
+thread widths. `extras=alongside` retains literal sibling grid placement.
+
+`post.layout=compact`, `post.excerptLines=3` control feed density and excerpts.
+`post.format.stamp=short-relative`, `post.format.date=calendar-date`, and
+`post.format.initials=initials` apply to post metadata; use `detail` for the
+reading pane and `result` for search dates. `date` is the general date-tile slot
+with its own formats and `soonDays`. `poll.format.stamp` controls closing dates;
+`fields.format.stamp` and `attachment-content.format.stamp` control other dates.
+UI labels still use the general `labels ui` / personal labels handle.
+
+`catchup.previewCount=3` controls grouped preview rows; the heading expands the
+full group, and phones start collapsed. One icon per category is shown on a
+thread's row. The Summarise action is present only when `model.status` reports
+the selected model installed on an available service. No status error is shown
+to neighbours. If inference itself returns an unavailable/offline response,
+the action hides for that window session too. The optional generated paragraph
+has its own block heading.
+
+Kinds supply `compose_label`, `compose_description`, `compose_icon`,
+`field_labels`, `field_types`, `fields` and `required`. New kinds are discovered
+automatically. `compose.advancedFields="closes place"` moves those fields into
+More options. Field types `datetime` use the small local parser described in
+ARRANGEMENT.md plus a native date/time picker and visible confirmation. Only
+the selected kind's fields are sent. Removing a pending attachment removes it
+from the draft; it does not delete its private upload from the world.
+
+Search filters apply on change. Time choices are Any time, Past week, Past month,
+Choose dates; the last opens a labelled picker. Cards highlight literal matches
+as text, never HTML. Page hits carry their owning thread and initial file/page.
+`attachment-content.page` / `pageTarget` are general initial-page handles;
+`pageRequest` is a request counter for re-addressing an already-open reader.
+
+Semantic tokens `nb-amber-ink`, `nb-amber-soft`, `nb-announcement`, kind `accent`
+tokens and `accent`/`muted` control contrast and state colours. Full slots omit
+the action, rather than fading low-contrast disabled text. `nb-reading-width`,
+`nb-reading-size`, `nb-page-leading` control document comfort; `nb-photo-height`
+and `nb-phone-photo-height` bound thumbnails, never the full-size original.
+
+Reach boundary: English smart-date grammar is deliberately small, PDF graphics
+still require a renderer, and no calendar, map or notifications were added.
+## Final review details
+
+Poll totals use `labels voteCount` for the singular and `labels votes` for the
+plural. Selection quoting consumes the selection only on explicit activation.
+The thread lens projects its matching `forgotten` row through the same notice
+template as the feed, keeping the human reason and Undo available on phones.
+The compact channel picker includes a separate Your board group for Saved and
+the leader-only queue/count. Returning to a channel leaves the bookmark filter;
+other chosen orderings are preserved. These labels use the same label handles.
+

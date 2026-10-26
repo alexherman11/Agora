@@ -268,7 +268,7 @@ class Kernel:
 
     # ------------------------------------------------------------------ reading the world
     def things(self, kind):
-        return [t for t, a in self.state.things.items() if a.get("kind") == kind]
+        return [t for t, a in list(self.state.things.items()) if a.get("kind") == kind]
 
     def name(self, t):
         a = self.state.things.get(t, {})
@@ -388,7 +388,7 @@ class Kernel:
     def shown(self, reader, t):
         """The thing as `reader` (a person id) may see it, or None. Every read passes here (SHAPE section 7). Sealed
         likes are shown only as a count."""
-        a = self.state.things.get(t)
+        a = dict(self.state.things.get(t) or {})
         if not a or not a.get('kind') or t == "world" or a.get("forgotten"):
             return None                 # a forgotten thing is out of every view; undo of the forget brings it back
         if not self._sees(reader, a.get("sees", "place"), t):
@@ -431,10 +431,14 @@ class Kernel:
             out["contacts"] = ", ".join(contacts)                      # only those this reader may see
         if a.get("kind") == "post":
             out["likes"] = likes
+            entry=self.find_entry('like',next(iter(self.groups_of(t)),self.place)) if likes else None
+            out['you_liked']=bool(entry and a.get('like:'+self.seal(reader,entry,t)))
         if a.get("options"):
             for o in str(a.get("options") or "").split():
                 out[f"votes_{o}"] = votes.get(o, 0)
             out["votes"] = sum(votes.values())
+            entry=self.find_entry('vote',next(iter(self.groups_of(t)),self.place)) if votes else None
+            out['your_vote']=a.get('vote:'+self.seal(reader,entry,t),'') if entry else ''
         if claims:
             out["claimed_by"] = ", ".join(self.name(p) for p in claims)       # in the order they were claimed
             out["claims"] = len(claims)

@@ -33,6 +33,9 @@ async function fire(node,event,values={}){
   }).join(' '));
   const saw={...node.saw,...values.saw};
   const out=await act(line,saw);
+  // Commit-related local selection (for example dismissing a dialog) belongs
+  // before the first repaint. A refused word leaves both view and draft intact.
+  if(values.select&&typeof values.select==='object'&&!Array.isArray(values.select))viewState={...viewState,...values.select};
   // A previous read may have started before this act. Drain it, then request a
   // reading begun after admission, so a sequential editor save uses fresh revs.
   if(refreshInFlight)await refreshInFlight;
@@ -74,7 +77,7 @@ function renderTrusted(node){
   const api={P:boundP,el:owned(P.node,owner),button:owned(P.press,owner),part:owned((name,tag,attrs,...kids)=>part(node,name,tag,attrs,...kids),owner),palette,flag,Q,
     children:node.children,render,settings:node.settings,facts:node.facts,node,
     child:(name,settings={})=>{const child=node.children.find(c=>c.name===name);if(!child)throw Error('Arrange child slot '+name);return render({...child,settings:{...child.settings,...settings},display:{...child.display,...settings}})},
-    display:key=>node.display?.[key]??node.settings[key],guard:fn=>owned(fn,owner),
+    display:key=>node.display?.[key]??node.settings[key],format:(key,value,fallback='text')=>P.formatValue(value,node.formats?.[key]||fallback),guard:fn=>owned(fn,owner),
     setTimeout:(fn,ms)=>scoped(owner,()=>setTimeout(fn,ms)),setInterval:(fn,ms)=>scoped(owner,()=>setInterval(fn,ms)),
     requestAnimationFrame:fn=>scoped(owner,()=>requestAnimationFrame(fn)),
     fire:(event,values)=>fire(node,event,values),openMenu,closeMenu,rows,tell,

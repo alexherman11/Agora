@@ -1,14 +1,17 @@
-root : board-shell, title "Seabright", subtitle "The neighbourhood board"
+root : board-shell, title "Seabright"
   watch reading:"board.badges"
   watch reading:"rows board-mark"
   watch reading:"rows kind"
   watch reading:"rows board-channel"
   watch reading:"rows board-order"
   watch reading:"rows board-settings"
+  watch reading:"rows board-rsvp"
   channels : board-navigation
+    watch reading:"rows board-seen"
+    watch reading:"board.queue"
   centre : column, role nb-centre
     tools : board-toolbar
-    catchup : board-catchup, of reading:"board.catch-up in=$view.channel" as c, limit 3, each catchup-item
+    catchup : board-catchup, of reading:"board.catch-up in=$view.channel" as c, limit 100, each catchup-item
       only when $view.search = "" and $view.queue != yes
       on seen do board.seen
       on snapshot do make kind=board-catch-up sees=me title="Catch-up summary context" text=$value
@@ -21,7 +24,9 @@ root : board-shell, title "Seabright", subtitle "The neighbourhood board"
     queue : board-search, of reading:"board.queue in=$view.channel" as r, each catchup-item
       only when $view.queue = yes
   conversation : board-thread
+    only when $view.thread != ""
     on reply do board.reply $target $fields
+    hidden : column, of reading:"forgotten", prop:id=$view.thread as n, each notice
     selected : column, of tag:post, prop:id=$view.thread as p, each detail
     replies : column, of tag:post, prop:thread=$view.thread as p, by made, each detail
       only when $view.thread != ""
@@ -37,7 +42,10 @@ root : board-shell, title "Seabright", subtitle "The neighbourhood board"
 catchup-item : board-entry
 notice : board-notice
   on undo do undo $value
-post : board-post, layout roomy
+post : board-post, layout compact, excerptLines 3
+  format stamp as short-relative
+  format date as calendar-date
+  format initials as initials
   on like do like $item
   on personal do board.personal $item action=$value
   on unpersonal do undo $value
@@ -45,16 +53,28 @@ post : board-post, layout roomy
   on answer do board.answer $target reply=$reply
   body : markdown, value $p.text
   fields : field-list, fields ""
+    format stamp as calendar-date
+  date : date-tile, start $p.start, end $p.end, place $p.location
+    only when $p.start != ""
+    format date as calendar-date
+    format month as month
+    format day as day
+    format weekday as weekday
+    format time as time
   poll : poll
+    format stamp as short-relative
     only when $p.post_kind = poll
     on vote do vote $item $value
     when fact votes changes play pulse
   slots : slots
-    only when $p.seats > 0
+    only when $p.seats > 0 and $p.post_kind != event
     on claim do claim $item
   files : column, of tag:file, prop:attached_to=$p.id as file, limit 1, each attachment-preview
   when fact likes changes play pulse
-detail : board-post, detail yes, layout roomy
+detail : board-post, detail yes, layout compact
+  format stamp as short-relative
+  format date as calendar-date
+  format initials as initials
   on like do like $item
   on personal do board.personal $item action=$value
   on unpersonal do undo $value
@@ -62,12 +82,21 @@ detail : board-post, detail yes, layout roomy
   on answer do board.answer $target reply=$reply
   body : markdown, value $p.text
   fields : field-list, fields ""
+    format stamp as calendar-date
+  date : date-tile, start $p.start, end $p.end, place $p.location
+    only when $p.start != ""
+    format date as calendar-date
+    format month as month
+    format day as day
+    format weekday as weekday
+    format time as time
   poll : poll
+    format stamp as short-relative
     only when $p.post_kind = poll
     on vote do vote $item $value
     when fact votes changes play pulse
   slots : slots
-    only when $p.seats > 0
+    only when $p.seats > 0 and $p.post_kind != event
     on claim do claim $item
   event-slots : column, of tag:slot, prop:event=$p.id as slot, each slot
   files : column, of tag:file, prop:attached_to=$p.id as file, each attachment
@@ -75,15 +104,18 @@ detail : board-post, detail yes, layout roomy
 slot : slots
   on claim do claim $item
 attachment : column, of reading:"file-read $file.id" as content, each attachment-content
-attachment-content : file, content $content, name $file.name
+attachment-content : file, content $content, name $file.name, owner $file.upload_owner, page $view.documentPage, pageTarget $view.documentFile, pageRequest $view.documentRequest
+  format stamp as calendar-date
   on alt do set $target alt=$value
   on rsvp do board.rsvp $target status=going
   on calendar do board.calendar $target
   table : table, sortable yes
 attachment-preview : column, of reading:"file-read $file.id" as content, each attachment-thumbnail
-attachment-thumbnail : file, content $content, name $file.name, variant thumbnail
+attachment-thumbnail : file, content $content, name $file.name, owner $file.upload_owner, variant thumbnail
+  format stamp as calendar-date
   on alt do set $target alt=$value
   on rsvp do board.rsvp $target status=going
   on calendar do board.calendar $target
   table : table, sortable yes
 result : board-entry
+  format stamp as short-relative

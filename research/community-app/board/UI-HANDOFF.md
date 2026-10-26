@@ -1,5 +1,10 @@
 # Seabright interface handoff
 
+Polish follow-up for Claude: [POLISH-HANDOFF.md](POLISH-HANDOFF.md) records the
+current source, 104-check UI proof, final screenshots and new handles. Its live
+adoption remains pending because the active desktop cannot be restarted under
+the hidden-only constraint. The original handoff below is preserved as history.
+
 Builder draft, 26 October 2026. Claude owns review, polish and commit. No git
 commands were run by this builder, and `lens.js` was not edited.
 

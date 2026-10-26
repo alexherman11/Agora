@@ -111,3 +111,32 @@ PDF page text and quote attribution are verified. Original PDF page graphics
 still depend on an installed renderer; none was installed during this job.
 The native download/file proof exercises a never-shown WebView2, not a public
 web deployment. The frozen fresh-agent tweak trial remains the next review.
+
+## 26 October: neighbourhood polish (builder draft, review pending)
+
+| Source edits | Missing world-level handle or reading |
+| --- | --- |
+| `kernel/kernel.py` | Read my own sealed choice/upvote (`your_vote`, `you_liked`) without exposing another person's sealed keys. |
+| `painter/handles.py`, `arrangement.py`, `painter.js`, `primitives.js` | Short relative and calendar formats, letters-only initials, dynamic `api.format`, viewer identity on nongesture parts, a bounded local smart-date parser and disposable selection-only actions. |
+| `components/date-tile.js`, `poll.js`, `slots.js`, `file.js`, `field-list.js`, `painter/catalogue.py` | Reusable date tiles, private-choice result bars, meters for any claimable thing, reader page/pageTarget handles, clean full-size photo viewing, owner-only description editing, date formatting for generic fields. |
+| desktop `kd_window.py`, `pages/widget-host.js`, `pages/widget-slots.js` | Human widget window titles without an implementation prefix. |
+| board `board.py` | Change RSVP status without claiming a second seat; page search and imported calendar catch-up results identify their owning thread/file; decisions retain the deciding leader. |
+| board `board-components.js`, `board-theme.css`, `board.lens`, `ui_install.py` | Authored compact feed and conditional reading pane, theme measures, grouped catch-up preview count, compose tile declarations/advanced fields, selection quote fallback, live search filters. New handles are in UI-HANDLES.md and ARRANGEMENT.md. |
+| board `ui_proof.py`, `test_polish.py`, `polish_dates_proof.js` | Hidden regression interactions and explicit layout/privacy/date/contrast checks. Existing interactions are preserved with new labels and tile flow. |
+| `painter/proof.py` | Compare replay and live scratch facts at the same committed instant, holding the existing writer lock while asynchronous paint reports can arrive. No assertion weakened. |
+| `painter/browser.py`, board proof driver | Recognise Chromium's alternate detached-session wording; service both hidden browsers' intercepted requests during waits. The two-person check also verifies the frame's timeOrigin stayed unchanged. |
+| board `polish_live.py` | Gated installation without a board opening, with preserved task/history/window/provider snapshots and a fresh structural projection. |
+| `painter/painter.js`, board composer | Successful gesture-local selection before repaint (`api.fire` values.select); dismiss a committed one-action dialog without reconstructing a blank replacement over Undo. Failed actions retain their form/draft. |
+| `kernel/kernel.py` | Snapshot dictionary enumeration and shown-row facts while module registration/writes run concurrently; avoid dictionary-resolution work for zero reactions. Counts and reader-only seals retain their existing authority. |
+| board shell, installer and guide | `root.extras=feed` keeps a stopped extra sibling in the feed's scroll column instead of displacing/narrowing the thread. `alongside` remains available. |
+| `painter/browser.py`, UI capture driver | Publish whole PNGs atomically with a unique scratch file and bounded transient-lock retry; never truncate an existing proof raster while a reader has it open. |
+| general `file`, catalogue, board entry/lens | `pageRequest` re-addresses an open reader; search thread/file/page travel in one local selection so an intermediate page-one render cannot win. |
+| general `file.owner`, board lens | Supply already-projected upload ownership so poster controls have their space immediately and do not move the reply footer after a late metadata lookup. Admission remains with the kernel. |
+
+| general selection action and board thread lens | Consume the selection only on explicit quote; render the existing forgotten/Undo reading inside an open hidden thread so phone users can restore it without an invalid reply form. |
+| general poll labels | Singular `voteCount` handle for a one-vote total, preserving the existing plural `votes` label. |
+| board shell navigation | Reuse Saved/queue world readings in the compact phone picker; preserve leader admission and clear bookmark ordering when returning to channels. |
+
+The parser accepts English weekday/today/tomorrow plus local time or ISO local
+date/time. Responsive breakpoints remain CSS defaults, explicitly identified in
+the guide. All work is uncommitted for Claude; `lens.js` is untouched.

@@ -171,7 +171,7 @@ def call(message):
         if not text:
             raise ValueError('write the decision outcome')
         return answer([line('make', kind='decision', text=text, about=target, within=target, **{'in': group}),
-                       line('set', target, outcome=text, decided_at=now)], thread)
+                       line('set', target, outcome=text, decided_at=now,decided_by=person)], thread)
 
     if word in ('personal', 'seen', 'report'):
         if word == 'seen':
@@ -197,6 +197,9 @@ def call(message):
         status = kv.get('status', 'going')
         if status not in ('going', 'maybe'):
             raise ValueError('RSVP says going or maybe')
+        existing=next((r for r in rows(use,'board-rsvp') if r.get('about')==target and owner(r)==person),None)
+        if existing:
+            return answer([line('set',existing['id'],status=status)],event,existing)
         # Both choices use the existing claim word and its undo, seat and once
         # checks. Status is a linked thing, so callers never edit the event.
         return answer([line('claim', target), line('make', kind='board-rsvp', status=status,
@@ -307,7 +310,9 @@ def call(message):
             for i, page in enumerate(content.get('pages', []), 1):
                 if query in page.casefold():
                     result.append(dict(id=doc['id'], match='document page', page=i, text=page,
-                                       file_source=doc['file_source']))
+                                       file_source=doc['file_source'],thread=parent.get('thread') or parent_id,
+                                       title=files.get(doc['file_source'],{}).get('name','Document'),
+                                       made=doc['made'],made_by=owner(doc),groups=parent.get('groups',[]),post_kind='document'))
         return dict(text=str(len(result)) + ' matches', rows=result)
     if word == 'catch-up':
         seen = [r for r in rows(use, 'board-seen') if owner(r) == person]
@@ -326,9 +331,12 @@ def call(message):
             if fresh:
                 busy.append(dict(p, category='busy', new_replies=len(fresh)))
         result += sorted(busy, key=lambda p: (-p['new_replies'], p['id']))[:10]
-        result += [dict(e, category='event') for e in rows(use, 'event') if e.get('file_source') and
-                   stamp(e['made']) > stamp(since) and (not kv.get('in') or scope(e) == kv['in'])]
-        result += [dict(r, category='following') for r in replies if r.get('thread') in following and stamp(r['made']) > stamp(since)]
+        files={r['id']:r for r in rows(use,'file')};by_id={p['id']:p for p in posts}
+        for e in rows(use,'event'):
+            if e.get('file_source') and stamp(e['made'])>stamp(since) and (not kv.get('in') or scope(e)==kv['in']):
+                parent=by_id.get(files.get(e['file_source'],{}).get('attached_to'),{})
+                if parent:result.append(dict(e,category='event',thread=parent.get('thread') or parent['id'],title=parent.get('title') or e.get('title','Event')))
+        result += [dict(r, category='following',title=by_id.get(r.get('thread'),{}).get('title') or r.get('title','')) for r in replies if r.get('thread') in following and stamp(r['made']) > stamp(since)]
         return dict(text='Catch-up since ' + since + ' · plain data, no model', rows=result)
     if word == 'feed':
         names = {r['id']: r['name'] for r in rows(use, 'person')}

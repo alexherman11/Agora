@@ -1,0 +1,16 @@
+{
+  "status": "pending",
+  "at": "2026-10-26T23:53:04Z",
+  "screen_gate": "clear at final inspection",
+  "mutations_performed": false,
+  "runtime_restarted": false,
+  "board_opened": false,
+  "posts_seeded": 0,
+  "feed_posts_at_attempt": 0,
+  "existing_tasks": 26,
+  "window_records": 9,
+  "window_provider_on": true,
+  "running_compiler_has_viewer_metadata": false,
+  "reason": "Required runtime adoption would recreate active desktop windows and violate the hidden-only constraint. Installer refused before mutation.",
+  "next_step": "Coordinator arranges hidden runtime adoption, then runs pinned Python polish_live.py --live after gaming_gate.py. Do not open or seed the board."
+}

@@ -9,7 +9,7 @@
       for(const [id,f] of slots)if(!rows.some(w=>w.id===id)){f.remove();slots.delete(id)}
       for(const w of rows){const old=slots.get(w.id);if(old&&old.widgetCode!==w.code){old.remove();slots.delete(w.id)}}
       for(const w of rows)if(!slots.has(w.id)){
-        const f=document.createElement('iframe');f.title='Widget · '+w.name;
+        const f=document.createElement('iframe');f.title=w.title||w.name;
         f.widgetCode=w.code;
         f.src='/desk/widget.html?slot=1&widget='+encodeURIComponent(w.id);
         Object.assign(f.style,{position:'relative',width:'310px',height:'100%',border:'0',flex:'0 0 310px',background:'transparent'});

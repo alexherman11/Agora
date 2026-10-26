@@ -116,7 +116,12 @@ def run():
         check('Gallery uses painter and renders live catalogue examples',gallery.js('document.querySelectorAll("[data-component=calendar]").length>0 && document.querySelectorAll("canvas").length>=3'))
         check('Gallery has a one-click taskbar entry',bool(d.rows('button',name='component-gallery-button')))
         from kernel.kernel import Kernel
-        check('Scratch replay matches all current facts',Kernel(str(Path(f.d.dir)/'world')).state.snapshot()==k.state.snapshot())
+        # Paint-health reports can land while the replay is being loaded. Hold
+        # the writer lock so both sides describe the same committed instant.
+        with k.lock:
+            replay=Kernel(str(Path(f.d.dir)/'world')).state.snapshot()
+            current=k.state.snapshot()
+        check('Scratch replay matches all current facts',replay==current)
         print(f'{len(checks)} of {len(checks)} component checks passed',flush=True)
     finally:
         (evidence/'proof.json').write_text(json.dumps(dict(checks=checks,count=len(checks)),indent=2),encoding='utf-8')

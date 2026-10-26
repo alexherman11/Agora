@@ -326,9 +326,9 @@ def compile_view(k, actor, target, _trail=(), reader=None, view=None):
         if error:health.update(health='stopped',last_error=error)
         settings_seen.append(dict(part=path, name=node['name'],component=kind, settings=settings, display=displays,labels=labels.get('ui',{}),facts=facts,health=health,
                                  parts=declared_parts,gestures=[g['event'] for g in node['gestures']]))
-        return dict(component=kind, name=node['name'], path=path, role=node.get('role',''), settings=settings, facts=facts, saw=reads,
+        return dict(component=kind, name=node['name'], path=path, role=node.get('role',''), settings=settings, facts=facts, saw=reads,viewer=env.get('viewer',{}),
                     collection=dict(total=total, offset=offset, limit=limit) if query else None,
-                    definition=component['id'] if component else None,error=error,display=displays,labels=labels.get('ui',{}),health=health,
+                    definition=component['id'] if component else None,error=error,display=displays,formats=formats,labels=labels.get('ui',{}),health=health,
                     disabled=str(enabled).lower() in ('no','false','0') or bool(health['disabled']),motions=node.get('motions',[]),
                     gestures=[dict(event=g['event'], line=g['line'], env=env) for g in node['gestures']], children=children)
     base = dict(view=view, viewer=dict(id=actor.person, name=k.name(actor.person)), today=k.now().strftime('%Y-%m-%d'),
