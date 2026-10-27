@@ -106,8 +106,10 @@ def main(argv=None):
         said = p.line(f"say {convo} hello JEFF RUN: look {convo} | rows chat | frobnicate now | say {shop} hi from JEFF")
         p.check("Alex's line in the Conversation speaks to JEFF", "to JEFF" in said["text"], said["text"])
 
+        mine = int(said["made"][0][2:])                   # the copy keeps the live Conversation: only lines after ours
+
         def jeff_said():
-            return [r for r in p.lines_of(convo) if r["by"] == "JEFF"]
+            return [r for r in p.lines_of(convo) if r["by"] == "JEFF" and int(r["id"][2:]) > mine]
         first = p.until(jeff_said)
         ms = int((time.time() - t0) * 1000)
         p.check("JEFF's words come back into the Conversation, as JEFF", first and first[0]["text"] == "On it.",
@@ -117,7 +119,7 @@ def main(argv=None):
                 done[1]["text"][:160] if done else "")
         shop_lines = p.lines_of(shop)
         p.check("one lines call: a refused line refuses only itself; the line after it ran",
-                any(r["by"] == "JEFF" and "hi from JEFF" in r["text"] for r in shop_lines),
+                any(r["by"] == "JEFF" and "hi from JEFF" in r["text"] and int(r["id"][2:]) > mine for r in shop_lines),
                 "frobnicate refused, say in Shop talk ran")
         reqs = [json.loads(x) for x in log.read_text(encoding="utf-8").splitlines() if x.strip()]
         offered = sorted(set(sum((r["tools"] for r in reqs if r["tools"]), [])))
@@ -125,7 +127,7 @@ def main(argv=None):
         other = [t for t in offered if not t.startswith("mcp__") and t != "DeferredToolPlaceholder"]
         p.check("the model was offered the three door tools (see, do, lines) and no built-in tool",
                 door == ["mcp__agora__do", "mcp__agora__lines", "mcp__agora__see"] and not other, ", ".join(offered))
-        result = next((r["result"] for r in reqs if r.get("result")), "") or ""
+        result = next((r["result"] for r in reqs if '"ran": 4' in (r.get("result") or "")), "") or ""
         p.check("the tool result says the refusal and the rest", '"refused": 1' in result and '"ran": 4' in result,
                 result[:200])
         p.check("his charter is his system prompt", any("standing rules" in (r.get("system") or "") or
@@ -157,7 +159,8 @@ def main(argv=None):
                 f"{len(reqs)} model requests, none carrying it")
         t1 = time.time()
         p.line(f"say {shop} @jeff a word, please")
-        heard = p.until(lambda: [r for r in p.lines_of(shop) if r["by"] == "JEFF" and r["text"] == "Heard you."])
+        heard = p.until(lambda: [r for r in p.lines_of(shop) if r["by"] == "JEFF" and r["text"] == "Heard you."
+                                 and int(r["id"][2:]) > mine])
         warm = int((time.time() - t1) * 1000)
         p.check("@jeff in Shop talk wakes him; he answers there", heard, f"{warm} ms to his words, warm")
 
@@ -165,7 +168,7 @@ def main(argv=None):
         p.until(lambda: "not running" in p.line("look house")["text"], 15)
         p.line(f"say {convo} are you there? (said while the house was off)")
         p.line("on house")
-        got = p.until(lambda: [r for r in p.lines_of(convo) if r["by"] == "JEFF"][2:], 60)
+        got = p.until(lambda: jeff_said()[2:], 60)
         p.check("a line said while the house was off reaches him when it is on again (the cursor)", got,
                 got[0]["text"] if got else "")
         sent = (p.world / "modules" / "house" / "jeff" / "transcript.jsonl").read_text(encoding="utf-8")
