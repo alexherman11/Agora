@@ -745,9 +745,23 @@ class WindowHost:
             self.dirty.set()
 
     def _owner_only(self, caller):
-        if caller.get("person") != self.owner and caller.get("id") != self.owner:
-            return {"refused": "window opens and moves windows only for this desktop's owner and their agents"}
+        if caller.get("person") != self.owner and caller.get("id") != self.owner                 and caller.get("person") not in self._stewards():
+            return {"refused": "window opens and moves windows only for this desktop's owner, its stewards and their "
+                               "agents"}
         return None
+
+    def _stewards(self):
+        """The people who lead this place (Alex, 27 Oct: JEFF a steward too), read with `who` (grant window
+        words="who"), at most every two seconds."""
+        now = time.monotonic()
+        if now - getattr(self, "_stewards_at", -9) > 2:
+            try:
+                rows = self.m.see("who").get("rows") or []
+                self._steward_ids = {r["id"] for r in rows if r.get("kind") == "person" and r.get("role") == "steward"}
+            except Exception:
+                self._steward_ids = getattr(self, "_steward_ids", set())
+            self._stewards_at = now
+        return self._steward_ids
 
     def call(self, msg):
         out = self._call(msg)

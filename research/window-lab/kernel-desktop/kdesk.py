@@ -43,7 +43,7 @@ DEFAULT_WORLD = HERE / "state" / "world"
 BASE_PY = Path(getattr(sys, "_base_executable", sys.executable))
 STEWARD_ACCOUNT = "desktop:alex"
 
-WINDOW_GRANTS = "window.* make set forget rows look hear:make hear:set hear:forget hear:undo hear:off"
+WINDOW_GRANTS = "window.* make set forget rows look who hear:make hear:set hear:forget hear:undo hear:off"
 GUY_GRANTS = "guy.* window.list window.overlay rows look holds hear:window.opened"
 SYSTEM_GRANTS = "system.* rows look"
 MEDIA_GRANTS = "media.* rows look"
