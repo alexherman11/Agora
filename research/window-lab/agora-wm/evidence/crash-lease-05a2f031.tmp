@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "owner": {
+    "pid": 108400,
+    "created": 134375327588230557,
+    "exe": "C:\\Users\\Alex\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+  },
+  "guard": {
+    "pid": 101616,
+    "created": 134375327590720253,
+    "exe": "C:\\Users\\Alex\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+  },
+  "released": false,
+  "windows": [
+    {
+      "ref": {
+        "hwnd": 2167792,
+        "process": {
+          "pid": 110452,
+          "created": 134375327568154585,
+          "exe": "C:\\Users\\Alex\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+        },
+        "thread": 102724,
+        "cls": "AgoraWMProof8625ef8cdc8e482a92a59a27bccd70fb"
+      },
+      "placement": {
+        "flags": 0,
+        "show": 1,
+        "min": [
+          0,
+          1995
+        ],
+        "max": [
+          -1,
+          -1
+        ],
+        "normal": [
+          241,
+          140,
+          1159,
+          799
+        ]
+      },
+      "dwm": {
+        "33": 0
+      },
+      "cookie": 2676878
+    }
+  ],
+  "reason": "off"
+}

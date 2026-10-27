@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "owner": {
+    "pid": 97808,
+    "created": 134375336943331738,
+    "exe": "C:\\Users\\Alex\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+  },
+  "guard": {
+    "pid": 112796,
+    "created": 134375337079426914,
+    "exe": "C:\\Users\\Alex\\AppData\\Local\\Programs\\Python\\Python312\\pythonw.exe"
+  },
+  "released": true,
+  "windows": [
+    {
+      "ref": {
+        "hwnd": 15013154,
+        "process": {
+          "pid": 97808,
+          "created": 134375336943331738,
+          "exe": "C:\\Users\\Alex\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+        },
+        "thread": 80140,
+        "cls": "AgoraWMProof1354bc2dc69a4eb2849ab3ecdf875715"
+      },
+      "placement": {
+        "flags": 0,
+        "show": 1,
+        "min": [
+          -1,
+          -1
+        ],
+        "max": [
+          -1,
+          -1
+        ],
+        "normal": [
+          191,
+          240,
+          1009,
+          849
+        ]
+      },
+      "dwm": {
+        "33": 0
+      },
+      "cookie": 935737974,
+      "restore_geometry": true,
+      "released": true,
+      "outcome": "restored"
+    },
+    {
+      "ref": {
+        "hwnd": 15602870,
+        "process": {
+          "pid": 97808,
+          "created": 134375336943331738,
+          "exe": "C:\\Users\\Alex\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+        },
+        "thread": 80140,
+        "cls": "AgoraWMProof1354bc2dc69a4eb2849ab3ecdf875715"
+      },
+      "placement": {
+        "flags": 0,
+        "show": 1,
+        "min": [
+          -1,
+          -1
+        ],
+        "max": [
+          -1,
+          -1
+        ],
+        "normal": [
+          180,
+          150,
+          810,
+          620
+        ]
+      },
+      "dwm": {
+        "33": 0
+      },
+      "cookie": 393912530,
+      "restore_geometry": true,
+      "released": true,
+      "outcome": "restored"
+    },
+    {
+      "ref": {
+        "hwnd": 42274046,
+        "process": {
+          "pid": 97808,
+          "created": 134375336943331738,
+          "exe": "C:\\Users\\Alex\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+        },
+        "thread": 80140,
+        "cls": "AgoraWMProof1354bc2dc69a4eb2849ab3ecdf875715"
+      },
+      "placement": {
+        "flags": 0,
+        "show": 1,
+        "min": [
+          0,
+          1995
+        ],
+        "max": [
+          -1,
+          -1
+        ],
+        "normal": [
+          241,
+          140,
+          1159,
+          799
+        ]
+      },
+      "dwm": {
+        "33": 0
+      },
+      "cookie": 675727920,
+      "restore_geometry": true,
+      "released": true,
+      "outcome": "restored"
+    },
+    {
+      "ref": {
+        "hwnd": 9442698,
+        "process": {
+          "pid": 97808,
+          "created": 134375336943331738,
+          "exe": "C:\\Users\\Alex\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+        },
+        "thread": 80140,
+        "cls": "AgoraWMProof1354bc2dc69a4eb2849ab3ecdf875715"
+      },
+      "placement": {
+        "flags": 0,
+        "show": 1,
+        "min": [
+          -1,
+          -1
+        ],
+        "max": [
+          -1,
+          -1
+        ],
+        "normal": [
+          91,
+          40,
+          591,
+          390
+        ]
+      },
+      "dwm": {
+        "33": 0
+      },
+      "cookie": 1014787224,
+      "restore_geometry": true,
+      "released": true,
+      "outcome": "restored"
+    }
+  ],
+  "reason": "off"
+}

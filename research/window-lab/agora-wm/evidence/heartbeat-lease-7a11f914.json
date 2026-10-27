@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "owner": {
+    "pid": 103976,
+    "created": 134375338140115483,
+    "exe": "C:\\Users\\Alex\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+  },
+  "guard": {
+    "pid": 111376,
+    "created": 134375338196369471,
+    "exe": "C:\\Users\\Alex\\AppData\\Local\\Programs\\Python\\Python312\\pythonw.exe"
+  },
+  "released": true,
+  "windows": [
+    {
+      "ref": {
+        "hwnd": 14750596,
+        "process": {
+          "pid": 103976,
+          "created": 134375338140115483,
+          "exe": "C:\\Users\\Alex\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+        },
+        "thread": 53640,
+        "cls": "AgoraWMProof131579a5331e478bb69156ab12ba6b3d"
+      },
+      "placement": {
+        "flags": 0,
+        "show": 1,
+        "min": [
+          0,
+          1995
+        ],
+        "max": [
+          -1,
+          -1
+        ],
+        "normal": [
+          241,
+          140,
+          1159,
+          799
+        ]
+      },
+      "dwm": {
+        "33": 0
+      },
+      "cookie": 1024581530,
+      "restore_geometry": true,
+      "released": true,
+      "outcome": "restored"
+    }
+  ],
+  "reason": "heartbeat expired"
+}

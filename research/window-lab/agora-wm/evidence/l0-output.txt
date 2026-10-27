@@ -1,0 +1,16 @@
+L0 fuzz: 2000 sequences x 30 events = 60000 events; invariants passed
+L0 scenarios: 14 PNGs + day.replay.json
+L0 solve: {"windows": 5, "median_ms": 0.298, "p95_ms": 0.349, "max_ms": 1.545}
+L0 solve: {"windows": 15, "median_ms": 0.811, "p95_ms": 1.056, "max_ms": 1.214}
+L0 solve: {"windows": 40, "median_ms": 2.223, "p95_ms": 3.38, "max_ms": 4.219}
+test_all_resize_corners (test_engine.EngineTests.test_all_resize_corners) ... ok
+test_fixed_obstacle_and_pin_clamp (test_engine.EngineTests.test_fixed_obstacle_and_pin_clamp) ... ok
+test_full_policy_only_when_full_and_no_unnecessary_minimise (test_engine.EngineTests.test_full_policy_only_when_full_and_no_unnecessary_minimise) ... ok
+test_fuzz (test_engine.EngineTests.test_fuzz) ... ok
+test_impossible_fixed_geometry_explicit (test_engine.EngineTests.test_impossible_fixed_geometry_explicit) ... ok
+test_unaffected_component_and_minimal_zero (test_engine.EngineTests.test_unaffected_component_and_minimal_zero) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 24.022s
+
+OK
