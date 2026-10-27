@@ -60,7 +60,13 @@ def runtime_config(directory, model=MODEL, *, mcp=None):
     from runtime_pin import catalog_matches, ensure_runtime, worker_record_url
 
     catalog, catalog_sha = pinned_catalog(model)
-    ensure_runtime(record_url=worker_record_url(mcp) if mcp else None)
+    servers = json.loads(Path(mcp).read_text(encoding="utf-8"))["mcpServers"] if mcp else {}
+    if set(servers) == {"agora"}:
+        from kernel_runtime_record import KernelRecord
+        from runtime_pin import Checker
+        Checker(record=KernelRecord(mcp)).check()
+    else:
+        ensure_runtime(record_url=worker_record_url(mcp) if mcp else None)
     lock = json.loads((HERE / "worker-runtime-lock.json").read_text(encoding="utf-8"))
     binary = os.environ.get("HOUSE_CODEX_BIN") or lock["binary"]
     if (

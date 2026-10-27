@@ -520,6 +520,8 @@ class House:
             return {"refused": "the house is still starting; try again in a moment"}
         if word == "house.build":
             return self.builders.start(msg)
+        if word == "house.retry":
+            return self.builders.retry(msg)
         if word == "house.tell":
             return self.builders.tell(msg)
         if word == "house.review":
@@ -662,6 +664,8 @@ class House:
 
 
 OFFER = [
+    {"word": "house.retry", "kind": "do", "takes": "<id>", "undo": "external", "may": "stewards",
+     "help": "house.retry <task>: retry a proven terminal startup failure before any model thread. Preserves its existing claim and worktree; refuses uncertain or changed work."},
     {"word": "house.tell", "kind": "do", "takes": "<id> <words>", "undo": "external", "may": "stewards",
      "help": "house.tell <task> <words>: retain a follow-up for your active or received builder, continuing the same Codex thread. Held, uncertain, reviewed and landed work does not restart."},
     {"word": "house.build", "kind": "do", "takes": "<id>", "undo": "external", "may": "stewards",

@@ -148,6 +148,32 @@ def test_uncertain_mutation_does_not_write_again(manager):
     assert manager.fixture_door.writes==[]
 
 
+def test_retry_cannot_replay_a_started_or_uncertain_turn(manager):
+    s=state(manager,'blocked');s['session']='a-real-thread'
+    assert 'refused' in manager.retry(msg())
+    s.pop('session');s['phase']='uncertain'
+    assert 'refused' in manager.retry(msg())
+
+
+def test_retry_retains_claim_tree_and_only_runs_unchanged_prethread_failure(manager):
+    s=state(manager,'blocked');manager.session=lambda _:manager.fixture_door
+    manager.git=lambda cwd,*args:'a' if args[0]=='rev-parse' else ''
+    original=(s['run'],s['tree'])
+    with patch.object(B.threading.Thread,'start') as launch:
+        assert manager.retry(msg()).get('external')
+        assert launch.call_count==1
+    assert (s['run'],s['tree'])==original
+    assert s['phase']=='preparing'
+
+
+def test_retry_refuses_changed_source(manager):
+    s=state(manager,'blocked');manager.session=lambda _:manager.fixture_door
+    manager.git=lambda cwd,*args:'b'
+    with patch.object(B.threading.Thread,'start') as launch:
+        assert 'refused' in manager.retry(msg())
+        launch.assert_not_called()
+
+
 def test_main_advancement_blocks_publish_without_git_mutation(manager):
     s=state(manager,'reviewed');s.update(review_base='a',candidate='b')
     manager.session=lambda _:manager.fixture_door

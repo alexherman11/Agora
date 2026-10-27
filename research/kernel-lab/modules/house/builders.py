@@ -78,6 +78,9 @@ class Builders:
             state = json.loads(path.read_text(encoding='utf-8'))
             if state['phase'] in ACTIVE:
                 state.update(phase='recovery-needed', detail='House restarted during an operation; inspect retained process, branch and receipts before resuming')
+            rows=house.m.see('look '+state['task']).get('rows') or []
+            if rows and rows[0].get('build_run') != state['run']:
+                state.update(phase='released',detail='world claim released or reassigned; preserved work is not running')
             self.states[state['task']] = state
             self.save(state)
 
@@ -238,6 +241,7 @@ class Builders:
                     state['result_ok'] = bool(e.get('ok'))
                     if not e.get('ok'):
                         raise RuntimeError('worker failed: '+str(e.get('detail')))
+                    state['turns']=state.get('turns',0)+1
                     self.assert_owned(state)
                     with self.lock:
                         pending = state.get('pending', [])
@@ -267,6 +271,27 @@ class Builders:
             pending=state['pending'];state['pending']=[]
             self.save(state)
         self.run_worker(state, 'Owner follow-up on this same task. Retain its scope and all safety boundaries.\n'+'\n'.join(pending))
+
+    def retry(self, msg):
+        """Only a proven pre-thread startup failure; never replay an unknown turn."""
+        state=self.states.get(msg.get('args',{}).get('target'))
+        if not state or state['requester'] != msg.get('caller',{}).get('person'):
+            return {'refused':'only the requester may retry this startup'}
+        with self.lock:
+            if state['phase']!='blocked' or state.get('session') or state['task'] in self.children:
+                return {'refused':'retry only applies to a terminal startup failure before any Codex thread'}
+            self.assert_owned(state)
+            if (not state.get('tree') or self.git(state['tree'],'rev-parse','HEAD')!=state['base']
+                    or self.git(state['tree'],'status','--porcelain','--untracked-files=no')):
+                return {'refused':'startup tree has changes; reconcile before retry'}
+            if sum(s['phase'] in ACTIVE or s['task'] in self.children for s in self.states.values())>=self.capacity:
+                return {'refused':'both slots occupied'}
+            state['phase']='preparing';self.save(state)
+            def launch(s):
+                task=self.session(s['requester']).look(s['task'])
+                self.run_worker(s,self.prompt(s,task))
+            threading.Thread(target=self.guarded,args=(state,launch),daemon=True).start()
+        return {'text':'pre-thread startup retry recorded; same claim and worktree, no task replay','external':True}
 
     def tell(self, msg):
         state=self.states.get(msg.get('args',{}).get('target'))
@@ -426,7 +451,7 @@ Assistant, October 27: "Found the blocker: the new world is running, but its Hou
                     task=state['task'], chat=state.get('chat', ''), doing=phase, now=state.get('detail', ''),
                     colour='sage' if phase=='working' else 'rose' if phase in ('blocked','recovery-needed') else 'sky',
                     provider='codex', model=state['model'], reasoning=state['reasoning'],
-                    turns=int(bool(state.get('result_received'))), last_turn=state.get('updated',''),
+                    turns=state.get('turns',0), last_turn=state.get('updated',''),
                     first_words_ms=None, error=state.get('detail','') if phase=='blocked' else '',
                     acts=[], acts_text='', waiting=0, session=state.get('session',''))
 
