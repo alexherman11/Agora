@@ -436,6 +436,10 @@ def undo(k, actor, st, entry, tx, group, saw=None):
     def prev_seq(t, a, s):
         return max([x for x, _ in k.state.history.get((t, a), []) if x < s] + [0])
 
+    def settled(seqs_after):
+        """Later writes that cancel out: acts since undone, and the undos that undid them."""
+        return all(x in undone or x in seqs or k.log.records[x - 1].get("undoes") for x in seqs_after)
+
     writes = []
     for r in group_recs:
         facts = [f for part in r["parts"] for f in part["facts"]]
@@ -446,7 +450,9 @@ def undo(k, actor, st, entry, tx, group, saw=None):
             t, a = f[0], f[1]
             v = f[3] if len(f) > 3 else None
             value, last = now(t, a)
-            if (value is None) != (v is None) or (value is not None and last != r["seq"]):
+            later = [x for x, _ in k.state.history.get((t, a), []) if x > r["seq"]]
+            same = (value is None) == (v is None) and (value is None or value == v)
+            if not same or (last != r["seq"] and not settled(later)):
                 raise Refused(f"r{seq} cannot be undone: {k.name(t)} {a.split(':')[0]} changed since (r{last})")
             back = k.state.before(t, a, r["seq"])
             cur[(t, a)] = (None if back is GONE else back, prev_seq(t, a, r["seq"]))
@@ -454,7 +460,7 @@ def undo(k, actor, st, entry, tx, group, saw=None):
         for t in {f[0] for f in facts if f[1] == "kind" and f[2] == "0"}:
             later = [s for (tt, _), hist in k.state.history.items() if tt == t for s, _ in hist
                      if s > r["seq"] and s not in seqs]
-            if later:
+            if later and not settled(later):
                 raise Refused(f"r{seq} cannot be undone: {k.name(t)} has changed since (r{max(later)}); undo that first")
     for t, a, back in writes:
         tx.set(t, a, back)
@@ -609,7 +615,10 @@ def make(k, actor, st, entry, tx, group, saw=None):
 
 def _make_notes(k, actor, kind, kv):
     """What make does not recognise, said, never refused (P7, Alex 27 Oct): a kind nothing here shows or uses yet, and
-    a setting the kind's other things never say, or say otherwise (bar=dock where buttons say bar=taskbar)."""
+    a setting the kind's other things never say, or say otherwise (bar=dock where buttons say bar=taskbar). Only for
+    what a person or agent wrote: a module's own lines (window.open's make) are its business."""
+    if actor.kind == "module":
+        return ""
     others = [a for t, a in list(k.state.things.items()) if a.get("kind") == kind and not a.get("forgotten")
               and k.shown(actor.person, t) is not None]
     if not others:

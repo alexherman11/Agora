@@ -119,9 +119,33 @@ def test_p3_undo_takes_back_the_whole_action_with_what_rules_did(world):
 def test_p1_a_name_of_the_wrong_kind_says_so(world):
     k, a, b = world
     say(k, a, 'verb window.shut steps="set $target closed=yes" help="window.shut <window>: close a window"')
+    say(k, b, 'make kind=window name=Lines')                           # <window> is a kind here: windows exist
     say(k, b, 'make kind=lens name=Feed')
     out = say(k, b, 'window.shut Feed', False)['text']
     assert 'no window you can see is called Feed' in out and 'a lens' in out
     w = say(k, b, 'make kind=window name=Feed')['made'][0]
     say(k, b, 'window.shut Feed')
     assert k.state.get(w, 'closed') == 'yes'
+
+
+def test_third_agent_findings(world):
+    """27 Oct, the third fresh agent: placeholders are not kinds, $2 by name, plain verbs on shared names, free words
+    as the first setting, and a second undo."""
+    k, a, b = world
+    one = say(k, b, 'make kind=taskboard-task title=One lane=Now')['made'][0]
+    two = say(k, b, 'make kind=taskboard-task title=Two lane=Now')['made'][0]
+    say(k, a, 'verb pair steps="set $1 lane=Done; set $2 lane=Done" help="pair <a> <b>: finish two cards"')
+    say(k, b, 'pair One Two')                                          # <a> is a placeholder; $2 resolves by name
+    assert k.state.get(one, 'lane') == k.state.get(two, 'lane') == 'Done'
+    say(k, a, 'verb window.shut steps="set $target closed=yes" help="window.shut <window>: close a window"')
+    w = say(k, b, 'make kind=window name=Help')['made'][0]
+    say(k, b, 'make kind=button label=Help does="look"')
+    say(k, b, 'shut Help')                                             # a window and a button: shut fits the window
+    assert k.state.get(w, 'closed') == 'yes'
+    say(k, a, 'verb task.add steps="make kind=taskboard-task title=$title lane=$to" help="task.add title=<t> [to=<lane>]: add a card"')
+    card = say(k, b, 'task.add "buy milk"')['made'][0]
+    assert k.state.get(card, 'title') == 'buy milk'
+    say(k, b, 'set "buy milk" lane=Now')
+    say(k, b, 'undo')                                                  # the set
+    assert 'undid' in say(k, b, 'undo')['text']                        # then the make, though the card changed and changed back
+    assert k.state.get(card, 'kind') is None or k.state.get(card, 'forgotten') or card not in k.state.things

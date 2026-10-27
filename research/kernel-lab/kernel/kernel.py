@@ -507,12 +507,16 @@ class Kernel:
                           + ", ".join(f"{t}, a {kd}" for t, kd in hits[:4]) + ")")
         return hinted or hits
 
-    @staticmethod
-    def usage_kind(entry):
-        """The kind a word's usage names first (window.move <window> …: window), if any."""
+    def usage_kind(self, entry):
+        """The kind a word's usage names first (window.move <window> …: window), if things of that kind exist here
+        (tidy <a> <b> names no kind: <a> is only a placeholder)."""
         first = (str(entry.get("help") or "").splitlines() or [""])[0]
         m = L.re.search(r"<([a-z][a-z0-9-]*)", first)
-        return m.group(1) if m and m.group(1) not in ("id", "thing", "words", "text", "word") else None
+        kind = m.group(1) if m and m.group(1) not in ("id", "thing", "words", "text", "word") else None
+        if kind and any(a.get("kind") == kind or str(a.get("kind", "")).endswith("-" + kind)
+                        for a in list(self.state.things.values())):
+            return kind
+        return None
 
     def resolve_name(self, actor, st, entry):
         """A name where a word takes a thing: the whole of its free words first ("buy milk"), then the first word.
@@ -540,29 +544,55 @@ class Kernel:
                 cands.append(e)
         if not cands:
             return None
-        kind = None
+        kinds = []                                  # the kinds of whatever the line names
         if st.target and L.ID.match(st.target):
-            kind = self.state.get(st.target, "kind")
+            kinds = [self.state.get(st.target, "kind")]
         elif st.words:
             for name in [st.words] + ([st.words.split()[0]] if " " in st.words else []):
-                hits = self.named(actor, name)
-                if len({kd for _, kd in hits}) == 1:
-                    kind = hits[0][1]
+                kinds = list(dict.fromkeys(kd for _, kd in self.named(actor, name)))
+                if kinds:
                     break
 
-        def fits(e):
+        def fits(e, kind):
             ns = str(self.state.get(e, "word")).rsplit(".", 1)[0]
             usage = (str(self.state.get(e, "help") or "").splitlines() or [""])[0]
             return ns == kind or ns in str(kind).split("-") or f"<{kind}" in usage or f"<{kind}" in str(
                 self.state.get(e, "takes") or "")
-        fit = [e for e in cands if fits(e)] if kind else cands
+        # close Help, where Help names a window and a button: the family word that fits one of them (window.close)
+        fit = [e for e in cands if any(fits(e, kd) for kd in kinds)] if kinds else cands
         if len(fit) == 1:
             return fit[0]
         said = ", ".join(self.state.get(e, "word") for e in (fit or cands))
-        if kind:
-            raise Refused(f"{word} could mean {said} for a {kind}; say which" if fit else
-                          f"nothing called {word} acts on a {kind}; {word} means {said} for other things")
+        named_as = " or ".join(f"a {kd}" for kd in kinds[:3])
+        if kinds and fit:
+            raise Refused(f"{word} could mean {said} for {named_as}; say which")
+        if kinds:
+            raise Refused(f"nothing called {word} acts on {named_as}; {word} means {said} for other things")
+        if st.words or st.target:
+            raise Refused(f"nothing you can see is called {st.words or st.target}; {word} means {said} (help {word})")
         raise Refused(f"{word} could mean {said}; say which, or name the thing (help {word})")
+
+    def name_target(self, actor, st, entry, group):
+        """A word that takes a thing, given a name: its dictionary entry's name (word.set window.open), or a thing so
+        called (window.close Help; the kind its usage names first). Sets st.target; refuses when two things share it."""
+        takes = self.takes_id(entry.get("takes"))
+        first_takes = (str(entry.get("takes") or "").split() or [""])[0]
+        names_a_thing = (takes and first_takes in ("<id>", "[<id>]")) or (
+            entry.get("from") == "verb" and self.usage_kind(entry))     # task.done <task>: a verb about a thing
+        if not (names_a_thing and not st.target and st.words):
+            return
+        first = st.words.split()[0]
+        plain = not L.ID.match(first) and not L.RECORD.match(first)
+        if plain and self.usage_kind(entry) and self.resolve_name(actor, st, entry):
+            return
+        try:
+            named = self.find_entry(first, group) if plain else None
+        except Refused:
+            named = None
+        if named and self.shown(actor.person, named) is not None:
+            st.target, st.words = named, st.words[len(first):].strip()
+        elif plain:
+            self.resolve_name(actor, st, entry)        # set Lines at=…: Lines is dk74
 
     def needs_a_thing(self, actor, st, entry, text):
         """The refusal for a word given a name (or nothing) where it takes a thing's id: say which id, as a line."""
@@ -899,7 +929,10 @@ class Kernel:
         for i, s in enumerate(steps):
             s = self.fill_handles(s, handles)
             try:
+                s, pressed = self.pressed_line(actor, s)       # press <button>: its does= runs here, as a typed line
                 r = self.step(actor, s, press=press if len(steps) == 1 else None, saw=saw, mode=mode)
+                if pressed:
+                    r = dict(r, text=f"pressed {pressed}: {r.get('text', '')}")
                 self.keep_handle(s, r.get("made"), handles)
             except Refused as exc:
                 texts.append(f"refused: {exc}")
@@ -916,6 +949,30 @@ class Kernel:
         if self.modules:
             self.modules.reconcile()
         return out
+
+    def pressed_line(self, actor, text):
+        """press <button> -> (its does= line, its label). The line runs as an ordinary typed line, outside any lock, so
+        a module word in it answers as it would from a click. Anything else -> (text, None)."""
+        st = L.parse(text)
+        with self.lock:
+            try:
+                eid = self.find_entry(st.word)
+            except Refused:
+                return text, None
+            if not eid or self.state.get(eid, "bound") != "press" or self.state.get(eid, "from") != "kernel":
+                return text, None
+            if not st.target and st.words:
+                self.name_target(actor, st, self.entry(eid), None)
+            if not st.target:
+                raise Refused("press <button>: say which, by its label or id (rows button lists them)")
+            a = self.shown(actor.person, st.target)
+            if a is None:
+                raise self.no_such(st.target)
+            line = str(a.get("does") or "").strip()
+            if not line:
+                raise Refused(f"{a.get('label') or st.target} has nothing to press: only a thing with does=\"<line>\" "
+                              f"(a button) runs a line")
+            return line, str(a.get("label") or st.target)
 
     @staticmethod
     def fill_handles(text, handles):
@@ -959,23 +1016,7 @@ class Kernel:
             if st.target and takes is None:
                 st.words = (st.target + " " + st.words).strip()       # a word that takes no thing: an id is words
                 st.target = None
-            first_takes = (str(entry.get("takes") or "").split() or [""])[0]
-            names_a_thing = (takes and first_takes in ("<id>", "[<id>]")) or (
-                entry.get("from") == "verb" and self.usage_kind(entry))     # task.done <task>: a verb about a thing
-            if names_a_thing and not st.target and st.words:
-                # a word's name where a thing is expected names its dictionary entry: word-set window.open help=…
-                first = st.words.split()[0]
-                plain = not L.ID.match(first) and not L.RECORD.match(first)
-                # a word whose usage names a kind (window.close <window>) looks for a thing so called first
-                if not (plain and self.usage_kind(entry) and self.resolve_name(actor, st, entry)):
-                    try:
-                        named = self.find_entry(first, group) if plain else None
-                    except Refused:
-                        named = None
-                    if named and self.shown(actor.person, named) is not None:
-                        st.target, st.words = named, st.words[len(first):].strip()
-                    elif plain:
-                        self.resolve_name(actor, st, entry)        # set Lines at=…: Lines is dk74
+            self.name_target(actor, st, entry, group)          # a name where a thing goes (P1)
             if st.target and L.ID.match(st.target):
                 if self.shown(actor.person, st.target) is None:
                     raise self.no_such(st.target)                     # the same words as for a thing that isn't there
@@ -1070,6 +1111,13 @@ class Kernel:
         # names a later part of the line fills itself: handles (as=card) and what the painter and rules supply
         later = set(L.re.findall(r"\bas=([a-z][a-z0-9_]*)", raw_steps)) | {"today", "by", "carried", "target"}
         unfilled = "\x00unfilled\x00"
+        free = " ".join(args).strip()
+        if free and not L.re.search(r"\$([1-9*]|target\b)", raw_steps):
+            # task.add "buy milk": free words where a verb has no place for them fill its first setting nobody gave
+            first = next((n for n in L.re.findall(r"=\$([a-z][a-z0-9_]*)\b", raw_steps)
+                          if n not in st.kv and n not in later), None)
+            if first:
+                st.kv = dict(st.kv, **{first: free})
 
         def fill(x):
             # Named values are quoted and inserted in ONE substitution pass: a
@@ -1142,6 +1190,10 @@ class Kernel:
                                       f"which a verb note's steps can't run yet; nothing was done")
                     if s2.target and self.takes_id(e.get("takes")) is None:
                         s2.words, s2.target = (s2.target + " " + s2.words).strip(), None
+                    try:
+                        self.name_target(actor, s2, e, g)            # a step given a name ($2 = "Appearance")
+                    except Refused as exc:
+                        raise Refused(f"{entry['word']} stopped at '{x}': {exc}; nothing was done")
                     if s2.target and L.ID.match(s2.target):
                         if self.shown(actor.person, s2.target) is None:
                             raise self.no_such(s2.target)
@@ -1181,7 +1233,13 @@ class Kernel:
         def stop(x, why):
             for mid, use in asked:
                 self.modules.done(mid, use, {"ok": False, "refused": why, "made": [], "text": why})
-            return Refused(f"{entry['word']} stopped at '{x}': {why}; nothing was done")
+            if not asked:
+                return Refused(f"{entry['word']} stopped at '{x}': {why}; nothing was done")
+            # an earlier step's module may already have acted on the screen; the world records none of it
+            who = ", ".join(dict.fromkeys(self.state.get(m, "name") for m, _ in asked))
+            return Refused(f"{entry['word']} stopped at '{x}': {why}. Nothing was recorded, but {who} answered an "
+                           f"earlier step and may already have acted (the screen can differ from the world until it "
+                           f"catches up)")
         for x in steps:
             x = self.fill_handles(x, handles)
             s2 = L.parse(x)
@@ -1198,6 +1256,10 @@ class Kernel:
                 x = L.re.sub(r'^\S+', s2.word, x, count=1)
                 if s2.target and self.takes_id(e.get("takes")) is None:
                     s2.words, s2.target = (s2.target + " " + s2.words).strip(), None
+                try:
+                    self.name_target(actor, s2, e, g)            # tidy Feed Appearance: $2 by name, as typed
+                except Refused as exc:
+                    raise stop(x, str(exc).removeprefix("refused: "))
                 if s2.target and L.ID.match(s2.target):
                     if s2.target in tx.made:
                         if self.source(e)[0] == "module":

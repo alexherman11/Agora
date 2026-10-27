@@ -100,6 +100,21 @@ Tests (**ran**): [test_lines_plainly.py](../tests/test_lines_plainly.py) 7 tests
 
 Known limits: a button or verb line that says a name resolves it when it runs, not when saved, so renaming the thing breaks that line (ids still bind). After undoing an act, undoing the act before it can still refuse "changed since" (an older kernel limit). `move Feed left` (a bare spot) is not read as `to=left`.
 
+## Third agent, on the approved language (ran)
+
+Same prompt and tasks, fresh sandbox copy with the language installed, the window module turned on in the sandbox only (it is off in the live world). **14 done, 6 partly, 0 failed**, about 210 lines ([log](evidence/naive-agent-log-3.md), [lines](evidence/naive-agent-transcript-3.jsonl)). Not better on the count than the second run (15, 5, 0): it found bugs in the new code, now fixed and tested:
+
+- `close Help`, the first screen's own example, refused: "Help" also named a button, and the plain verb gave up when a name had two kinds. Now it takes the family word that fits one of them.
+- `tidy <a> <b>` in a verb's help made `<a>` a kind ("no a you can see is called Feed"). A usage word is a kind only when things of that kind exist.
+- `$2` by name failed inside a verb: neither verb path resolved names in its steps. Both do now (one `name_target` for the step and both verb paths).
+- A verb whose module step had already acted said "nothing was done". It now says nothing was recorded, and which module may already have acted on the screen.
+- `press` always timed out: it ran its line while holding the kernel's lock, so a module word in it could not answer. `press` now becomes its button's line before the step runs.
+- `task.add "buy milk"` made a card with no title. A verb whose steps never use `$1`/`$*` now fills its first unsupplied setting with the free words.
+- A second `undo` refused "changed since": a later change that was itself undone now counts as settled.
+- `make`'s notes fired on a module's own lines (window.open's make); now only on what a person or agent wrote.
+
+Checked in the sandbox by hand (**ran**): `close Help` closed the window and `undo` reopened it; `tidy Appearance Lines` moved both; `press MyFeed` opened the feed through the window module; `task.add "buy milk"` titled the card; `done "buy milk"`, then two undos took back the done and the add. Tests (**ran**): `research/kernel-lab/tests` `122 passed, 30 subtests passed`; `test_kdesk.py` `22 passed`; then `test_lines_plainly.py` and `test_help_topics.py` `16 passed` after the last change. Still open from its log: `open feed to=right` opens a second Feed rather than moving the first (window module); `wm.arrange` says it re-arranged when the window manager is off (wm session); refusals all start "refused:" whatever their cause (a timeout, an ambiguity, a permission); `recent` hides acts on things since forgotten (a closed window).
+
 ## What needed Alex: the language
 
 Seven proposals, each with today/proposed lines, how it works, and what would change my mind: [lines-plainly.html](lines-plainly.html). In one line each: names work where ids go (P1); a few plain verbs that ask the thing's kind what they mean (P2); receipts in the user's words, rule side effects named, honest no-ops (P3); one spelling for families, old names kept as aliases (P4); `who`, `recent`, `kinds`, `on <module>` (P5); agents named everywhere, "me" says whose (P6); `make` warns about unknown kinds, `press <button>` from Lines (P7).
