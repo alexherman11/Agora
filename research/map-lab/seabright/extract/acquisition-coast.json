@@ -1,0 +1,9 @@
+{
+  "endpoint": "https://overpass-api.de/api/interpreter",
+  "query": "[out:json][timeout:60];way[natural=coastline](36.950,-122.035,36.985,-121.990);out tags geom;",
+  "requested_utc": "2026-10-27T16:46:23+00:00",
+  "osm_base": "2026-10-27T16:45:50Z",
+  "bytes": 25042,
+  "sha256": "de2d10f34ce6c26519c4be2ae316bc0e5ae132a3a78c58ac37f3ec1feab335e3",
+  "elements": 23
+}

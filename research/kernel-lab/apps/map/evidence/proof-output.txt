@@ -1,0 +1,28 @@
+PASS events find their place: one by place=, one by its written location · dk172 dk173
+PASS the window opens and draws Seabright
+PASS three placed things show as pins (spot, event at the spot, event by location) · ["Tide pools \u00b7 Spots", "Beach cleanup \u00b7 Events", "Council night \u00b7 Events \u00b7 approximate place"]
+PASS the event placed only by its written location is drawn as approximate · 1 approximate
+PASS pressing a pin shows its facts and where it is · 74 m from East Cliff Drive, 176 m from The Crow's Nest · kind, title, start, place, made, changed
+PASS selecting repaints the window without reloading the map
+PASS search finds Java Junction and flies there (to the middle of the map beside the panels) · 2 px from the middle
+PASS adding a spot in the window makes a spot thing where it was pressed · dk174 0.0 m from the press
+PASS an event added on the map is an event thing with a time and a place · start 2026-10-31T17:00:00.000Z, 0.0 m from the press
+PASS dragging a pin moves the thing in the world · 0.0 m from where it was dropped
+PASS undo takes the move back · 36.96705,-122.00835
+PASS the planner shows the street path length and time for three stops · 948 m · 12 min
+PASS saving makes a route thing that keeps its street path · 948 m, 12 min, via East Cliff Drive, Atlantic Avenue, Seabright Avenue, Murray Street
+PASS pressing a route's flag shows its length and time · 948 m · 12 min on foot
+PASS "Fly along it" rides the camera down the street path · 76 m along after 4 s, pitch 58
+PASS hiding a layer is your own view preference; the layer itself is unchanged · hidden: dk158
+PASS showing it again brings its pins back
+PASS map.show, said as a line, turns the open window to the thing · 1 px from the middle
+PASS a layer made in a line shows in the layers panel without reopening
+PASS changing a layer in the window sets its facts in the world · color #4f9a4a
+PASS a part-style line restyles every event pin · font-size 22px
+PASS pressing a building shows what the ground knows about it · Santa Cruz Museum of Natural History
+PASS a building becomes a spot that remembers its OpenStreetMap feature · way/64622304
+PASS the + key zooms in · 280 -> 196 m
+PASS the 2D button flattens the map
+PASS the engine kept one load through the whole evening · loads 1
+PASS no script errors · []
+total 37.0 s
