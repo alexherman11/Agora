@@ -14,7 +14,7 @@ Progman/WorkerW and `WM_GETICON` on existing windows in `test_shell_icons.py` an
 |---|---|---|
 | Top bar | `pages/shell/top.html` + `shell.js` (`Top`) | Slim translucent rail. Every element is a button with a popover: launcher, focused app's window menu, clock (calendar), notifications, media, one quick-settings cluster (network, volume, battery), JEFF, off (two presses). Optional readings (CPU, memory) are off until `shell-settings` says so. |
 | Dock | `pages/shell/dock.html` + `shell.js` (`Dock`) | Centred floating pill. Real colour icons, grouped by exe, running / in-front / minimised marks, a stable remembered order, pinned Agora apps and world pin buttons. Click, middle-click (new window), right-click menu, hover preview. All through `wm.*`, with `native_shell` words when the WM is off. |
-| Desktop layer | `pages/shell/desktop.html` | Agora's own layer under every app; draws the theme's wallpaper, live with the theme. Never touches the system wallpaper. |
+| Desktop layer | `wallpaper.py`, `pages/shell/desktop.html` | Since 27 Oct (Alex's ask) no window: the desktop page is rendered once in hidden Edge at the monitor's real size and set as the Windows wallpaper, again when the theme changes. `window.shell off` puts the old wallpaper back; so does `wallpaper.py restore` without the desk (and keeps it off until `wallpaper.py on`). `AGORA_DESKTOP_LAYER=bottom` brings back the old bottom-most window. |
 | Icon pipeline | `shell_icons.py`, route `/desk/icon` in `kdesk.py` | See below. |
 | Native seams | `shell_native.py` | Window shape (`SetWindowRgn`), reserved strips, DWM thumbnails, bottom-most layer, opt-in WorkerW attach. |
 | Host wiring | `kd_window.py`, `native_shell.py`, `kdesk.py` | Shell views, `window.shell on\|off`, `/desk/icon`, icon refs on window rows. |
@@ -406,3 +406,15 @@ Claude, 27 Oct (Alex: clicking the wallpaper hid the bars; the JEFF button opene
     its own window (loopback http only, refused otherwise; the same url is brought forward). The JEFF button's line is the
     world thing `Shell settings` (kind=shell-settings, `jeff_open`), so moving JEFF's chat into the new kernel later is one
     `set`. Missing word: a cross-world reference (a thing in one world that names a view in another); a URL stands in for it.
+
+Claude, 27 Oct (Alex: "set it as my real Windows wallpaper, and drop the full-screen wallpaper window"):
+
+20. `wallpaper.py` (new), `kd_window.py` `reconcile`/`hello`: the desktop layer was a screen-sized WebView2 window held at the
+    bottom by a 1 s loop; it covered the desktop icons, cost a renderer all the time, and made every full-screen check need
+    rough spot 18. Now the window module renders `desktop.html` in headless Edge (CDP, exact device metrics) and sets the PNG
+    with `SystemParametersInfoW(SPI_SETDESKWALLPAPER)`, Fill. The old wallpaper (path, style, a copy of the picture) is saved
+    once in `state/wallpaper/before.json`; leaving the shell puts it back. Windows Spotlight cannot be turned back on by a
+    program, so a Spotlight desktop comes back as its last picture and Spotlight is one pick in Settings > Background.
+    The theme is re-read every 5 s (theme.json hash), because the window module does not hear theme things.
+    Missing word: a module hearing another kind's changes it does not own (`hear:theme.changed` for the window module)
+    without widening its `only` grant; polling stands in.

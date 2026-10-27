@@ -13,11 +13,13 @@ and kd_window.py calls it (PageApi.layout / thumbs / title, the bar placers, the
     to reserve (its own --ag-bar-height / --ag-dock-size), and AppBar.resize() re-registers the strip.
   * THUMBNAILS. DwmRegisterThumbnail draws a live picture of another window inside this one, over a placeholder the
     page leaves; window handles that are not numbers (a window manager's own keys) are not drawn, the placeholder stays.
-  * THE DESKTOP LAYER. A window under every app that draws the theme's wallpaper. Default: a bottom-most tool window
-    (kept at the bottom, never activated). Opt-in: AGORA_DESKTOP_LAYER=workerw tries the Progman/WorkerW attach;
-    unverified on build 26200 (the structure there is DefView as a child of Progman, see SHELL.md) and never the default.
+  * THE DESKTOP LAYER. Since 27 Oct the default is no window at all: wallpaper.py renders the theme's wallpaper to a
+    picture and sets it as the Windows wallpaper. The window below is the opt-in fallback (AGORA_DESKTOP_LAYER=bottom):
+    a bottom-most tool window that draws the theme's wallpaper (kept at the bottom, never activated). AGORA_DESKTOP_LAYER=
+    workerw tries the Progman/WorkerW attach; unverified on build 26200 (the structure there is DefView as a child of
+    Progman, see SHELL.md).
 
-Only documented user32/dwmapi/gdi32 calls, no hooks, no injection, no change to the system wallpaper.
+Only documented user32/dwmapi/gdi32 calls, no hooks, no injection. (The system wallpaper is wallpaper.py's, not this file's.)
 """
 import ctypes
 import json

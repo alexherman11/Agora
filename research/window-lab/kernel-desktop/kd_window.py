@@ -647,6 +647,7 @@ class WindowHost:
         self.lock = threading.RLock()
         self.dirty = threading.Event()
         self.token = None
+        self.wall = None               # wallpaper.Keeper: the theme's wallpaper as Windows' own, in place of the layer window
         self.m = Module(offer=self.offer(), on_call=self.call, on_happen=self.happen, on_status=self.status,
                         on_hello=self.hello, on_off=self.off)
 
@@ -665,9 +666,10 @@ class WindowHost:
             {"word": "window.launch", "kind": "do", "takes": "path=<exe>", "may": "anyone",
              "help": "window.launch path=<absolute executable or Start menu shortcut>: launch a pinned Windows program. A pin is a button with bar=taskbar, path=<exe> (its icon) and does=window.launch path=<exe or .lnk/.url> (a game starts through its Steam shortcut)."},
             {"word": "window.shell", "kind": "do", "takes": "on|off", "may": "anyone",
-             "help": "window.shell on|off: the desktop shell (SHELL.md): a slim top bar, a centred dock and Agora's own desktop "
-                     "layer, in place of the old top bar and taskbar. on forgets the old bars' window things and makes the three "
-                     "shell windows; off forgets those and brings the taskbar back. One act, so undo takes it back."},
+             "help": "window.shell on|off: the desktop shell (SHELL.md): a slim top bar, a centred dock and the theme's wallpaper "
+                     "as the Windows wallpaper (wallpaper.py), in place of the old top bar and taskbar. on forgets the old bars' window "
+                     "things and makes the three shell things; off forgets those, brings the taskbar back and puts the old Windows "
+                     "wallpaper back. One act, so undo takes it back."},
             {"word": "window.list", "kind": "see", "takes": "[all]", "may": "anyone",
              "help": "window.list [all]: the Agora windows open on this desktop now, front first. With all, other "
                      "programs' windows too, as boxes and program ids, never their titles."},
@@ -712,6 +714,9 @@ class WindowHost:
             self.token = next(t for t, v in sessions.items() if v.get("signer") == "alex")
         except (OSError, KeyError, StopIteration, ValueError) as exc:
             log(f"no desktop session for the pages: {exc!r}")
+        import wallpaper
+        if not HEADLESS and self.token and self.wall is None and wallpaper.enabled():
+            self.wall = wallpaper.Keeper(PORT, self.token, monitor()[0][2:], scale(), log)
         self.dirty.set()
 
     def off(self):
@@ -731,7 +736,8 @@ class WindowHost:
     def status(self):
         n = len(self.screen.wins)
         views = ", ".join(sorted(r.get("shows", "?") for r in self.rows.values()))
-        return f"{n} window{'' if n == 1 else 's'} on the screen ({views or 'none'}); {self.opened} opened since start"
+        wall = f"; wallpaper: {self.wall.status()}" if self.wall and self.wall.status() else ""
+        return f"{n} window{'' if n == 1 else 's'} on the screen ({views or 'none'}); {self.opened} opened since start{wall}"
 
     def happen(self, h):
         # the kernel sends what this module's grants hear (hear:make, hear:set, ...); any of them may touch a window
@@ -980,6 +986,11 @@ class WindowHost:
                 log(f"taskbar: {out.get('text')}")
                 return                                  # its happening brings us back here
             self.made_bar = True
+            rows = want
+            if self.wall:              # the desktop layer is the Windows wallpaper itself (wallpaper.py): no window for it
+                layer = {wid for wid, row in want.items() if row.get("layer")}
+                self.wall.want(bool(layer))
+                want = {wid: row for wid, row in want.items() if wid not in layer}
             for wid in [w for w in list(self.screen.wins) if w not in want]:
                 self.screen.close(wid)
                 self.applied.pop(wid, None)
@@ -995,7 +1006,7 @@ class WindowHost:
                 elif self.applied.get(wid) != box and not row.get("edge") and not row.get("layer"):
                     self.screen.place(wid, box)
                     self.applied[wid] = box
-            self.rows = want
+            self.rows = rows
 
     def _open(self, wid, row, box):
         if row.get("shows") in SHELL_VIEWS:                   # the desktop shell: pages/shell/<page>.html
