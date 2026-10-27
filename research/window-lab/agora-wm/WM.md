@@ -101,8 +101,13 @@ not replaced with a custom-width overlay; `border_width` cannot control that API
 
 ## Words, readings and intent
 
-All twelve offers have help. Only the desktop owner and their agents may inspect or
-control this personal native surface. `wm.changed` announces JSON text
+All twelve offers have help. Only the desktop owner, its stewards and their agents may
+inspect or control this personal native surface.
+
+*Claude, 27 Oct 2026:* Alex made JEFF a steward (`role dk827 leader in=dk1`) so JEFF could put
+the desk in live mode. The module now also admits stewards, read once a second with `who`
+(granted by `grant wm words="who"`). **ran**: before, JEFF's `wm.windows` was refused; after,
+`20 windows; shadow`, and JEFF's own `wm.mode live` (r1560) left it `20 windows; live`. `wm.changed` announces JSON text
 `{"keys":[...]}` at no more than ten announcements per second; it carries no titles.
 
 | Word | Behaviour |

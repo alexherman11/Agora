@@ -55,6 +55,7 @@ class WMModule:
     def __init__(self,headless=False,allow_live=False,theme_native=None):
         self.headless=headless;self.allow_live=allow_live;self.theme_native=theme_native
         self.owner=None;self.manager=None;self.lock=threading.RLock();self.stop=threading.Event()
+        self.stewards=set()     # people who lead this place (Alex, 27 Oct: JEFF a steward too); refreshed by intent_loop
         self.requests=queue.Queue();self.latest=None;self.last_mode_request=None;self.intent_seen=False
         # Window pins and adopted windows are screen state (Alex, 26 Oct: "visual state should not live in the world"):
         # kept in <home>/screen.json, never as world things. The world keeps preferences only (wm-settings).
@@ -93,6 +94,13 @@ class WMModule:
                 with self.lock:self.latest=(settings,pins)
                 self.say('intent',None)
             except Exception as exc:self.say('intent','wm intent: '+str(exc))
+            try:
+                seen=self.m.see('who')      # needs the grant `who` (grant wm words="who")
+                if seen.get('refused') or seen.get('ok') is False:raise RuntimeError(seen.get('refused') or seen.get('text'))
+                rows=seen.get('rows') or []
+                self.stewards={r['id'] for r in rows if r.get('kind')=='person' and r.get('role')=='steward'}
+                self.say('who',None)
+            except Exception as exc:self.say('who','wm who: '+str(exc))
             self.stop.wait(1)
 
     def say(self,topic,line):
@@ -110,7 +118,8 @@ class WMModule:
 
     def call(self,msg):
         caller=msg.get('caller') or {}
-        if self.owner not in (caller.get('id'),caller.get('person')):return {'refused':'only this desktop owner and their agents may read or control its windows'}
+        if self.owner not in (caller.get('id'),caller.get('person')) and caller.get('person') not in self.stewards:
+            return {'refused':'only this desktop owner, its stewards and their agents may read or control its windows'}
         word=msg['word'].removeprefix('wm.');args=msg.get('args') or {};kv=args.get('kv') or {}
         words=str(args.get('words') or '').split();target=kv.get('key') or args.get('target') or (words[0] if words else None)
         if word=='windows':
