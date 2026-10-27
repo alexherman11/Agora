@@ -57,6 +57,9 @@ class WMModule:
         # Window pins and adopted windows are screen state (Alex, 26 Oct: "visual state should not live in the world"):
         # kept in <home>/screen.json, never as world things. The world keeps preferences only (wm-settings).
         self.screen={'pins':[],'adopted':[]};self.screen_path=None
+        self.said={}            # topic -> last line said on stderr: a refusal is said once, not every second
+        self.backlog=[]         # hook events drained during the 60 Hz drag path, handed to the next full tick
+        self.full_at=0.0        # last full tick: during a drag one still runs each second (closes, the game gate)
         self.m=Module(offers(),self.call,on_hello=self.hello,on_off=self.stop.set,
             on_status=lambda:f'{self.manager.mode if self.manager else "starting"}; {len(self.manager.rows) if self.manager else 0} windows')
 
@@ -86,8 +89,17 @@ class WMModule:
                 settings=self.read_intent();pins=list(self.screen['pins'])
                 # Geometry, pins and adoption are never world facts.
                 with self.lock:self.latest=(settings,pins)
-            except Exception as exc:log('wm intent:',str(exc))
+                self.say('intent',None)
+            except Exception as exc:self.say('intent','wm intent: '+str(exc))
             self.stop.wait(1)
+
+    def say(self,topic,line):
+        """stderr (kept by the kernel in stderr.log) hears state changes only: a line when a topic's message
+        changes, and one 'cleared' line when it goes away. Never once per tick."""
+        if self.said.get(topic)==line:return
+        before=self.said.get(topic);self.said[topic]=line
+        if line:log(line)
+        elif before:log(f'wm {topic}: clear')
 
     def _request(self,op,*args):
         answer=queue.Queue();self.requests.put((op,args,answer))
@@ -146,14 +158,18 @@ class WMModule:
             if self.latest:
                 settings,pins=self.latest;self.latest=None
                 try:
-                    manager.configure(settings,[r['key'] for r in pins if r.get('active')=='yes'])
+                    # Pins are window keys from screen.json (26 Oct); older world wm-pin rows are not read any more.
+                    manager.configure(settings,[r for r in pins if isinstance(r,str)])
                     manager.adopted=set(self.screen['adopted'])
                     request=settings.get('mode_request')
                     if not self.intent_seen:
                         manager.switch('off' if settings.get('mode')=='off' else 'shadow');self.intent_seen=True
                     elif request!=self.last_mode_request:manager.switch(settings.get('mode','shadow'))
                     self.last_mode_request=request
-                except Exception as exc:log('wm settings refused:',str(exc))
+                    self.say('settings',None)
+                except Exception as exc:
+                    # A refused live request (game gate active) is retried each second until it can apply; say so once.
+                    self.say('settings','wm settings refused: '+str(exc))
             if manager.lease:
                 try:manager.lease.heartbeat()
                 except Exception:
@@ -171,8 +187,18 @@ class WMModule:
                 except Exception as exc:answer.put({'refused':str(exc)})
             if self.headless:work=Rect(0,0,3840,2160);rows=[];events=[]
             else:
+                events=self.backlog+(feed.drain() if feed else []);self.backlog=[]
+                g=manager.gesture;ref=manager.gesture_ref
+                now=time.monotonic()
+                if g and ref and manager.mode!='off' and now-self.full_at<1 and not g.idle(now*1000) and not any(
+                        e['hwnd']==ref.hwnd and e['type'] in ('drag-end','minimise','close','hide') for e in events):
+                    # Drag path: just the dragged window's rectangle (~0.05 ms), not a full enumeration (~7-12 ms,
+                    # ran 26 Oct with 17 windows) or the gate (~26 ms). Events wait for the next full tick.
+                    try:
+                        manager.drag_tick(manager.native.rect_of(ref));self.backlog=events[-512:];return
+                    except OSError:pass       # the window went away mid-drag: a full tick sorts it out
                 from win32_host import work_area
-                work=work_area();rows=manager.native.windows();events=feed.drain() if feed else []
+                work=work_area();rows=manager.native.windows();self.full_at=now
             manager.ingest(rows,work,events)
             now=time.monotonic()
             if manager.changed and now-manager.last_change>=.1:

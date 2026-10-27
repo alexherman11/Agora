@@ -39,6 +39,11 @@ class KernelIntegration(unittest.TestCase):
                 self.assertEqual(reading['rows'],[])
                 self.assertIn('never titles',say('help wm.windows')['text'])
                 before=len(kernel.log.records);say('wm.windows');self.assertEqual(len(kernel.log.records),before)
+                # Nothing per tick reaches the world (Alex, 26 Oct: "doesn't flood the log"): ~25 module ticks and
+                # two or three settings reads later, no record and no happening came from the window manager.
+                happened=len(kernel.happenings);time.sleep(2.5)
+                self.assertEqual(len(kernel.log.records),before,'a tick wrote a record')
+                self.assertEqual([h['word'] for h in kernel.happenings[happened:]],[],'a tick announced a happening')
                 result=say('wm.mode off');self.assertEqual(len(result['records']),1)
                 time.sleep(1.2);self.assertIn('off',say('wm.windows')['text'])
                 say('undo '+result['records'][0]);time.sleep(1.2);self.assertIn('shadow',say('wm.windows')['text'])

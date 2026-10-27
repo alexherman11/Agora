@@ -24,7 +24,8 @@ def fragment(headless=False,allow_live=False):
 
 def lines(allow_live=False):
     module=spec(allow_live=allow_live)
-    return ['make kind=wm-settings name=wm-settings when_full=minimise-oldest manage=all drag=ghost reflow=gentle mode=shadow never="[]"',
+    return ['make kind=wm-settings name=wm-settings when_full=minimise-oldest manage=all drag=ghost reflow=gentle mode=shadow never="[]"'
+        ' dwell_ms=350 snap_px=16 deadzone_px=10 motion_ms=250 pin_min=0.5 edges=shared',
         'module wm run='+json.dumps(json.dumps(module['run']))+' grants='+json.dumps(GRANTS)]
 
 

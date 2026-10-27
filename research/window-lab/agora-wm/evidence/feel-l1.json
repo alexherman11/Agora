@@ -1,0 +1,96 @@
+{
+  "desktop": "agora-sandbox-wm-feel-1bc30e1395",
+  "tests": [
+    {
+      "test": "shallow drop: dragged window pushed back to the gap, neighbours untouched",
+      "result": {
+        "notes": [
+          216,
+          1389,
+          1000,
+          629
+        ],
+        "landing_outline_shown": true,
+        "ghosts": 0
+      }
+    },
+    {
+      "test": "dwell then release: neighbour ghost shown, then real neighbour moved; actual windows overlap-free",
+      "result": {
+        "browser": [
+          16,
+          73,
+          1800,
+          1010
+        ],
+        "chat": [
+          1832,
+          73,
+          1992,
+          1300
+        ],
+        "notes": [
+          216,
+          1099,
+          1000,
+          629
+        ],
+        "ghosts_shown": 1
+      }
+    },
+    {
+      "test": "shared edge resize: chat recedes with the browser edge",
+      "result": {
+        "browser": [
+          16,
+          73,
+          2100,
+          1300
+        ],
+        "chat": [
+          2132,
+          73,
+          1692,
+          1300
+        ],
+        "notes": [
+          16,
+          1389,
+          1000,
+          629
+        ]
+      }
+    },
+    {
+      "test": "off restores every fixture to its placement before the lease",
+      "result": true
+    }
+  ],
+  "scale": 1.5,
+  "drag_tick_ms": {
+    "ticks": 67,
+    "median": 0.38,
+    "p95": 3.908,
+    "max": 5.809,
+    "meaning": "manager.drag_tick incl. feel step and real ghost SetWindowPos calls"
+  },
+  "alex_before": {
+    "foreground": 10160950,
+    "focus": 10160950,
+    "cursor": [
+      1088,
+      1377
+    ],
+    "input desktop": "Default"
+  },
+  "alex_after": {
+    "foreground": 10160950,
+    "focus": 10160950,
+    "cursor": [
+      1088,
+      1377
+    ],
+    "input desktop": "Default"
+  },
+  "alex_untouched": true
+}

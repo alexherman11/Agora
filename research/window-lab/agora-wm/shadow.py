@@ -25,7 +25,7 @@ def report(path):
                 elif win['managed'] and win['planned']!=win['actual']:moves[win['app']]+=1
     value={'samples':samples,'apps':sorted(apps),'would_move_samples':dict(sorted(moves.items())),
         'would_minimise_samples':dict(sorted(minimum.items())),'gated_samples':dict(gates),'infeasible_samples':invalid,
-        'meaning':'counts are observations, not distinct actions; no window titles recorded'}
+        'meaning':'lines are distinct plans (the manager writes on change, 26 Oct) plus gated ticks; no window titles recorded'}
     print('L2 shadow: '+json.dumps(value),flush=True);return value
 
 

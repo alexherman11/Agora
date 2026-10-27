@@ -41,3 +41,34 @@ def replay(data,directory):
 if __name__=='__main__':
     import sys
     replay(json.loads(Path(sys.argv[1]).read_text()),sys.argv[2])
+
+
+def film(state,key,ticks,path,width=480,every=4):
+    """A drag as a filmstrip: real windows (filled), neighbour ghosts (outlined), the landing (dashed), one panel
+    per `every` ticks. ticks: [(rect, t_ms)]. Uses feel.Gesture; the last panel is the release."""
+    from feel import Gesture,Feel
+    g=Gesture(state,key,ticks[0][0],ticks[0][1],Feel(scale=1.5));panels=[]
+    scale=width/state.work.w;height=int(state.work.h*scale)
+    font=ImageFont.truetype('C:/Windows/Fonts/segoeui.ttf',13)
+    def box(r):return [int((r.x-state.work.x)*scale),int((r.y-state.work.y)*scale)+22,int((r.right-state.work.x)*scale),int((r.bottom-state.work.y)*scale)+22]
+    def panel(label,windows,ghosts,landing,dragged):
+        im=Image.new('RGB',(width,height+24),'#f5f2ec');d=ImageDraw.Draw(im);d.text((6,3),label,fill='#263747',font=font)
+        for k,r in sorted(windows.items()):
+            d.rectangle(box(r),fill='#e5c8b4' if k==key else '#b7d2e2',outline='#536779')
+            d.text((box(r)[0]+4,box(r)[1]+2),k,fill='#263747',font=font)
+        for r in ghosts.values():d.rectangle(box(r),outline='#c0392b',width=2)
+        if landing:
+            b=box(landing)
+            for x in range(b[0],b[2],8):d.line([x,b[1],min(x+4,b[2]),b[1]],fill='#27ae60',width=2);d.line([x,b[3],min(x+4,b[2]),b[3]],fill='#27ae60',width=2)
+            for y in range(b[1],b[3],8):d.line([b[0],y,b[0],min(y+4,b[3])],fill='#27ae60',width=2);d.line([b[2],y,b[2],min(y+4,b[3])],fill='#27ae60',width=2)
+        return im
+    homes={k:w.rect for k,w in state.windows.items() if w.rect and not w.minimised}
+    for i,(r,t) in enumerate(ticks[1:]):
+        f=g.step(r,t)
+        if i%every==0:panels.append(panel(f'{t-ticks[0][1]} ms {f.kind}',{**homes,key:r},f.ghosts,f.landing,r))
+    result=g.release(*ticks[-1])
+    panels.append(panel('released',result.placements,{},None,None))
+    cols=4;rows=(len(panels)+cols-1)//cols
+    sheet=Image.new('RGB',(cols*(width+6),rows*(height+30)),'#ffffff')
+    for i,p in enumerate(panels):sheet.paste(p,((i%cols)*(width+6),(i//cols)*(height+30)))
+    sheet.save(path);return result

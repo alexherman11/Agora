@@ -34,10 +34,20 @@ class EngineTests(unittest.TestCase):
                     self.assertEqual(old_visible,r.placements,(seed,step,'avoidable movement'))
                 if e['type']=='open':
                     for k,box in old_visible.items():
-                        if k in r.placements:self.assertEqual(box,r.placements[k],(seed,step,'open shuffled an existing window'))
+                        if k in r.placements and not before.windows[k].pinned:
+                            self.assertEqual(box,r.placements[k],(seed,step,'open shuffled an existing window'))
                 for k,w in before.windows.items():
-                    if w.pinned and k in s.windows and kind not in ('unpin','close'):
-                        self.assertEqual(w.rect,s.windows[k].rect)
+                    if not (w.pinned and k in s.windows and w.rect and not w.minimised):continue
+                    after=s.windows[k]
+                    self.assertFalse(after.minimised and kind not in ('minimise','restore','open'),(seed,step,'WM minimised a pin'))
+                    if kind in ('unpin','close','work-area') or after.minimised:continue
+                    if kind in ('open','restore','close','minimise'):
+                        # A pin may only narrow (keeping its screen-side edge) or grow back toward its pinned width.
+                        self.assertEqual((w.rect.y,w.rect.h),(after.rect.y,after.rect.h),(seed,step))
+                        self.assertTrue(w.rect.x==after.rect.x or w.rect.right==after.rect.right,(seed,step))
+                        floor=min(w.rect.w,max(w.minimum[0],int((w.home or w.rect).w*s.pin_min)))
+                        self.assertGreaterEqual(after.rect.w,floor,(seed,step))
+                    else:self.assertEqual(w.rect,after.rect,(seed,step,kind))
                 again=solve(s,{'type':'arrange'})
                 self.assertEqual(r.placements,again.placements,(seed,step,e))
                 self.assertEqual(again,solve(again.state,{'type':'arrange'}))

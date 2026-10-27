@@ -327,3 +327,242 @@ Microsoft documentation informed the Win32 boundary, with no external implementa
 [DWM attributes](https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/ne-dwmapi-dwmwindowattribute),
 [SHQueryUserNotificationState](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shqueryusernotificationstate),
 [RegisterHotKey](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerhotkey).
+
+## Feel: resistance, dwell, snapping, pins (draft by Claude builder, 26 Oct 2026, for Alex to confirm)
+
+Alex, 26 Oct: *"covering a tile with another doesn't immediately move it. It should feel more like moving
+android or iphone apps around on the homescreen. Like there is a bit of resistance to things moving or resizing.
+Things should be resizable from all corners and sides. Things should be able to snap together if you drag them
+near each other (with a small gap). And pinning something should keep it on screen, though it might get made more
+narrow if something big comes on screen."* And: *"make it so that the tiling manager doesn't flood the log."*
+
+### What we can and cannot touch (the constraint that shapes everything)
+
+A foreign window (Chrome, Discord) is dragged and sized by Windows' own modal loop, which follows the cursor. We
+cannot add resistance to *that* window without injecting into its process (forbidden). So the feel lives in three
+places we do own:
+1. **The neighbours.** They move only when we say.
+2. **The landing.** This is where the dragged window ends up when you let go: we place it once, at release.
+3. **The ghost layer.** It shows both of the above, live, at 60 Hz.
+
+During a drag the real neighbours stay put. Their translucent ghosts do the shuffling, and a fainter outline
+shows the landing. At release the real windows go where the ghosts were. `drag=live` (real neighbours sliding
+during the drag) stays refused until it is measured smooth on real Chromium windows. The engine already produces
+the per-frame positions it would need.
+
+### The drag, frame by frame (homescreen model)
+
+1. **Dead zone.** Until the window has moved `deadzone_px` from where it started, nothing happens. That is 10 px
+   at 100 %, so 15 px on Alex's 150 % screen. A release inside the dead zone puts it back exactly where it was,
+   so a click on a title bar that wobbles 6 px is not a move. Windows' own drag threshold is 4 px (**ran**
+   `GetSystemMetrics(SM_CXDRAG)` = 4). Android's touch slop is 8 dp (**recall**).
+2. **Contact.** When the dragged window's rectangle covers a neighbour's *home* rectangle (closer than the gap),
+   that neighbour is *in contact*. It does not move, and its ghost stays where it is.
+3. **Dwell.** A neighbour in contact gives way only after the drag has rested on it for `dwell_ms` = **350 ms**,
+   while moving slower than 600 px/s (at 100 %).
+   - A drag that sweeps across a window in transit never moves it. A hover that pauses does.
+   - Leaving contact resets the timer.
+   - 350 ms is AOSP Launcher3's `REORDER_TIMEOUT` (**read**, through a search summary of an AOSP commit). A fork
+     uses 650 ms.
+4. **How it yields.** Pinned and unmanaged windows never yield: they are walls. Other neighbours yield in one of
+   two ways:
+   - **Swap.** If the dragged window's centre is *inside* the neighbour, the neighbour slides into the dragged
+     window's vacated starting slot. It shrinks to fit that slot only if it keeps at least 60 % of its size;
+     otherwise there is no swap.
+   - **Slide aside.** Otherwise it moves along the axis of least overlap. This is the existing push solver, which
+     cascades into its own neighbours, then shrinks to minimum size, then minimises the least recently used.
+5. **Easing.** Every ghost move is one animation of `motion_ms` = **250 ms**, with Material 3's standard easing
+   `cubic-bezier(0.2, 0, 0, 1)` (**read**, the `md-sys-motion` tokens: medium1 = 250 ms). A target that changes
+   mid-flight restarts from where the ghost is now, so motion never jumps.
+6. **Settling back.** When the drag leaves a neighbour that had yielded, the neighbour waits **250 ms**
+   (`return_ms`), then eases home. Brush past and come back within that time, and it doesn't bounce.
+7. **Release is what the ghosts showed.** Neighbours that gave way go where their ghosts were. Neighbours still
+   resisting stay put, and the dragged window lands on its outline: the nearest free spot, out of whatever is
+   still resisting. This is the resistance: a sloppy drop that clips a neighbour by 40 px moves *your* window,
+   not theirs, and a quick drop onto a window lands beside it. To make a window give way, rest on it.
+
+   One exception: a neighbour in its 250 ms settle-back delay goes home, because nothing needs it moved. The
+   no-overlap rule holds whatever happens: if the outline cannot be made legal, the existing solver settles
+   around it.
+
+   *Changed while building (ran):* the first draft yielded "deep" drops at release (33 % covered). The resize
+   filmstrip showed why that is wrong: the ghost said "the edge stops here", and the release pushed the chat
+   under the browser as a 160 px strip. A seeded property test now checks that release equals the last frame:
+   **ran** 2000/2000 seeds matched once the release used the same bounded search as the preview. A bigger
+   search at release had found different layouts in 2 of 300.
+8. **When a neighbour can't slide cleanly**, it first gives way by shrinking its own facing side (never under
+   60 %), instead of shoving a third window. It keeps the side it first chose while that still works, so its
+   ghost doesn't flicker between "shorter" and "narrower". Past that, the push solver shrinks only down to 60 %
+   (engine `SQUASH`); past *that*, the covered window is minimised rather than squashed into a strip.
+   *Found in the hidden-desktop proof (ran):* the browser slid right and squeezed the chat from 1992 px to
+   776 px. Now its bottom edge gives way (1300 → 1010 px) and the chat is untouched.
+
+A hover that backs away before 350 ms moves nothing. A hover that waits, sees the neighbour slide, and then backs
+away also ends with nothing moved: the neighbour slides home after 250 ms, or at release.
+
+### Snapping
+
+- **Radius.** `snap_px` = **16 px** at 100 % (24 px on Alex's screen). Within it, an edge snaps to one of:
+  - the screen's outer gap;
+  - a neighbour's facing edge, at exactly the inner gap (the "snap together with a small gap");
+  - a neighbour's parallel edge (tops aligned, lefts aligned).
+
+  The closest candidate wins. Ties break by order.
+- **What snaps.** Snapping applies to the **landing**: it is shown as the ghost outline during the drag and
+  applied at release. A move snaps whichever edge is closest on each axis. A resize snaps only the moving edges.
+- **Escape.** Move past the radius. There is no modifier key, because that would mean reading global key state.
+- **Never into an overlap.** A snap that would make the window overlap something is dropped for that axis.
+
+### Resizing: all eight edges and corners
+
+- **Foreign windows** keep Windows' own sizing border on all eight sides, about 11 px physical at 150 % (**ran**
+  `SM_CXSIZEFRAME` = 5 + `SM_CXPADDEDBORDER` = 6). Chrome, Electron apps (Discord, Spotify, Claude, ChatGPT) and
+  Windows Terminal all keep it (**recall**). The engine tells a resize from a move by the rectangle alone (the
+  size changed), and works out which edges moved.
+- **Resize resistance.**
+  1. A moving edge that reaches a neighbour it isn't snapped to stops for `dwell_ms`: the landing clamps at the
+     gap.
+  2. Then the neighbour's facing edge gives way and **follows** the edge. The neighbour shrinks; it is not shoved.
+  3. It shrinks down to its floor: 60 % of its size (the same `SQUASH` as arrange), never under its minimum.
+  4. At the floor the edge stops again. A second dwell hands the neighbour to the push solver (slide aside,
+     minimise the least recently used).
+- **Shared edges** (`edges=shared`, the default). Two windows snapped exactly the gap apart share that edge.
+  Resizing one across the shared edge moves both, with no dwell: grow one and the other recedes, shrink it and the
+  other follows. This is the tiling feel: one drag makes the chat wider. `edges=free` turns this off.
+- **Rubber band at the minimum.** The landing never goes below the window's minimum (learned from refusals). The
+  ghost outline stops while the real frame overshoots, and release snaps it back.
+- **Frameless windows with no border.** Agora's own WebView2 windows from `kd_window.py` can't be fixed from here
+  without editing `kd_window.py`, which is another builder's file. They need `WM_NCHITTEST` edge zones in that
+  host.
+- **Considered and not built: WM-owned "gutter" handle windows in the gaps.** In the 12 px gap, the two windows'
+  invisible sizing borders already cover the whole strip. A gutter would only win if it were raised above both.
+  That means re-raising it on every focus change, and stealing clicks from dialogs that sit over a gap. Revisit
+  this if the shared-edge rule above doesn't feel right by hand.
+
+### Pins
+
+A pin stays on screen. Nothing the WM does minimises it or moves it off the screen. Something big may make it
+narrower:
+- **Opening or restoring a window that doesn't fit** goes through these steps in order:
+  1. Minimise the least recently used unpinned windows (`when_full`).
+  2. If it still doesn't fit, **narrow pins**, keeping each pin's edge nearest the screen edge. A pin narrows
+     down to `pin_min` = **50 %** of the width it was pinned at, and never under its minimum.
+  3. If it still doesn't fit, open the new window smaller, down to 60 % of the size it asked for.
+  4. Only then leave it minimised, as before.
+- **When space frees** (a close or a minimise), a narrowed pin grows back to its pinned width first.
+- **A work-area change** (a bar appears) moves and narrows a pin only as far as needed to keep it on screen.
+- **During drags, pins are walls.** You can drag a pin yourself; where you drop it becomes its new pinned place.
+
+### Tunables
+
+All values are at 100 % scale and are multiplied by the monitor's DPI scale (**ran**: 144 dpi, so 1.5 on Alex's
+screen).
+
+| wm-settings key | Default | Range | What it sets |
+|---|---:|---|---|
+| `dwell_ms` | 350 | 0–2000 | How long a drag rests on a window before it gives way |
+| `snap_px` | 16 | 0–64 | Snap radius (0 turns snapping off) |
+| `deadzone_px` | 10 | 0–64 | Movement before a drag or resize breaks free |
+| `motion_ms` | 250 | 0–1000 | Ghost animation duration (0 = jump) |
+| `pin_min` | 0.5 | 0.2–1.0 | Narrowest a pin may get, as a share of its pinned width |
+| `edges` | shared | shared, free | Whether snapped windows share a resized edge |
+
+Internal constants in `feel.py`:
+- `return_ms` 250, `fling_px_s` 600, `bond_px` 2, `follow_px` 64;
+- `idle_ms` 10000: a lost drag-end releases the gesture after this;
+- easing `(0.2, 0, 0, 1)`.
+
+### Owned dialogs and maximised windows (found while thinking this through)
+
+- **Owned dialogs.** A Save dialog is an owned top-level window. It was managed like an app, so opening one on a
+  full screen would minimise the oldest window.
+- **Maximised windows.** A maximised window was "restored" on the next tick, because its rectangle didn't match
+  its plan.
+
+Both now float outside the layout. Owned windows are listed unmanaged (`why: owned dialog or popup`). A maximised
+window leaves the layout until you un-maximise it, and then it comes back like a newly opened window.
+
+### Log flooding
+
+- **The world.** Nothing per tick reaches it: no records, no happenings. The kernel test now counts both across
+  idle ticks.
+- **stderr.** A refusal is said once, not every second. The live `stderr.log` said `wm settings refused:
+  game/fullscreen gate is active` 98 times (**ran** `uniq -c`).
+- **`shadow.jsonl`.** It had reached 448 KB after a few minutes (**ran** `ls`). It is now written only when the
+  plan changes, and rotates at 2 MB.
+- **A bug that would have flooded too.** Since pins moved to `screen.json`, any pin made every settings read fail
+  (`'str' object has no attribute 'get'`). Fixed.
+
+### What would change my mind, and the risks
+
+- **Dwell timing.** If 350 ms feels sluggish by hand, lower `dwell_ms` (around 200 feels iOS-snappy, **recall**).
+  If windows still shuffle in transit, raise it, or lower the fling speed. Only Alex's hand can judge this.
+- **Ghost-only preview.** If it feels disconnected (the real neighbours jump at release), measure `drag=live`
+  with translation-only moves on real Chrome and Electron windows. Translations are cheap; resizes are not.
+- **Windows' own Snap** (drag to a screen edge for half a screen, or the snap-layouts bar at the top) fights the
+  landing at release. Turning off *Settings → System → Multitasking → Snap windows* is Alex's call; we change no
+  Windows settings.
+- **Apps that refuse sizes** are learned as a minimum, or become obstacles, as before.
+- **DPI changes.** A DPI change mid-session changes the scale at the next settings read, once a second.
+- **Games.** The gate pauses everything, as before. A gesture is dropped, and its ghosts cleared, when the gate
+  closes.
+- **Foreground lock.** Nothing here needs focus. Ghost windows are click-through, no-activate tool windows.
+
+### Built and measured (Claude builder, 26 Oct 2026)
+
+**Files.**
+
+| File | Change |
+|---|---|
+| `feel.py` (new) | The gesture: dead zone, dwell, swap/slide/cut, easing, settle-back, snap, shared edges, landing. Pure; time is an input |
+| `engine.py` | `push` works on a rectangle dict (same search, ~20× cheaper), takes `held` and `budget`, shrinks only to `SQUASH`. Pins carry `home`: `narrow_pins` on open/restore, `regrow_pins` on close/minimise, clamped on screen at a work-area change. A big new window opens smaller (down to 60 %) before failing; minimisations it didn't need are given back |
+| `manager.py` | Drives a `Gesture` from hook events. `drag_tick` is the 60 Hz path. Pins are placed (narrowed or regrown) and adopt your own moves. Owned and maximised windows float. Feel settings are validated. The gate is cached 0.5 s. The shadow log is written on change and rotates at 2 MB |
+| `wm_module.py` | The 60 Hz drag path reads only the dragged window (a full tick each second still runs). stderr hears a refusal once (`say`). Pins are read as keys from `screen.json` (fixes the 'str'.get bug) |
+| `win32_host.py` | `dpi_scale()`, `Native.scale()`, `Native.rect_of()`, rows carry `owned` and `maximised` (internal; not in `wm.windows`) |
+| `ghost.py` | The landing outline (alpha 40) beside neighbour ghosts (alpha 70); unchanged boxes make no API calls |
+| `simulator.py` | `film()`: a drag as a filmstrip (`evidence/feel-film-dwell.png`, `feel-film-resize.png`) |
+| `hidden_feel_proof.py` (new) | Real windows, ghosts, placement and lease contract on a never-shown desktop |
+| `test_feel.py` (new), `test_manager.py`, `test_engine.py`, `test_module_kernel.py` | Scenes from Alex's screen; WYSIWYG property; frame cost; quiet logs; nothing per tick reaches the world |
+
+**Ran.**
+- **Unit and kernel suites:** `python -m unittest test_engine test_feel test_manager test_watchdog
+  test_source_seam test_module_kernel` printed `Ran 55 tests ... OK` (was 22).
+- **Fuzz:** L0 fuzz 60,000 events, with the pin invariants rewritten (a pin may narrow or regrow, never be
+  minimised by the WM or leave the screen).
+- **Frame cost**, 20 windows in a packed 5×4 grid, slow diagonal drag, 300 ticks: median 1.5 ms, p95 3.8 ms,
+  max 5.3 ms; release 5.7 ms. Before the push rewrite: median 16.4 ms, p95 29.3 ms.
+- **WYSIWYG:** 300 seeds in the suite (2000 once, by hand: 2000/2000).
+- **Hidden desktop** (`hidden_feel_proof.py`), printed `feel L1 passed; alex: untouched`:
+  - shallow drop → notes `[216,1389,1000,629]`, neighbours untouched;
+  - dwell 600 ms → browser `[16,73,1800,1010]`, chat untouched, actual windows overlap-free;
+  - shared edge +300 → chat `[2132,73,1692,1300]`;
+  - `drag_tick` with real ghost calls: median 0.64 ms, p95 4.1 ms;
+  - off restored every fixture.
+- **The real watchdog could not arm** on the hidden desktop: Alex's live guard holds Ctrl+Alt+Backspace
+  (RegisterHotKey error 1409). So the feel proof uses an in-process lease with the same contract. The original
+  `hidden_proof.py` passed its 9 native tests, and its watchdog tests failed for the same reason. Rerun it while
+  the live WM is off.
+- **Read-only on the real desktop:** 17 windows, none owned or maximised. Enumeration median 7.3 ms (max 11.6);
+  gate 26 ms; DPI 144.
+
+**Not verified** (needs a hand on the real screen):
+- whether 350 ms / 250 ms / 24 px *feel* right;
+- ghost visibility on the Dusk theme (a dark translucent box);
+- Windows' own Snap fighting the landing;
+- real Chrome/Electron hook timing during a physical drag;
+- `rect_of` latency against a real modal move loop;
+- the panic chord by hand.
+
+**Roll-out (Claude).** The live module (pid 130396 at 20:48) still runs the old code; Python loaded it at start.
+1. Restart only the `wm` module, not kdesk and not the kernel (**read** `kernel/words.py` `off`):
+   - say `off wm`: its process stops and its grants are taken back;
+   - then `undo r<that record>`: it turns on again with its grants, and the kernel starts the new code.
+
+   The guard releases everything when the manager exits. The module comes back in shadow.
+2. Send a fresh `wm.mode live` with Alex present. An old request never re-arms.
+3. Optional: add the feel keys to the existing `wm-settings`, so Alex can see and tune them:
+   `set <wm-settings id> dwell_ms=350 snap_px=16 deadzone_px=10 motion_ms=250 pin_min=0.5 edges=shared`.
+   Missing keys use these defaults anyway.
+4. Watch `<world>/modules/wm/stderr.log`: it should stay quiet. Recovery is unchanged:
+   `python watchdog.py --release-all <world>/modules/wm/lease.json`.
+

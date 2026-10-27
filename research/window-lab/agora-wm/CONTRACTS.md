@@ -97,8 +97,28 @@ Themes are data only: no JS, no remote URLs, values checked by the painter's exi
 - `wm.arrange` (re-solve now), `wm.mode live|shadow|off`, `wm.leave-alone <app>` / `wm.manage <app>`.
 - ~~Happening `wm.changed` (throttled to ≤10/s) with the changed keys, for the dock and top bar.~~ Removed 26 Oct (Claude, from Alex: "visual state should not live in the world"); the shell polls `wm.windows`.
 - Settings thing `wm-settings`: `when_full` minimise-oldest|fill|focus, `manage` all|adopted, `drag` ghost|live, and `never` (a list of apps).
+  - *Added 26 Oct (Claude builder; WM.md "Feel"), all optional, validated, defaults shown:* `dwell_ms` 350
+    (0–2000), `snap_px` 16 (0–64, at 100 % scale), `deadzone_px` 10 (0–64), `motion_ms` 250 (0–1000), `pin_min` 0.5
+    (0.2–1.0), `edges` shared|free.
+  - These are preferences, not screen state. A bad value is refused as a whole (the last good settings stay) and
+    is said once on stderr.
+- *26 Oct:* the `wm.windows` row fields are unchanged. A new `why` value is `owned dialog or popup` (managed
+  false). A maximised window keeps `managed` true and `state` normal, but floats outside the layout until it is
+  un-maximised.
 
-**Behaviours:** no overlap; free placement in the best free rectangle; minimise least recently used when full; pins immovable. Dragging pushes neighbours aside along the axis of least overlap, cascading, shrinking to minimum size, then minimising the least recently used. A ghost preview comes first; live movement only if it measures smooth. A resize from any corner pushes in the same way. Gaps and borders come from `theme-native.json`.
+**Behaviours** (*26 Oct: pins are no longer immovable; see the next paragraph and WM.md "Feel"*): no overlap; free placement in the best free rectangle; minimise least recently used when full; pins immovable. Dragging pushes neighbours aside along the axis of least overlap, cascading, shrinking to minimum size, then minimising the least recently used. A ghost preview comes first; live movement only if it measures smooth. A resize from any corner pushes in the same way. Gaps and borders come from `theme-native.json`.
+
+*Revised 26 Oct (Claude builder, from Alex: "a bit of resistance... like moving apps around on the homescreen"):*
+- **Drags.** A drag passes over neighbours; a neighbour gives way only after the drag rests on it (`dwell_ms`).
+  It swaps into the dragged window's old slot, or slides aside, or shrinks its own facing side (never under
+  60 %).
+- **Release** is exactly what the ghosts showed. The dragged window lands on its outline: the nearest free spot,
+  snapped at the gap.
+- **Resizes.** A resize stops at a neighbour, then shrinks it after a dwell. Windows snapped edge to edge share
+  that edge (`edges=shared`).
+- **Pins** stay on screen: they are never minimised or moved off by the WM. A big new window may narrow a pin
+  to `pin_min` of its pinned width, and the pin grows back when space frees.
+- **Squeezing.** Nothing is squeezed under 60 %. Past that, the covered window is minimised.
 
 **Safety:**
 - **Shadow mode is the default on first run.** The manager computes and logs and moves nothing.

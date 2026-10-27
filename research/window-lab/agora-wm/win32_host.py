@@ -31,6 +31,8 @@ sig(u,'GetWindowLongPtrW',C.c_ssize_t,W.HWND,C.c_int)
 for name in ('IsWindow','IsWindowVisible','IsIconic','IsZoomed'):
     sig(u,name,W.BOOL,W.HWND)
 sig(u,'GetForegroundWindow',W.HWND)
+sig(u,'GetWindow',W.HWND,W.HWND,W.UINT)
+sig(u,'MonitorFromPoint',W.HMONITOR,W.POINT,W.DWORD)
 sig(u,'SetWindowPos',W.BOOL,W.HWND,W.HWND,C.c_int,C.c_int,C.c_int,C.c_int,W.UINT)
 sig(u,'ShowWindowAsync',W.BOOL,W.HWND,C.c_int)
 sig(u,'SetForegroundWindow',W.BOOL,W.HWND)
@@ -135,6 +137,17 @@ def attribute(hwnd,attr):
     return val.value if hr==0 else None
 
 
+def dpi_scale():
+    """Primary monitor's effective DPI / 96 (ran 26 Oct: 144 dpi, 1.5). Feel's pixel numbers are at 100 %."""
+    try:
+        x=C.c_uint();y=C.c_uint()
+        if C.WinDLL('shcore').GetDpiForMonitor(u.MonitorFromPoint(W.POINT(0,0),1),0,C.byref(x),C.byref(y))==0 and x.value:
+            return x.value/96
+    except (OSError,AttributeError):pass
+    try:return u.GetDpiForSystem()/96 or 1.0
+    except (OSError,AttributeError):return 1.0
+
+
 def work_area():
     r=W.RECT()
     if not u.SystemParametersInfoW(0x30,0,C.byref(r),0):raise OSError('work area unavailable')
@@ -225,6 +238,8 @@ class Native:
             if rule.get('ignore'):why='app rule: leave alone'
             elif elevated(ref.process['pid']):why='elevated or inaccessible'
             elif not style&0x00C00000 and not rule.get('manage') and not agora:why='frameless; no app rule'
+            owned=bool(u.GetWindow(hwnd,4))   # GW_OWNER: a dialog or popup belongs to its owner, not the layout
+            if not why and owned:why='owned dialog or popup'
             preferred=[r.w,r.h]
             if u.IsIconic(hwnd):
                 try:
@@ -232,10 +247,17 @@ class Native:
                 except OSError:pass
             rows.append({'key':ref.key,'app':app,'exe':ref.process['exe'],'icon':ref.process['exe'],
                 'agora':agora,'state':'minimised' if u.IsIconic(hwnd) else 'normal','focused':hwnd==front,
-                'rect':r.values(),'space':'primary','managed':not why,'why':why,'ref':ref,'_preferred':preferred})
+                'rect':r.values(),'space':'primary','managed':not why,'why':why,'ref':ref,'_preferred':preferred,
+                'owned':owned,'maximised':bool(u.IsZoomed(hwnd)) and not u.IsIconic(hwnd)})
             return True
         callback=ENUM(each);u.EnumWindows(callback,0)
         return rows
+
+    def scale(self):return dpi_scale()
+
+    def rect_of(self,ref):
+        """One window's visible rectangle, for the 60 Hz drag path (no enumeration). Read-only."""
+        return rect(ref.hwnd)
 
     def placement(self,ref):
         p=Placement();p.length=C.sizeof(p)
