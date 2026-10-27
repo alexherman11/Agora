@@ -7,6 +7,7 @@ text is desk command lines, one per line (or separated by ;). Lines beginning wi
     $1 $2 ...   the words after the verb (a word that names a thing may be an id or a title; a word that is a
                 blank, like $new, is filled where the verb was said)
     $*          the rest of the line after the verb word, exactly as said, as one value
+    ${3...}     the words from the 3rd on: the values $3 $4 ... give, one space between; quoted or not, the same (a894)
     $1.title    the title of the thing $1 names
     $me         whoever is using it
     $this       the thing the verb lives on (when it lives on a thing)
