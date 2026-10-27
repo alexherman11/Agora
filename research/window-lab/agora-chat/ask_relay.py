@@ -73,7 +73,7 @@ def relay_once():
         if not line:
             continue
         context = f"{where} — {name}" if name else where
-        desk(f"append {CHAT} line={q(line)} to=claude via=right-click asked_at={q(context)} thing={q(r.get('about', ''))}",
+        desk(f"do append {CHAT} line={q(line)} to=claude via=right-click asked_at={q(context)} thing={q(r.get('about', ''))}",
              who="alex")
         kernel("do", f"set {r['id']} status=sent")
         sent += 1
