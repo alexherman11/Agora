@@ -107,6 +107,13 @@ KERNEL_ENTRIES = [
             "normal visibility. allows.<word>=word:<see verb> also narrows admission of that word on the thing; "
             "its value is the line's answer=. refusal=<text> supplies a kind refusal. Policies bind entry ids, "
             "fail closed, and cannot call modules. They may inspect their own target's non-sealed facts."),
+    _k("say", "do", "<id> <words> [reply_to=<id>] [about=<id>]", "members", "yes",
+       help="say <chat> <words>: a line in a chat (rows chat lists them). @name calls that person; in a closed chat "
+            "(made with with=\"Alex, JEFF\") a line with no @name speaks to everyone else in it. reply_to=<said line> "
+            "answers one. Only the chat's people may say in a closed chat. undo takes your line back."),
+    _k("chat", "see", "<id> [limit=<n>] [since=<id>]", "anyone", "no",
+       help="chat <chat> [limit=20] [since=<said line>]: its latest lines, oldest first, as you may see them. "
+            "make kind=chat name=<name> makes an open chat; with=\"<names>\" makes one only those people see."),
     _k("look", "see", "[<id>]", "anyone", "no", aliases="l",
        help="look: the feed, pinned posts first, then the newest.\nlook <thing>: one thing, as you may see it."),
     _k("help", "see", "[<word>]", "anyone", "no", aliases="?",
@@ -178,7 +185,7 @@ KERNEL_ENTRIES = [
 ]
 
 # aspects no line may write with make or set: what the kernel itself keeps, or derives
-RESERVED_KINDS = {"person", "agent", "module", "grant", "word", "invite", "world", "place", "group", "kit", "web-layout", "paint-report"}
+RESERVED_KINDS = {"person", "agent", "module", "grant", "word", "invite", "world", "place", "group", "kit", "web-layout", "paint-report", "said"}
 RESERVED_KINDS.add('file')
 RESERVED = {"kind", "made_by", "for", "pinned", "forgotten", "sees", "lives", "from", "bound", "origin", "bundle",
             "made", "changed", "made_at", "changed_at", "steps_bound", "do_bound", "on_entry", "reviewed_code"}
@@ -572,6 +579,10 @@ def make(k, actor, st, entry, tx, group, saw=None):
     k.reaches(actor, "make", kind)
     if sees is not None and sees not in SEES_SAID:
         raise Refused("sees= says me, leaders, group or place: who besides the kernel may see it")
+    closed = None
+    if kind == "chat" and kv.get("with"):
+        from .chat import closed_sees
+        closed = closed_sees(k, actor, kv)          # with="Alex, JEFF": only those people see it
     _writable(k, kv)
     _conditions(k, kv, group)
     from painter.handles import validate_write
@@ -598,7 +609,9 @@ def make(k, actor, st, entry, tx, group, saw=None):
         tx.set(t, "for", actor.person)
     tx.set(t, f"in:{group}", len(k.log.records) + 1)
     public = group == k.place or k.state.get(group, "open")         # an open group's work is seen by all
-    if sees == "me":
+    if closed:
+        tx.set(t, "sees", closed)
+    elif sees == "me":
         who = k.state.get(actor.module, "for") if actor.kind == "module" and actor.caller is None else actor.person
         if not who or k.state.get(who, "kind") != "person":
             raise Refused("sees=me needs a person: a module says it only when it is installed for one")
@@ -904,6 +917,7 @@ from .inpage import widget
 from .blobs import upload, attach, file_result, file_read
 from .world_words import dictionary_copy, group_word, clock, forgotten
 from .readings import who, recent, kinds, on, press
+from .chat import say, chat as chat_word, closed_sees
 from .store import GONE
 from painter.arrangement import component, look_view, components, component_card
 from painter.health import component_health, component_action, personal_view, personal_style, paint_clear
@@ -920,4 +934,4 @@ KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant":
           "counts": counts, "test": test, "look": look, "help": help_, "post": post, "like": like, "pin": pin, "undo": undo, "off": off,
           "status": status, "make": make, "set": set_, "forget": forget, "holds": holds, "claim": claim,
           "vote": vote, "role": role, "rows": rows, "find": rows, "verb": verb,
-          "who": who, "recent": recent, "kinds": kinds, "on": on, "press": press}
+          "who": who, "recent": recent, "kinds": kinds, "on": on, "press": press, "say": say, "chat": chat_word}

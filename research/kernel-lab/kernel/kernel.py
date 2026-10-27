@@ -872,8 +872,14 @@ class Kernel:
 
     def happening_for(self, person, h):
         by = "someone" if h.get("by") == "sealed" else self.name(h.get("for") or h.get("by")) if h.get("by") else None
-        return {"n": h["n"], "word": h["word"], "target": h.get("target"), "by": by, "text": h.get("text", ""),
-                "record": h.get("record"), "announced": bool(h.get("announced"))}
+        out = {"n": h["n"], "word": h["word"], "target": h.get("target"), "by": by, "text": h.get("text", ""),
+               "record": h.get("record"), "announced": bool(h.get("announced"))}
+        for m in h.get("made") or ():
+            if self.state.get(m, "kind") == "said":         # a said line: whom it calls (chat.py), so a waker need
+                out["said"] = m                              # not read it again
+                out["to"] = str(self.state.get(m, "to") or "").split()
+                out["by_id"] = h.get("for") or h.get("by")
+        return out
 
     def module_hears(self, mid, h):
         """A module hears a word its grants name as `hear:<word or pattern>`, about a thing it may see: what its

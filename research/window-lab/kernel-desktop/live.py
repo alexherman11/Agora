@@ -53,6 +53,16 @@ def _flat(v):
             for a, x in v.items() if x is not None}
 
 
+def local_time(iso, today):
+    """2026-10-27T17:37:20Z -> '10:37' today, else 'Mon 26 Oct, 10:37', in this machine's time (a said line's `at`)."""
+    import calendar
+    try:
+        t = time.localtime(calendar.timegm(time.strptime(iso, "%Y-%m-%dT%H:%M:%SZ")))
+    except ValueError:
+        return iso
+    return time.strftime("%H:%M" if time.strftime("%Y-%m-%d", t) == today else "%a %d %b, %H:%M", t)
+
+
 def install(facade_cls):
     """Wrap the painter's desk_for so widgets carry their live props. Idempotent."""
     if getattr(facade_cls.desk_for, "live", False):
@@ -63,7 +73,17 @@ def install(facade_cls):
         d = orig(self, reader)
         k = self.k
         live = None
+        today = time.strftime("%Y-%m-%d")
         for s in d.world.subjects.values():
+            if "said" in (s.get("tags") or []) and s["props"].get("made_at"):
+                s["props"]["made_local"] = local_time(s["props"]["made_at"], today)
+            if "house-agent" in (s.get("tags") or []):
+                # what an agent is doing (asleep, idle, working): the house module's live.json, key house:<name>
+                if live is None:
+                    live = readings(k)
+                key = "house:" + str(s["props"].get("name") or s.get("title") or "").lower()
+                s["props"]["doing"] = (live.get(key) or {}).get("doing") or "asleep"
+                continue
             if "widget" not in (s.get("tags") or []):
                 continue
             if live is None:

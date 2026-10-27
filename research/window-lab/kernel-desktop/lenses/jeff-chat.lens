@@ -1,0 +1,99 @@
+chat : column
+  share 1
+  role chat
+  of tag:conversation-draft as draft
+  each room
+room : column
+  share 1
+  role room
+  head : row
+    role chathead
+    face : text "J"
+      role face
+    who : column
+      share 1
+      name : text "JEFF"
+        role chatname
+      state : text "thinking…"
+        role thinking
+        only when count(tag:house-agent,prop:name=JEFF,prop:doing=working) > 0
+      rest : text "here when you want him"
+        role meta
+        only when count(tag:house-agent,prop:name=JEFF,prop:doing=working) = 0
+
+  hello : column
+    role hello
+    only when count(tag:said,prop:chat=$CONVO) = 0
+    hi : text "JEFF lives on your desktop now."
+      role heading
+    what : text "He keeps the whole picture: what the residents and builders are doing, what is waiting on you, and what can wait. Ask him anything, or ask for the lowdown."
+      role meta
+  feed : column
+    share 1
+    scroll end
+    role feed
+    of tag:said,prop:chat=$CONVO as s
+    clamp last 120
+    run by
+    each said
+  working : row
+    role working
+    of tag:house-agent,prop:name=JEFF,prop:doing=working as h
+    each typing
+  dock : column
+    role dock
+    answering : row
+      role answering
+      only when ($draft.reply_to or "") != ""
+      q : text "Answering: $draft.quote"
+        role meta
+        clamp 1
+        share 1
+      x : text "×"
+        role tool
+        on click do set $draft.item reply_to="" quote=""
+    say : text ""
+      role input
+      hint "Write to JEFF…"
+      lines 1..12
+      commit explicit
+      on edit when ($draft.reply_to or "") = "" do say $CONVO text="$value"
+      on edit when ($draft.reply_to or "") != "" do say $CONVO text="$value" reply_to=$draft.reply_to; set $draft.item reply_to="" quote=""
+    footer : row
+      role urfooter
+      help : text "Enter sends · Shift+Enter for a new line · @name to call someone else in"
+        role hint
+        share 1
+said : column
+  role said
+  role said.mine when $s.by = "Alex"
+  head : row
+    role saidhead
+    only when $run = 1
+    who : text "$s.by"
+      role who
+      role who.jeff when $s.by = "JEFF"
+    at : text "$s.made_local"
+      role meta
+  bubble : column
+    role bubble
+    role bubble.mine when $s.by = "Alex"
+    role bubble.jeff when $s.by = "JEFF"
+    quoted : text "“$s.reply_to_title”"
+      role chatquote
+      clamp 3
+      only when ($s.reply_to or "") != ""
+    body : text "$s.text"
+      markdown
+      role words
+  acts : row
+    role acts
+    answer : text "Answer"
+      role tool
+      on click do set $draft.item reply_to=$s.item quote="$s.text"
+typing : row
+  role typingrow
+  dots : text "• • •"
+    role dots
+  who : text "JEFF is working"
+    role meta

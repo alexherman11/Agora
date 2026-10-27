@@ -225,8 +225,8 @@ def run(folder, out):
         bot = MCP(place.url, place.agent_token)
         init = bot.initialize()
         tools = bot.request("tools/list")["result"]["tools"]
-        check("real MCP initialization and exactly two tools", init["capabilities"] == {"tools": {}}
-              and [t["name"] for t in tools] == ["do", "see"], "initialize, initialized, tools/list over stdio")
+        check("real MCP initialization and exactly three tools", init["capabilities"] == {"tools": {}}
+              and [t["name"] for t in tools] == ["do", "see", "lines"], "initialize, initialized, tools/list over stdio")
 
         # From here Lena's imagined choices use only the guide's bootstrap, examples and word help.
         before = len(k.log.records)

@@ -365,6 +365,11 @@ def serve(args):
         if args.reasoning not in efforts:
             raise RuntimeError(f"Reasoning effort {args.reasoning} is unavailable; no substitution")
         parameters = thread_parameters(client, directory, args.model)
+        if getattr(args, "mcp_config", None):
+            # The kernel's house (kernel-lab/modules/house): the door adapter as this resident's one MCP server,
+            # with its own session. Every other configured server stays disabled. Unproven with a live model.
+            server = json.loads(Path(args.mcp_config).read_text(encoding="utf-8"))["mcpServers"]["agora"]
+            parameters["config"]["mcp_servers"]["agora"] = server
         if getattr(args, "charter_file", None):
             parameters["developerInstructions"] = Path(args.charter_file).read_text(
                 encoding="utf-8")
@@ -448,6 +453,7 @@ def main():
     parser.add_argument("--world")
     parser.add_argument("--target")
     parser.add_argument("--actor")
+    parser.add_argument("--mcp-config", help="a file naming the door adapter as the one MCP server (the kernel's house)")
     args = parser.parse_args()
     try:
         return serve(args)

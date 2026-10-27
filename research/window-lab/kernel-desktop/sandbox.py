@@ -54,6 +54,11 @@ def run(name, port):
             nm, argv = k.state.get(m, "name"), list(k.state.get(m, "run") or [])
             if nm in OFF and k.state.get(m, "on"):
                 tx.set(m, "on", False); n += 1
+            elif nm == "house":
+                # the house runs agents: only against a scripted model (HOUSE_FAKE_MODEL), never a live one, here
+                want = bool(os.environ.get("HOUSE_FAKE_MODEL"))
+                if bool(k.state.get(m, "on")) != want:
+                    tx.set(m, "on", want); n += 1
             elif nm in HEADLESS and "--headless" not in argv:
                 tx.set(m, "run", argv + ["--headless"]); n += 1
             elif nm not in HEADLESS | OFF | {"theme", "board", "files"} and k.state.get(m, "on"):

@@ -60,6 +60,23 @@ class MCPWire(unittest.TestCase):
         self.assertIn("/see", denied["text"])
         self.assertEqual(len(self.place.kernel.log.records), before)
 
+    def test_a_batch_routes_each_line_and_a_refusal_refuses_only_itself(self):
+        # MOVING-IN D2 (27 Oct): batching is first class; lines routes each line by its word, see/do take lists too
+        self.client.initialize()
+        params = {"name": "lines", "arguments": {"lines": [
+            "look", "frobnicate now", 'post "from a batch" as=p', "look $p"]}}
+        out = json.loads(self.client.request("tools/call", params)["result"]["content"][0]["text"])
+        self.assertEqual((out["ran"], out["refused"]), (4, 1))
+        self.assertEqual([r["via"] for r in out["receipts"]], ["/see", "/do", "/do", "/see"])
+        self.assertEqual([r["ok"] for r in out["receipts"]], [True, False, True, True])
+        self.assertIn("from a batch", out["receipts"][3]["text"])        # $p: the thing the third line made
+        seen = json.loads(self.client.request("tools/call", {"name": "see", "arguments": {
+            "lines": ["help", 'post "cannot act"']}})["result"]["content"][0]["text"])
+        self.assertEqual([r["ok"] for r in seen["receipts"]], [True, False])
+        for bad in ({"lines": []}, {"lines": ["look", " "]}, {"lines": "look"}, {"line": "look", "lines": ["look"]}):
+            self.assertEqual(self.client.request("tools/call", {"name": "lines", "arguments": bad})["error"]["code"],
+                             -32602)
+
     def test_unknown_tools_and_extra_arguments_do_not_reach_the_door(self):
         self.client.initialize()
         before = len(self.place.kernel.log.records)

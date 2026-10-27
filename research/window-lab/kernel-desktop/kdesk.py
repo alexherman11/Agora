@@ -9,7 +9,8 @@ speaks (/api/scene, /api/style, /api/do, /lens.html and the desk-shell files), a
     GET /desk/window-origin?win=<window>&next=<page>   owner-only redirect to a leased loopback listener
 
 Signing in. There is no entry service on the desktop. A stand-in in this process plays its half of the seam (SHAPE 3):
-it knows two sessions, Alex's (for the pages on his screen) and his agent's ("agent for Alex", label claude), kept in
+it knows three sessions, Alex's (for the pages on his screen), his agent's ("agent for Alex", label claude) and JEFF's
+(a person of his own since 27 Oct, account desktop:jeff, which the house runs him with), kept in
 <world>/keep/sessions.json beside the world, never in the log and never in git (state/ is ignored). The window host
 opens each page through /dev/signin, which sets the session as an HttpOnly cookie, so no page script holds it.
 """
@@ -47,6 +48,8 @@ GUY_GRANTS = "guy.* window.list window.overlay rows look holds hear:window.opene
 SYSTEM_GRANTS = "system.* rows look"
 MEDIA_GRANTS = "media.* rows look"
 SUMMARIZE_GRANTS = "summarize.* model.preview rows make set"
+HOUSE_GRANTS = "house.* rows look chat hear:say hear:make hear:set hear:undo hear:task.*"
+JEFF_ACCOUNT = "desktop:jeff"
 THEME_GRANTS = "theme.* make set forget rows look file-read clock hear:set hear:make hear:forget hear:undo"
 
 
@@ -68,6 +71,8 @@ def module_specs(headless=False):
          "grants": SYSTEM_GRANTS, "for": "steward"},
         {"name": "media", "run": [py, str(HERE / "kd_media.py")] + tail, "publishes": "media.*",
          "grants": MEDIA_GRANTS, "for": "steward"},
+        {"name": "house", "run": [py, str(HERE.parents[1] / "kernel-lab/modules/house/house.py")],
+         "publishes": "house.*", "grants": HOUSE_GRANTS, "for": "steward"},
         {"name": "theme", "run": [py, str(HERE.parents[1] / "kernel-lab/theme/theme_module.py")],
          "publishes": "theme.*", "grants": THEME_GRANTS, "only": "kind:theme,theme-settings,theme-choice",
          "for": "steward"},
@@ -89,6 +94,9 @@ ABOUT = {"window": "the window host: it makes the Agora windows on this desktop 
                    "bars' widgets and system.now",
          "media": "the media words (media.play, media.next, media.prev, media.now) through Windows' media session",
          "summarize": "local task summaries with honest literal fallback; off summarize stops it",
+         "house": "the house: runs the world's agents (JEFF first), wakes one only when someone addresses it (@name, "
+                  "its closed chat such as the Conversation, a task given to it, house.wake); house.who says what each "
+                  "is doing; off house ends every agent's process",
          "theme": "the themes: theme.use, theme.try, theme.import, theme.export; one look for every window, bar and widget "
                   "(research/kernel-lab/theme/THEMES.md); off theme stops the words, the look stays"}
 
@@ -138,6 +146,46 @@ def after_genesis(k, headless=False):
         k._commit(tx, by="kernel", words="install: what each module is, whose, and the window grant's narrowing")
 
 
+def moving_in(k):
+    """JEFF moves in (MOVING-IN.md, build step 1, 27 Oct): a person of his own (his account is the local entry's,
+    desktop:jeff), the Conversation (a chat only Alex and JEFF see), Shop talk (an open chat where agents coordinate)
+    and his house-agent thing, which says how the house runs him. Written once, as the kernel's own record. He starts
+    asleep (want=asleep); setting want=awake is moving him in for real."""
+    from kernel.kernel import Tx
+    with k.lock:
+        steward = next((t for t in k.things("person") if k.is_steward(t)), None)
+        jeff = k.accounts.get(JEFF_ACCOUNT)
+    if jeff is None:
+        jeff = k.join(JEFF_ACCOUNT, "JEFF", invite={"admitted": "steward", "channel": "moving in"})["person"]
+    with k.lock:
+        chats = {k.state.get(c, "name") for c in k.things("chat")}
+        agents = {k.state.get(a, "person") for a in k.things("house-agent")}
+        if "Conversation" in chats and "Shop talk" in chats and jeff in agents:
+            return
+        tx = Tx(k)
+        tx.part("install", None, "install")
+        n = len(k.log.records) + 1
+
+        def thing(**facts):
+            t = tx.mint()
+            for a, v in facts.items():
+                tx.set(t, a, v)
+            tx.set(t, "made_by", steward)
+            tx.set(t, f"in:{k.place}", n)
+            return t
+        if "Conversation" not in chats:
+            thing(kind="chat", name="Conversation", **{"with": f"{steward} {jeff}"},
+                  sees=f"person:{steward}|person:{jeff}",
+                  about="Alex and JEFF talking. Only they see it; every line in it speaks to the other.")
+        if "Shop talk" not in chats:
+            thing(kind="chat", name="Shop talk", about="Where agents coordinate. @name reaches one person.")
+        if jeff not in agents:
+            thing(kind="house-agent", name="JEFF", person=jeff, signer="jeff", provider="claude",
+                  model="claude-opus-5-5", reasoning="medium", fallback_provider="codex", fallback_model="gpt-6-astra",
+                  fallback_reasoning="medium", speaks="text", want="asleep")
+        k._commit(tx, by="kernel", words="install: JEFF moves in: the Conversation, Shop talk, and how the house runs him")
+
+
 class LocalEntry:
     """The entry service's half of the seam, in process: token -> {account, method, agent?}."""
 
@@ -145,9 +193,11 @@ class LocalEntry:
         self.path = Path(keep) / "sessions.json"
         self.sessions = json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {}
         changed = False
-        for who, agent in (("alex", None), ("claude", "claude")):
+        # Alex's pages, his agent ("agent for Alex": the builders' session), and JEFF, a person of his own (27 Oct)
+        for who, account, agent in (("alex", STEWARD_ACCOUNT, None), ("claude", STEWARD_ACCOUNT, "claude"),
+                                    ("jeff", JEFF_ACCOUNT, None)):
             if not any(v.get("signer") == who for v in self.sessions.values()):
-                self.sessions[secrets.token_urlsafe(24)] = {"account": STEWARD_ACCOUNT, "method": "desktop",
+                self.sessions[secrets.token_urlsafe(24)] = {"account": account, "method": "desktop",
                                                             "signer": who, **({"agent": agent} if agent else {})}
                 changed = True
         if changed:
@@ -302,6 +352,7 @@ def start(world=DEFAULT_WORLD, port=8810, modules=True, headless=False):
     k = Kernel(world, None if (world / "log" / "0001.jsonl").exists() else genesis(headless))
     after_genesis(k, headless)
     entry = LocalEntry(k.keep_dir)
+    moving_in(k)
     k.dev_sessions = lambda: entry.sessions             # the door's /dev/signin knows these sessions
     handler = make_desk_handler(k, entry)
     srv = DesktopServer(("127.0.0.1", port), handler)
