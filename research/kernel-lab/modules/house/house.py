@@ -14,6 +14,7 @@ The words answer at once and never wait on a model turn (the kernel gives a modu
     house.wake <person> [words]   wake one now, with your words                      (do, outside the world)
     house.stop <person>           end its process; the next call starts it again     (do, outside the world)
     house.activity <person>       what it said and did outside any chat              (see)
+    house.log <person>            its chat, its acts and its activity, as one log      (see)
 What an agent is doing changing (idle to working, a new act) is announced as the happening house.doing about its
 house-agent thing, so a painted page (apps/work) rereads; it is never recorded.
 
@@ -26,6 +27,7 @@ live.py), never into the log. Transcripts and state stay in <world>/modules/hous
 Off switch: off house (every agent's process ends with it).
 """
 import json
+import re
 import os
 import queue
 import sys
@@ -308,7 +310,8 @@ class Agent:
         chat = self.turn.get("chat")
         if self.cfg.get("speaks", "text") == "text" and chat:
             # one text block, one line, the moment it arrives; acts done before any line of this turn go under it
-            early = self.turn.pop("receipts", [])
+            # receipts already under the previous line stay there; only those made before any line come with this one
+            early = [] if self.turn.get("line") else self.turn.get("receipts", [])
             acts = f" acts={quoted(chr(10).join(early))}" if early else ""
             out = self.door.post("/do", f"say {chat} text={quoted(text.strip())}{acts}")
             if out.get("ok") and out.get("made"):
@@ -527,6 +530,11 @@ class House:
             return {"text": (f"{a.name}'s activity outside any chat, latest last:\n" + "\n".join(
                 f"  {r['at'][11:16]} {r['what']}: {r['text'][:300]}" for r in rows)) if rows else
                 f"{a.name} has done nothing outside a chat yet", "rows": rows}
+        if word == "house.log" and a is not None:
+            n = str((args.get("kv") or {}).get("limit", "60"))
+            log = self.log_of(a, min(int(n), 300) if n.isdigit() else 60)
+            return {"text": "\n".join(" ".join(x.split("\t")) for x in log) or f"{a.name} has no log yet",
+                    "rows": [{"person": a.person, "name": a.name, "log": "\n".join(log), "lines": len(log)}]}
         if a is None:
             return {"refused": f"{word} <person>: the house runs {', '.join(x.name for x in self.agents.values()) or 'no one'}"}
         if word == "house.wake":
@@ -538,6 +546,48 @@ class House:
             a.stop("house.stop")
             return {"text": f"{a.name}'s process ended; the next line to it starts it again", "external": True}
         return {"refused": f"the house has no word {word}"}
+
+    def log_of(self, a, n=60):
+        """An agent's log, oldest first: its chat's lines and its own lines anywhere, the receipts under its lines, what
+        it did outside any chat, and what it is doing now. Lines `kind<TAB>HH:MM<TAB>who<TAB>text` (the console
+        component's format). Read fresh each time; the house keeps no copy."""
+        import calendar
+        names = {r["id"]: r.get("name") or r["id"] for r in self.m.see("rows person").get("rows") or []}
+        chat = a.cfg.get("chat")
+        entries = []
+
+        def local(iso):
+            try:
+                return time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(calendar.timegm(
+                    time.strptime(iso, "%Y-%m-%dT%H:%M:%SZ"))))
+            except (TypeError, ValueError):
+                return iso or ""
+        for r in self.m.see("rows said").get("rows") or []:
+            speaker = r.get("for") or r.get("made_by")
+            if not (r.get("chat") == chat or speaker == a.person or a.person in str(r.get("to") or "").split()):
+                continue
+            at = local(r.get("made"))
+            kind = "said" if speaker == a.person else "heard"
+            where = "" if r.get("chat") == chat else f"[{self.chat_name(r.get('chat'))}] "
+            text = " ".join(str(r.get("text") or "").split())
+            entries.append((at, kind, names.get(speaker, r.get("by") or ""), where + text))
+            for act in str(r.get("acts") or "").splitlines():
+                if act.strip():
+                    entries.append((at, "act", "", act.strip()))
+        for e in a.recent_activity(200):
+            why = re.sub(r"\s*\([a-z]+\d+[^)]*\).*$", "", " ".join(str(e.get("woken_by") or "").split()).lstrip("~ "))
+            why = f"[outside any chat · {why[:70]}{'…' if len(why) > 70 else ''}] " if why else "[outside any chat] "
+            for i, line in enumerate(str(e.get("text") or "").splitlines() or [""]):
+                acts = e.get("what") == "acts"
+                entries.append((e.get("at", ""), "act" if acts else "own", a.name if i == 0 and not acts else "",
+                                ("" if acts or i else why) + " ".join(line.split())))
+        if a.busy:
+            entries.append((now_s(), "now", a.name, "working · " + "; ".join(a.state.get("last_acts", [])[-3:])
+                            if a.state.get("last_acts") else "working · thinking"))
+        if a.state.get("error") and not a.busy:
+            entries.append((now_s(), "error", a.name, a.state["error"]))
+        entries = sorted(enumerate(entries), key=lambda ie: (ie[1][0], ie[0]))[-n:]
+        return [f"{kind}\t{at[11:16]}\t{who}\t{text}" for _, (at, kind, who, text) in entries]
 
     def row(self, a):
         provider, model, effort = a.provider()
@@ -598,6 +648,9 @@ OFFER = [
     {"word": "house.activity", "kind": "see", "takes": "<id> [limit=<n>]",
      "help": "house.activity <person> [limit=10]: what an agent said and did outside any chat (woken by a task or "
              "house.wake): its own record, latest last. In a chat, its words are lines there, its acts receipts under them."},
+    {"word": "house.log", "kind": "see", "takes": "<id> [limit=<n>]",
+     "help": "house.log <person> [limit=60]: one agent's log, oldest first: its chat's lines and its own lines anywhere, "
+             "the receipts of what it did under them, its record outside any chat, and what it is doing now."},
     {"word": "house.wake", "kind": "do", "takes": "<id> [<words>]", "undo": "external", "may": "members",
      "help": "house.wake <person> [words]: wake an agent now with your words. Usually you need not: saying @name in a "
              "chat, or any line in its closed chat, wakes it. It answers in its own time."},

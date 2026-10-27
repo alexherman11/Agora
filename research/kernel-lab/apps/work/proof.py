@@ -65,51 +65,106 @@ def main(argv=None):
         convo = door.rows("chat", name="Conversation")[0]["id"]
         door.say("look " + agent["id"])
         door.say(f"set {agent['id']} want=awake")
-        door.say(f'say {convo} text="hello from the proof"')
+        door.say(f'say {convo} text="hello from the proof RUN: rows chat | frobnicate"')
         task = door.say('task-add title="Dock: battery reads wrong" who=JEFF')["made"][0]
         door.say("look " + task)
         door.say(f"set {task} build=building builder=builder-a")
         dock = door.rows("shell-settings")[0].get("dock_apps", "")
         check("Work is in the dock's apps", "work" in dock.split(","), dock)
+        view = door.rows("work-view")[0]
+        check("JEFF is open at first, so the right side is never empty", view.get("agent") == agent["person"])
 
         from painter.browser import Page
         page = Page(url, token, ids["widget"], width=1500, height=1000)
         page.c.call("Page.bringToFront")            # the painter paints only a page that is seen (27 Oct)
         try:
-            page.until('document.querySelectorAll("[data-component]").length > 0', 60)
-            page.until('document.body.textContent.includes("JEFF") && document.body.textContent.includes("AT WORK")', 30)
+            page.until('document.querySelectorAll(".band").length >= 5', 60)
+            page.until('document.querySelectorAll(".console-line").length > 0 && '
+                       'document.body.textContent.includes("Done:")', 40)
         except AssertionError:
             page.shot(ev / "work-failed.png")
             raise
+        bands = page.js('[...document.querySelectorAll(".band")].map(b => b.querySelector(".band-head").textContent)')
+        check("bands with a count, an empty band one quiet line",
+              any(b.startswith("Builds1") for b in bands) and any("Needs you· nothing waits on you" == b for b in bands),
+              " | ".join(bands))
         text = page.js("document.body.textContent")
-        check("the page paints JEFF from house.who", "JEFF" in text, text[:200].replace("\n", " · "))
-        check("a card with build= is under BUILDS, with its builder", "Dock: battery reads wrong" in text
-              and "builder-a" in text, "building · Dock: battery reads wrong · builder-a")
+        check("a card with build= is a line under Builds, with its builder", "Dock: battery reads wrong" in text
+              and "builder-a" in text)
+        log = page.js('[...document.querySelectorAll(".console-line")].map(l => l.className.split(" ")[1] + " " + l.textContent)')
+        at = lambda test: next((i for i, x in enumerate(log) if test(x)), -1)  # noqa: E731
+        heard = at(lambda x: x.startswith("heard") and "hello from the proof" in x)
+        act = at(lambda x: x.startswith("act") and "rows chat" in x and "(1 refused)" in x)
+        done = at(lambda x: x.startswith("said") and "Done:" in x)
+        check("his log is a terminal: Alex's line, his receipts under his line, his answer after them, in time order",
+              0 <= heard < act < done and sum(1 for x in log if x.startswith("act") and "rows chat" in x) == 1,
+              f"lines {heard}, {act}, {done} of {len(log)}")
+        font = page.js('getComputedStyle(document.querySelector(".console-log")).fontFamily')
+        check("the log is monospaced", any(f in font for f in ("mono", "Mono", "Cascadia", "Consolas")), font)
+        fill = page.js('[document.querySelector(".console").getBoundingClientRect().height, innerHeight, '
+                       'document.querySelector(".console").getBoundingClientRect().width, innerWidth]')
+        check("the log fills the right side", fill[0] > 0.75 * fill[1] and fill[2] > 0.5 * fill[3],
+              f"{fill[0]:.0f} of {fill[1]} px high, {fill[2]:.0f} of {fill[3]} px wide")
         page.shot(ev / "work-overview.png")
-        page.js('[...document.querySelectorAll("button")].find(b => b.innerText.trim() === "Open").click()')
-        page.until('document.body.textContent.includes("IN THEIR CHAT")', 20)
-        page.until('document.body.textContent.includes("hello from the proof")', 20)
-        text = page.js("document.body.textContent")
-        check("Open shows him up close: his chat and his record outside it",
-              "IN THEIR CHAT" in text and "OUTSIDE ANY CHAT" in text and "Heard you." in text, "")
-        page.shot(ev / "work-jeff-open.png")
-        page.js('(() => { const i = [...document.querySelectorAll("input")].find(x => (x.placeholder || "").startsWith("Write to JEFF"));'
-                ' i.value = "from the Work page"; i.dispatchEvent(new Event("change", {bubbles: true})); return true })()')
-        page.until('document.body.textContent.includes("from the Work page")', 40)
+        at_input = page.point(".console-prompt input")            # typed as Alex would: click, type, Enter
+        page.c.call("Input.dispatchMouseEvent", type="mousePressed", button="left", clickCount=1, **at_input)
+        page.c.call("Input.dispatchMouseEvent", type="mouseReleased", button="left", clickCount=1, **at_input)
+        page.c.call("Input.insertText", text="from the Work page")
+        for kind in ("keyDown", "keyUp"):
+            page.c.call("Input.dispatchKeyEvent", type=kind, key="Enter", code="Enter", windowsVirtualKeyCode=13,
+                        **({"text": chr(13)} if kind == "keyDown" else {}))
         lines = []
-        end = time.time() + 30
+        end = time.time() + 40
         while time.time() < end:
             lines = door.say(f"chat {convo} limit=10")["rows"]
             if any(r["text"] == "from the Work page" for r in lines) and lines[-1]["by"] == "JEFF":
                 break
+            page.c.js("0")          # the test browser's firewall lets a request through only while we read its events
             time.sleep(0.3)
-        check("the box says into his chat, as Alex, and he answers there",
+        check("the prompt says into his chat, as Alex, and he answers there",
               any(r["text"] == "from the Work page" and r["by"] == "Alex" for r in lines) and lines[-1]["by"] == "JEFF",
               " | ".join(f"{r['by']}: {r['text']}" for r in lines[-3:]))
+        page.until('[...document.querySelectorAll(".console-line.said")].some(l => l.textContent.includes("Heard you."))', 20)
+        try:
+            page.until('document.querySelector(".console-prompt input").value === ""', 10)
+        except AssertionError:
+            pass
+        box = page.js('document.querySelector(".console-prompt input").value')
+        check("the box is empty again once the line is said", box == "", repr(box))
+        own = page.js('[...document.querySelectorAll(".console-line.own")].map(l => l.textContent)')
+        check("what he said outside any chat is marked so, by what woke him, with no ids",
+              own and all("[outside any chat · Alex gave you a task: Dock: battery reads wrong]" in x and "dk" not in x
+                          for x in own), " | ".join(own))
+        size = page.js("[document.scrollingElement.scrollHeight, innerHeight]")
+        check("the page itself never scrolls (only the log does)", size[0] <= size[1], f"{size[0]} of {size[1]} px")
         grants = door.rows("grant", to=ids["widget"])[0].get("words", "")
         check("the page hears house.doing (what an agent is doing, never recorded)", "hear:house.doing" in grants)
-        page.until('document.body.textContent.includes("Heard you.")', 20)
+        stream = [e["params"]["entry"] for e in page.errors if e.get("method") == "Log.entryAdded"
+                  and "/door/stream" in e["params"]["entry"].get("url", "")]
+        check("'the kernel is away' here is the test browser's firewall refusing /door/stream, not a disconnect",
+              stream and all("BLOCKED_BY_CLIENT" in x.get("text", "") for x in stream),
+              f"{len(stream)} stream requests, each {stream[0].get('text') if stream else ''}")
         page.shot(ev / "work-jeff-talked.png")
+        themes = door.say("theme.list")                  # the system theme: wear a dark one and look again
+        dark = next((r for r in themes.get("rows") or [] if any(w in str(r.get("name", "")).lower()
+                                                                  for w in ("night", "mocha", "dark", "dusk"))), None)
+        if not dark:
+            check("a dark theme to wear", False, themes.get("text", "")[:200])
+        else:
+            door.say(f"theme.use {dark['id']}")
+            try:
+                page.until(r'(() => { const c = getComputedStyle(document.querySelector(".console")).backgroundColor.match(/\d+/g).map(Number); '
+                           'return c[0] + c[1] + c[2] < 200 })()', 20)
+            except AssertionError:
+                pass
+            look = page.js('[getComputedStyle(document.querySelector(".console")).backgroundColor, '
+                           'getComputedStyle(document.querySelector(".console-line.said")).color, '
+                           'getComputedStyle(document.body).backgroundColor]')
+            dim = lambda c: sum(map(int, __import__("re").findall(r"\d+", c)[:3]))  # noqa: E731
+            check(f"Work wears the system theme ({dark.get('name')}): a dark log with light words",
+                  dim(look[0]) < 200 and dim(look[1]) > 350, " · ".join(look))
+            page.shot(ev / "work-dark.png")
+            door.say("theme.use place")
     finally:
         if page:
             page.close()

@@ -1,76 +1,62 @@
 # Work: who is at work and what is moving, one page (Alex, 27 Oct: "a really good overview of all the work being
 # done, where i can click in and view more closely or chat with workers directly"). Brought forward from the old
-# desk's home-work and home-board panels (old-desk/): one line per person or card, a coloured word for its state.
-# Left: the people the house runs, then the cards: NEEDS YOU, BUILDS (a card with build=, which task.build will
-# write), IN MOTION, LANDED. Right: one person up close: what they are doing now, their lines and receipts in their
-# chat, their record outside any chat, and a box to talk to them. Colours are part-styles on the badges (install.py).
+# desk's home-work and home-board panels (old-desk/): bands with counts, one compact line per card, colour says whose
+# move it is (amber Alex's, lilac a resident's, mint an agent at work now, the rest grey), an empty band one quiet line.
+# Right: the open person's log as a terminal (house.log: their chat, the receipts of their acts, what they did outside
+# any chat, what they are doing now; newest at the bottom) with a prompt under it that says into their chat.
 # $SHOP is Shop talk's id, filled in by install.py; a person with no chat of their own is talked to there, by @name.
 root : column, of tag:work-view as view, each page
-page : split, columns "2fr 3fr"
-  left : scroll, padding 18px
-    list : column, gap 6px
+page : grid, columns "5fr 7fr", gap 36px
+  left : column
+    list : column, gap 16px
       title : text "Work", role heading
-      people-head : text "AT WORK", role sub
-      people : column, gap 4px, of reading:"house.who" as a, each person
-      needs-head : text "NEEDS YOU", role sub
-      needs : column, gap 4px, of tag:taskboard-task, prop:who=Alex as t, each needs-line
-      builds-head : text "BUILDS", role sub
-      builds : column, gap 4px, of tag:taskboard-task as t, each build-line
-      moving-head : text "IN MOTION", role sub
-      moving : column, gap 4px, of tag:taskboard-task, prop:lane=Now as t, each moving-line
-      landed-head : text "LANDED", role sub
-      landed : column, gap 4px, of tag:taskboard-task, prop:lane=Done as t, limit 8, each landed-line
-  right : scroll, padding 18px
-    pick : text "Open someone on the left to see their work up close and talk to them.", role sub
+      people : band, name "At work", tone mint, empty "no one the house runs"
+        rows : column, of reading:"house.who" as a, each person
+      needs : band, name "Needs you", tone amber, empty "nothing waits on you"
+        rows : column, of tag:taskboard-task, prop:who=Alex as t, each needs-line
+      builds : band, name "Builds", tone lilac, empty "no builds yet"
+        rows : column, of tag:taskboard-task as t, each build-line
+      moving : band, name "In motion", tone mint, empty "nothing in motion"
+        rows : column, of tag:taskboard-task, prop:lane=Now as t, each moving-line
+      landed : band, name "Landed", tone grey, empty "nothing landed yet", folded yes
+        rows : column, of tag:taskboard-task, prop:lane=Done as t, limit 12, each landed-line
+  right : column
+    pick : text "Open someone on the left to see their log and talk to them.", role sub
       only when $view.agent = ""
-    up : column, of reading:"house.who" as sel, each close
-person : row, gap 10px
+    up : column, width 100%, of reading:"house.who" as sel, each close
+person : row, gap 8px
   only when $a.name != ""
   state : badge, label $a.doing
   name : text "$a.name"
   now : text "$a.now", role sub
   open : button, label "Open"
     on press do set $view.id agent=$a.person
-needs-line : row, gap 10px
+needs-line : row, gap 8px
   only when $t.lane != "Done"
   state : badge, label "yours"
   what : text "$t.title"
-build-line : row, gap 10px
+build-line : row, gap 8px
   only when $t.build != ""
   state : badge, label $t.build
   what : text "$t.title"
   who : text "$t.builder", role sub
-moving-line : row, gap 10px
-  state : badge, label "now"
+moving-line : row, gap 8px
+  state : badge, label "$t.who"
   what : text "$t.title"
-  who : text "$t.who", role sub
-landed-line : row, gap 10px
+landed-line : row, gap 8px
   state : badge, label "done"
   what : text "$t.title", role sub
-close : column, gap 10px
+close : column, gap 8px, width 100%
   only when $sel.person = $view.agent
   head : row, gap 10px
     state : badge, label $sel.doing
-    name : text "$sel.name", role heading
-    shut : button, label "Close"
-      on press do set $view.id agent=""
-  model : text "$sel.now · $sel.model $sel.reasoning · $sel.turns turns · first words $sel.first_words", role sub
-  acting : code, value $sel.acts_text
-    only when $sel.doing = "working"
-  chat-head : text "IN THEIR CHAT", role sub
+    name : text "$sel.name"
+    model : text "$sel.now · $sel.model $sel.reasoning · $sel.turns turns · first words $sel.first_words", role sub
+  log : column, width 100%, of reading:"house.log $sel.person limit=200" as l, each terminal
+terminal : column, width 100%
+  in-chat : console, value $l.log, label "$sel.name's log", hint "Write to $sel.name…", empty "Nothing yet. Say something below."
     only when $sel.chat != ""
-  chat : column, gap 6px, of reading:"chat $sel.chat limit=15" as m, each said
-    only when $sel.chat != ""
-  talk : input, label "Talk to $sel.name", hint "Write to $sel.name…"
-    only when $sel.chat != ""
-    on change do say $sel.chat text="$value"
-  talk-shop : input, label "Talk to $sel.name in Shop talk", hint "Write to $sel.name…"
+    on say do say $sel.chat text="$value"
+  in-shop : console, value $l.log, label "$sel.name's log", hint "Write to $sel.name in Shop talk…", empty "Nothing yet."
     only when $sel.chat = ""
-    on change do say $SHOP text="@$sel.name $value"
-  out-head : text "OUTSIDE ANY CHAT", role sub
-  outside : column, of reading:"house.activity $sel.person limit=15" as e, each act
-said : column, gap 2px
-  line : text "$m.by: $m.text"
-  receipts : code, value $m.acts
-    only when $m.acts != ""
-act : code, value $e.line
+    on say do say $SHOP text="@$sel.name $value"

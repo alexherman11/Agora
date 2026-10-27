@@ -1,11 +1,11 @@
 {
- "at": "2026-10-27 12:02",
+ "at": "2026-10-27 12:34",
  "complete": true,
  "checks": [
   {
    "check": "installed through the door (lens, widget, Alex's work-view, dock)",
    "ok": true,
-   "detail": "{'lens': 'dk217', 'widget': 'dk218', 'view': 'dk228'}"
+   "detail": "{'lens': 'dk220', 'widget': 'dk221', 'view': 'dk233'}"
   },
   {
    "check": "Work is in the dock's apps",
@@ -13,29 +13,69 @@
    "detail": "lines,help,board,taskboard,appearance,feed,work"
   },
   {
-   "check": "the page paints JEFF from house.who",
-   "ok": true,
-   "detail": "WorkAT WORKidleJEFFlast turn 12:02OpenNEEDS YOUBUILDSbuildingDock: battery reads wrongbuilder-aIN MOTIONLANDEDOpen someone on the left to see their work up close and talk to them."
-  },
-  {
-   "check": "a card with build= is under BUILDS, with its builder",
-   "ok": true,
-   "detail": "building \u00b7 Dock: battery reads wrong \u00b7 builder-a"
-  },
-  {
-   "check": "Open shows him up close: his chat and his record outside it",
+   "check": "JEFF is open at first, so the right side is never empty",
    "ok": true,
    "detail": ""
   },
   {
-   "check": "the box says into his chat, as Alex, and he answers there",
+   "check": "bands with a count, an empty band one quiet line",
    "ok": true,
-   "detail": "JEFF: Heard you. | Alex: from the Work page | JEFF: Heard you."
+   "detail": "At work1\u25be | Needs you\u00b7 nothing waits on you | Builds1\u25be | In motion\u00b7 nothing in motion | Landed\u00b7 nothing landed yet"
+  },
+  {
+   "check": "a card with build= is a line under Builds, with its builder",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "check": "his log is a terminal: Alex's line, his receipts under his line, his answer after them, in time order",
+   "ok": true,
+   "detail": "lines 0, 2, 3 of 5"
+  },
+  {
+   "check": "the log is monospaced",
+   "ok": true,
+   "detail": "\"Cascadia Mono\", Consolas, monospace"
+  },
+  {
+   "check": "the log fills the right side",
+   "ok": true,
+   "detail": "825 of 929 px high, 804 of 1498 px wide"
+  },
+  {
+   "check": "the prompt says into his chat, as Alex, and he answers there",
+   "ok": true,
+   "detail": "JEFF: Done: {\"ok\": false, \"ran\": 2, \"refused\": 1, \"receipts\": [{\"line\": \"rows chat\", \"via\": \"/see\", \"ok\": true, \"text\": \"2 chats\\n  dk78 \u00b7 chat \u00b7 Conversation\\n  dk80 \u00b7 chat \u00b7 Shop talk\", \"rows\": [{\"kind\": \"chat\" | Alex: from the Work page | JEFF: Heard you."
+  },
+  {
+   "check": "the box is empty again once the line is said",
+   "ok": true,
+   "detail": "''"
+  },
+  {
+   "check": "what he said outside any chat is marked so, by what woke him, with no ids",
+   "ok": true,
+   "detail": "12:33JEFF[outside any chat \u00b7 Alex gave you a task: Dock: battery reads wrong] Heard you."
+  },
+  {
+   "check": "the page itself never scrolls (only the log does)",
+   "ok": true,
+   "detail": "929 of 929 px"
   },
   {
    "check": "the page hears house.doing (what an agent is doing, never recorded)",
    "ok": true,
    "detail": ""
+  },
+  {
+   "check": "'the kernel is away' here is the test browser's firewall refusing /door/stream, not a disconnect",
+   "ok": true,
+   "detail": "1 stream requests, each Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector"
+  },
+  {
+   "check": "Work wears the system theme (dusk): a dark log with light words",
+   "ok": true,
+   "detail": "rgb(42, 31, 82) \u00b7 rgb(196, 168, 255) \u00b7 rgb(28, 20, 56)"
   }
  ]
 }

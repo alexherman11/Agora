@@ -141,8 +141,13 @@ def main(argv=None):
         p.check("Shop talk is the team's, an open group the place sees", team and team in shop_row.get("groups", []))
         p.line(f"look {team}", who="jeff")
         led = p.line(f"group {team} open=yes", who="jeff", route="/do")
-        p.check("JEFF leads the team (a leader's word works for him); Alex is still the only steward",
-                led.get("ok") and not p.line("off guy", who="jeff").get("ok"), led.get("text", "")[:120])
+        # whether he is also a steward is the world's to say (Alex made him one, 27 Oct, f62c84eb6); the proof copies it
+        steward = p.line("off guy", who="jeff").get("ok")
+        if steward:
+            p.line("undo", who="jeff")
+        p.check("JEFF leads the team (a leader's word works for him)", led.get("ok"),
+                led.get("text", "")[:120] + (" · in this world he is also a steward" if steward else
+                                             " · Alex is the only steward here"))
 
         before = [r["id"] for c in (convo, shop) for r in p.lines_of(c)]
         p.line(f"look {jeff}")
