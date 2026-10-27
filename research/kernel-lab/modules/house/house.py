@@ -13,10 +13,12 @@ The words answer at once and never wait on a model turn (the kernel gives a modu
     house.who                     who the house runs, and what each is doing         (see)
     house.wake <person> [words]   wake one now, with your words                      (do, outside the world)
     house.stop <person>           end its process; the next call starts it again     (do, outside the world)
+    house.activity <person>       what it said and did outside any chat              (see)
 
-An agent acts through MCP (see, do, lines) with its own session, as itself. With speaks=text (the default), the words
-of its turn are said into the chat that woke it, as it, the moment each arrives; speaks=say leaves that to its own
-`say` lines. What it is doing (asleep, idle, working) is not a fact: it goes to live.json (the desktop's live layer,
+An agent acts through MCP (see, do, lines) with its own session, as itself. With speaks=text (the default), each text
+block of its turn is said into the chat that woke it, as it, the moment it arrives, and its tool calls become small
+receipts under that line (`acts`); thinking is never posted. Woken by no chat (a task, house.wake), its words and acts
+go to its own activity record (house.activity) instead. speaks=say leaves the chat to its own `say` lines. What it is doing (asleep, idle, working) is not a fact: it goes to live.json (the desktop's live layer,
 live.py), never into the log. Transcripts and state stay in <world>/modules/house/<name>/, outside git.
 
 Off switch: off house (every agent's process ends with it).
@@ -206,7 +208,7 @@ class Agent:
         parts += [i["text"] for i in items]
         text = "\n\n".join(parts)
         self.turn = {"chat": chats[-1] if chats else None, "woken": min(i["at"] for i in items), "first": None,
-                     "acts": 0}
+                     "receipts": [], "line": None, "woken_by": items[-1]["text"].splitlines()[0][:160]}
         if self.child.send(text):
             self.busy = True
             self.state["last_sent"] = text[-4000:]
@@ -239,11 +241,21 @@ class Agent:
         elif e == "text":
             self._spoke(ev["text"])
         elif e == "tool":
-            self.turn["acts"] = self.turn.get("acts", 0) + 1
             lines = ev["input"].get("lines") or [ev["input"].get("line", "")]
             self.state["last_acts"] = [str(x)[:120] for x in lines][-6:]
+            name = ev["name"].rsplit("__", 1)[-1]
+            receipt = ("" if name == "lines" else name + ": ") + " · ".join(str(x)[:80] for x in lines)
+            self.turn.setdefault("receipts", []).append(receipt)
+            self._receipts()
             self.house.publish()
+        elif e == "toolresult":
+            if ev.get("refused") and self.turn.get("receipts"):
+                self.turn["receipts"][-1] += f" ({ev['refused']} refused)"
+                self._receipts()
         elif e == "result":
+            left = self.turn.get("receipts") or []
+            if left and not self.turn.get("line") and self.turn.get("chat"):     # with no chat, each was kept as it came
+                self.activity("acts", "\n".join(left))
             with self.lock:
                 self.busy = False
                 if ev["ok"]:
@@ -293,11 +305,46 @@ class Agent:
             self.save()
         chat = self.turn.get("chat")
         if self.cfg.get("speaks", "text") == "text" and chat:
-            out = self.door.post("/do", f"say {chat} text={quoted(text.strip())}")
-            if not out.get("ok"):
+            # one text block, one line, the moment it arrives; acts done before any line of this turn go under it
+            early = self.turn.pop("receipts", [])
+            acts = f" acts={quoted(chr(10).join(early))}" if early else ""
+            out = self.door.post("/do", f"say {chat} text={quoted(text.strip())}{acts}")
+            if out.get("ok") and out.get("made"):
+                self.turn["line"], self.turn["receipts"] = out["made"][0], []
+            else:
                 self.log("unsaid", out.get("text"))
         else:
-            self.log("thought", text)
+            # woken by no chat (a task, house.wake), or speaks=say: his own activity record, never a chat
+            self.activity("text", text)
+
+    def _receipts(self):
+        """His tool calls since his last line, as small receipts under it (`acts`). Before any line, or with no chat,
+        they wait for the next line, or go to his activity record when the turn ends."""
+        line, receipts = self.turn.get("line"), self.turn.get("receipts") or []
+        if line and receipts and self.cfg.get("speaks", "text") == "text":
+            out = self.door.post("/do", f"look {line}; set {line} acts={quoted(chr(10).join(receipts))}")
+            if not out.get("ok"):
+                self.log("receipt", out.get("text"))
+        elif receipts and not self.turn.get("chat"):
+            self.activity("acts", receipts[-1])
+
+    def activity(self, what, text):
+        """His own record of what he did and said outside any chat (house.activity reads it; the work overview
+        will). Beside the house's state, never in the world's log."""
+        entry = {"at": now_s(), "what": what, "text": text, "woken_by": self.turn.get("woken_by", "")}
+        try:
+            with (self.dir / "activity.jsonl").open("a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except OSError:
+            pass
+        self.log("activity", entry)
+
+    def recent_activity(self, n=10):
+        try:
+            rows = (self.dir / "activity.jsonl").read_text(encoding="utf-8").splitlines()[-n:]
+            return [json.loads(r) for r in rows if r.strip()]
+        except (OSError, ValueError):
+            return []
 
 
 class House:
@@ -375,8 +422,10 @@ class House:
             "a timer: you are woken when someone addresses you, and each message from the house says what reached "
             "you. Your tools are see, do and lines; each takes Lines (help, rows guide and help <word> teach them); "
             "lines takes a list and routes each line, and a refused line refuses only itself. "
-            + ("Your words in a turn are said, as you, into the chat that woke you, the moment you write them, so "
-               "write to the person; use say <chat> only to speak somewhere else. "
+            + ("Each block of your words in a turn is said, as you, into the chat that woke you the moment you write "
+               "it, with your tool calls as small receipts under it, so write to the person, briefly, like texting; "
+               "use say <chat> only to speak somewhere else. Woken by no chat (a task, house.wake), your words go to "
+               "your own activity record, not to any chat. "
                if cfg.get("speaks", "text") == "text" else
                "Your words in a turn are your own thinking; say <chat> <words> is how anyone hears you. ")
             + "rows chat lists the chats; chat <chat> reads one.")
@@ -468,6 +517,12 @@ class House:
                 "the house runs no agents yet: make kind=house-agent person=<person> … adds one"
             return {"text": text, "rows": rows}
         a = self.agents.get(args.get("target") or "")
+        if word == "house.activity" and a is not None:
+            n = str((args.get("kv") or {}).get("limit", "10"))
+            rows = a.recent_activity(min(int(n), 100) if n.isdigit() else 10)
+            return {"text": (f"{a.name}'s activity outside any chat, latest last:\n" + "\n".join(
+                f"  {r['at'][11:16]} {r['what']}: {r['text'][:300]}" for r in rows)) if rows else
+                f"{a.name} has done nothing outside a chat yet", "rows": rows}
         if a is None:
             return {"refused": f"{word} <person>: the house runs {', '.join(x.name for x in self.agents.values()) or 'no one'}"}
         if word == "house.wake":
@@ -522,6 +577,9 @@ OFFER = [
     {"word": "house.who", "kind": "see", "takes": "",
      "help": "house.who: the agents the house runs (JEFF and others), what each is doing (asleep, resting, idle, "
              "working), its model, its turns and how fast its last first words came."},
+    {"word": "house.activity", "kind": "see", "takes": "<id> [limit=<n>]",
+     "help": "house.activity <person> [limit=10]: what an agent said and did outside any chat (woken by a task or "
+             "house.wake): its own record, latest last. In a chat, its words are lines there, its acts receipts under them."},
     {"word": "house.wake", "kind": "do", "takes": "<id> [<words>]", "undo": "external", "may": "members",
      "help": "house.wake <person> [words]: wake an agent now with your words. Usually you need not: saying @name in a "
              "chat, or any line in its closed chat, wakes it. It answers in its own time."},

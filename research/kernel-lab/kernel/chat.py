@@ -2,7 +2,8 @@
 
     make kind=chat name="Shop talk"                       an open chat: the place sees it, anyone in it may say
     make kind=chat name=Conversation with="Alex, JEFF"    a closed chat: only those people see it and say in it
-    say <chat> <words> [reply_to=<said>] [about=<thing>]  a line in it, a `said` thing; undo takes it back
+    say <chat> <words> [reply_to=<said>] [about=<thing>] [acts=<receipts>]   a line in it, a `said` thing
+    set <said> acts=<receipts>                            only its speaker, and only its acts (what it did after it)
     chat <chat> [limit=<n>] [since=<said>]                its latest lines, oldest first
 
 A said line is addressed (its `to`): to each @name in it outside quotes, or, with none, in a closed chat to everyone else
@@ -79,6 +80,8 @@ def say(k, actor, st, entry, tx, group, saw=None):
         tx.set(t, "to", " ".join(to))
     if reply:
         tx.set(t, "reply_to", reply)
+    if st.kv.get("acts"):
+        tx.set(t, "acts", str(st.kv["acts"])[:2000])     # what the speaker did around this line: small receipts
     a = st.kv.get("about")
     if a:
         if k.shown(actor.person, a) is None:
@@ -102,6 +105,7 @@ def say(k, actor, st, entry, tx, group, saw=None):
 def said_row(k, t, a):
     by = a.get("made_by")
     return {"id": t, "kind": "said", "chat": a.get("chat"), "by": k.name(a.get("for") or by) if by else "",
+            "acts": a.get("acts", ""),
             "via": k.name(by) if a.get("for") else "", "text": a.get("text", ""), "at": a.get("made", ""),
             "to": [k.name(p) for p in str(a.get("to") or "").split()], "reply_to": a.get("reply_to", ""),
             "about": a.get("about", ""), "rev": k.state.rev.get(t, 0)}
@@ -136,5 +140,14 @@ def chat(k, actor, st, entry, tx, group, saw=None):
     people = str(k.state.get(c, "with") or "").split()
     head = (f"{k.name(c)} ({c}), a chat" + (f" between {', '.join(k.name(p) for p in people)}" if people else ", open")
             + f": {len(rows)} latest line{'' if len(rows) == 1 else 's'}")
-    body = [f"  {r['id']} {str(r['at'])[11:16]} {r['by']}: {r['text']}" for r in rows]
+    body = [f"  {r['id']} {str(r['at'])[11:16]} {r['by']}: {r['text']}" + (f"\n      ~ {r['acts']}" if r["acts"] else "")
+            for r in rows]
     return {"text": head + ("\n" + "\n".join(body) if body else "; say <chat> <words> starts it"), "rows": rows}
+
+
+def said_set(k, actor, t, kv):
+    """set on a said line: its speaker may change its acts (receipts of what they did after saying it), nothing else."""
+    if set(kv) - {"acts"}:
+        raise Refused("a said line keeps its words; set changes only its acts= (undo takes the line back)")
+    if k.state.get(t, "made_by") != actor.id:
+        raise Refused("only whoever said the line sets its acts")

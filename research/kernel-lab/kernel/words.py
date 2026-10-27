@@ -657,7 +657,10 @@ def set_(k, actor, st, entry, tx, group, saw=None):
     if k.state.get(t, 'kind') == 'file-settings' and not k.is_steward(actor.person):
         raise Refused('file-settings belongs to stewards')
     k.reaches(actor, "set", k.state.get(t, "kind"), target=t, fields=st.kv)
-    if k.state.get(t, "kind") in RESERVED_KINDS:
+    if k.state.get(t, "kind") == "said":
+        from .chat import said_set
+        said_set(k, actor, t, st.kv)                    # its speaker's acts only (chat.py)
+    elif k.state.get(t, "kind") in RESERVED_KINDS:
         raise Refused(f"{t} is a {k.state.get(t, 'kind')}; set changes only things made with make")
     if not st.kv:
         raise Refused("set needs k=v: set <thing> label=Feed")

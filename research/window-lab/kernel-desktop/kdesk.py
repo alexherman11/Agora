@@ -148,8 +148,8 @@ def after_genesis(k, headless=False):
 
 def moving_in(k):
     """JEFF moves in (MOVING-IN.md, build step 1, 27 Oct): a person of his own (his account is the local entry's,
-    desktop:jeff), the Conversation (a chat only Alex and JEFF see), Shop talk (an open chat where agents coordinate)
-    and his house-agent thing, which says how the house runs him. Written once, as the kernel's own record. He starts
+    desktop:jeff), the team (an open group he leads), the Conversation (a chat only Alex and JEFF see), Shop talk (the
+    team's open chat where agents coordinate) and his house-agent thing, which says how the house runs him. Written once, as the kernel's own record. He starts
     asleep (want=asleep); setting want=awake is moving him in for real."""
     from kernel.kernel import Tx
     with k.lock:
@@ -160,7 +160,9 @@ def moving_in(k):
     with k.lock:
         chats = {k.state.get(c, "name") for c in k.things("chat")}
         agents = {k.state.get(a, "person") for a in k.things("house-agent")}
-        if "Conversation" in chats and "Shop talk" in chats and jeff in agents:
+        team = next((g for g in k.things("group") if k.state.get(g, "name") == "team"), None)
+        shop = next((c for c in k.things("chat") if k.state.get(c, "name") == "Shop talk"), None)
+        if "Conversation" in chats and shop and jeff in agents and team and k.state.get(shop, f"in:{team}"):
             return
         tx = Tx(k)
         tx.part("install", None, "install")
@@ -177,8 +179,18 @@ def moving_in(k):
             thing(kind="chat", name="Conversation", **{"with": f"{steward} {jeff}"},
                   sees=f"person:{steward}|person:{jeff}",
                   about="Alex and JEFF talking. Only they see it; every line in it speaks to the other.")
-        if "Shop talk" not in chats:
-            thing(kind="chat", name="Shop talk", about="Where agents coordinate. @name reaches one person.")
+        if team is None:
+            # the team: JEFF leads it (the coordinator for Alex, 27 Oct: a leader of a group, not of the place, so
+            # Alex stays the only steward); open, so the whole place sees what is in it
+            team = tx.mint()
+            for a, v in (("kind", "group"), ("name", "team"), ("open", True), (f"in:{k.place}", n),
+                         (f"member:{jeff}", "leader"), ("made_by", steward)):
+                tx.set(team, a, v)
+        if shop is None:
+            shop = thing(kind="chat", name="Shop talk", about="Where agents coordinate. @name reaches one person.")
+        if not k.state.get(shop, f"in:{team}"):
+            tx.set(shop, f"in:{team}", n)            # Shop talk is the team's
+            tx.set(shop, f"in:{k.place}")
         if jeff not in agents:
             thing(kind="house-agent", name="JEFF", person=jeff, signer="jeff", provider="claude",
                   model="claude-opus-5-5", reasoning="medium", fallback_provider="codex", fallback_model="gpt-6-astra",

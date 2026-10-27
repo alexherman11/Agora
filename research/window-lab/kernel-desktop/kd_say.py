@@ -32,7 +32,7 @@ def say(line, token, port=8810):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("lines", nargs="+")
-    ap.add_argument("--as", dest="who", default="claude", choices=["claude", "alex"])
+    ap.add_argument("--as", dest="who", default="claude", choices=["claude", "alex", "jeff"])
     ap.add_argument("--world", default=str(HERE / "state" / "world"))
     ap.add_argument("--port", type=int, default=8810)
     a = ap.parse_args()

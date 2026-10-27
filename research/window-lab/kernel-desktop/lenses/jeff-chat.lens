@@ -86,6 +86,10 @@ said : column
     body : text "$s.text"
       markdown
       role words
+  receipts : text "$s.acts"
+    role receipt
+    clamp 4
+    only when ($s.acts or "") != ""
   acts : row
     role acts
     answer : text "Answer"

@@ -1,5 +1,5 @@
 {
- "at": "2026-10-27 10:33",
+ "at": "2026-10-27 10:54",
  "complete": true,
  "checks": [
   {
@@ -10,22 +10,22 @@
   {
    "check": "house.who answers at once",
    "ok": true,
-   "detail": "20 ms: JEFF (dk827) \u00b7 asleep \u00b7 claude claude-opus-5-5 medium \u00b7 0 turns"
+   "detail": "26 ms: JEFF (dk827) \u00b7 working \u00b7 claude claude-opus-5-5 medium \u00b7 0 turns"
   },
   {
    "check": "want=awake warms his process (no turn)",
    "ok": true,
-   "detail": "JEFF (dk827) \u00b7 idle \u00b7 claude claude-opus-5-5 medium \u00b7 0 turns"
+   "detail": "JEFF (dk827) \u00b7 idle \u00b7 claude claude-opus-5-5 medium \u00b7 1 turns \u00b7 first words 3789 ms"
   },
   {
    "check": "Alex's line in the Conversation speaks to JEFF",
    "ok": true,
-   "detail": "ok say dk834 [r1452] in Conversation \u00b7 to JEFF"
+   "detail": "ok say dk845 [r1465] in Conversation \u00b7 to JEFF"
   },
   {
    "check": "JEFF's words come back into the Conversation, as JEFF",
    "ok": true,
-   "detail": "3416 ms to first words (scripted model); On it."
+   "detail": "217 ms to first words (scripted model); On it."
   },
   {
    "check": "his turn ends with his words on the result",
@@ -53,14 +53,34 @@
    "detail": ""
   },
   {
-   "check": "a plain line in Shop talk wakes no one",
+   "check": "his tool calls are small receipts under the line before them",
+   "ok": true,
+   "detail": "look dk828 \u00b7 rows chat \u00b7 frobnicate now \u00b7 say dk829 hi from JEFF (1 refused)"
+  },
+  {
+   "check": "Shop talk is the team's, an open group the place sees",
    "ok": true,
    "detail": ""
   },
   {
+   "check": "JEFF leads the team (a leader's word works for him); Alex is still the only steward",
+   "ok": true,
+   "detail": "ok group dk842 [r?]"
+  },
+  {
+   "check": "woken by no chat (house.wake), his words and acts go to his activity record, no chat",
+   "ok": true,
+   "detail": "  10:54 text: Done: {\"ok\": true, \"ran\": 1, \"refused\": 0, \"receipts\": [{\"line\": \"rows chat\", \"via\": \"/see\", \"ok\": true, \"text\": \"2 chats\\n  dk828 \u00b7 chat \u00b7 Conver"
+  },
+  {
+   "check": "a plain line in Shop talk wakes no one",
+   "ok": true,
+   "detail": "5 model requests, none carrying it"
+  },
+  {
    "check": "@jeff in Shop talk wakes him; he answers there",
    "ok": true,
-   "detail": "152 ms to his words, warm"
+   "detail": "61 ms to his words, warm"
   },
   {
    "check": "a line said while the house was off reaches him when it is on again (the cursor)",
@@ -75,7 +95,7 @@
   {
    "check": "first words, Alex's line to JEFF's line, scripted model (the house's and Claude's own cost)",
    "ok": true,
-   "detail": "cold (process started moments before): 3416 ms; warm: 152 ms"
+   "detail": "cold (process started moments before): 217 ms; warm: 61 ms"
   }
  ]
 }

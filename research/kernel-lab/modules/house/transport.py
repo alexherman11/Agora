@@ -9,6 +9,8 @@ bearer session, never through `>` lines in its text.
 Every child's stream is reduced to these events, put on the agent's queue:
     {"e": "init", "session": id}        {"e": "text", "text": ...}        {"e": "tool", "name": ..., "input": {...}}
     {"e": "compacted"}                  {"e": "result", "ok": bool, "detail": ...}     {"e": "exit", "code": n}
+    {"e": "toolresult", "refused": n}   (a tool's answer: how many of its lines were refused)
+Thinking blocks are never reduced to anything: they stay in the transcript.
 """
 import glob
 import json
@@ -131,6 +133,19 @@ def reduce(ev):
                 out.append({"e": "text", "text": c["text"]})
             elif c.get("type") == "tool_use":
                 out.append({"e": "tool", "name": c.get("name", ""), "input": c.get("input") or {}})
+        return out
+    if t == "user":
+        out = []
+        for c in ev.get("message", {}).get("content", []) or []:
+            if isinstance(c, dict) and c.get("type") == "tool_result":
+                body = c.get("content")
+                text = body if isinstance(body, str) else "".join(x.get("text", "") for x in body or [] if isinstance(x, dict))
+                try:
+                    r = json.loads(text)
+                    refused = int(r.get("refused", 0 if r.get("ok") else 1)) if isinstance(r, dict) else 0
+                except (ValueError, TypeError):
+                    refused = 1 if c.get("is_error") else 0
+                out.append({"e": "toolresult", "refused": refused})
         return out
     if t == "result":
         return [{"e": "result", "ok": not ev.get("is_error"), "detail": str(ev.get("result") or ev.get("subtype") or "")[:500]}]

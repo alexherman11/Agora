@@ -4,7 +4,7 @@ never a window on Alex's screen (sandbox.py: port 8830, every module headless).
     python proof_house.py [--port 8830] [--out evidence/house-proof.json]
 
 What it checks, each as ran:
-  1. the house words answer at once (house.who), and JEFF starts asleep
+  1. the house words answer at once (house.who)
   2. want=awake warms his process; Alex's line in the Conversation wakes him; his words come back into it, as JEFF
   3. the model was offered exactly the three door tools (see, do, lines) and no others
   4. one lines call: a refused line refuses only itself, the rest ran (his line in Shop talk exists)
@@ -94,9 +94,10 @@ def main(argv=None):
         shop = next(r["id"] for r in p.line("rows chat")["rows"] if r.get("name") == "Shop talk")
         t = time.time()
         who = p.line("house.who")
-        p.check("house.who answers at once", time.time() - t < 1.0 and "asleep" in who["text"],
+        p.check("house.who answers at once", time.time() - t < 1.0 and "JEFF" in who["text"],
                 f"{(time.time() - t) * 1000:.0f} ms: {who['text'].splitlines()[-1].strip()}")
 
+        p.line(f"look {agent}")
         p.line(f"set {agent} want=awake")
         p.check("want=awake warms his process (no turn)",
                 p.until(lambda: "idle" in p.line("house.who")["text"], 30), p.line("house.who")["text"].splitlines()[-1].strip())
@@ -129,13 +130,31 @@ def main(argv=None):
                 result[:200])
         p.check("his charter is his system prompt", any("standing rules" in (r.get("system") or "") or
                                                          "charter" in (r.get("system") or "") for r in reqs))
+        receipt = p.until(lambda: "refused" in (jeff_said()[0].get("acts") or "") and jeff_said()[0]["acts"])
+        p.check("his tool calls are small receipts under the line before them",
+                receipt and "rows chat" in receipt and "(1 refused)" in receipt, str(receipt)[:200])
 
-        n = len(reqs)
+        team = (p.line("rows group name=team")["rows"] or [{}])[0].get("id")
+        shop_row = next(r for r in p.line("rows chat")["rows"] if r["id"] == shop)
+        p.check("Shop talk is the team's, an open group the place sees", team and team in shop_row.get("groups", []))
+        p.line(f"look {team}", who="jeff")
+        led = p.line(f"group {team} open=yes", who="jeff", route="/do")
+        p.check("JEFF leads the team (a leader's word works for him); Alex is still the only steward",
+                led.get("ok") and not p.line("off guy", who="jeff").get("ok"), led.get("text", "")[:120])
+
+        before = [r["id"] for c in (convo, shop) for r in p.lines_of(c)]
+        p.line(f"look {jeff}")
+        p.line(f"house.wake {jeff} RUN: rows chat", route="/do")
+        acts = p.until(lambda: "Done:" in json.dumps(p.line(f"house.activity {jeff}")["rows"]), 30)
+        after = [r["id"] for c in (convo, shop) for r in p.lines_of(c)]
+        p.check("woken by no chat (house.wake), his words and acts go to his activity record, no chat",
+                acts and before == after, p.line(f"house.activity {jeff}")["text"].splitlines()[-1][:160])
+
         p.line(f"say {shop} morning all, nothing for anyone")
-        time.sleep(1.5)
+        time.sleep(2)
         reqs = [json.loads(x) for x in log.read_text(encoding="utf-8").splitlines() if x.strip()]
-        p.check("a plain line in Shop talk wakes no one", len([r for r in reqs if r["tools"]]) ==
-                len([r for r in reqs[:n] if r["tools"]]))
+        p.check("a plain line in Shop talk wakes no one", not any("morning all" in (r.get("user") or "") for r in reqs),
+                f"{len(reqs)} model requests, none carrying it")
         t1 = time.time()
         p.line(f"say {shop} @jeff a word, please")
         heard = p.until(lambda: [r for r in p.lines_of(shop) if r["by"] == "JEFF" and r["text"] == "Heard you."])

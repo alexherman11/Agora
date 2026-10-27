@@ -66,6 +66,16 @@ class Chats(unittest.TestCase):
         self.run_as(self.pike, "undo")
         self.assertIsNone(self.k.shown(self.pike, line))
 
+    def test_only_the_speaker_sets_a_lines_acts_and_nothing_else(self):
+        shop = self.run_as(self.jeff, 'make kind=chat name="Shop talk"')["made"][0]
+        line = self.run_as(self.jeff, f'say {shop} looking now acts="look dk1"')["made"][0]
+        self.assertEqual(self.k.state.get(line, "acts"), "look dk1")
+        self.run_as(self.jeff, f'look {line}; set {line} acts="look dk1 · rows chat"')
+        self.assertEqual(self.k.state.get(line, "acts"), "look dk1 · rows chat")
+        self.run_as(self.jeff, f'look {line}; set {line} text=rewritten', ok=False)
+        self.run_as(self.pike, f'look {line}; set {line} acts=forged', ok=False)
+        self.assertIn("rows chat", self.run_as(self.alex, f"chat {shop}")["text"])
+
     def test_say_finds_a_chat_by_name(self):
         self.run_as(self.alex, 'make kind=chat name=Conversation with="Alex, JEFF"')
         out = self.run_as(self.alex, "say Conversation hi JEFF")
