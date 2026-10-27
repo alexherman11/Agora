@@ -487,6 +487,30 @@ class Kernel:
     def entry(self, e):
         return dict(self.state.things.get(e, {}), id=e)
 
+    def needs_a_thing(self, actor, st, entry, text):
+        """The refusal for a word given a name (or nothing) where it takes a thing's id: say which id, as a line."""
+        usage = (entry.get('help', '').splitlines() or [''])[0]
+        first = (st.words.split() or [''])[0].strip('"\'')
+        if not first:
+            return f"{st.word} needs a thing, by its id: {usage}"
+        hits = []
+        for t, a in list(self.state.things.items()):
+            if a.get('kind') in ('topic', 'word'):
+                continue                                   # help pages and words are not what a line acts on
+            if first.casefold() in {str(a.get(f, '')).casefold() for f in ('name', 'title', 'label')} \
+                    and self.shown(actor.person, t) is not None and not a.get('forgotten'):
+                hits.append((t, a.get('kind')))
+        hinted = [h for h in hits if f"<{h[1]}" in usage]  # window.move <window> …: a window first
+        hits = hinted or hits
+        if len(hits) == 1:
+            line = text.replace(first if first in text else st.words.split()[0], hits[0][0], 1)
+            return f"{st.word} takes an id, not a name: {first} is {hits[0][0]} (a {hits[0][1]}). Say: {line}"
+        if hits:
+            return (f"{st.word} takes an id; {len(hits)} things are called {first}: "
+                    + ", ".join(f"{t} (a {kd})" for t, kd in hits[:4]) + ". Say it again with one of those ids")
+        return (f"{st.word} takes a thing's id (like dk74), and nothing here is called {first}. "
+                f"rows <kind> lists ids; find kind=<kind> name=<name> finds one by name. {usage}")
+
     @staticmethod
     def source(entry):
         """Where an entry's implementation comes from -> ("kernel", name) | ("module", module name) | (other, None)."""
@@ -842,7 +866,8 @@ class Kernel:
                 eid = next((e for e in self.things('word') if self.state.get(e, 'from') == 'kernel'
                             and self.state.get(e, 'bound') == st.word), None)
             if eid is None:
-                raise Refused(f"nothing answers to '{st.word}' here; help lists the words you may use")
+                from .helping import suggest
+                raise Refused(f"nothing answers to '{st.word}' here; " + suggest(self, actor, st.word, group))
             entry = self.entry(eid)
             st.word = entry['word']
             text = L.re.sub(r'^\S+', st.word, text, count=1)
@@ -850,13 +875,23 @@ class Kernel:
             if st.target and takes is None:
                 st.words = (st.target + " " + st.words).strip()       # a word that takes no thing: an id is words
                 st.target = None
+            first_takes = (str(entry.get("takes") or "").split() or [""])[0]
+            if takes and first_takes in ("<id>", "[<id>]") and not st.target and st.words:
+                # a word's name where a thing is expected names its dictionary entry: word-set window.open help=…
+                first = st.words.split()[0]
+                try:
+                    named = self.find_entry(first, group) if not L.ID.match(first) else None
+                except Refused:
+                    named = None
+                if named and self.shown(actor.person, named) is not None:
+                    st.target, st.words = named, st.words[len(first):].strip()
             if st.target and L.ID.match(st.target):
                 if self.shown(actor.person, st.target) is None:
                     raise self.no_such(st.target)                     # the same words as for a thing that isn't there
                 group = group or (st.target if self.state.get(st.target, "kind") in ("group", "place")
                                   else (self.groups_of(st.target) or [None])[0])
             elif takes == "required":
-                raise Refused(f"{st.word} needs a thing: {entry.get('help', '').splitlines()[0]}")
+                raise Refused(self.needs_a_thing(actor, st, entry, text))
             group = group or self.place
             if not self.may(actor, entry, st.target, group):
                 if actor.kind == "module" and self._may_person(actor.person, entry, st.target, group):
@@ -939,6 +974,10 @@ class Kernel:
         if depth > 4:
             raise Refused(f"{entry['word']} calls words that call it, too deep; nothing was done")
         args = ([st.target] if st.target else []) + st.words.split()
+        raw_steps = entry.get('steps_bound') or entry.get("steps") or ""
+        # names a later part of the line fills itself: handles (as=card) and what the painter and rules supply
+        later = set(L.re.findall(r"\bas=([a-z][a-z0-9_]*)", raw_steps)) | {"today", "by", "carried", "target"}
+        unfilled = "\x00unfilled\x00"
 
         def fill(x):
             # Named values are quoted and inserted in ONE substitution pass: a
@@ -952,9 +991,14 @@ class Kernel:
                     return " ".join(args)
                 if key.isdigit():
                     return args[int(key) - 1] if len(args) >= int(key) else ""
-                return shlex.quote(st.kv[key]) if key in st.kv else m[0]
-            return L.re.sub(r"\$(target\b|[1-9]|\*|[a-z][a-z0-9_]*\b)", sub, x)
-        steps = [fill(x) for x in L.split_batch(entry.get('steps_bound') or entry.get("steps") or "") if x.strip()]
+                if key in st.kv:
+                    return shlex.quote(st.kv[key])
+                return m[0] if key in later else unfilled
+            out = L.re.sub(r"\$(target\b|[1-9]|\*|[a-z][a-z0-9_]*\b)", sub, x)
+            # a key=$name nobody gave is left out, not stored as "$name" (and a set does not erase that fact)
+            out = L.re.sub(r"\s*\b[a-z_][a-z0-9_.-]*=" + unfilled, "", out)
+            return out.replace(unfilled, "")
+        steps = [fill(x) for x in L.split_batch(raw_steps) if x.strip()]
         self._local.verb_depth = depth + 1
         try:
             if entry.get("word_kind") == "see":

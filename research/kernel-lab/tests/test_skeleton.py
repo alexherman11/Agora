@@ -173,7 +173,7 @@ class Skeleton(unittest.TestCase):
         self.assertEqual((words["look"]["from"], words["look"]["bound"]), ("kernel", "look"))
         out = self.ok(self.maya, "help pin", path="/see")
         self.assertIn("who may: leaders", out["text"])
-        listing = self.ok(self.maya, "help", path="/see")["text"]
+        listing = self.ok(self.maya, "help all", path="/see")["text"]     # bare help is a short first screen now
         self.assertIn("not yours here:", listing)
         self.assertIn("pin (leaders)", listing)
         said = self.k.on_offer(self.tally, [{"word": "tally.quiet", "kind": "see", "help": ""},

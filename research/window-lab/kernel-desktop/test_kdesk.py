@@ -36,11 +36,11 @@ class Desk:
         self.dir = tempfile.mkdtemp(prefix="kdesk-test-")
         self.k, self.srv, self.host, self.entry = kdesk.start(Path(self.dir) / "world", 0, headless=True)
         self.url = f"http://127.0.0.1:{self.srv.server_address[1]}"
-        self.wait(lambda: "window.list" in self.say("help", "alex")["text"] and
+        self.wait(lambda: "window.list" in self.say("help all", "alex")["text"] and
                   "holds window.overlay" in self.say("status guy", "alex")["text"], 20)
         # Offers arrive asynchronously. Wait for every publisher before measuring
         # an unchanged log; late dictionary-install records are not telemetry.
-        self.wait(lambda: all(w in self.say('help')['text'] for w in ('system.now','media.now','media.prev'))
+        self.wait(lambda: all(w in self.say('help all')['text'] for w in ('system.now','media.now','media.prev'))
                   and self.window('taskbar'), 20)
 
     def say(self, line, who="claude"):
@@ -343,7 +343,7 @@ class DesktopTest(unittest.TestCase):
 
     def test_system_and_media_words(self):
         d = self.d
-        d.wait(lambda: "media.now" in d.say("help", "alex")["text"] and "system.now" in d.say("help", "alex")["text"], 20)
+        d.wait(lambda: "media.now" in d.say("help all", "alex")["text"] and "system.now" in d.say("help all", "alex")["text"], 20)
         out = d.say("system.now")
         self.assertTrue(out["ok"], out["text"])
         self.assertIn("cpu: 12%", out["text"])
@@ -363,7 +363,7 @@ class DesktopTest(unittest.TestCase):
 
     def test_native_words_remain_words_and_are_owner_only(self):
         d = self.d
-        d.wait(lambda: 'window.desktop' in d.say('help')['text'])
+        d.wait(lambda: 'window.desktop' in d.say('help all')['text'])
         self.assertEqual(d.say('window.desktop')['rows'], [])
         for word in ('window.start', 'window.activate handle=123', 'window.settings which=volume',
                      'window.launch path=C:/Windows/notepad.exe'):

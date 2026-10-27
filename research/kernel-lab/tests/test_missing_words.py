@@ -76,7 +76,7 @@ def test_translations_share_identity_help_permissions_and_undo(world):
     for actor in (b, bot):
         assert k.find_entry('cambiar') == eid
         assert say(k, actor, 'help cambiar')['text'].startswith('Cambiar los datos')
-        assert 'cambiar' in say(k, actor, 'help')['text']
+        assert 'cambiar' in say(k, actor, 'help all')['text']      # the full listing; bare help is a short first screen
     thing = say(k, b, 'make kind=note title=Before')['made'][0]
     say(k, bot, 'look ' + thing)
     result = say(k, bot, f'cambiar {thing} title=Después')

@@ -601,7 +601,7 @@ class Proof:
 def kdesk_scratch():
     from test_kdesk import Desk
     d = Desk()
-    d.wait(lambda: "theme.use" in d.say("help")["text"], 30)
+    d.wait(lambda: "theme.use" in d.say("help all")["text"], 30)
     d.wait(lambda: len(d.say("theme.list", "alex")["rows"]) >= 5, 30)
     return d
 

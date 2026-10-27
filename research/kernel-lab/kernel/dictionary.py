@@ -55,12 +55,17 @@ def word_set(k, actor, st, entry, tx, group, saw=None):
     k.fence(actor, t, list(values), saw)
     if 'aliases' in values or any(f.startswith('label.') for f in values):
         bind_legacy(k, tx)
+    said = []
     for f, v in values.items():
+        before = k.state.get(t, f)
         if v:
             tx.set(t, f, v)
         else:
             tx.set(t, f)
-    return {'text': 'ok word-set [r?]'}
+        was = f' (was {str(before)[:60]})' if before and f != 'help' else ''
+        said.append(f'{f} now {str(v)[:120]}{was}' if v else f'{f} taken away')
+    # echo what changed, so a fix can be read back without another line (friction study, 26 Oct)
+    return {'text': f"ok word-set {k.state.get(t, 'word')} [r?] · " + ' · '.join(said)}
 
 
 def word_rename(k, actor, st, entry, tx, group, saw=None):

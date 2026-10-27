@@ -209,7 +209,7 @@ def look(k, actor, st, entry, tx, group, saw=None):
         if m:
             st.target = m
         else:
-            raise k.no_such(st.words.split()[0])
+            raise Refused(k.needs_a_thing(actor, st, entry, st.text))    # look Lines: say which id
     if st.target:
         t = st.target
         a = k.shown(actor.person, t)
@@ -265,45 +265,28 @@ def look(k, actor, st, entry, tx, group, saw=None):
 
 
 def help_(k, actor, st, entry, tx, group, saw=None):
-    from .dictionary import localized
+    """help, help <anything>, help all: kernel/helping.py (a short first screen; never a dead end)."""
+    from . import helping
     if st.words:
         w = st.words.split()[0].lower()
-        e = k.find_entry(w, group)
+        try:
+            e = k.find_entry(w, group)
+        except Refused:
+            e = None
         if e is None:
             if w=='part-style':
                 return dict(text='make kind=part-style lens=<lens> target=component.part[fact=value] color=... background=... radius=... padding=... gap=... glow=... lines=1..9 emphasis=normal|bold. Colour tokens or #rgb/#rgba/#rrggbb/#rrggbbaa. Spacing uses 1..4 measures (gap 1..2), including CSS shorthand padding. target=tokens defines colour/spacing and motion-<name> JSON tokens. Invalid writes refuse. personal-style applies just for me.')
             card = component_card(k, actor, w)
             if card: return card
-            if w in FLOOR_HELP:
-                return {"text": f"{FLOOR_HELP[w]}\n(this word's entry is missing; the kernel answers from its own floor)"}
-            raise Refused(f"nothing answers to '{w}' here; help lists the words you may use")
-        if k.shown(actor.person, e) is None:
+        elif k.shown(actor.person, e) is None:
             raise k.no_such(e)
-        a = localized(k, actor.person, k.entry(e))
-        k.mark(actor, e, k.shown(actor.person, e))
-        facts = [f"{a['word']} ({e}), a {a.get('word_kind')} word", f"takes: {a.get('takes') or 'nothing'}",
-                 f"who may: {a.get('may')}"]
-        for key in ("once", "sealed", "undo"):
-            if a.get(key):
-                facts.append(f"{key}: {a[key]}")
-        facts.append(f"from: {a.get('from')}" + (f" ({a['bound']})" if a.get("bound") and a.get("bound") != a["word"] else ""))
-        if a.get("from", "").startswith("module:"):
-            mid = k.module_named(a["from"][7:])
-            if not mid or not k.state.get(mid, "on") or not k.modules or not k.modules.running(mid):
-                facts.append("unbound: this community must grant and run the module")
-        return {"text": a.get("help", "") + "\n" + " · ".join(facts), "rows": [dict(a)]}
-    mine, others = [], []
-    for e in sorted(k.entries(), key=lambda e: k.state.get(e, "word")):
-        if k.shown(actor.person, e) is None:
-            continue
-        a = localized(k, actor.person, k.entry(e))
-        line = f"  {a['word']} ({a.get('word_kind')}): {a.get('help', '').splitlines()[0]}"
-        (mine if k.may(actor, a, None, group) else others).append((line, a))
-    text = ["words you may use here:"] + [l for l, _ in mine]
-    if others:
-        text.append("not yours here: " + ", ".join(f"{a['word']} ({a.get('may')})" for _, a in others))
-    return {"text": "\n".join(text), "rows": [{"word": a["word"], "kind": a.get("word_kind"), "yours": True} for _, a in mine]
-            + [{"word": a["word"], "kind": a.get("word_kind"), "yours": False} for _, a in others]}
+    out = helping.answer(k, actor, st.words, group)
+    if out is not None:
+        return out
+    w = st.words.split()[0].lower()
+    if w in FLOOR_HELP:
+        return {"text": f"{FLOOR_HELP[w]}\n(this word's entry is missing; the kernel answers from its own floor)"}
+    raise Refused(f"nothing here mentions '{w}'; " + helping.suggest(k, actor, w, group))
 
 
 def post(k, actor, st, entry, tx, group, saw=None):
@@ -724,9 +707,14 @@ def rows(k, actor, st, entry, tx, group, saw=None):
         k.mark(actor, r["id"], r)
     what = kind if kind != "any" else "thing"
     text = "\n".join(f"  {r['id']} · {r.get('kind')} · "
-                     f"{r.get('title') or r.get('name') or r.get('word') or (r.get('text') or '')[:60]}" for r in rows)
-    return {"text": f"{len(rows)} {what}{'' if len(rows) == 1 else 's'}" + ("\n" + text if rows else ""),
-            "rows": rows}
+                     f"{r.get('title') or r.get('name') or r.get('word') or r.get('label') or (r.get('text') or '')[:60]}"
+                     for r in rows)
+    plural = what if len(rows) == 1 else what + ("es" if what.endswith(("s", "x", "ch", "sh")) else "s")
+    if not rows and kv:
+        # a filter compares a fact exactly; say so, rather than a bare 0 that reads like "there are none"
+        return {"text": f"0 {plural}: none you can see has " + " and ".join(f"{f}={v}" for f, v in kv.items())
+                        + f"; rows {kind} alone lists them all", "rows": rows}
+    return {"text": f"{len(rows)} {plural}" + ("\n" + text if rows else ""), "rows": rows}
 
 
 VERB_NAME = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
