@@ -360,6 +360,8 @@ class House:
         self.home = None
         self.chat_names = {}
         self.ready = threading.Event()
+        self.builders = None
+        self.builder_url = URL
 
     # ---- start
     def hello(self, msg):
@@ -371,6 +373,8 @@ class House:
         self.m.ready.wait(10)
         time.sleep(0.2)                   # the kernel publishes our words first
         self.load()
+        from builders import Builders
+        self.builders = Builders(self)
         for a in self.agents.values():
             self.catch_up(a)
             if a.cfg.get("want", "awake") == "awake" and not (a.child and a.child.alive()):
@@ -468,6 +472,7 @@ class House:
         if not self.ready.wait(15):
             return
         word = msg.get("word")
+        self.builders.hear(msg)
         if word in MESSAGE_WORDS and msg.get("said"):
             to = [p for p in msg.get("to") or [] if p in self.agents and p != msg.get("by_id")]
             if not to:
@@ -513,8 +518,21 @@ class House:
         word, args = msg.get("word"), msg.get("args") or {}
         if not self.ready.wait(5):
             return {"refused": "the house is still starting; try again in a moment"}
+        if word == "house.build":
+            return self.builders.start(msg)
+        if word == "house.tell":
+            return self.builders.tell(msg)
+        if word == "house.review":
+            return self.builders.request_review(msg)
+        if word == "house.land":
+            return self.builders.land(msg)
+        if word in ("house.log", "house.activity") and args.get("target") in self.builders.states:
+            state = self.builders.states[args["target"]]
+            if not self.m.see("look " + (state.get("chat") or state["task"]), use=msg.get("use")).get("rows"):
+                return {"refused": "this worker log belongs to its requester"}
+            return self.builders.log(args["target"])
         if word == "house.who":
-            rows = [self.row(a) for a in self.agents.values()]
+            rows = [self.row(a) for a in self.agents.values()] + self.builders.rows(msg)
             text = (f"the house runs {len(rows)} agent{'' if len(rows) == 1 else 's'}:\n" + "\n".join(
                 f"  {r['name']} ({r['person']}) · {r['doing']} · {r['provider']} {r['model']} {r['reasoning']} · "
                 f"{r['turns']} turns" + (f" · first words {r['first_words_ms']} ms" if r['first_words_ms'] else "")
@@ -636,12 +654,22 @@ class House:
             time.sleep(5)
 
     def off(self):
+        if self.builders:
+            self.builders.off()
         for a in list(self.agents.values()):
             a.stop("off house")
         os._exit(0)
 
 
 OFFER = [
+    {"word": "house.tell", "kind": "do", "takes": "<id> <words>", "undo": "external", "may": "stewards",
+     "help": "house.tell <task> <words>: retain a follow-up for your active or received builder, continuing the same Codex thread. Held, uncertain, reviewed and landed work does not restart."},
+    {"word": "house.build", "kind": "do", "takes": "<id>", "undo": "external", "may": "stewards",
+     "help": "house.build <task>: claim a ready task and start an authenticated Codex builder asynchronously, two at most. Uses your existing agent session; never creates credentials. Result receipt is not task completion."},
+    {"word": "house.review", "kind": "do", "takes": "<id>", "undo": "external", "may": "stewards",
+     "help": "house.review <task>: independently check a received committed result against current main, including hidden desktop checks. Does not land or close it."},
+    {"word": "house.land", "kind": "do", "takes": "<id>", "undo": "external", "may": "stewards",
+     "help": "house.land <task>: publish the exact reviewed source if main and ownership still match. Activation and owner verification remain separate."},
     {"word": "house.who", "kind": "see", "takes": "",
      "help": "house.who: the agents the house runs (JEFF and others), what each is doing (asleep, resting, idle, "
              "working), its model, its turns and how fast its last first words came."},

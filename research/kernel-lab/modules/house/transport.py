@@ -78,10 +78,10 @@ def mcp_config(url, token_file, out):
 class Child:
     """One model process. `events` gets the reduced events above; `send(text)` starts a turn."""
 
-    def __init__(self, cmd, cwd, env, events, log):
+    def __init__(self, cmd, cwd, env, events, log, stderr=None):
         self.events, self.log = events, log
         self.proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                     stderr=open(Path(cwd) / "stderr.log", "a", encoding="utf-8"),
+                                     stderr=open(stderr or Path(cwd) / "stderr.log", "a", encoding="utf-8"),
                                      text=True, encoding="utf-8", errors="replace", bufsize=1,
                                      creationflags=NO_WINDOW)
         threading.Thread(target=self._read, daemon=True, name="agent-child").start()

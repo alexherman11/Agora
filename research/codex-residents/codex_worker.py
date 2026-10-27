@@ -132,15 +132,16 @@ def build_config(directory, binary, profile, catalog):
 
 def thread_parameters(directory, model, prompt, mcp, extra_config=None):
     servers = json.loads(Path(mcp).read_text(encoding="utf-8"))["mcpServers"]
-    if set(servers) != {"desk"}:
-        raise ValueError("Worker configuration must expose only the authorized desk server")
+    if set(servers) not in ({"desk"}, {"agora"}):
+        raise ValueError("Worker configuration must expose exactly one authorized world server")
+    tools = ["see", "do", "lines"] if set(servers) == {"agora"} else ["desk"]
     config = {
         "mcp_servers": {
             name: {
                 **entry,
                 "enabled": True,
-                "enabled_tools": ["desk"],
-                "tools": {"desk": {"approval_mode": "approve"}},
+                "enabled_tools": tools,
+                "tools": {tool: {"approval_mode": "approve"} for tool in tools},
             }
             for name, entry in servers.items()
         }

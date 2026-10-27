@@ -1,0 +1,19 @@
+# Kernel House builders — implementation, 27 October
+
+Builder draft implementing approved MOVING-IN step 3. The missing world word was `task.build`: the House could run residents but could not claim or execute a coding task. This is the corresponding Rough spots record. It does not revive Frontier.
+
+`task.build <card>` is a world alias for `house.build`. House validates visible, unheld ownership, persists a request, then returns promptly. An asynchronous runner claims the card with the kernel's revision fence, creates its own Git worktree, and starts the existing ChatGPT-authenticated Codex coding adapter. Two simultaneous builders are allowed. No session, credential, module grant, security setting or paid fallback is added. A requester must already have exactly one agent session mapped to their account. Today Alex has one; JEFF does not have a separate builder-agent session, so that request is explicitly refused rather than borrowing Alex's identity.
+
+Work uses `house.who` and `house.log`. Adapter startup remains “preparing” until Codex acknowledges a thread. Each task has a private requester chat. Human chat messages or `house.tell <card> <words>` retain a same-task follow-up; a successful idle result can continue its existing Codex thread. Paused, uncertain, reviewed and landed work never wakes implicitly. Corrections require explicit acknowledgement before review. Public activity stores text/tool names, never private reasoning or raw tool arguments. Logs require visibility of the worker chat; inventory requires visibility of its task.
+
+Completion is three distinct steps:
+
+1. **Received:** the model ended successfully. Its task remains open. The builder supplies committed source and `BUILD-RESULT.md` self-proof.
+2. **Reviewed:** `house.review` independently runs kernel chat/painter tests and hidden desktop tests against the exact candidate. It preserves failures and test output. Current main is merged into the worker tree before checks when necessary; conflicts remain for reconciliation.
+3. **Landed:** `house.land` publishes that exact checked commit only if main still matches and user edits do not overlap. It does not reload a runtime or mark the user's outcome verified. The coordinator checks the task-specific proof, safely activates the affected component, and verifies the observable outcome before closure.
+
+Interrupted operations are retained as recovery-needed after restart. An uncertain network/process outcome is not replayed. Worktrees and evidence remain available; no automatic deletion or forced lock recovery exists. Full dynamic revocation of native tools is not claimed: the worker must check live task authority before effects, while the harness fences claim/review/publication and prevents held follow-up wakes.
+
+**Ran:** 21 builder tests, including a private real-kernel/Git lifecycle with a scripted model, independent subprocess test and preservation of an unrelated dirty file. Earlier affected regressions: 25 desktop/adapter tests; 26 initial builder/chat/painter tests. Follow-up/correction checks supersede the initial builder count. Real House module proof: three checks passed, including world alias dispatch and permission-held refusal with no model launch. These tests do not prove the two requested tasks or physical UI behavior; real worker execution and outcome checks are recorded on their cards.
+
+Reproduce with the pinned interpreter: `python -B -m pytest -q research/kernel-lab/modules/house/test_builders.py`; `python -B -m pytest -q research/window-lab/kernel-desktop/test_kdesk.py research/codex-residents/test_worker.py`. All desktop tests are headless. Temporary fixture evidence is retained, not cleaned by a broad deletion.
