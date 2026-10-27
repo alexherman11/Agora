@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (78)
+## open (89)
 
 ### F2. Scripts cannot say who is running them
 
@@ -520,6 +520,90 @@ Claude, 22 Oct, 19:45. Writing the adapter runner, I wrote notation/feeds.py wit
 a13270 · family=house · status=open
 
 Seen 23 Oct, 17:17 (a13174, Sable): I set commission=cancelled on a card the house had admitted moments before. The card read 'cancelled' while a fresh worker turn was starting on it; the worker read the cancel on arrival and stood down cleanly (e37201: nothing requested, read or committed). So nothing was interrupted this time, but only because the worker checked. The ambiguity: from the world, a resident can't tell whether a card has a live turn, a starting one, or none, so 'cancel' can't say whether it prevented future dispatch or cut a turn, and JEFF's 'no forced stops' can't be honoured with certainty. Wanted: the card shows its turn state (none, starting, running, ending) beside commission, and cancel's receipt says which of those it met: 'no turn; future dispatch prevented' or 'a turn is running; it will see this when it reads'.
+
+### A window cannot say its own shape (desktop shell)
+
+a13646 · family=window · status=open
+
+The new top bar, dock and desktop layer needed source edits in kd_window.py, kdesk.py and native_shell.py (26 Oct, shell builder). Missing world words: window.shape and window.reserve written by a page to its own window; a bundle (make or forget a named group of windows in one act); icon <ref> returning bytes through the door; wm.windows rows with a stable ref and wm.close; wm.title for previews; system.volume, a notification word, a presence word. Details: research/window-lab/kernel-desktop/SHELL.md, Rough spots.
+
+### Host chrome paints literals; modules cannot serve or check (themes)
+
+a13648 · family=module · status=open
+
+The theme system needed source edits in door.py, kits.py, handles.py, painter.js and the host pages (26 Oct, theme builder). Missing world words: a module serving a read-only per-person document through the door; a kind saying a field is data, not references; a module-registered check run inside make and set; a lens word for wear-the-theme versus pin-my-colours; a happening for undo delivered to modules. Kernel finding: lines.py uses shlex.split, quadratic in line length (400 KB took 25 s), so one long line can stall the door; needs a linear tokenizer and a line limit. Details: research/kernel-lab/theme/THEMES.md.
+
+### A window has no native identity or geometry lease (window manager)
+
+a13650 · family=window · status=open
+
+The window manager needed a small seam in kd_window.py (26 Oct, WM builder): Agora windows publish an Agora.Window property so the WM admits them without reading titles, and drag watching skips windows under a WM lease so WM moves are not mistaken for hand drags. Missing world word: a window-owned native identity and geometry lease. Also: Windows reports busy (QUNS 2) whenever its screen-sized text-input host holds focus; the gate now ignores shell overlays. Details: research/window-lab/agora-wm/ROUGH-SPOTS-WM.md.
+
+### Screen state was world facts
+
+a13652 · family=desktop · status=open
+
+26 Oct, Claude, from Alex: visual state should not live in the world. Source edits: kd_window keeps window geometry in state/geometry.json (drags and window.move no longer set at= size=); agora-wm keeps pins and adopted windows in screen.json and no longer announces wm.changed; the painter reports only failures, without painted text or styles. Missing world-level word: a screen-local store a module owns (screen state that survives restarts but is never a record), so no module invents its own file.
+
+### Bar windows showed white
+
+a13654 · family=desktop · status=open
+
+26 Oct, Claude: on the real screen SetWindowRgn clips clicks but not a WebView2 drawing, so the shell bars showed white boxes. Source edit: kd_window/shell_native make bar windows transparent on DWM glass. Missing world-level word: a window kind of see-through surface (window.open ... surface=glass) instead of a host special case for the shell.
+
+### Help is a kernel function, not a world page
+
+a13658 · family=code · status=open
+
+Claude, 26 Oct 2026, for the epic a terminal that teaches itself (live task board dk748). Source edits in research/kernel-lab/kernel (uncommitted when written): helping.py (new), words.py help_ and rows, kernel.py (unknown-word refusal, needs-a-thing refusal, word names as entry targets, verb notes), dictionary.py word-set echo.
+
+Wanted: help that teaches. Short first screen, help <anything>, help check, refusals that say what to type.
+
+Why no world edit could do it: help was a kernel function that listed every entry; there was no world thing a help page could be, and no way for the world to say how a word is grouped or what to suggest.
+
+The world-level word now: kind=topic. A topic thing (name, aliases, words, text, order) is a help page, made and fixed with make and set. What is still source: the order help tries (word, topic, module, kind, id, search) and the refusal wording. The next word that would move those into the world: a refusal template on the entry (said= / refused= fields), the same seam as receipts in plain words (P3 on the design page).
+
+Bug, cured: a verb note stored an unsupplied setting as the literal dollar-name text (task-add left who and when as placeholders on cards). Lesson: a stored line must say what is optional; until takes= is the one source, the kernel drops key=dollar-name pairs nobody gave.
+
+Study and evidence: research/kernel-lab/terminal/FRICTION-STUDY.md.
+
+### Names, plain verbs and undo are the kernel step, not world words
+
+a13668 · family=code · status=open
+
+Claude, 27 Oct 2026: the language Alex approved on the Lines, plainly page (P1-P7), in research/kernel-lab/kernel (kernel.py, words.py, dictionary.py, helping.py, readings.py new) and window-lab/kernel-desktop/kd_media.py, theme_module.py.
+
+Wanted: names where ids go, plain verbs (close Help), one dotted spelling, who/recent/kinds/on/press, make that warns, undo of a whole action, honest no-ops, themes yours by default.
+
+Why no world edit could do it: how a line finds its thing, how an unknown word is read, what undo takes back and which names may be dotted are the kernel's own step; no world word reaches them.
+
+The world-level words that would have made parts of it world edits: a resolver note (how a name becomes a thing: which fields, which kinds never count); a plain-verb table the world can extend (Alex chose none, inferred from names, so this stays code by design); a receipt template on the entry (said=). The renames themselves, topic pages, help texts and the Appearance lens line were world edits (install_lines_plainly.py).
+
+Study and evidence: research/kernel-lab/terminal/FRICTION-STUDY.md.
+
+### An interrupted prepare holds a card forever: 'needs reconciliation; not replaying', and nobody's job is to reconcile it
+
+a13677 · family=landing · status=open
+
+Seen 23 to 27 Oct on two map cards, a12778 and a12833 (and earlier on Comment, a12734). The house's prepare times out in git (commit, then rev-parse), and every later attempt says 'interrupted prepare needs reconciliation; not replaying', alternating with 'landing serialization is busy; prepare queued'. The card shows commission=prepare and 'no model turn is running' for four days. The worker can't retry, the asker can't, and the message names no one whose job it is to reconcile. Wanted: the hold names its resolver and wakes them, or the house reconciles an interrupted prepare itself from its durable receipt.
+
+### The dock has no world verb
+
+a13691 · family=missing-word · status=open
+
+27 Oct, JEFF: Alex asked for OBS on the dock. Rocket League was added outside the world (no event), and no verb or object lets a resident pin an app. Dock pins should be world objects so any resident can add, remove or reorder them.
+
+### test_door's gesture count varies run to run
+
+a13733 · family=host · status=open
+
+27 Oct, JEFF: batch 85976 was refused because test_door saw 119 sent against a wanted one event per gesture. On the same commit it then passed twice (118/119, 118/118). A judging test that varies by run refuses unrelated candidates. Needs a timing-stable count or a retry rule in judging.
+
+### Health help flag starts checks instead of showing usage
+
+a13788 · family=tooling · status=open
+
+27 October, worker-a13741. RAN health.py --help expecting read-only usage; it produced no output before I interrupted its owned command (exit1). READ health.main afterward: unknown flags are ignored, so --help selects the default full suite, not help. Git status then showed an extra roomworld-visit-105804-try fixture, retained untouched; no full-suite result or descendant closure is certified. Correct bounded health.py frontier-try --only python,scripts --json passed at e39198,39210 events. Please give health an inert help/unknown-option refusal path and interruption lifetime receipt through its normal owner; no health source or cleanup changed on a13741.
 
 ## curing (49)
 
