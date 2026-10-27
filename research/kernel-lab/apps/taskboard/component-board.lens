@@ -9,7 +9,7 @@ board-view : board, filter $view.filter
 lane-view : lane, name $lane.name
   on drop card do task-move $carried to="$lane.name"
   cards : column, of tag:taskboard-task, prop:lane=$lane.name as task, by priority, each task-view
-task-view : card, title $task.short, colour $task.colour, note $task.note, note_colour $task.note_colour, note_style $task.note_style, who $task.who
+task-view : card, title $task.title, colour $task.colour, note $task.note, note_colour $task.note_colour, note_style $task.note_style, who $task.who
   only when $view.filter = "all" or $task.priority = $view.filter
   on key 1 do task-priority $task.id priority=1
   on key 2 do task-priority $task.id priority=2
@@ -24,6 +24,8 @@ task-view : card, title $task.short, colour $task.colour, note $task.note, note_
   on note-colour do task-note-colour $task.id colour="$value"
   on note-style do task-note-style $task.id style="$value"
   flag : flag, priority $task.priority
+  summary : text-block, label "Summary", value $task.short
+    only when $task.short_source != "short version, no model"
   actions : menu
     on menu "⚑  P1 · Urgent" do task-priority $task.id priority=1
     on menu "⚑  P2 · High" do task-priority $task.id priority=2
