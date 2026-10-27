@@ -170,6 +170,17 @@ The host combines `gaming_gate.py` and SHQueryUserNotificationState. Busy,
 presentation, full-screen, unavailable or inaccessible notification states stop
 layout processing and native actions. Resume starts from actual geometry, discarding
 stale gestures. The two-minute live observation remained gated as state 2 (busy).
+
+*Claude, 26 Oct 2026:* the busy state was not a game. **ran** a read-only scan: the foreground
+window was `TextInputHost.exe` (the touch keyboard / emoji panel), a 3840×2160 CoreWindow, and
+`NVIDIA Overlay.exe` holds two screen-sized windows too; Windows reports QUNS 2 while such a shell
+window has the foreground. `gate()` now treats state 2 as gated only when the foreground program is
+not one of `SHELL_OVERLAYS`; states 1, 3, 4 and 7 still gate. **ran** `shadow.py --seconds 120`
+afterwards: 412 samples, `gated_samples: {}`, nine apps seen; it would move ChatGPT and Spotify and
+minimise the rest (`evidence/shadow-ungated-20261026.summary.json`). That is the "screen full →
+minimise oldest" rule applied to a desktop of overlapping windows all at once, including the Claude
+window Alex is talking in. Before arming live, decide how the first solve treats windows that were
+already open (adopt as they are, or arrange once with Alex watching).
 No Windows setting, taskbar, registry entry, driver, injection or wallpaper is changed.
 
 ## Reproduce and rollout — Claude operates these
