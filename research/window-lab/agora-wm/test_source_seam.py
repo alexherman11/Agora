@@ -21,10 +21,11 @@ class SourceSeam(unittest.TestCase):
             namespace={'time':NS(sleep=sleep),'user32':user,'log':lambda *_:None}
             module=ast.Module(body=[method],type_ignores=[]);exec(compile(ast.fix_missing_locations(module),str(source),'exec'),namespace)
             instance=NS(rows={'wt123':{'rev':1}},screen=NS(wins={'wt123':{'hwnd':123}},box=lambda _: (30,40,500,600)),
-                applied={},settle={},m=Mock())
+                applied={},settle={},m=Mock(),geo=Mock())
             with self.assertRaises(StopIteration):namespace['watch_drags'](instance)
-            if leased:instance.m.do.assert_not_called()
-            else:instance.m.do.assert_called_once()
+            instance.m.do.assert_not_called()           # a drag is never a world fact (Alex, 26 Oct)
+            if leased:instance.geo.put.assert_not_called()  # the WM owns a leased window's geometry
+            else:instance.geo.put.assert_called_once_with('wt123',(30,40,500,600))
 
 
 if __name__=='__main__':unittest.main()

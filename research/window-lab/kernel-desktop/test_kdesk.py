@@ -166,41 +166,29 @@ class DesktopTest(unittest.TestCase):
         self.assertTrue(d.say(rows[0]["does"], "alex")["ok"])                # the taskbar's press, as Alex
         d.wait(lambda: d.window("lines"))
 
-    def test_a_verb_note_places_two_windows_in_one_act(self):
-        # A do verb is one act, one record. Windows are world things, so `set` on them is enough: the window module
-        # makes the screen follow, and one undo takes both moves back. window.list (a module's reading) counts as
-        # having looked at them (12a4a82), so the verb needs no `rows window` first.
+    def test_where_a_window_sits_is_not_in_the_world(self):
+        # Alex, 26 Oct: "visual state should not live in the world". The world says which windows are open and what
+        # they show; where they sit is this screen's (and its window manager's). A move changes the screen only.
         d = self.d
         d.say("window.open help")
         d.say("window.open lines")
         d.wait(lambda: len(d.windows()) == 3)
         a, b = d.wait(lambda: d.window("help")), d.wait(lambda: d.window("lines"))
-        before = (a["box"][0], b["box"][0])
-        out = d.say('verb side steps="set $1 at=24,40; set $2 at=1300,40" '
-                    'help="side <window> <window>: two windows side by side"')
+        for row in d.say("rows window")["rows"]:
+            self.assertNotIn("at", row)
+            self.assertNotIn("size", row)
+        out = d.say(f"window.move {b['id']} to=left")
         self.assertTrue(out["ok"], out["text"])
-        self.assertIn("from: verb", d.say("help side")["text"])
-        out = d.say(f"side {a['id']} {b['id']}")
-        self.assertTrue(out["ok"], out["text"])
-        self.assertIn("one act", out["text"])
-        d.wait(lambda: d.window("help")["box"][0] == 24 and d.window("lines")["box"][0] == 1300)
-        self.assertTrue(d.say("undo")["ok"])
-        d.wait(lambda: (d.window("help")["box"][0], d.window("lines")["box"][0]) == before)
-        # a one-step verb of a module word is an alias: `shove` is `window.move`
-        out = d.say('verb shove steps="window.move $1 to=left" help="shove <window>: to the left"')
-        self.assertTrue(out["ok"], out["text"])
-        out = d.say(f"shove {b['id']}")
-        self.assertTrue(out["ok"], out["text"])
+        self.assertFalse(out.get("records"), out)
         d.wait(lambda: d.window("lines")["box"][0] == 24)
-        # module words and kernel words in one verb: still one act, and one undo takes all of it back
-        here = (d.window("help")["box"][0], d.window("lines")["box"][0])
-        out = d.say('verb swap steps="window.move $1 to=right; set $2 at=500,40" help="swap <window> <window>"')
+        # a verb of module words still works: `shove` is `window.move`, and it records nothing either
+        out = d.say('verb shove steps="window.move $1 to=right" help="shove <window>: to the right"')
         self.assertTrue(out["ok"], out["text"])
-        out = d.say(f"swap {b['id']} {a['id']}")
+        out = d.say(f"shove {a['id']}")
         self.assertTrue(out["ok"], out["text"])
-        d.wait(lambda: d.window("lines")["box"][0] > 1000 and d.window("help")["box"][0] == 500)
-        self.assertTrue(d.say("undo")["ok"])
-        d.wait(lambda: (d.window("help")["box"][0], d.window("lines")["box"][0]) == here)
+        d.wait(lambda: d.window("help")["box"][0] > 1000)
+        for row in d.say("rows window")["rows"]:
+            self.assertNotIn("at", row)
 
     def test_a_rule_hears_window_opened(self):
         d = self.d

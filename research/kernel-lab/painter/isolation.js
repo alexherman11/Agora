@@ -51,8 +51,14 @@ function paintedParts(owner){
   });
 }
 function observeComponent(owner,health,error='',elapsed=0){
+  // Only failures, and the recovery after one, reach the world (Alex, 26 Oct: "visual state should not live in the
+  // world"). Painted text and styles stay on this screen: every repaint used to become a record (Lines filled with
+  // "component-health" lines, one a second). paintedParts() is still here for a local reader.
+  const bad=health==='stopped'||health==='slow';
+  if(!bad&&!owner.reportedBad)return;
+  owner.reportedBad=bad;
   const report={path:owner.node.path,health,last_error:String(error?.message||error).split('\n')[0].slice(0,300),elapsed_ms:elapsed,
-    source:owner.sourceTag||'',painted:paintedParts(owner)};
+    source:owner.sourceTag||'',painted:[]};
   const key=JSON.stringify({...report,elapsed_ms:0});
   if(owner.observed===key)return;owner.observed=key;pendingObservations.set(owner.node.path,report);
   nativeTimers.clearTimeout(observationTimer);observationTimer=nativeTimers.setTimeout(flushObservations,180);

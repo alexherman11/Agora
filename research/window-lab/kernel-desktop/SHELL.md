@@ -67,6 +67,17 @@ Gaps to settle with the theme builder (observed in the compiler's output; not ch
 
 ## Window shape: how it works and what is lost
 
+> **Superseded in part, Claude, 26 Oct 2026 (live, on Alex's screen).** The region does NOT clip a WebView2's
+> drawing on the real composed desktop: Alex saw the whole bar and dock windows as white boxes (**ran**: pixel
+> (255, 255, 255) at 1900,400 under the 840 px top-bar window; shrinking that window removed it; re-applying the
+> region, redrawing, and setting the region on every WebView2 child changed nothing). Spike 1 D printed the same
+> white as its "corner pixel" and was read as a pass because hit-testing passed. Spike 1 A (transparent=True)
+> painted its corner black, and black is what DWM glass treats as see-through. Now: the two bar windows are
+> `transparent=True` and `shell_native.glass()` extends DWM glass over the whole client area; the region stays,
+> for clicks only. **ran** after: the same points read wallpaper (93,69,160) and dock-area purples, no white.
+> This also opens what the paragraph below says was lost (translucency over other programs, shadows, smooth edges);
+> not yet used or measured.
+
 Windowed WebView2 cannot be per-pixel transparent (spike 1). The shell therefore:
 
 - clips each window with `SetWindowRgn` from rounded rects the page reports (`__shape`);

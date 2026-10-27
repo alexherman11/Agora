@@ -95,7 +95,7 @@ Themes are data only: no JS, no remote URLs, values checked by the painter's exi
 - `wm.focus <key>`, `wm.minimise <key>`, `wm.restore <key>`, `wm.close <key>` (asks the window politely to close; never kills a process).
 - `wm.pin <key>` / `wm.unpin <key>`: a world fact about the app and its placement.
 - `wm.arrange` (re-solve now), `wm.mode live|shadow|off`, `wm.leave-alone <app>` / `wm.manage <app>`.
-- Happening `wm.changed` (throttled to ≤10/s) with the changed keys, for the dock and top bar.
+- ~~Happening `wm.changed` (throttled to ≤10/s) with the changed keys, for the dock and top bar.~~ Removed 26 Oct (Claude, from Alex: "visual state should not live in the world"); the shell polls `wm.windows`.
 - Settings thing `wm-settings`: `when_full` minimise-oldest|fill|focus, `manage` all|adopted, `drag` ghost|live, and `never` (a list of apps).
 
 **Behaviours:** no overlap; free placement in the best free rectangle; minimise least recently used when full; pins immovable. Dragging pushes neighbours aside along the axis of least overlap, cascading, shrinking to minimum size, then minimising the least recently used. A ghost preview comes first; live movement only if it measures smooth. A resize from any corner pushes in the same way. Gaps and borders come from `theme-native.json`.

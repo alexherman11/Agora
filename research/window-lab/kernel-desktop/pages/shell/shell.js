@@ -688,7 +688,7 @@ const Shell = (() => {
         if (e.key === "ArrowUp") { e.preventDefault(); this.hover(it, true); }
       });
       await this.refresh();
-      setInterval(() => this.refresh(), 2500);
+      setInterval(() => this.refresh(), 1000);       // the window manager no longer announces screen churn to the world
       addEventListener("resize", () => Shell.report());
     },
     async refresh() {

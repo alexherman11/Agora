@@ -7,16 +7,19 @@ Started by the kernel (the world's module thing `window`), never by hand. It pub
     window.open <view> [thing] [to=<spot>|at=x,y size=w,h]
                                        do    a new window thing in the world; this host opens it on the screen
     window.move <window> to=<spot>|at=x,y [size=w,h]
-                                       do    sets where it is (spots: left, right, center, big, top-left, ...)
+                                       do    puts it there on the screen (spots: left, right, center, big, ...); no record
     window.close <window>              do    the window thing goes (undo opens it again where it was)
     window.focus <window>              do    brings it forward, or tucks it away if it is in front already
     window.opened                      hear  a window this host opened is on the screen now (a rule can act on it)
 
-How it works. The world holds intent: one `window` thing per window (shows=<view>, at, size, sees). This process makes
-the screen match it, level-triggered: after every happening that touches a window thing, and every few seconds, it
-reads `rows window` on its own grants and opens, moves and closes real windows until they agree. So a window opened by
-a word, by a rule or by Alex's own press is the same act, undo works, and the windows come back after a restart.
-When Alex drags a window, it records where he left it (`set <window> at=.. size=..`, by this module, on its own).
+How it works. The world holds intent: one `window` thing per window (shows=<view>, lens, target, edge). This process
+makes the screen match it, level-triggered: after every happening that touches a window thing, and every few seconds, it
+reads `rows window` on its own grants and opens and closes real windows until they agree. So a window opened by a word,
+by a rule or by Alex's own press is the same act, undo works, and the windows come back after a restart.
+Where a window sits is NOT in the world (Alex, 26 Oct: "visual state should not live in the world"): it is this
+screen's, kept in state/geometry.json (Geometry), and the window manager's when it holds the window. A drag or a
+window.move changes the screen and that file, never a record. Old at=/size= on a window thing are read once, as a
+first placement, when the file has nothing for it.
 
 Its windows are WebView2 (pywebview), frameless. A window showing a lens (a world thing `kind=lens`, made by a
 line) is lens.js itself, unchanged, painting from the kernel's painter routes, inside a thin frame page that gives it
@@ -297,7 +300,8 @@ class GuiScreen(Screen):
         api = PageApi(self, wid)
         win = self.webview.create_window(title, url, js_api=api, x=int(x / s), y=int(y / s), width=max(200, int(w / s)),
                                          height=max(30, int(h / s)), frameless=True, easy_drag=False, on_top=bool(bar) and bar != "layer", min_size=(120, 24),
-                                         background_color="#F6F3EC", text_select=True, hidden=True)
+                                         background_color="#F6F3EC", text_select=True, hidden=True,
+                                         transparent=view in SHELL_VIEWS and bar in ("top", "bottom"))
         rec = {"w": win, "hwnd": None, "view": view, "bar": bar}
         with self.lock:
             self.wins[wid] = rec
@@ -356,6 +360,7 @@ class GuiScreen(Screen):
         height = TOP_H if edge == "top" else BAR_H
         if view in SHELL_VIEWS:                               # the shell's bars: a strip reserved, a window of their own
             import shell_native
+            shell_native.glass(hwnd)
             placed = shell_native.bar_placer(view, hwnd, lambda h: user32.ShowWindow(h, SW_SHOWNOACTIVATE), scale,
                                              lambda: self.bar_hidden.get(wid))
             height = shell_native.initial_reserve(view, scale())
@@ -566,8 +571,36 @@ def parse_box(row):
         return None
 
 
+class Geometry:
+    """Where each window sits on this screen: local, never in the world (Alex, 26 Oct: "visual state should not live
+    in the world"). The world says which windows are open and what they show; where they are belongs to this desktop
+    and its window manager. Kept in state/geometry.json so windows come back where they were after a restart."""
+
+    def __init__(self, path):
+        self.path, self.lock = path, threading.Lock()
+        self.boxes = {}
+        if path and path.exists():
+            try:
+                self.boxes = {k: tuple(v) for k, v in json.loads(path.read_text(encoding="utf-8")).items()}
+            except (OSError, ValueError):
+                self.boxes = {}
+
+    def get(self, wid):
+        return self.boxes.get(wid)
+
+    def put(self, wid, box):
+        with self.lock:
+            self.boxes[wid] = tuple(int(v) for v in box)
+            if self.path:
+                tmp = self.path.with_suffix(".tmp")
+                tmp.write_text(json.dumps(self.boxes), encoding="utf-8")
+                os.replace(tmp, self.path)
+
+
 class WindowHost:
     def __init__(self):
+        self.geo = Geometry(None if HEADLESS else HERE / "state" / "geometry.json")
+        self.intent = {}               # name -> box a window.open asked for, until its window opens
         self.screen = MemScreen() if HEADLESS else GuiScreen(self)
         self.rows = {}                 # wid -> the window thing as last read
         self.applied = {}              # wid -> the box last put on the screen (or recorded from a drag)
@@ -607,8 +640,8 @@ class WindowHost:
                      f"{', '.join(v for v in VIEWS if v != 'taskbar')}. Spots: {spots}. Only the desktop's owner "
                      f"(and their agents) open windows here. A view open already is brought forward instead; new=yes opens another. undo closes it."},
             {"word": "window.move", "kind": "do", "takes": "<id> [to=<spot>] [at=<x,y>] [size=<w,h>]", "may": "anyone",
-             "help": f"window.move <window> to=<spot> | at=x,y [size=w,h]: put a window somewhere ({spots}). undo puts "
-                     f"it back."},
+             "help": f"window.move <window> to=<spot> | at=x,y [size=w,h]: put a window somewhere ({spots}). Changes "
+                     f"the screen only (where a window sits is not in the world), so nothing is recorded."},
             {"word": "window.close", "kind": "do", "takes": "<id>", "may": "anyone",
              "help": "window.close <window>: close it. Its window thing goes from the world; undo opens it again where "
                      "it was."},
@@ -724,22 +757,18 @@ class WindowHost:
             rows = self.m.see("rows window", use=use).get("rows") or []
             shell = [r for r in rows if r.get("shows") in SHELL_VIEWS]
             old = [r for r in rows if r.get("shows") not in SHELL_VIEWS and (r.get("shows") == "taskbar" or r.get("edge"))]
-            wx, wy, ww, wh = self.screen.work()
-            (mx, my, mw, mh), _ = monitor()
             if mode == "on":
                 if shell:
                     return {"text": "the desktop shell is on already"}
                 lines = [f"forget {r['id']}" for r in old]
                 for view, (name, _page, bar) in SHELL_VIEWS.items():
-                    at, size = {"top": (f"{mx},{my}", f"{mw},{TOP_H}"), "bottom": (f"{mx},{my + mh - BAR_H}", f"{mw},{BAR_H}"),
-                                "layer": (f"{mx},{my}", f"{mw},{mh}")}[bar]
-                    lines.append(f"make kind=window shows={view} name={json.dumps(name)} at={at} size={size}"
+                    lines.append(f"make kind=window shows={view} name={json.dumps(name)}"
                                  + (f" edge={bar}" if bar in ("top", "bottom") else " layer=bottom"))
                 return {"lines": lines, "saw": {r["id"]: r["rev"] for r in old}}
             if not shell:
                 return {"text": "the desktop shell is not on"}
             lines = [f"forget {r['id']}" for r in shell]
-            lines.append(f'make kind=window shows=taskbar name="Agora taskbar" edge=bottom at={mx},{my + mh - BAR_H} size={mw},{BAR_H}')
+            lines.append(f'make kind=window shows=taskbar name="Agora taskbar" edge=bottom')
             self.made_bar = True
             return {"lines": lines, "saw": {r["id"]: r["rev"] for r in shell}}
         if word == "window.open":
@@ -772,7 +801,8 @@ class WindowHost:
             box = self.box_for(view, dict(kv, edge=edge), n)
             base = (lens.get("title") or view.capitalize()) if lens else (widget.get('title', view) if widget else VIEWS[view][0])
             name = base + (f" {n + 1}" if n and view != "taskbar" else "")
-            line = (f'make kind=window shows={view} name={json.dumps(name,ensure_ascii=False)} at={box[0]},{box[1]} size={box[2]},{box[3]}'
+            self.intent[name] = box                       # where it opens is this screen's business, not the world's
+            line = (f'make kind=window shows={view} name={json.dumps(name,ensure_ascii=False)}'
                     + (f" lens={view}" if lens else "") + (f" target={thing}" if thing else "")
                     + (f" widget={widget['id']}" if widget else "")
                     + (f" edge={edge}" if edge else ""))
@@ -787,9 +817,11 @@ class WindowHost:
                 return {"lines": [f"forget {row['id']}"], "saw": {row["id"]: row["rev"]}}
             if row.get("edge"):
                 return {"refused": f"{row.get('name')} keeps its edge ({row.get('edge')}); close it instead"}
-            box = self.box_for(row.get("shows"), kv, 0, current=parse_box(row))
-            return {"lines": [f"set {row['id']} at={box[0]},{box[1]} size={box[2]},{box[3]}"],
-                    "saw": {row["id"]: row["rev"]}}
+            box = self.box_for(row.get("shows"), kv, 0, current=self.screen.box(row["id"]) or self.geo.get(row["id"]))
+            self.screen.place(row["id"], box)              # the screen moves; nothing is recorded in the world
+            self.applied[row["id"]] = box
+            self.geo.put(row["id"], box)
+            return {"text": f"{row.get('name')} moved"}
         return {"refused": f"window has no word {word}"}
 
     def row_for(self, target, use):
@@ -882,9 +914,7 @@ class WindowHost:
             if (not any(row.get("shows") == "taskbar" or row.get("shows") in SHELL_VIEWS for row in want.values())
                     and not getattr(self, "made_bar", False)):
                 self.made_bar = True
-                box = self.box_for("taskbar", {}, 0)
-                out = self.m.do(f'make kind=window shows=taskbar name="Agora taskbar" edge=bottom '
-                                f'at={box[0]},{box[1]} size={box[2]},{box[3]}')
+                out = self.m.do('make kind=window shows=taskbar name="Agora taskbar" edge=bottom')
                 log(f"taskbar: {out.get('text')}")
                 return                                  # its happening brings us back here
             self.made_bar = True
@@ -892,7 +922,8 @@ class WindowHost:
                 self.screen.close(wid)
                 self.applied.pop(wid, None)
             for wid, row in want.items():
-                box = parse_box(row) or self.box_for(row.get("shows"), {}, 0)
+                box = (self.geo.get(wid) or self.intent.pop(row.get("name"), None) or parse_box(row)
+                       or self.box_for(row.get("shows"), {"edge": row.get("edge") or ""}, 0))
                 if row.get('widget') and wid in self.screen.wins and self.widget_codes.get(wid)!=active[row['widget']]:
                     self.screen.close(wid)
                     continue
@@ -927,6 +958,7 @@ class WindowHost:
         url = (f"http://127.0.0.1:{PORT}/dev/signin?token={quote(self.token)}&next={quote(path)}" if self.token
                else f"http://127.0.0.1:{PORT}{path}")
         self.applied[wid] = box
+        self.geo.put(wid, box)
 
         def on_shown():
             self.opened += 1
@@ -959,9 +991,7 @@ class WindowHost:
                     if seen[1] >= 2:
                         self.settle.pop(wid, None)
                         self.applied[wid] = box
-                        out = self.m.do(f"set {wid} at={box[0]},{box[1]} size={box[2]},{box[3]}",
-                                        saw={wid: row.get("rev", 0)})
-                        log(f"{wid} moved by hand: {out.get('text')}")
+                        self.geo.put(wid, box)                 # local only: a drag is not a world fact
                     else:
                         self.settle[wid] = (box, seen[1] + 1)
                 else:

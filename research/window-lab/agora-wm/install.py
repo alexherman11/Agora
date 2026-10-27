@@ -15,16 +15,16 @@ def spec(headless=False,allow_live=False):
     argv=[str(PYTHON),str(HERE/'wm_module.py')]
     if headless:argv.append('--headless')
     if allow_live:argv.append('--allow-live')
-    return {'name':'wm','run':argv,'publishes':'wm.*','grants':GRANTS,'only':'kind:wm-settings,wm-pin','for':'steward'}
+    return {'name':'wm','run':argv,'publishes':'wm.*','grants':GRANTS,'only':'kind:wm-settings','for':'steward'}
 
 
 def fragment(headless=False,allow_live=False):
-    return {'modules':[spec(headless,allow_live)],'things':[{'kind':'wm-settings','name':'wm-settings',**DEFAULTS,'adopted':[]}]}
+    return {'modules':[spec(headless,allow_live)],'things':[{'kind':'wm-settings','name':'wm-settings',**DEFAULTS}]}
 
 
 def lines(allow_live=False):
     module=spec(allow_live=allow_live)
-    return ['make kind=wm-settings name=wm-settings when_full=minimise-oldest manage=all drag=ghost reflow=gentle mode=shadow never="[]" adopted="[]"',
+    return ['make kind=wm-settings name=wm-settings when_full=minimise-oldest manage=all drag=ghost reflow=gentle mode=shadow never="[]"',
         'module wm run='+json.dumps(json.dumps(module['run']))+' grants='+json.dumps(GRANTS)]
 
 

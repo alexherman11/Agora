@@ -84,6 +84,20 @@ def build_region(shape, dpr, width, height):
     return union
 
 
+class MARGINS(ctypes.Structure):
+    _fields_ = [("l", ctypes.c_int), ("r", ctypes.c_int), ("t", ctypes.c_int), ("b", ctypes.c_int)]
+
+
+def glass(hwnd):
+    """See-through where the page is (Claude, 26 Oct, live). On Alex's real screen DWM does NOT clip a WebView2's
+    drawing to the window region: the whole window rect showed white (ran: pixel (255,255,255) at 1900,400 under the
+    top bar; spike 1 D's 'see-through' corner was that same white, read as a pass because hit-testing passed). So the
+    window is a transparent WebView2 (pywebview transparent=True, black host) on a sheet of DWM glass: black and
+    transparent pixels show what is behind. The region stays, for clicks only."""
+    m = MARGINS(-1, -1, -1, -1)
+    return dwmapi.DwmExtendFrameIntoClientArea(wt.HWND(hwnd), ctypes.byref(m)) == 0
+
+
 def set_shape(hwnd, shape, dpr):
     r = wt.RECT()
     user32.GetWindowRect(hwnd, ctypes.byref(r))

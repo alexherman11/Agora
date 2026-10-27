@@ -80,4 +80,18 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(result.minimise,['impossible'])
 
 
+class SquashTests(unittest.TestCase):
+    def test_arrange_minimises_rather_than_squashing_into_a_strip(self):
+        # Alex's desktop on 26 Oct, the moment tiling went live: overlapping windows, one tall one on the right.
+        boxes={'seabright':(87,78,1165,981),'tasks':(1317,97,1258,1828),'help':(2301,582,1200,1300),
+               'lines':(1300,637,1100,945),'claude':(3000,94,783,1816),'appearance':(1351,285,1180,1500)}
+        s=State(work=Rect(0,57,3840,2031))
+        for i,(k,b) in enumerate(boxes.items()):s.windows[k]=Window(k,preferred=b[2:],rect=Rect(*b),last_used=i)
+        r=solve(s,{'type':'arrange'})
+        self.assertTrue(valid(r.state))
+        for k,rect in r.placements.items():
+            self.assertGreaterEqual(rect.w,int(boxes[k][2]*.6),k);self.assertGreaterEqual(rect.h,int(boxes[k][3]*.6),k)
+        self.assertTrue(r.minimise)                      # something gave way, and it was minimised, not squashed
+
+
 if __name__=='__main__':unittest.main()

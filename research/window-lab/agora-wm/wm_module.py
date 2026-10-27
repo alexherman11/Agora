@@ -24,18 +24,20 @@ HELP={
  'minimise':('do','<key>','Really minimise a manageable unpinned window; never cloak.'),
  'restore':('do','<key>','Restore a manageable window and place it without overlap.'),
  'close':('do','<key>','Ask the window politely to close with WM_CLOSE; never kill a process.'),
- 'pin':('do','<key>','Keep this window fixed. Undoable world intent; no geometry enters the log.'),
- 'unpin':('do','<key>','Let this pinned window move again. Undoable.'),
+ 'pin':('do','<key>','Keep this window fixed. Screen state, kept by this window manager, never in the world.'),
+ 'unpin':('do','<key>','Let this pinned window move again. Screen state, never in the world.'),
  'arrange':('do','','Re-solve the current layout, preserving already legal windows.'),
  'mode':('do','live|shadow|off','Shadow computes only; live needs rollout arming; off releases every saved placement.'),
  'leave-alone':('do','<app>','Treat this app as fixed obstacles. Undoable world intent.'),
- 'manage':('do','<app>','Remove an app exclusion; in adopted mode also adopts its current windows. Undoable.'),
- 'changed':('hear','','Changed window keys in JSON text, at most ten announcements per second; no titles.')}
+ 'manage':('do','<app>','Remove an app exclusion (undoable); in adopted mode also adopts its current windows (screen state, kept locally).'),
+}
+# No wm.changed happening any more (Alex, 26 Oct: "visual state should not live in the world"): window keys and layout
+# churn flooded the world's stream (Lines). The shell reads wm.windows on its own clock instead.
 
 
 def offers():
     return [{'word':'wm.'+name,'kind':kind,'takes':takes,'help':'wm.'+name+': '+help,
-        'may':'anyone','undo':'yes' if name in ('pin','unpin','mode','leave-alone','manage') else ('external' if kind=='do' else 'no')}
+        'may':'anyone','undo':'yes' if name in ('mode','leave-alone','manage') else ('external' if kind=='do' else 'no')}
         for name,(kind,takes,help) in HELP.items()]
 
 
@@ -52,11 +54,17 @@ class WMModule:
         self.headless=headless;self.allow_live=allow_live;self.theme_native=theme_native
         self.owner=None;self.manager=None;self.lock=threading.RLock();self.stop=threading.Event()
         self.requests=queue.Queue();self.latest=None;self.last_mode_request=None;self.intent_seen=False
+        # Window pins and adopted windows are screen state (Alex, 26 Oct: "visual state should not live in the world"):
+        # kept in <home>/screen.json, never as world things. The world keeps preferences only (wm-settings).
+        self.screen={'pins':[],'adopted':[]};self.screen_path=None
         self.m=Module(offers(),self.call,on_hello=self.hello,on_off=self.stop.set,
             on_status=lambda:f'{self.manager.mode if self.manager else "starting"}; {len(self.manager.rows) if self.manager else 0} windows')
 
     def hello(self,msg):
         self.owner=msg.get('for') or msg.get('owner');self.home=Path(msg['home'])
+        self.screen_path=self.home/'screen.json'
+        try:self.screen={'pins':[],'adopted':[],**json.loads(self.screen_path.read_text(encoding='utf-8'))}
+        except (OSError,ValueError):pass
         if self.headless:self.manager=Manager(MemNative(),self.home,gate_fn=lambda:[])
         else:
             from win32_host import Native
@@ -75,8 +83,8 @@ class WMModule:
         self.m.ready.wait(3)
         while not self.stop.is_set():
             try:
-                settings=self.read_intent();pins=self.m.see('rows wm-pin').get('rows',[])
-                # Geometry is never a world fact, including for pins.
+                settings=self.read_intent();pins=list(self.screen['pins'])
+                # Geometry, pins and adoption are never world facts.
                 with self.lock:self.latest=(settings,pins)
             except Exception as exc:log('wm intent:',str(exc))
             self.stop.wait(1)
@@ -106,13 +114,11 @@ class WMModule:
             with self.lock:row=next((r for r in self.manager.reading() if r['key']==target),None)
             if not row or not row['managed']:return {'refused':'choose a current manageable window from wm.windows'}
             if word=='pin' and row['state']=='minimised':return {'refused':'restore the window before pinning it'}
-            pins=self.m.see('rows wm-pin',use=msg.get('use')).get('rows',[])
-            existing=next((r for r in pins if r.get('key')==target),None)
-            if existing:
-                return {'lines':[f'set {existing["id"]} active={"yes" if word=="pin" else "no"}'],
-                    'saw':{existing['id']:existing['rev']}}
-            if word=='unpin':return {'text':'already unpinned'}
-            return {'lines':[f'make kind=wm-pin key={quote(target)} app={quote(row["app"])} active=yes'], 'saw':{}}
+            pins=set(self.screen['pins'])
+            if (target in pins)==(word=='pin'):return {'text':f'already {word}ned'}
+            pins=pins|{target} if word=='pin' else pins-{target}
+            self._save_screen(pins=sorted(pins));self.latest=(settings,sorted(pins))
+            return {'external':True,'text':f'wm.{word}: {row["app"]}'}
         if word in ('leave-alone','manage'):
             app=' '.join(words) if words else target
             if not app:return {'refused':'give the app name from wm.windows'}
@@ -122,12 +128,16 @@ class WMModule:
                 except ValueError:never=[x.strip() for x in never.split(',') if x.strip()]
             never=[n for n in never if n.lower()!=app.lower()]
             if word=='leave-alone':never.append(app)
-            adopted=settings.get('adopted',[])
-            if isinstance(adopted,str):adopted=json.loads(adopted)
             if word=='manage':
-                with self.lock:adopted=sorted(set(adopted)|{r['key'] for r in self.manager.rows if r['app'].lower()==app.lower()})
-            return {'lines':[f'set {sid} never={quote(json.dumps(never))} adopted={quote(json.dumps(adopted))}'],'saw':saw}
+                with self.lock:adopted=sorted(set(self.screen['adopted'])|{r['key'] for r in self.manager.rows if r['app'].lower()==app.lower()})
+                self._save_screen(adopted=adopted)
+            return {'lines':[f'set {sid} never={quote(json.dumps(never))}'],'saw':saw}
         return {'refused':'unknown wm word'}
+
+    def _save_screen(self,**changes):
+        self.screen.update(changes)
+        if self.screen_path:
+            tmp=self.screen_path.with_suffix('.tmp');tmp.write_text(json.dumps(self.screen),encoding='utf-8');tmp.replace(self.screen_path)
 
     def tick(self,feed=None):
         with self.lock:
@@ -137,8 +147,7 @@ class WMModule:
                 settings,pins=self.latest;self.latest=None
                 try:
                     manager.configure(settings,[r['key'] for r in pins if r.get('active')=='yes'])
-                    adopted=settings.get('adopted',[])
-                    manager.adopted=set(json.loads(adopted) if isinstance(adopted,str) else adopted)
+                    manager.adopted=set(self.screen['adopted'])
                     request=settings.get('mode_request')
                     if not self.intent_seen:
                         manager.switch('off' if settings.get('mode')=='off' else 'shadow');self.intent_seen=True
@@ -167,8 +176,7 @@ class WMModule:
             manager.ingest(rows,work,events)
             now=time.monotonic()
             if manager.changed and now-manager.last_change>=.1:
-                self.m.happen('wm.changed',text=json.dumps({'keys':sorted(manager.changed)}))
-                manager.changed.clear();manager.last_change=now
+                manager.changed.clear();manager.last_change=now   # screen churn stays here, never in the world's stream
 
     def run(self):
         if not self.headless:

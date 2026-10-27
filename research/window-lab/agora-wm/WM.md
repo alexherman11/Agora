@@ -115,7 +115,7 @@ control this personal native surface. `wm.changed` announces JSON text
 | `wm.arrange` | Re-solve, preserving legal windows |
 | `wm.mode live|shadow|off` | Undoable mode request; applied only after admission |
 | `wm.leave-alone <app>` / `wm.manage <app>` | Undoable exclusion / adoption intent |
-| `wm.changed` | Happening for the shell, with changed keys |
+| ~~`wm.changed`~~ | Removed 26 Oct (Claude, from Alex: "visual state should not live in the world"); the shell polls `wm.windows` each second |
 
 Rows contain exactly `key, app, exe, icon, agora, state, focused, rect, space,
 managed, why`. `icon` is the executable path for the shell to resolve. `agora` is
@@ -181,6 +181,22 @@ minimise the rest (`evidence/shadow-ungated-20261026.summary.json`). That is the
 minimise oldest" rule applied to a desktop of overlapping windows all at once, including the Claude
 window Alex is talking in. Before arming live, decide how the first solve treats windows that were
 already open (adopt as they are, or arrange once with Alex watching).
+
+*Claude, 26 Oct 2026, ~20:45: live.* Alex: "visual state should not live in the world, let the tiling manager
+organize the existing windows." So `manage=all`, installed in his world (`wm-settings` dk531, `module wm` with
+`--allow-live`) and armed with `wm.mode live`. Changes that went with it:
+- **No screen state in the world.** Pins and adopted windows now live in `<home>/screen.json` (`wm.pin`/`unpin`
+  are screen acts, not records); `wm.changed` is gone (it flooded Lines with window keys; the dock polls
+  `wm.windows` each second); `kd_window` keeps window geometry in `state/geometry.json`, never `set at= size=`.
+  `wm-settings` keeps preferences only (when_full, drag, reflow, never, mode).
+- **Gate 2 again.** **ran**: QUNS 2 with `claude.exe` (an ordinary window) in front, while Agora's desktop layer and
+  the Claude app's screen overlay were screen-sized. State 2 now gates only if the foreground window covers its
+  monitor (`_foreground_covers_monitor`).
+- **No squashing.** **ran** the first live arrange: Task board and Help came out 161 px tall (minimum 240×160). An
+  arrange now minimises a window rather than give it under `SQUASH` (60 %) of its usual width or height;
+  `test_engine.SquashTests` replays that desktop.
+**ran** after: `17 windows; live`, four Agora windows tiled without overlap, none under 60 %. Not verified: a new
+window opening onto a full screen live, drag push-aside live, the panic chord pressed by hand.
 No Windows setting, taskbar, registry entry, driver, injection or wallpaper is changed.
 
 ## Reproduce and rollout — Claude operates these

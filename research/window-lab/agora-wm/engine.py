@@ -26,6 +26,9 @@ class Rect:
     def values(self): return [self.x, self.y, self.w, self.h]
 
 
+SQUASH = 0.6      # an arrange never shrinks a window below this share of its usual width or height
+
+
 @dataclass
 class Window:
     key: str
@@ -240,8 +243,12 @@ def solve(state,event=None):
             if v.rect and s.bounds.contains(v.rect) and v.rect.w>=v.minimum[0] and v.rect.h>=v.minimum[1] and not any(v.rect.near(b,s.gap_inner) for b in accepted):
                 accepted.append(v.rect);continue
             free=free_rectangles(s.bounds,accepted,s.gap_inner)
-            options=[Rect(r.x,r.y,min(max(v.preferred[0],v.minimum[0]),r.w),min(max(v.preferred[1],v.minimum[1]),r.h)) for r in free
-                if r.w>=v.minimum[0] and r.h>=v.minimum[1]]
+            # A gap much smaller than the window is not a place for it: minimise it instead of squashing it into a
+            # strip (live, 26 Oct: two Agora windows came out 161 px tall). Usual size = its own size, else preferred.
+            want=(v.rect.w,v.rect.h) if v.rect else v.preferred
+            least=(max(v.minimum[0],int(min(want[0],s.bounds.w)*SQUASH)),max(v.minimum[1],int(min(want[1],s.bounds.h)*SQUASH)))
+            options=[Rect(r.x,r.y,min(max(v.preferred[0],least[0]),r.w),min(max(v.preferred[1],least[1]),r.h)) for r in free
+                if r.w>=least[0] and r.h>=least[1]]
             if options:
                 v.rect=min(options,key=lambda r:(abs(r.x-(v.rect.x if v.rect else 0))+abs(r.y-(v.rect.y if v.rect else 0)),-r.w*r.h,r))
                 accepted.append(v.rect)

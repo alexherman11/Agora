@@ -150,9 +150,29 @@ def gate():
     hr=shell.SHQueryUserNotificationState(C.byref(state))
     if hr!=0:reasons.append('notification state unavailable')
     elif state.value in (1,3,4,7):reasons.append(f'notification gate {state.value}')
-    elif state.value==2 and _foreground_exe().lower() not in SHELL_OVERLAYS:
+    elif state.value==2 and _foreground_exe().lower() not in SHELL_OVERLAYS and _foreground_covers_monitor():
+        # "Busy" alone is not a game: on 26 Oct Windows reported it with Claude (an ordinary window) in front while
+        # Agora's own desktop layer and the Claude app's screen overlay were screen-sized. Gate only when the window
+        # in front really covers its monitor.
         reasons.append('notification gate 2')
     return reasons
+
+
+class _MONITORINFO(C.Structure):
+    _fields_=[('cbSize',W.DWORD),('rcMonitor',W.RECT),('rcWork',W.RECT),('dwFlags',W.DWORD)]
+
+
+u.MonitorFromWindow.restype=W.HMONITOR;u.MonitorFromWindow.argtypes=[W.HWND,W.DWORD]
+
+
+def _foreground_covers_monitor():
+    h=u.GetForegroundWindow()
+    if not h:return False
+    r=W.RECT();u.GetWindowRect(h,C.byref(r))
+    mi=_MONITORINFO();mi.cbSize=C.sizeof(_MONITORINFO)
+    if not u.GetMonitorInfoW(u.MonitorFromWindow(h,2),C.byref(mi)):return True   # unknown: stay careful
+    m=mi.rcMonitor
+    return r.left<=m.left and r.top<=m.top and r.right>=m.right and r.bottom>=m.bottom
 
 
 # Screen-sized shell windows that make Windows report "busy" (QUNS 2) with no full-screen program running.
