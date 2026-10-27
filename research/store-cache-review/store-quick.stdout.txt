@@ -1,0 +1,98 @@
+ok   genesis: one record holds the world as it is
+ok   the log replayed says what the world says, and the round trip holds, at the start
+ok   a second genesis is refused
+ok   a read makes no record: look
+ok   a read makes no record: read
+ok   a read makes no record: find
+ok   a read makes no record: help
+ok   a read makes no record: verbs
+ok   a read makes no record: history
+ok   a read makes no record: where
+ok   walking makes no record (presence is not on the log), though the world's own list still gets a go event
+ok   a refusal makes no record
+ok   so the log has not moved
+ok   a prop is one record with one part and one fact, on the subject
+ok   the record says who, the words, and the event it made
+ok   and what its author had seen of what it touched
+ok   a fact names the value before by its hash ('-' for none)
+ok   the next fact on it names the value the first one left
+ok   a chat line is one fact
+ok   the 160th line's record is no bigger than the 5th's (within 5%)
+ok   where the world's own event kept a copy of the whole chat, 20 times the size by now
+     a line's record: 765 bytes at line 5, 774 at line 160; the event's undo copy: 1691 then 49439 bytes
+ok   a create is one record: the subject, its appearance, where it is and what it comes after
+ok   a comment is one fact, on the comment
+ok   resolving it changes that one fact
+ok   a link is one fact, a thing of its own
+ok   unlinking takes that fact away
+ok   a move in a flow is at most three facts (what each of three things comes after), not one per sibling
+ok   a move to another surface says where it is now
+ok   in a free surface a box is a fact someone chose
+ok   removing an appearance takes its facts away and leaves what it said
+ok   after every kind of change, the log replayed still says what the world says
+ok   marking a card done, with a rule that moves done cards: one record, the act then the rule
+ok   the rule's part holds the move's facts
+ok   put back whole: the card is open again AND back on the Board, as before the command
+ok   a prop, put back by its facts, is the world before it
+ok   a retitle, put back by its facts, is the world before it
+ok   a rewrite, put back by its facts, is the world before it
+ok   a chat line, put back by its facts, is the world before it
+ok   a comment, put back by its facts, is the world before it
+ok   a tag, put back by its facts, is the world before it
+ok   a due date, put back by its facts, is the world before it
+ok   a create, put back by its facts, is the world before it
+ok   a move in a flow, put back by its facts, is the world before it
+ok   a move to another surface, put back by its facts, is the world before it
+ok   a link, put back by its facts, is the world before it
+ok   a rekind, put back by its facts, is the world before it
+ok   a new surface, put back by its facts, is the world before it
+ok   the verbs' own undos arrive at the same facts, but for the one known difference (a move to another surface: the old undo loses the place in the order)
+ok   scenario 1: Alex retitles, Sable sets a prop, Alex's retitle is put back; the title returns and Sable's prop stays
+ok   but once the title itself was changed again, putting the first back is refused, naming the fact
+ok   scenario 2: a line someone answered cannot be put back (the answer would point at nothing)
+ok      a line no one answered can
+ok   a surface someone has since put a note in cannot be put back (the note would be nowhere)
+ok   after the undo trials (all on copies), the log still says what the world says
+ok   a change made outside any command is written first, as its own record, at the next command
+ok   so the log never falls behind the world
+ok   half a line at the end of the log (a write cut short) is dropped; the next record follows the last whole one
+ok   and the log is whole
+ok   a value changed in an old record is found: the next fact on it says what it was before, and the digests stop agreeing
+ok   what a fact said at an earlier record is read from the log
+ok   two people in different paragraphs: neither is refused, and their records share no fact
+ok   a paragraph put between two others changes what two things come after, not the paragraphs around them
+ok   and the writer of the paragraph above it goes on writing: the insert did not stale their paragraph
+ok   a comment stays on its paragraph when the paragraph moves (it is a fact of the paragraph, not of a place)
+ok   (a rule moved it to the Done lane)
+ok   undo <event>, through the desk: the command and what its rule did are put back whole
+ok      the world's own events say so (each is marked undone) and the undo is itself a record of the facts it put back
+ok      a second undo of it is refused
+ok   scenario 1 through the desk: Alex's retitle comes back though Sable has since set a prop on the card
+ok   scenario 2 through the desk: the answered line is refused, saying which command and why
+ok   a bare undo puts back my latest command
+ok   an event older than the log has no record: it is undone the verb's own way, and that undo is recorded as facts
+ok   after undos through the desk, the log says what the world says
+ok   Sable changes line 2; Juniper, who read it before that, changes line 5: hers is joined, not refused, and both are in the text
+ok      she is told so, and that she has not read Sable's line
+ok      and whose change it was and which event (Juniper and Sable, a3474: 'theirs' named no one)
+ok   she then rewrites the whole text from what she remembers (without Sable's line): joined again, and Sable's line is still there
+ok   the same line changed by both is refused as before, now naming the line
+ok      and after reading it again, it lands
+ok   (the lens compiles)
+ok   a lens, two editors, two parts: both land, and the lens still compiles
+ok   (both of those land too, on different lines)
+ok   (Sable renames the part and its one caller in one rewrite: the lens compiles)
+ok   different lines, but together they do not compile (Juniper's new lines call the part by the name Sable just changed): hers is refused, and says why
+ok      having read Sable's version, she calls it by its new name and it lands
+ok   after joining texts, the log says what the world says
+ok   a line added to a 43 KB note is a record of under 1 KB (the change, not the note), and so is one passage replaced
+ok      and the log replayed still says what the world says
+ok      a change written that way is put back like any other
+ok      and what the text said at an earlier record is still read from the log
+ok   a rewrite with no text= is refused and names retitle; the text is as it was, and no record is made
+ok      text="" is how a text is emptied on purpose, and undo puts it back
+ok   at the end: every record replayed says what the world says; a world rebuilt from its facts says the same
+     268 records ({'genesis': 1, 'command': 266, 'outside': 1}); a command's record is 1055 bytes on average; the genesis is 7767 bytes
+     derived, re-derived from facts: {'nodes': 46, 'boxes differ': 0, 'orders differ': 0}
+
+all passed

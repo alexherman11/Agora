@@ -1,0 +1,1981 @@
+[
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 25.41,
+    "answer": "Added a soft translucent red glow for p1 card bodies on `taskboard-components`, using style `dk179` (receipt `r226`).\n\nNo code was necessary. The other board and shared task/lane facts were unchanged. `look-view` confirms the style; I couldn\u2019t inspect the rendered pixels.",
+    "board": "A",
+    "number": 1,
+    "request": "Make p1 cards glow softly red.",
+    "changes": [
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "for",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "glow",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "in:dk1",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "kind",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "lens",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "made_by",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "target",
+        "category": "style",
+        "lines": 1
+      }
+    ],
+    "lines": 7,
+    "landed": [
+      "style"
+    ],
+    "success": false,
+    "board_proof": false,
+    "proof_passed": 10,
+    "proof_checks": 11,
+    "wall_seconds": 45.73,
+    "first_check_success": false
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 43.61,
+    "answer": "Updated `taskboard-js` (`dk176`) so p1 cards use a soft red glow, including during hover and dragging.\n\nInline code was necessary and explicitly reviewed as Alex. Saved code verified; pixels could not be inspected because the widget is not mounted. The other board and shared task/lane facts were unchanged.",
+    "board": "B",
+    "number": 1,
+    "request": "Make p1 cards glow softly red.",
+    "changes": [
+      {
+        "thing": "dk177",
+        "kind": "grant",
+        "field": "revoked",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "by",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "kind",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "only",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "to",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "where",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "words",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk176",
+        "kind": "widget",
+        "field": "code",
+        "category": "source",
+        "lines": 5
+      }
+    ],
+    "lines": 12,
+    "landed": [
+      "facts",
+      "source"
+    ],
+    "success": true,
+    "board_proof": false,
+    "proof_passed": 8,
+    "proof_checks": 11,
+    "wall_seconds": 89.16,
+    "first_check_success": true
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 62.64,
+    "answer": "Updated `taskboard-components` (dk170) with due-date chips: neutral for today/future dates, red and labelled \u201cOverdue\u201d for dates before today (UTC). Cards without dates have no chip.\n\nNo code was necessary. Only the board arrangement and its styles changed; shared facts and the other board remain untouched.\n\n`look-view` confirms 3 overdue and 2 upcoming chips. Visual appearance could not be inspected.",
+    "board": "A",
+    "number": 2,
+    "request": "Show a due date chip on cards that have one; make it red when it's overdue.",
+    "changes": [
+      {
+        "thing": "dk170",
+        "kind": "lens",
+        "field": "text",
+        "category": "lens",
+        "lines": 4
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "background",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "color",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "for",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "in:dk1",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "kind",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "lens",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "made_by",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "padding",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "radius",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "target",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "background",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "color",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "emphasis",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "for",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "in:dk1",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "kind",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "lens",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "made_by",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "padding",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "radius",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "target",
+        "category": "style",
+        "lines": 1
+      }
+    ],
+    "lines": 25,
+    "landed": [
+      "lens",
+      "style"
+    ],
+    "success": false,
+    "board_proof": false,
+    "proof_passed": 10,
+    "proof_checks": 11,
+    "wall_seconds": 82.62,
+    "first_check_success": false,
+    "recheck": {
+      "success": false,
+      "reason": "Checker now accepts an Overdue label and red chip background; exact original word calls replayed, no new agent or implementation edits.",
+      "replayed_calls": 23
+    }
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 56.2,
+    "answer": "Updated `taskboard-js` (`dk176`) with due date chips and red \u201cOverdue\u201d styling for dates before today in UTC.\n\nInline code was necessary; saved source was verified and explicitly reviewed/activated as Alex. Other boards and shared task/lane facts were unchanged.\n\nLimitation: the widget is not mounted, so rendered appearance remains unverified.",
+    "board": "B",
+    "number": 2,
+    "request": "Show a due date chip on cards that have one; make it red when it's overdue.",
+    "changes": [
+      {
+        "thing": "dk177",
+        "kind": "grant",
+        "field": "revoked",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "by",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "kind",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "only",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "revoked",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "to",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "where",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "words",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "by",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "kind",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "only",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "to",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "where",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "words",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk176",
+        "kind": "widget",
+        "field": "code",
+        "category": "source",
+        "lines": 17
+      }
+    ],
+    "lines": 31,
+    "landed": [
+      "facts",
+      "source"
+    ],
+    "success": true,
+    "board_proof": false,
+    "proof_passed": 8,
+    "proof_checks": 11,
+    "wall_seconds": 91.97,
+    "first_check_success": false,
+    "recheck": {
+      "success": true,
+      "reason": "Checker now accepts an Overdue label and red chip background; exact original word calls replayed, no new agent or implementation edits.",
+      "replayed_calls": 26
+    }
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 34.86,
+    "answer": "Updated taskboard-components (dk170) to hide Done only for Alex using an arrangement condition. No JavaScript code was necessary. Shared task/lane facts and the other board are unchanged.\n\nVerified with `look-view`: Alex\u2019s view contains only Backlog and Now. Pixels were not visually inspected. Change receipt: r229.",
+    "board": "A",
+    "number": 3,
+    "request": "Hide the Done lane, just for me.",
+    "changes": [
+      {
+        "thing": "dk170",
+        "kind": "lens",
+        "field": "text",
+        "category": "lens",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "view-preference",
+        "field": "for",
+        "category": "lens",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "view-preference",
+        "field": "forgotten",
+        "category": "lens",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "view-preference",
+        "field": "in:dk1",
+        "category": "lens",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "view-preference",
+        "field": "kind",
+        "category": "lens",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "view-preference",
+        "field": "lens",
+        "category": "lens",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "view-preference",
+        "field": "made_by",
+        "category": "lens",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "view-preference",
+        "field": "sees",
+        "category": "lens",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "view-preference",
+        "field": "text",
+        "category": "lens",
+        "lines": 1
+      }
+    ],
+    "lines": 9,
+    "landed": [
+      "lens"
+    ],
+    "success": true,
+    "board_proof": true,
+    "proof_passed": 11,
+    "proof_checks": 11,
+    "wall_seconds": 45.75,
+    "first_check_success": true
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 55.91,
+    "answer": "Updated taskboard-js (dk176) to hide the entire Done lane for Alex using private preference dk179.\n\nInline code was necessary; I edited and explicitly reviewed/reactivated it. Shared tasks, lanes, and the other board are unchanged.\n\nLimitation: the widget is not mounted, so I could not inspect the visual result.",
+    "board": "B",
+    "number": 3,
+    "request": "Hide the Done lane, just for me.",
+    "changes": [
+      {
+        "thing": "dk177",
+        "kind": "grant",
+        "field": "revoked",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "by",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "kind",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "only",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "to",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "where",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "words",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "view-preference",
+        "field": "for",
+        "category": "lens",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "view-preference",
+        "field": "hide_done",
+        "category": "lens",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "view-preference",
+        "field": "in:dk1",
+        "category": "lens",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "view-preference",
+        "field": "kind",
+        "category": "lens",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "view-preference",
+        "field": "lens",
+        "category": "lens",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "view-preference",
+        "field": "made_by",
+        "category": "lens",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "view-preference",
+        "field": "sees",
+        "category": "lens",
+        "lines": 1
+      },
+      {
+        "thing": "dk176",
+        "kind": "widget",
+        "field": "code",
+        "category": "source",
+        "lines": 8
+      }
+    ],
+    "lines": 22,
+    "landed": [
+      "facts",
+      "lens",
+      "source"
+    ],
+    "success": true,
+    "board_proof": true,
+    "proof_passed": 11,
+    "proof_checks": 11,
+    "wall_seconds": 65.31,
+    "first_check_success": true
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 23.39,
+    "answer": "Updated `taskboard-components` (dk170) with 8px card padding and two-line limits for titles and note excerpts.\n\nNo code was necessary. Only board-scoped styles changed; the other board and shared facts remain untouched.\n\n`look-view` confirms the styles. Visual appearance could not be inspected.",
+    "board": "A",
+    "number": 4,
+    "request": "Make cards more compact: at most two lines of text, less padding.",
+    "changes": [
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "for",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "in:dk1",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "kind",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "lens",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "made_by",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "padding",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "part-style",
+        "field": "target",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "for",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "in:dk1",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "kind",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "lens",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "lines",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "made_by",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "part-style",
+        "field": "target",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk181",
+        "kind": "part-style",
+        "field": "for",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk181",
+        "kind": "part-style",
+        "field": "in:dk1",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk181",
+        "kind": "part-style",
+        "field": "kind",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk181",
+        "kind": "part-style",
+        "field": "lens",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk181",
+        "kind": "part-style",
+        "field": "lines",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk181",
+        "kind": "part-style",
+        "field": "made_by",
+        "category": "style",
+        "lines": 1
+      },
+      {
+        "thing": "dk181",
+        "kind": "part-style",
+        "field": "target",
+        "category": "style",
+        "lines": 1
+      }
+    ],
+    "lines": 21,
+    "landed": [
+      "style"
+    ],
+    "success": true,
+    "board_proof": true,
+    "proof_passed": 11,
+    "proof_checks": 11,
+    "wall_seconds": 32.75,
+    "first_check_success": true
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 45.49,
+    "answer": "Updated `taskboard-js` (`dk176`): reduced card padding to 8px \u00d7 10px, tightened spacing, and limited titles and note previews to two lines each.\n\nInline code was necessary; reviewed and reactivated as Alex with unchanged permissions. Other boards and shared task/lane facts were untouched.\n\nVerified saved code, but couldn\u2019t inspect rendered pixels; the widget is not mounted.",
+    "board": "B",
+    "number": 4,
+    "request": "Make cards more compact: at most two lines of text, less padding.",
+    "changes": [
+      {
+        "thing": "dk177",
+        "kind": "grant",
+        "field": "revoked",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "by",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "kind",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "only",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "revoked",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "to",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "where",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "words",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "by",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "kind",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "only",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "to",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "where",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "words",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk176",
+        "kind": "widget",
+        "field": "code",
+        "category": "source",
+        "lines": 2
+      }
+    ],
+    "lines": 16,
+    "landed": [
+      "facts",
+      "source"
+    ],
+    "success": true,
+    "board_proof": true,
+    "proof_passed": 11,
+    "proof_checks": 11,
+    "wall_seconds": 54.05,
+    "first_check_success": true
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 36.22,
+    "answer": "Updated `taskboard-components` (`dk170`) to order lanes: Backlog \u2192 Now \u2192 Waiting \u2192 Done. Added Waiting drop and menu actions.\n\nNo JavaScript changes were necessary. Other board and shared facts stayed unchanged. Structure verified with `look-view`; pixels and drag interaction were not visually tested. Waiting currently has no tasks.",
+    "board": "A",
+    "number": 5,
+    "request": "Add a Waiting lane between Doing and Done.",
+    "changes": [
+      {
+        "thing": "dk170",
+        "kind": "lens",
+        "field": "text",
+        "category": "lens",
+        "lines": 18
+      }
+    ],
+    "lines": 18,
+    "landed": [
+      "lens"
+    ],
+    "success": true,
+    "board_proof": true,
+    "proof_passed": 11,
+    "proof_checks": 11,
+    "wall_seconds": 45.86,
+    "first_check_success": false,
+    "recheck": {
+      "success": true,
+      "reason": "Checker requires a real functional Waiting drop in order, rather than a particular lane storage representation. Exact original word calls replayed, no new agent or implementation edits.",
+      "replayed_calls": 20
+    }
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 43.28,
+    "answer": "Updated `taskboard-js` (`dk176`) to four lanes: Backlog \u2192 Now \u2192 Waiting \u2192 Done.\n\nInline JavaScript was necessary; I edited and explicitly reviewed it as Alex, preserving its grants. The other board and shared task/lane facts are unchanged.\n\nVerified the saved code. Visual appearance and drag behavior remain unverified because the widget is not mounted.",
+    "board": "B",
+    "number": 5,
+    "request": "Add a Waiting lane between Doing and Done.",
+    "changes": [
+      {
+        "thing": "dk177",
+        "kind": "grant",
+        "field": "revoked",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "by",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "kind",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "only",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "to",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "where",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "words",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk176",
+        "kind": "widget",
+        "field": "code",
+        "category": "source",
+        "lines": 4
+      }
+    ],
+    "lines": 11,
+    "landed": [
+      "facts",
+      "source"
+    ],
+    "success": true,
+    "board_proof": true,
+    "proof_passed": 11,
+    "proof_checks": 11,
+    "wall_seconds": 52.33,
+    "first_check_success": false,
+    "recheck": {
+      "success": true,
+      "reason": "Checker requires a real functional Waiting drop in order, rather than a particular lane storage representation. Exact original word calls replayed, no new agent or implementation edits.",
+      "replayed_calls": 28
+    }
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 47.03,
+    "answer": "Updated `taskboard-components` (dk170) to show assignee initials in 28px circles: AA for Alex Anderson and JB for Jeff Builder.\n\nCode was necessary. Created and explicitly reviewed supporting component dk179 as Alex. All 25 cards use it; shared task facts and the other board remain unchanged.\n\nVerified the definition and bindings through `look-view`. Visual appearance could not be inspected with the available tools.",
+    "board": "A",
+    "number": 6,
+    "request": "Show the assignee's initials in a little circle on each card.",
+    "changes": [
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "code",
+        "category": "component code",
+        "lines": 39
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "category",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "example",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "for",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "gestures",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "in:dk1",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "kind",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "made_by",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "name",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "parts",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "purpose",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "reviewed_code",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "settings",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "slots",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "uses",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk170",
+        "kind": "lens",
+        "field": "text",
+        "category": "lens",
+        "lines": 2
+      }
+    ],
+    "lines": 55,
+    "landed": [
+      "component code",
+      "facts",
+      "lens"
+    ],
+    "success": true,
+    "board_proof": true,
+    "proof_passed": 11,
+    "proof_checks": 11,
+    "wall_seconds": 56.52,
+    "first_check_success": true
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 43.95,
+    "answer": "Updated `taskboard-js` (`dk176`) to use assignee initials in its existing little circles: Alex Anderson \u2192 AA, Jeff Builder \u2192 JB. Full names remain in tooltips.\n\nInline code was necessary; reviewed and reactivated as Alex with the existing grants. Other boards and shared task/lane facts were untouched.\n\nVerified the saved code. Visual appearance remains unverified because the widget is not mounted.",
+    "board": "B",
+    "number": 6,
+    "request": "Show the assignee's initials in a little circle on each card.",
+    "changes": [
+      {
+        "thing": "dk177",
+        "kind": "grant",
+        "field": "revoked",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "by",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "kind",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "only",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "to",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "where",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "words",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk176",
+        "kind": "widget",
+        "field": "code",
+        "category": "source",
+        "lines": 2
+      }
+    ],
+    "lines": 9,
+    "landed": [
+      "facts",
+      "source"
+    ],
+    "success": true,
+    "board_proof": false,
+    "proof_passed": 8,
+    "proof_checks": 11,
+    "wall_seconds": 89.16,
+    "first_check_success": true
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 61.92,
+    "answer": "Updated taskboard-components (dk170) with an 850 ms check-mark animation for observed moves into Done.\n\nCode was necessary: added and explicitly reviewed board-specific component dk179 as Alex. Other board and shared task/lane facts are unchanged.\n\nStructure verified with `look-view`; animation pixels could not be inspected. Initial loads don\u2019t animate; reduced motion uses a brief static check.",
+    "board": "A",
+    "number": 7,
+    "request": "When a card lands in Done, play a small check-mark animation.",
+    "changes": [
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "code",
+        "category": "component code",
+        "lines": 58
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "category",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "example",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "for",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "gestures",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "in:dk1",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "kind",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "limitations",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "made_by",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "name",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "parts",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "purpose",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "reviewed_code",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "settings",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "slots",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "uses",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk170",
+        "kind": "lens",
+        "field": "text",
+        "category": "lens",
+        "lines": 4
+      }
+    ],
+    "lines": 77,
+    "landed": [
+      "component code",
+      "facts",
+      "lens"
+    ],
+    "success": false,
+    "board_proof": true,
+    "proof_passed": 11,
+    "proof_checks": 11,
+    "wall_seconds": 79.09,
+    "first_check_success": false
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 69.11,
+    "answer": "Updated `taskboard-js` (`dk176`) with a small, one-second check-mark animation when a card transitions into Done.\n\nCode was necessary; I edited the inline widget code and explicitly reviewed/reactivated it as Alex (`r228`). The other board and shared task/lane facts were untouched.\n\nStored code verified. Visual playback remains unverified because the widget is unmounted. Filtered or collapsed cards won\u2019t show the animation.",
+    "board": "B",
+    "number": 7,
+    "request": "When a card lands in Done, play a small check-mark animation.",
+    "changes": [
+      {
+        "thing": "dk177",
+        "kind": "grant",
+        "field": "revoked",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "by",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "kind",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "only",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "to",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "where",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "words",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk176",
+        "kind": "widget",
+        "field": "code",
+        "category": "source",
+        "lines": 35
+      }
+    ],
+    "lines": 42,
+    "landed": [
+      "facts",
+      "source"
+    ],
+    "success": true,
+    "board_proof": false,
+    "proof_passed": 10,
+    "proof_checks": 11,
+    "wall_seconds": 89.06,
+    "first_check_success": true
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 75.06,
+    "answer": "Updated `taskboard-components` (dk170): lane headings are **Pendientes**, **En curso**, and **Hecho**, and all card menu labels are Spanish.\n\nCode was necessary: created and explicitly reviewed a board-specific lane component (dk179), preserving lane identities and Done folding. Shared task/lane facts and the other board were untouched.\n\nVerified the stored definition and structure: 3 lanes, 25 cards. Visual appearance and interactions could not be inspected.",
+    "board": "A",
+    "number": 8,
+    "request": "Show the lane names and the card menu in Spanish for me.",
+    "changes": [
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "code",
+        "category": "component code",
+        "lines": 10
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "category",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "example",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "for",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "gestures",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "in:dk1",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "kind",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "made_by",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "name",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "parts",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "purpose",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "reviewed_code",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "settings",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "slots",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "component",
+        "field": "uses",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk170",
+        "kind": "lens",
+        "field": "text",
+        "category": "lens",
+        "lines": 36
+      }
+    ],
+    "lines": 60,
+    "landed": [
+      "component code",
+      "facts",
+      "lens"
+    ],
+    "success": false,
+    "board_proof": true,
+    "proof_passed": 11,
+    "proof_checks": 11,
+    "wall_seconds": 84.59,
+    "first_check_success": false
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 33.24,
+    "answer": "Updated `taskboard-js` (`dk176`): lane labels are **Pendientes**, **En curso**, and **Hecho**; card menu labels and colour tooltips are Spanish.\n\nInline JavaScript was necessary and explicitly reviewed/reactivated as Alex. Shared task/lane facts and the other board remain unchanged.\n\nVerified the saved code; visual appearance remains unverified because the widget is not mounted.",
+    "board": "B",
+    "number": 8,
+    "request": "Show the lane names and the card menu in Spanish for me.",
+    "changes": [
+      {
+        "thing": "dk177",
+        "kind": "grant",
+        "field": "revoked",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "by",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "kind",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "only",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "to",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "where",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "grant",
+        "field": "words",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk176",
+        "kind": "widget",
+        "field": "code",
+        "category": "source",
+        "lines": 22
+      }
+    ],
+    "lines": 29,
+    "landed": [
+      "facts",
+      "source"
+    ],
+    "success": false,
+    "board_proof": false,
+    "proof_passed": 8,
+    "proof_checks": 11,
+    "wall_seconds": 69.22,
+    "first_check_success": false
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 57.98,
+    "answer": "Added \u201cSnooze until tomorrow\u201d to card menus on `taskboard-components` (`dk170`). Cards hide until the next UTC day, then return in their existing lane.\n\nNo code was necessary\u2014only arrangement changes. The other board remains unchanged.\n\nVerified hide/return conditions using \u201cFix the bar before the neighbourhood demo\u201d (`dk105`), then cleared the test snooze. All 25 cards are restored. Visual appearance and an actual midnight rollover were not inspected.",
+    "board": "A",
+    "number": 9,
+    "request": "Add 'Snooze until tomorrow' to the card menu: the card hides until tomorrow, then comes back.",
+    "changes": [
+      {
+        "thing": "dk170",
+        "kind": "lens",
+        "field": "text",
+        "category": "lens",
+        "lines": 71
+      }
+    ],
+    "lines": 71,
+    "landed": [
+      "lens"
+    ],
+    "success": true,
+    "board_proof": true,
+    "proof_passed": 11,
+    "proof_checks": 11,
+    "wall_seconds": 68.98,
+    "first_check_success": true
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 79.47,
+    "answer": "Added \u201cSnooze until tomorrow\u201d to `taskboard-js` (`dk176`) through inline JavaScript, explicitly reviewed and reactivated as Alex.\n\nSnoozes persist separately in `dk179`; cards return at the next local midnight. The other board and shared task/lane facts were untouched.\n\nVerified saved code and grants. Visual behavior and midnight return were not runtime-tested; the widget is currently unmounted.",
+    "board": "B",
+    "number": 9,
+    "request": "Add 'Snooze until tomorrow' to the card menu: the card hides until tomorrow, then comes back.",
+    "changes": [
+      {
+        "thing": "dk177",
+        "kind": "grant",
+        "field": "revoked",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "taskboard-js-snoozes",
+        "field": "board",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "taskboard-js-snoozes",
+        "field": "for",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "taskboard-js-snoozes",
+        "field": "in:dk1",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "taskboard-js-snoozes",
+        "field": "kind",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "taskboard-js-snoozes",
+        "field": "made_by",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "taskboard-js-snoozes",
+        "field": "name",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "taskboard-js-snoozes",
+        "field": "title",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk179",
+        "kind": "taskboard-js-snoozes",
+        "field": "until",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "by",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "kind",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "only",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "to",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "where",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk180",
+        "kind": "grant",
+        "field": "words",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk181",
+        "kind": "grant",
+        "field": "by",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk181",
+        "kind": "grant",
+        "field": "kind",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk181",
+        "kind": "grant",
+        "field": "only",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk181",
+        "kind": "grant",
+        "field": "to",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk181",
+        "kind": "grant",
+        "field": "where",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk181",
+        "kind": "grant",
+        "field": "words",
+        "category": "facts",
+        "lines": 1
+      },
+      {
+        "thing": "dk176",
+        "kind": "widget",
+        "field": "code",
+        "category": "source",
+        "lines": 38
+      }
+    ],
+    "lines": 59,
+    "landed": [
+      "facts",
+      "source"
+    ],
+    "success": true,
+    "board_proof": false,
+    "proof_passed": 4,
+    "proof_checks": 6,
+    "wall_seconds": 112.19,
+    "first_check_success": true
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 18.03,
+    "answer": "Two p1 tasks have been in Doing (called **Now** here) for more than three days:\n\n- **Set aside a break** \u2014 `dk121`: entered Now on October 18, about 6 days ago.\n- **Keep original notes alongside summary** \u2014 `dk125`: entered Now on October 20, about 4 days ago.\n\nThis uses lane history; later notes don\u2019t reset the time.\n\nNothing changed on either board or in shared facts. No code was necessary. This is a facts/history reading; I did not inspect the visual board.",
+    "board": "A",
+    "number": 10,
+    "request": "Which p1 tasks have been sitting in Doing for more than three days?",
+    "changes": [],
+    "lines": 0,
+    "landed": [
+      "reading"
+    ],
+    "success": true,
+    "board_proof": true,
+    "proof_passed": 11,
+    "proof_checks": 11,
+    "wall_seconds": 27.48,
+    "first_check_success": true
+  },
+  {
+    "exit": 0,
+    "timed_out": false,
+    "seconds": 19.12,
+    "answer": "Two p1 tasks have been in Doing (Now) for more than three days:\n\n- **Set aside a break** \u2014 `dk121`: entered Now October 18, about 6 days ago.\n- **Keep original notes alongside summary** \u2014 `dk125`: entered Now October 20, about 4 days ago.\n\nThis uses lane-entry history; later notes do not reset the duration. **Confirm chairs and space for wheelchairs** (`dk117`) entered October 22, so does not qualify.\n\nNothing changed. No code was necessary. This was a facts/history reading; no visual inspection was performed.",
+    "board": "B",
+    "number": 10,
+    "request": "Which p1 tasks have been sitting in Doing for more than three days?",
+    "changes": [],
+    "lines": 0,
+    "landed": [
+      "reading"
+    ],
+    "success": true,
+    "board_proof": false,
+    "proof_passed": 8,
+    "proof_checks": 11,
+    "wall_seconds": 61.55,
+    "first_check_success": false,
+    "recheck": {
+      "success": true,
+      "reason": "Checker distinguishes explicit exclusions from the tasks listed as qualifying. Exact original word calls replayed, no new agent or implementation edits.",
+      "replayed_calls": 11
+    }
+  }
+]

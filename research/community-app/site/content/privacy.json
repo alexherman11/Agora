@@ -1,0 +1,23 @@
+{
+  "_note": "Draft by Claude, 23 Oct 2026, for Alex to rewrite. It describes what this software stores, nothing more. The promises in it (who sees answers, deleting on request) are Alex's to make or change. Google's consent screen needs this page's address.",
+  "title": "Privacy",
+  "updated": "Draft, 23 October 2026",
+  "sections": [
+    {"title": "What we keep", "body": [
+      "Your email address, so you can sign in. If you use Google, Google tells us your email address and the name on your account, and nothing else.",
+      "Your name as you want neighbours to see it, and your answers to the questions you see when you join.",
+      "Which invite link you came through and who made it, and when you signed in."
+    ]},
+    {"title": "What we never keep", "body": [
+      "Passwords: there aren't any. Sign-in links and codes work once and are stored only in scrambled form.",
+      "Your home address. We never ask for it. If you add a place yourself, it is shown only as you choose."
+    ]},
+    {"title": "Who sees it", "body": [
+      "Your name is shown to other members. Your answers are seen by you and by the group's leaders. Your email address is not shown to other members.",
+      "We don't sell or share any of this, and there are no ads."
+    ]},
+    {"title": "Leaving", "body": [
+      "Ask a leader and we will delete your account and what we keep about you."
+    ]}
+  ]
+}

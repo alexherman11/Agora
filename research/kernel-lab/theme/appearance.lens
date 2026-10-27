@@ -1,0 +1,18 @@
+# Appearance: choose, make, import, export and share themes. Arrangement only; the reviewed component draws it.
+# Every button below is an ordinary word the viewer already has (theme.*, board.post, attach); this window adds no power.
+root : appearance
+  watch reading:"theme.list"
+  watch reading:"theme.current"
+  watch reading:"theme.options"
+  watch reading:"rows board-channel"
+  on try do theme.try $theme
+  on keep do theme.keep
+  on revert do theme.revert
+  on use do theme.use $theme for=place
+  on useme do theme.use $theme for=me
+  on follow do theme.use place for=me
+  on make do theme.make $theme name=$name
+  on edit do theme.edit $theme $fields
+  on import do theme.import $fields
+  on post do board.post $fields
+  on attach do attach $file to=$target

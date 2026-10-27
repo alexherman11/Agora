@@ -1,0 +1,41 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Thing · Agora</title>
+<link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="kd.css">
+</head>
+<body>
+<main>
+  <h1 id="title">…</h1>
+  <div class="card"><pre id="said"></pre></div>
+  <h2>Its aspects</h2>
+  <div class="card"><pre id="aspects"></pre></div>
+</main>
+<script src="kd.js"></script><script src="theme-live.js"></script>
+<script>
+"use strict";
+const strip = KD.chrome("Thing");
+async function draw() {
+  const t = KD.target;
+  if (!t) { document.getElementById("title").textContent = "No thing named"; return; }
+  const r = await KD.see(`look ${t}`);
+  const row = (r.rows || [])[0] || {};
+  const name = row.name || row.label || (row.text || "").slice(0, 48) || "Thing";
+  document.getElementById("title").textContent = name;
+  strip.querySelector(".name").textContent = name;
+  document.title = `${name} · Agora`;
+  document.getElementById("said").textContent = row.text || row.name || row.label || "No text yet.";
+  const facts = Object.entries(row).filter(([k]) => !["id","rev","in","text","name","label"].includes(k) && !k.startsWith("like:"));
+  const readable = async (v) => {
+    if(typeof v === "boolean") return v ? "Yes" : "No";
+    if(Array.isArray(v)) return (await Promise.all(v.map(readable))).join(", ");
+    if(typeof v === "string" && /^dk\d+$/.test(v)) {
+      const reply = await KD.see(`look ${v}`), thing = (reply.rows || [])[0] || {};
+      return thing.name || thing.label || (thing.text || "").slice(0,48) || "Thing";
+    }
+    return typeof v === "object" ? JSON.stringify(v) : String(v);
+  };
+  document.getElementById("aspects").textContent = (await Promise.all(facts.map(async ([k,v]) => `${k.charAt(0).toUpperCase()+k.slice(1).replace(/_/g," ")}: ${await readable(v)}`))).join("\n");
+}
+KD.stream((h) => { if (h.word === "hello" || h.word === "world") draw(); });
+draw();
+</script>
+</body></html>

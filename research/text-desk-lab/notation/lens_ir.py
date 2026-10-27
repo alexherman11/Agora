@@ -345,7 +345,7 @@ def _static(node, irs, memo):
     if got is not None:
         return got
     em, b = node["emit"], node["bind"]
-    words = [em.get("text"), em.get("light"), em.get("remember"), em.get("fold") if isinstance(em.get("fold"), str) else None, node["place"],
+    words = [em.get("text"), em.get("light"), em.get("waits"), em.get("remember"), em.get("fold") if isinstance(em.get("fold"), str) else None, node["place"],
              *(em.get("tip") or ()), em.get("share"),
              "$" + em["resize"][0] if em.get("resize") else None]
     if em.get("partition"):
@@ -559,6 +559,8 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                         continue
                     g["cb"] = list(cb) + g["cb"][old["cb0"]:]
                     n["reads"] = _fence_reads(w, g["fields0"], g["ids0"], g["cb"])
+                    if n.get("source"):
+                        n["source"] = {**n["source"], "rev": S._rev_of(w, n["source"]["item"])}
                     _bind(w, n)
                 old["cb0"] = len(cb)
                 for k2, e2 in old["inner"]:
@@ -824,10 +826,34 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                     out["computed"] = computed
             else:
                 out["text"] = S._fill(em["text"], fill_ctx, track)
+            # Exact provenance only for direct fields, never a substring guess.
+            direct = re.fullmatch(r"\$(?:(\w+)\.)?(text|title)", em["text"])
+            if direct:
+                frame, field = direct.groups()
+                origin = frames.get(frame, {}) if frame else ctx
+                sid = origin.get("id") or origin.get("item")
+                if sid and out["text"] == acc.thing(sid).get(field):
+                    out["source"] = {"item": sid, "rev": S._rev_of(w, sid), "field": field}
             if em.get("light"):              # 13 Oct: the passages to light, filled as the words are
                 lt = em["light"]
                 out["light"] = (S._fill_text(lt, fill_ctx, track, lambda e: X.run(e, xenv()))[0] if "$(" in lt
                                 else S._fill(lt, fill_ctx, track))
+            if em.get("waits"):              # a10486: what Send waits on, filled as the words are
+                # Wait status is presentation, never permission or an action
+                # value. Keep its cache dependency (_static), but not a gesture
+                # fence that would stale merely because the wait completed.
+                from copy import deepcopy
+                saved_track, saved_cb = deepcopy(track), list(cb)
+                wt = em["waits"]
+                try:
+                    out["waits"] = (S._fill_text(wt, fill_ctx, track, lambda e: X.run(e, xenv()))[0] if "$(" in wt
+                                    else S._fill(wt, fill_ctx, track))
+                finally:
+                    wait_bad = set(track["bad"]) - set(saved_track["bad"])
+                    track.clear()
+                    track.update(saved_track)
+                    track["bad"].update(wait_bad)
+                    cb[:] = saved_cb
             if em.get("markdown") and "[[" in (out["text"] or ""):     # a5820: what each [[wikilink]] names, read now
                 out["wikilinks"] = S.wikilinks_of(w, out["text"], acc.thing)
             # a6109: an id in words that are only read is drawn as the name of what it names. Not recorded as a read:
@@ -904,6 +930,13 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         acts = [] if (node["acts"] and ctx.get("_state") in ("gone", "unplaced")) else [
             {"on": a["on"], "line": act_line(a["line"]), **{k: a[k] for k in ("part", "side", "label") if a.get(k)}}
             for a in node["acts"] if offered(a)]
+        if (ctx.get("_state") not in ("gone", "unplaced")
+                and any(a["on"] == "edit-quoted" for a in node["acts"])):
+            # Guards choose the world-authored route first. The composer then
+            # chooses plain/quoted locally, retaining that route's entire batch.
+            if (sum(a["on"] == "edit" for a in acts) != 1
+                    or sum(a["on"] == "edit-quoted" for a in acts) > 1):
+                raise S.LensRefusal(f"line {node['line']}: paired composer needs exactly one offered plain action and at most one offered quoted action after guards")
         if node["carry"]:
             if not ctx.get("item"):
                 raise S.LensRefusal(f"line {node['line']}: `carry` needs a world thing behind this part, and here there is none (a derived row or the root)")

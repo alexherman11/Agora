@@ -1534,6 +1534,12 @@ class DeskKnife(DeskMoo):
         words = line.split(None, 1)
         cmd = words[0].lower()
         arg = words[1].strip() if len(words) > 1 else ""
+        if cmd not in helpnotes.commands():
+            import dictionary      # a13316: a word of a kernel command's dictionary entry (inspect|x|ex) is that command
+            to = dictionary.alias(self, cmd)
+            if to and to in helpnotes.commands():
+                cmd, words = to, [to] + words[1:]
+                line = " ".join(words)
         if arg and cmd not in ("do", "rule", "run", "script") and (blanks.ctx_of(self).template or cmd in blanks.READS):
             # words that name things (look $new, go $here); inside a verb or script, every command's words
             arg = blanks.fill(self, arg, quote=True)
@@ -1647,6 +1653,12 @@ class DeskKnife(DeskMoo):
             if len(argv) < 2:
                 raise Refusal("do needs: do <verb> <target> [k=v ...]")
             verb = argv[0].lower()
+            if verb not in self._builtin_verbs() and verb not in promises.VERBS + promises.HOUSE_VERBS:
+                import dictionary  # a13316: a word of a built-in verb's dictionary entry (do shift ...) is that verb
+                to = dictionary.alias(self, verb)
+                if to and to in self._builtin_verbs():
+                    verb, argv[0] = to, to
+                    arg = re.sub(r"^\s*\S+", to, arg, count=1)
             if verb in promises.VERBS + promises.HOUSE_VERBS:      # a1587: do accept a2001 is accept a2001
                 return self._promise_verb(verb, arg.split(None, 1)[1] if len(arg.split(None, 1)) > 1 else "")
             is_target = is_target_word      # a selection term is the target, = or not (Juniper; see SEL)
@@ -1743,7 +1755,7 @@ class DeskKnife(DeskMoo):
         # topic's answer first (a1308)
         noun = name not in cmds and name not in builtin and name != helpnotes.MANUAL and name not in helpnotes.topics(w)
         if note is not None and not noun:
-            return note
+            return self._entry_help(name, note)
         if name in cmds:
             return helpnotes.floor(self, name)
         if name in knife.PAIR_DOC:
@@ -1754,7 +1766,7 @@ class DeskKnife(DeskMoo):
             if made:
                 return "\n\n".join(verbs.describe(self, s) for s in made)
             if note is not None:
-                return note
+                return self._entry_help(name, note)
             try:
                 self._resolve(name)                           # help <thing> is examine <thing>
                 return self.cmd_examine(name)
@@ -1776,6 +1788,13 @@ class DeskKnife(DeskMoo):
         if name in moo.REGISTRY:
             return helpnotes.floor(self, name)
         return super().cmd_help(name)
+
+    def _entry_help(self, name, note):
+        """a13316: help <word> for a dictionary entry: its kind, what it takes, undo, who may, where it comes from and
+        whether it is bound, before its help (dictionary.help_text); any other note's text as it is."""
+        import dictionary
+        hit = helpnotes.lookup(self.world).get(name)
+        return dictionary.help_text(self, hit[0]["id"], note) if hit else note
 
     def _topics(self):
         cmds = set(self._commands()) | set(self.COMMAND_ALIAS)
@@ -1869,6 +1888,8 @@ class DeskKnife(DeskMoo):
                     out += self._rule_lines(r)
             import verbs
             out += verbs.binding_lines(w, ("s", s["id"]), s["text"])     # a1156: what its stored words are bound to
+            import dictionary
+            out += dictionary.card(self, s["id"])      # a13316: a dictionary entry says its kind, takes, undo, who may, from
             if s["kind"] == "chat":
                 pend = moo.unanswered(w, s["id"], str(w.me or "alex").lower())
                 out.append("  awaiting reply: " + " | ".join(pend) if pend else "  nothing awaiting a reply")
@@ -2004,6 +2025,28 @@ class DeskKnife(DeskMoo):
 
     def _do_knife(self, verb, positional, kv):
         w = self.world
+        # Capture publication is a compare-and-set on one message generation,
+        # inside the same ordinary writer admission as Send, not examine+prop's
+        # shared per-actor "seen" cursor. No authority is added by these fences.
+        if verb == "prop" and "capture_if_generation" in kv:
+            import rooms
+            kv = dict(kv)
+            expected = {key: kv.pop("capture_if_" + key, None)
+                        for key in ("generation", "context", "pending")}
+            if len(positional) != 1 or any(value is None for value in expected.values()):
+                raise Refusal("capture publication needs one draft and all three comparisons")
+            draft = self._resolve(positional[0])
+            props = moo.props_of(w, draft)
+            actor = str(w.me).split("/")[0]
+            if not props.get("actor") or not rooms.same_person(w, props["actor"], actor):
+                raise Refusal("capture publication belongs to another actor")
+            if set(kv) - {"context", "pending"}:
+                raise Refusal("capture publication changes only context and pending")
+            current = {"generation": str(props.get("capture_generation") or "0"),
+                       "context": str(props.get("context") or ""),
+                       "pending": str(props.get("pending") or "")}
+            if expected != current:
+                raise Refusal("capture draft changed since reservation; not attached")
         # Private captures enter recorded state only with the writer's send.
         # context_from opts into consuming only the composer's observed IDs from
         # a native draft. Both native edits finish before hooks see either one.
@@ -2012,6 +2055,10 @@ class DeskKnife(DeskMoo):
             live = "captures" in kv
             captures = kv.pop("captures", "")
             source = kv.pop("context_from", "")
+            generation = kv.pop("capture_generation", None)
+            current_selection = captures == "current"
+            if (generation is not None or current_selection) and not source:
+                raise Refusal("capture_generation needs context_from")
             from message_context import CAP_ID, resolve
             actor = str(w.me).split("/")[0]
             session = getattr(self, "_session", "")
@@ -2039,6 +2086,16 @@ class DeskKnife(DeskMoo):
                 if owner and not (owner_pid and owner_pid == actor_pid) and \
                         not rooms.same_person(w, owner, actor):
                     raise Refusal("context_from belongs to another actor")
+                if generation is not None:
+                    actual = str(moo.props_of(w, draft).get("capture_generation") or "0")
+                    if not re.fullmatch(r"0|[1-9]\d{0,15}", str(generation)) or str(generation) != actual:
+                        raise Refusal("Not sent — this capture draft belongs to another message; your words are kept")
+                    if str(moo.props_of(w, draft).get("pending") or "").strip():
+                        raise Refusal("Not sent — a capture is still attaching; your words are kept")
+                if current_selection:
+                    if generation is None:
+                        raise Refusal("current captures need a message generation")
+                    captures = str(moo.props_of(w, draft).get("context") or "")
                 if live:
                     selected = str(captures).split()
                     if len(selected) > 8 or any(not CAP_ID.fullmatch(cid) for cid in selected):
@@ -2066,7 +2123,7 @@ class DeskKnife(DeskMoo):
                     kv["context"] = resolve(session, actor, " ".join(selected))
                 # An explicitly empty selection is ordinary text, even if another
                 # window attached something since the composer was painted.
-                if not selected:
+                if not selected and generation is None:
                     return self._do_knife(verb, positional, kv)
                 pending = attached()
                 remaining = [cid for cid in pending if cid not in set(selected)]
@@ -2077,8 +2134,11 @@ class DeskKnife(DeskMoo):
                     out = self._do_knife(verb, positional, kv)
                     appended = any((e.get("args") or {}).get("line_id")
                                    for e in w.events[n0:])
-                    if appended and remaining != pending:
-                        result = moo.v_prop(w, draft, {"context": " ".join(remaining)})
+                    if appended and (remaining != pending or generation is not None):
+                        change = {"context": " ".join(remaining)}
+                        if generation is not None:
+                            change["capture_generation"] = str(int(generation) + 1)
+                        result = moo.v_prop(w, draft, change)
                         event = w.event_by_id(result["event"])
                         event.setdefault("changed", []).extend(result.get("changed", []))
                         event["via"] = "prop"

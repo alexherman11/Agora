@@ -1,0 +1,720 @@
+{
+  "checks": [
+    {
+      "check": "Authored world definitions install",
+      "ok": true,
+      "detail": "24 declarations"
+    },
+    {
+      "check": "Style resolves without refused or unread properties",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Second install is a no-op",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Empty board explains quick add",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Summary writes are restricted to task things",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Help: task-priority",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Help: task-note-colour",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Help: task-note-style",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Help: task-remove",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Help: summarize.task",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Help: summarize.all",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Help: summarize.add",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "25 quick-adds parse p1\u2013p4 and preserve descriptions",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Automatic summaries disclose provenance",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Two notes retain multiline Markdown, colours and styles",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Triage duration",
+      "ok": true,
+      "detail": "1.6 seconds; requested 0 minutes"
+    },
+    {
+      "check": "Real quick-add typing keeps spaces and strips p2",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Missing or undone summary retains original description",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "25 cards in three drop lanes at 1600px",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Every task paints a priority icon",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Card menu exposes requested actions",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Priority changes through real card menu",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Pointer drag moves card to Done",
+      "ok": true,
+      "detail": "ok set tv86 [r102] \u00b7 lane=Done\n~ task-move, one act [r102]"
+    },
+    {
+      "check": "Stale competing drag refuses without moving",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Priority ordering compiles with real counts",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Painted tasks sort by priority in every lane",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Real multiline note editing, Bold, Italic and Save",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Note menu changes actual colour and style facts",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Three hidden screenshots saved",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "P1 chip filters tasks",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Remove forgets a card",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Undo my last act restores card and history",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Migration is idempotent",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Scratch replay matches all current facts",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "activity": [
+    {
+      "seconds": 0.609,
+      "who": "Alex",
+      "line": "summarize.add text=\"Fix the bar before the neighbourhood demo p1\"",
+      "records": [
+        "r32"
+      ]
+    },
+    {
+      "seconds": 0.672,
+      "who": "Alex",
+      "line": "look tv86",
+      "records": []
+    },
+    {
+      "seconds": 0.672,
+      "who": "Alex",
+      "line": "task-move tv86 to=Now",
+      "records": [
+        "r34"
+      ]
+    },
+    {
+      "seconds": 0.687,
+      "who": "Alex",
+      "line": "task-note tv86 text=\"## Evening notes\n\n**Welcome** every neighbour.\n\n- [ ] Check the entrance\n- [ ] Bring tea\n\nKeep the *original* details.\"",
+      "records": [
+        "r35"
+      ]
+    },
+    {
+      "seconds": 0.687,
+      "who": "Alex",
+      "line": "task-note-colour tv86 colour=sage",
+      "records": [
+        "r36"
+      ]
+    },
+    {
+      "seconds": 0.687,
+      "who": "Alex",
+      "line": "task-note-style tv86 style=strong",
+      "records": [
+        "r37"
+      ]
+    },
+    {
+      "seconds": 0.703,
+      "who": "agent",
+      "line": "summarize.add text=\"Confirm the venue and accessible entrance p2\"",
+      "records": [
+        "r38"
+      ]
+    },
+    {
+      "seconds": 0.75,
+      "who": "agent",
+      "line": "look tv87",
+      "records": []
+    },
+    {
+      "seconds": 0.765,
+      "who": "agent",
+      "line": "task-note tv87 text=\"## Evening notes\n\n**Welcome** every neighbour.\n\n- [ ] Check the entrance\n- [ ] Bring tea\n\nKeep the *original* details.\"",
+      "records": [
+        "r40"
+      ]
+    },
+    {
+      "seconds": 0.765,
+      "who": "agent",
+      "line": "task-note-colour tv87 colour=lilac",
+      "records": [
+        "r41"
+      ]
+    },
+    {
+      "seconds": 0.765,
+      "who": "agent",
+      "line": "task-note-style tv87 style=slant",
+      "records": [
+        "r42"
+      ]
+    },
+    {
+      "seconds": 0.765,
+      "who": "Alex",
+      "line": "summarize.add text=\"Review invitation wording with the organisers p3\"",
+      "records": [
+        "r43"
+      ]
+    },
+    {
+      "seconds": 0.828,
+      "who": "Alex",
+      "line": "look tv88",
+      "records": []
+    },
+    {
+      "seconds": 0.828,
+      "who": "agent",
+      "line": "summarize.add text=\"Print a large type version of the agenda p4\"",
+      "records": [
+        "r45"
+      ]
+    },
+    {
+      "seconds": 0.89,
+      "who": "agent",
+      "line": "look tv89",
+      "records": []
+    },
+    {
+      "seconds": 0.89,
+      "who": "agent",
+      "line": "task-move tv89 to=Now",
+      "records": [
+        "r47"
+      ]
+    },
+    {
+      "seconds": 0.906,
+      "who": "Alex",
+      "line": "summarize.add text=\"Ask the library about the projector p1\"",
+      "records": [
+        "r48"
+      ]
+    },
+    {
+      "seconds": 0.953,
+      "who": "Alex",
+      "line": "look tv90",
+      "records": []
+    },
+    {
+      "seconds": 0.968,
+      "who": "agent",
+      "line": "summarize.add text=\"Prepare tea and a quiet corner p2\"",
+      "records": [
+        "r50"
+      ]
+    },
+    {
+      "seconds": 1.015,
+      "who": "agent",
+      "line": "look tv91",
+      "records": []
+    },
+    {
+      "seconds": 1.031,
+      "who": "Alex",
+      "line": "summarize.add text=\"Check that the microphone reaches the back row p3\"",
+      "records": [
+        "r52"
+      ]
+    },
+    {
+      "seconds": 1.109,
+      "who": "Alex",
+      "line": "look tv92",
+      "records": []
+    },
+    {
+      "seconds": 1.109,
+      "who": "Alex",
+      "line": "task-move tv92 to=Now",
+      "records": [
+        "r54"
+      ]
+    },
+    {
+      "seconds": 1.109,
+      "who": "agent",
+      "line": "summarize.add text=\"Write a short welcome for newcomers p4\"",
+      "records": [
+        "r55"
+      ]
+    },
+    {
+      "seconds": 1.172,
+      "who": "agent",
+      "line": "look tv93",
+      "records": []
+    },
+    {
+      "seconds": 1.172,
+      "who": "Alex",
+      "line": "summarize.add text=\"Collect questions about the Seabright crossing p1\"",
+      "records": [
+        "r57"
+      ]
+    },
+    {
+      "seconds": 1.187,
+      "who": "Alex",
+      "line": "look tv94",
+      "records": []
+    },
+    {
+      "seconds": 1.187,
+      "who": "agent",
+      "line": "summarize.add text=\"Share the bus timetable with visitors p2\"",
+      "records": [
+        "r59"
+      ]
+    },
+    {
+      "seconds": 1.25,
+      "who": "agent",
+      "line": "look tv95",
+      "records": []
+    },
+    {
+      "seconds": 1.25,
+      "who": "agent",
+      "line": "task-move tv95 to=Now",
+      "records": [
+        "r61"
+      ]
+    },
+    {
+      "seconds": 1.265,
+      "who": "Alex",
+      "line": "summarize.add text=\"Check the door signage; include the side entrance p3\"",
+      "records": [
+        "r62"
+      ]
+    },
+    {
+      "seconds": 1.312,
+      "who": "Alex",
+      "line": "look tv96",
+      "records": []
+    },
+    {
+      "seconds": 1.328,
+      "who": "agent",
+      "line": "summarize.add text=\"Bring spare pens and blank name badges p4\"",
+      "records": [
+        "r64"
+      ]
+    },
+    {
+      "seconds": 1.39,
+      "who": "agent",
+      "line": "look tv97",
+      "records": []
+    },
+    {
+      "seconds": 1.39,
+      "who": "Alex",
+      "line": "summarize.add text=\"Confirm the chairs and leave space for wheelchairs p1\"",
+      "records": [
+        "r66"
+      ]
+    },
+    {
+      "seconds": 1.453,
+      "who": "Alex",
+      "line": "look tv98",
+      "records": []
+    },
+    {
+      "seconds": 1.453,
+      "who": "Alex",
+      "line": "task-move tv98 to=Now",
+      "records": [
+        "r68"
+      ]
+    },
+    {
+      "seconds": 1.453,
+      "who": "agent",
+      "line": "summarize.add text=\"Draft a follow-up message for volunteers p2\"",
+      "records": [
+        "r69"
+      ]
+    },
+    {
+      "seconds": 1.515,
+      "who": "agent",
+      "line": "look tv99",
+      "records": []
+    },
+    {
+      "seconds": 1.515,
+      "who": "Alex",
+      "line": "summarize.add text=\"Test the map on a phone before the meeting p3\"",
+      "records": [
+        "r71"
+      ]
+    },
+    {
+      "seconds": 1.531,
+      "who": "Alex",
+      "line": "look tv100",
+      "records": []
+    },
+    {
+      "seconds": 1.531,
+      "who": "agent",
+      "line": "summarize.add text=\"Ask two neighbours to review the task board p4\"",
+      "records": [
+        "r73"
+      ]
+    },
+    {
+      "seconds": 1.593,
+      "who": "agent",
+      "line": "look tv101",
+      "records": []
+    },
+    {
+      "seconds": 1.593,
+      "who": "agent",
+      "line": "task-move tv101 to=Now",
+      "records": [
+        "r75"
+      ]
+    },
+    {
+      "seconds": 1.609,
+      "who": "agent",
+      "line": "summarize.all lane=Now",
+      "records": []
+    },
+    {
+      "seconds": 1.609,
+      "who": "Alex",
+      "line": "summarize.add text=\"Set aside five minutes for a break p1\"",
+      "records": [
+        "r76"
+      ]
+    },
+    {
+      "seconds": 1.672,
+      "who": "Alex",
+      "line": "look tv102",
+      "records": []
+    },
+    {
+      "seconds": 1.672,
+      "who": "agent",
+      "line": "summarize.add text=\"Prepare a checklist for the evening hosts p2\"",
+      "records": [
+        "r78"
+      ]
+    },
+    {
+      "seconds": 1.734,
+      "who": "agent",
+      "line": "look tv103",
+      "records": []
+    },
+    {
+      "seconds": 1.734,
+      "who": "Alex",
+      "line": "summarize.add text=\"Find the latest council meeting notes p3\"",
+      "records": [
+        "r80"
+      ]
+    },
+    {
+      "seconds": 1.797,
+      "who": "Alex",
+      "line": "look tv104",
+      "records": []
+    },
+    {
+      "seconds": 1.797,
+      "who": "Alex",
+      "line": "task-move tv104 to=Now",
+      "records": [
+        "r82"
+      ]
+    },
+    {
+      "seconds": 1.797,
+      "who": "agent",
+      "line": "summarize.add text=\"Summarize the actions after the meeting p4\"",
+      "records": [
+        "r83"
+      ]
+    },
+    {
+      "seconds": 1.89,
+      "who": "agent",
+      "line": "look tv105",
+      "records": []
+    },
+    {
+      "seconds": 1.89,
+      "who": "Alex",
+      "line": "summarize.add text=\"Keep the original notes alongside the summary p1\"",
+      "records": [
+        "r85"
+      ]
+    },
+    {
+      "seconds": 1.953,
+      "who": "Alex",
+      "line": "look tv106",
+      "records": []
+    },
+    {
+      "seconds": 1.953,
+      "who": "agent",
+      "line": "summarize.add text=\"Arrange a ride home for the late volunteers p2\"",
+      "records": [
+        "r87"
+      ]
+    },
+    {
+      "seconds": 2.015,
+      "who": "agent",
+      "line": "look tv107",
+      "records": []
+    },
+    {
+      "seconds": 2.031,
+      "who": "agent",
+      "line": "task-move tv107 to=Now",
+      "records": [
+        "r89"
+      ]
+    },
+    {
+      "seconds": 2.031,
+      "who": "Alex",
+      "line": "summarize.add text=\"Recheck the date on the printed flyers p3\"",
+      "records": [
+        "r90"
+      ]
+    },
+    {
+      "seconds": 2.093,
+      "who": "Alex",
+      "line": "look tv108",
+      "records": []
+    },
+    {
+      "seconds": 2.093,
+      "who": "agent",
+      "line": "summarize.add text=\"Thank everyone who helped with setup p4\"",
+      "records": [
+        "r92"
+      ]
+    },
+    {
+      "seconds": 2.156,
+      "who": "agent",
+      "line": "look tv109",
+      "records": []
+    },
+    {
+      "seconds": 2.156,
+      "who": "Alex",
+      "line": "summarize.add text=\"Plan the next small step with the group p1\"",
+      "records": [
+        "r94"
+      ]
+    },
+    {
+      "seconds": 2.218,
+      "who": "Alex",
+      "line": "look tv110",
+      "records": []
+    },
+    {
+      "seconds": 2.234,
+      "who": "Alex",
+      "line": "task-move tv110 to=Now",
+      "records": [
+        "r96"
+      ]
+    },
+    {
+      "seconds": 4.187,
+      "who": "Alex",
+      "line": "look tv111",
+      "records": []
+    },
+    {
+      "seconds": 4.203,
+      "who": "Alex",
+      "line": "set tv111 short= short_source=",
+      "records": [
+        "r99"
+      ]
+    },
+    {
+      "seconds": 4.39,
+      "who": "Alex",
+      "line": "look tv111",
+      "records": []
+    },
+    {
+      "seconds": 4.437,
+      "who": "Alex",
+      "line": "task-remove tv111",
+      "records": [
+        "r100"
+      ]
+    },
+    {
+      "seconds": 6.297,
+      "who": "Alex",
+      "line": "look tv86",
+      "records": []
+    },
+    {
+      "seconds": 6.39,
+      "who": "Alex",
+      "line": "task-move tv86 to=Now",
+      "records": [
+        "r103"
+      ]
+    },
+    {
+      "seconds": 19.593,
+      "who": "agent",
+      "line": "look tv110",
+      "records": []
+    },
+    {
+      "seconds": 19.593,
+      "who": "agent",
+      "line": "task-remove tv110",
+      "records": [
+        "r109"
+      ]
+    },
+    {
+      "seconds": 19.609,
+      "who": "agent",
+      "line": "undo",
+      "records": [
+        "r110"
+      ]
+    }
+  ],
+  "requested_minutes": 0.0,
+  "wall_seconds": 19.64,
+  "records": 110,
+  "at": "2026-10-26T19:53:46.303601+00:00"
+}

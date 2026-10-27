@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "owner": {
+    "pid": 102088,
+    "created": 134375328243170920,
+    "exe": "C:\\Users\\Alex\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+  },
+  "guard": {
+    "pid": 89788,
+    "created": 134375328258618296,
+    "exe": "C:\\Users\\Alex\\AppData\\Local\\Programs\\Python\\Python312\\pythonw.exe"
+  },
+  "released": true,
+  "windows": [
+    {
+      "ref": {
+        "hwnd": 5969360,
+        "process": {
+          "pid": 35816,
+          "created": 134375328229742095,
+          "exe": "C:\\Users\\Alex\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+        },
+        "thread": 77168,
+        "cls": "AgoraWMProof56cb4003b58043bb8d8c0b1718ab0af1"
+      },
+      "placement": {
+        "flags": 0,
+        "show": 1,
+        "min": [
+          0,
+          1995
+        ],
+        "max": [
+          -1,
+          -1
+        ],
+        "normal": [
+          241,
+          140,
+          1159,
+          799
+        ]
+      },
+      "dwm": {
+        "33": 0
+      },
+      "cookie": 204874573,
+      "released": true,
+      "outcome": "restored"
+    }
+  ],
+  "reason": "manager ended"
+}

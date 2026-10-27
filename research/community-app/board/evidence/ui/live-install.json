@@ -1,0 +1,20 @@
+{
+  "at": "2026-10-26T21:47:06.200307+00:00",
+  "lens": "dk366",
+  "widget": "dk368",
+  "button": "dk370",
+  "opened": false,
+  "posts_seeded": 0,
+  "feed_posts": 0,
+  "tasks_preserved": 26,
+  "histories_preserved": true,
+  "windows_preserved": 8,
+  "provider_on": false,
+  "protected_sha256": "c03e9ef391a7592394b150b4fd052e1aeed242ec5e8c4d118b8922c4ce9b9cc5",
+  "widget_source_sha256": "17694fd9c9f51e87de69c71979d60727dd4b00f215a50da7349536d35c0d2c3e",
+  "source_matches": true,
+  "look_revision_verified": true,
+  "channels": 6,
+  "kinds": 12,
+  "orderings": 5
+}

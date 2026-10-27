@@ -71,6 +71,20 @@ Verbs are the basic structure of language, and using things like flip, tile, and
 - Entering a space should show its relevant verbs
 - Before making a change you know everything it will affect.
 - A change made of many steps should be able to partially succeed if there are good recovery paths, otherwise the change should apply all or nothing.
+
+*Added 23 Oct 2026: drafted by Claude from Alex's words of 23 Oct, at his direction. See [[Communities and the Dictionary]].*
+
+The word layer stays on top, and code makes new words for it. A module, written in any language, publishes words; people and agents use them as they use any verb, without reading the code. Every word has one entry in a dictionary that lives in the world.
+
+*Held*
+- Code makes new words; it never replaces the word layer. Anything a module can do can be done through its words.
+- Every word, whatever made it, has one entry in a dictionary that lives in the world. Everything about a word except its implementation (its name, aliases, help, translations, who may use it) changes without a source edit.
+- Every act is a line, whoever wrote the code that made it.
+- A word with no help is not published.
+
+*Leaning*
+- Words come in four kinds: do (acts), see (readings), hear (happenings), hold (surfaces and streams, held while something runs).
+- Words backed by code are named apart from words made in the world (dotted, `media.play`, against bare, `claim`).
 ### Appearances and Visualization
 The desk should at minimum implement and be able to represent all the functions and views of a normal desktop, though it may have more variable and flexible options for layouts, tiling, overlays, and transitions making it feel unique. Applications should be broadly customizable in appearance, layout, and composition. With the default being the addition and subtraction of visible tools and menus. Skinning your applications should be common, with many people choosing to fully customize the appearances over applications. In order to facilitate this, the view architecture needs to be adaptable and codable, while sharing a common contract about how it manipulates and and creates objects on the device. Agora also seeks to create composable views and as many live features as possible, with a graph embedded in a document updating in real time, or a weather chart updating in response to real weather regardless of whether its in a document or on the desktop wallpaper. 
 
@@ -85,6 +99,11 @@ The desk should at minimum implement and be able to represent all the functions 
 - Transitions and animations? 
 - How do we compose views?
 - What does the desktop look like (tiled windows, layered windows, no windows at all?)
+
+*Added 23 Oct 2026: drafted by Claude from Alex's words of 23 Oct, at his direction.*
+
+*Held*
+- The same views appear on a desktop, a website and a phone. What differs is the host around them and their layout, never the data.
 ### Scripting
 In order to make easier the process of further development and complex features, the text based world should have a rich, native scripting language. It should be extremely extensible, just like Minecraft Redstone enables the building of a full computer inside Minecraft, or people made a computer inside LambdaMOO. Not saying it needs to make a computer, but it needs to be able to do basically anything with objects and appearances. 
 
@@ -95,6 +114,11 @@ In order to make easier the process of further development and complex features,
 - The language the terminal uses, the one that builds views, and the one that behavior is written in are all the same
 *Open*
 - What is the terminal interface? What are the important requirements and limitations our language needs for long term growth, stability, and security? 
+
+*Added 23 Oct 2026: drafted by Claude from Alex's words of 23 Oct, at his direction.*
+
+*Leaning*
+- There is one language for acting and composing. Code in any language can add words to it, by speaking lines, and never needs a second language beside it.
 
 ## Default Applications
 *Tentative*
@@ -172,6 +196,19 @@ There are two tiers of change. The world tier is lenses, styles, verbs, rules an
 *Open*
 - When does code that draws become something the world can hold safely?
 
+*Added 23 Oct 2026: drafted by Claude from Alex's words of 23 Oct, at his direction.*
+
+A module starts with no power and holds only what it is granted in the world. Grants are what let code from many people act in a shared world. They do not contain what the code does on the machine it runs on, so code nobody has reviewed runs only inside a sandbox, and waits until one exists.
+
+*Held*
+- A module holds only the words and surfaces it is granted. Turning it off takes all of them at once.
+- A module keeps no private storage. Anything lasting is a thing in the world.
+- Every running thing answers to words, including one that stops it, and can say what it is and what it is doing.
+- Sharing a feature is posting it. Taking it is placing it in your space; leaving it is removing it.
+
+*Leaning*
+- The default that everyone sees is a visible thing with a history and a steward, so its stewardship can be handed to the community.
+
 ## Log and Parallel Work
 
 The desk's organization should be preserved so when you return it looks the same. Undo should be able to undo basically any event, though some events can not be rolled back and should be marked as such in the log. 
@@ -209,11 +246,32 @@ A room is a space several people are in at once, over the same objects. Each per
 - What does it take for a device to run Agora, ie be able to enter a room? 
 - For something like a stream, how much immersion do people need to have for it to count as being in the room? Do they need to be able to edit the underlying code, or just move them around and edit their own lenses?
 
+*Added 23 Oct 2026: drafted by Claude from Alex's words of 23 Oct, at his direction.*
+
+Agora is a substrate for any community that wants to connect and build together, beginning with the Seabright neighbours. A community is one place with groups inside it, and the groups can hold groups of their own.
+
+*Held*
+- A community's place works entirely without AI. AI is for those who want to build or reshape their own experience.
+- People bring their own agents, which act with their person's power and are labelled as agents.
+- Not every post weighs the same, but weight decides placement, never erasure.
+
+*Leaning*
+- Joining is by invite and takes one choice and a couple of questions.
+
 ## Authority and responsibility
 
 *Held*
 - Claims never grant themselves
 - Every act has an author
+
+*Added 23 Oct 2026: drafted by Claude from Alex's words of 23 Oct, at his direction.*
+
+*Held*
+- Power is which words you may use. It is checked when a word runs, with the rights of the person whose act it is.
+- What the system's own trusted surfaces show (signing in, receipts) cannot be covered or imitated by anything else.
+
+*Leaning*
+- An author can be sealed: the world knows who acted, but readers do not see it. Votes are anonymous this way by default.
 
 **Open:**
 - Who can change what?

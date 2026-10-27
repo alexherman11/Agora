@@ -1,0 +1,5 @@
+{
+  "success": true,
+  "reason": "Checker requires a real functional Waiting drop in order, rather than a particular lane storage representation. Exact original word calls replayed, no new agent or implementation edits.",
+  "replayed_calls": 28
+}

@@ -1,0 +1,19 @@
+test_actual_tail_digest_checked_even_if_stat_version_unchanged (__main__.JournalCache.test_actual_tail_digest_checked_even_if_stat_version_unchanged) ... ok
+test_actual_tail_sequence_checked_even_with_same_digest (__main__.JournalCache.test_actual_tail_sequence_checked_even_with_same_digest) ... ok
+test_equal_length_replacement_reads_actual_head_and_facts (__main__.JournalCache.test_equal_length_replacement_reads_actual_head_and_facts) ... ok
+test_external_append_without_facts_replays_current_records (__main__.JournalCache.test_external_append_without_facts_replays_current_records) ... ok
+test_growing_replacement_replays_from_beginning (__main__.JournalCache.test_growing_replacement_replays_from_beginning) ... ok
+test_missing_file_never_returns_cached_facts (__main__.JournalCache.test_missing_file_never_returns_cached_facts) ... ok
+test_ordinary_append_supplied_facts_reuse_verified_cache (__main__.JournalCache.test_ordinary_append_supplied_facts_reuse_verified_cache) ... ok
+test_ordinary_begin_does_not_reuse_old_facts_after_replacement (__main__.JournalCache.test_ordinary_begin_does_not_reuse_old_facts_after_replacement) ... ok
+test_replacement_during_replay_refuses_and_does_not_cache (__main__.JournalCache.test_replacement_during_replay_refuses_and_does_not_cache) ... ok
+test_reviewer_A2_recovery_refuses_valid_same_length_replacement (__main__.JournalCache.test_reviewer_A2_recovery_refuses_valid_same_length_replacement) ... ok
+test_same_bytes_rotation_allows_full_kernel_recovery (__main__.JournalCache.test_same_bytes_rotation_allows_full_kernel_recovery) ... ok
+test_same_bytes_rotation_rereads_without_manual_eviction (__main__.JournalCache.test_same_bytes_rotation_rereads_without_manual_eviction) ... ok
+test_same_file_rewrite_with_preserved_length_rereads (__main__.JournalCache.test_same_file_rewrite_with_preserved_length_rereads) ... ok
+test_truncation_rereads_and_drops_newer_facts (__main__.JournalCache.test_truncation_rereads_and_drops_newer_facts) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.423s
+
+OK

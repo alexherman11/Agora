@@ -1,0 +1,147 @@
+{
+  "at": "2026-10-24T22:13:26.764417+00:00",
+  "tasks": 26,
+  "task_hash": "1bcedb871a6d230d42cce35f56ad8281acf8fc12be242c4bd22cfaacfdf955dd",
+  "missing_priority": 0,
+  "windows": [
+    {
+      "id": "dk114",
+      "kind": "window",
+      "name": "Task board",
+      "shows": "taskboard",
+      "target": null,
+      "edge": "",
+      "box": [
+        16,
+        220,
+        1508,
+        1828
+      ],
+      "shown": true,
+      "front": false,
+      "z": 8
+    },
+    {
+      "id": "dk171",
+      "kind": "window",
+      "name": "Help",
+      "shows": "help",
+      "target": null,
+      "edge": "",
+      "box": [
+        2412,
+        678,
+        1200,
+        1300
+      ],
+      "shown": true,
+      "front": false,
+      "z": 9
+    },
+    {
+      "id": "dk74",
+      "kind": "window",
+      "name": "Lines",
+      "shows": "lines",
+      "target": null,
+      "edge": "",
+      "box": [
+        1285,
+        1033,
+        1100,
+        945
+      ],
+      "shown": true,
+      "front": false,
+      "z": 10
+    },
+    {
+      "id": "dk202",
+      "kind": "window",
+      "name": "Widget \u00b7 Task board \u00b7 JavaScript",
+      "shows": "taskboard-js",
+      "target": null,
+      "edge": "",
+      "box": [
+        1540,
+        220,
+        1508,
+        1828
+      ],
+      "shown": true,
+      "front": false,
+      "z": 11
+    },
+    {
+      "id": "dk35",
+      "kind": "window",
+      "name": "Agora taskbar",
+      "shows": "taskbar",
+      "target": null,
+      "edge": "bottom",
+      "box": [
+        0,
+        2094,
+        3840,
+        66
+      ],
+      "shown": false,
+      "front": false,
+      "z": 9999
+    },
+    {
+      "id": "dk73",
+      "kind": "window",
+      "name": "Topbar",
+      "shows": "topbar",
+      "target": null,
+      "edge": "top",
+      "box": [
+        0,
+        0,
+        3840,
+        60
+      ],
+      "shown": false,
+      "front": false,
+      "z": 9999
+    },
+    {
+      "kind": "work",
+      "box": [
+        0,
+        60,
+        3840,
+        2034
+      ]
+    }
+  ],
+  "history_hashes": {
+    "dk90": "f455ae93c5cc3b4bd3ea5d4f494d6d485b0883aa1e6c49991b1d272e57b52090",
+    "dk91": "d7f85bc9ab5d96628bbce9c7f38c480c3361be727b832cb28a80b430358d2912",
+    "dk92": "22dd60bd79cedd7a67d3daee0ce12bd232c16aecd236ff32ee3d04bb5ffa95e3",
+    "dk93": "25480013803e439f83cf2206b719ebac93eaaa1028ea4ecade5164a8ac78d68e",
+    "dk94": "4b27d51acb0d86f32ceafc2f2bbbd12db7a0f717ec814dcd0fe0d454fcb55ae1",
+    "dk95": "591f65b84c758b49363888346a0788ef4b509ad0f57e948d9623ee2bda4588e1",
+    "dk96": "d2b32eb46c451bb69bcb3c478c8d9b81273172516036e27bde87d111c522e1cb",
+    "dk97": "f6d6219b4f57bdd9a591eebd17ccc76b7b6a6fb40469de934d2d2131360974bc",
+    "dk98": "83239e60a7d9ac65536c1ba1b13845716414cb9c4c75862be2bd3b7a86362253",
+    "dk99": "5b202f2caab5158e2cb1aeb81d4b4fe3290f3b18cf05235a7399f87de32ba752",
+    "dk100": "714d63b7db51a582490a99eedc76740f05f1fc34068b3a7c8c0dd9cf441a2441",
+    "dk101": "b8614b87a52c0da19d6dce2c71c1c23f64327ccf5f940d3115932274e77aacef",
+    "dk102": "11e66595c7735a7c975bd0d9e0b1ffbc407c91241c5081ccbfc56acd6620db66",
+    "dk103": "9015407d71a4e7d214c34e8fa475d8899d905b7973c6767105a5bf346fa3887d",
+    "dk104": "b391dddd508c61355fcdb23d0d3695e13524ffb2675fc1bae5acf80d2c0cb0e0",
+    "dk105": "ca00ff0eda8072946bed3151880874c73c00f82d8ec1baf4e607eedb212808f7",
+    "dk106": "ed7d7f2cc9824fc20e327df933da48d2c48a4fb43ffecafb038da95044db7d61",
+    "dk107": "68da12a87be7d916a43ef4355fc8deb2eec8b148e01909f6d3e800c45b0273b0",
+    "dk108": "1082ecb8b683de8eb58f5ecc76a06f83b87672a71294375288cc0c9b31390c16",
+    "dk109": "cc713539937a087b9e84c737e8ad49d6ff8b082bafb62011bcfd8ee7c3a1323e",
+    "dk110": "2f06676b0b76d95df4151379bdffac8ff8c1e5cf5789884746e4ba6e02beeb24",
+    "dk111": "e61a88f9576b1bee9b5e6eaad665f6f67f85fda3d4994296718b005ecc4c895c",
+    "dk112": "f54170a1bdc4edcd5dfa2584539ca3975823db226662661fa0439ebd1c3c0efd",
+    "dk169": "665b4b2e150a07fb42f7dddec87461471b80caf04dda689f6e4cf9696c115e7e",
+    "dk170": "3ed283e482623863df96dde7c2b843e9d2a8e43670b8a67f26995a8b9c3f89fa",
+    "dk207": "aa819b9ecd0178ae4b40f361b9520ddc1f6282408eebda97698fa4b57efd40c2"
+  }
+}

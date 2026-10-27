@@ -185,6 +185,26 @@ class CleanupTests(unittest.TestCase):
         finally:
             shutil.rmtree(scratch)
 
+    def test_local_paint_switches_is_a_presentation_update_other_unknown_keys_still_refuse(self):
+        scratch = HERE / ".tmp-agora" / ("receipt-test-" + uuid.uuid4().hex)
+        os.makedirs(scratch)
+        path = scratch / "fake.json"
+        state = {"owners": [owner()], "pids": [10], "launches": [{"status": "created"}]}
+        try:
+            receipts.write(path, state)
+            updated = receipts.update_manifest(path, {"local_paint_switches": ["--disable-quic"]})
+            self.assertEqual(updated["local_paint_switches"], ["--disable-quic"])
+            self.assertEqual(updated["owners"], state["owners"])
+            updated = receipts.update_manifest(path, {"pid": 11, "local_paint_switches": []})
+            self.assertEqual(updated["pid"], 11)
+            self.assertEqual(updated["local_paint_switches"], [])
+            with self.assertRaises(ValueError):
+                receipts.update_manifest(path, {"arbitrary": 1})
+            with self.assertRaises(ValueError):
+                receipts.update_manifest(path, {"local_paint_switches": [], "owners": []})
+        finally:
+            shutil.rmtree(scratch)
+
     def test_actual_launch_obeys_cleanup_lease_without_launching(self):
         tree = ast.parse((HERE / "sandbox_window.py").read_text(encoding="utf-8"))
         node = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "start")

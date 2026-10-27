@@ -1,0 +1,92 @@
+[
+  {
+    "case": "crash",
+    "hidden": true,
+    "ready": {
+      "ready-crash1": {
+        "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0"
+      },
+      "ready-crash0": {
+        "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0"
+      }
+    },
+    "before_crash": {
+      "ready-crash1": 1,
+      "ready-crash0": 1,
+      "crash0": 1,
+      "crash1": 1
+    },
+    "after_crash": {
+      "ready-crash1": 1,
+      "ready-crash0": 2,
+      "crash0": 42,
+      "crash1": 4
+    },
+    "runtime_version": "155.0.4283.62",
+    "processes": [
+      {
+        "pid": 1372,
+        "kind": "Utility"
+      },
+      {
+        "pid": 58000,
+        "kind": "Renderer"
+      },
+      {
+        "pid": 90952,
+        "kind": "Utility"
+      },
+      {
+        "pid": 95224,
+        "kind": "Renderer"
+      },
+      {
+        "pid": 97668,
+        "kind": "Gpu"
+      },
+      {
+        "pid": 102876,
+        "kind": "Browser"
+      }
+    ],
+    "runtime_process_memory": [
+      {
+        "pid": 102876,
+        "private_bytes": 42971136,
+        "working_set": 121266176
+      },
+      {
+        "pid": 72440,
+        "private_bytes": 5763072,
+        "working_set": 29618176
+      },
+      {
+        "pid": 97668,
+        "private_bytes": 61329408,
+        "working_set": 64749568
+      },
+      {
+        "pid": 90952,
+        "private_bytes": 12664832,
+        "working_set": 42921984
+      },
+      {
+        "pid": 1372,
+        "private_bytes": 8687616,
+        "working_set": 21340160
+      },
+      {
+        "pid": 95224,
+        "private_bytes": 24203264,
+        "working_set": 53530624
+      },
+      {
+        "pid": 58000,
+        "private_bytes": 20377600,
+        "working_set": 52449280
+      }
+    ],
+    "private_bytes": 175996928,
+    "working_set": 385875968
+  }
+]

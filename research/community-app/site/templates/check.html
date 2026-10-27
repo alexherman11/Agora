@@ -1,0 +1,16 @@
+<section class="panel">
+  <div class="badge-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="28" height="28"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4h13A2.5 2.5 0 0 1 21 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m4 7 8 6 8-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+  <h1>Check your email</h1>
+  <p class="lead">We sent a sign-in link to <strong>{email}</strong>. Open it on this phone or computer, or type the code from the email here.</p>
+  <form method="post" action="/signin/code" class="stack code-form">
+    <input type="hidden" name="csrf" value="{csrf}">
+    <label class="field-label" for="code">6-digit code</label>
+    <input class="input code{error_class}" id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]*" maxlength="7" required{error_attrs}>
+    {error}
+    <button class="btn primary" type="submit">Sign in</button>
+  </form>
+  <p class="fine">The link and code work once, for {minutes} minutes. Nothing arrived? Check spam, or <a href="/signin">try again</a>.</p>
+  {dev}
+</section>

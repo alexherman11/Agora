@@ -351,6 +351,135 @@ class Case(unittest.TestCase):
         r = self.whole(self.verifier(allow_remote=[self.allowed()]))
         self.assertEqual(r["network"]["status"], "violation")
 
+    # -- local-page mode (a13146, JEFF m13143): the browser's own background traffic is logged, never contained
+    PAGE = "http://127.0.0.1:51234/lens.html?session=frontier-paint-1&as=alex&lens=task-board"
+    EDGE_TRAFFIC = [(101, 5, "fd00::2", 50010, "2603:1061:14::1", 443),     # what a11403's real run saw (a13090)
+                    (102, 5, "10.0.0.2", 50011, "204.79.197.200", 443)]
+
+    def local(self, **run):
+        return self.verifier(allow_loopback=True, network_mode="local-page", pages=[self.PAGE], **run)
+
+    def test_local_page_mode_accepts_the_browsers_traffic_and_lists_every_connection(self):
+        self.n.tcp_rows = list(self.EDGE_TRAFFIC) + [(101, 2, "127.0.0.1", 9222, "0.0.0.0", 0)]
+        self.n.udp_rows = [(101, "0.0.0.0", 5353)]
+        r = self.whole(self.local())
+        self.assertEqual(r["network"]["status"], "observed", r["network"])
+        self.assertEqual(r["network_label"], "network: observed, not contained")
+        self.assertEqual(r["network"]["label"], "network: observed, not contained")
+        self.assertTrue(r["allow_interaction"], r)
+        got = {(c["pid"], c["process"], c["protocol"], c["address"], c["port"]) for c in
+               r["network"]["evidence"]["connections"]}
+        self.assertEqual(got, {(101, "msedgewebview2.exe", "tcp", "2603:1061:14::1", 443),
+                               (102, "msedgewebview2.exe", "tcp", "204.79.197.200", 443),
+                               (101, "msedgewebview2.exe", "udp", "0.0.0.0", 5353)})
+        self.assertTrue(all(c["browser_tree"] for c in r["network"]["evidence"]["connections"]))
+        self.assertEqual(r["network"]["evidence"]["allow_remote"], [])
+        self.assertIn("network.brokered", r["network"]["not_proven_keys"])           # its limits stay said
+        for k in ("family", "windows", "writes"):
+            self.assertEqual(r[k]["status"], "observed", (k, r[k]))
+
+    def test_the_label_never_claims_containment(self):
+        for v in (self.local(), self.verifier()):
+            label = self.whole(v)["network_label"]
+            self.assertNotRegex(label.replace("not contained", ""), "contained")
+
+    def test_the_same_traffic_without_the_mode_still_refuses(self):
+        self.n.tcp_rows = list(self.EDGE_TRAFFIC)
+        self.n.udp_rows = [(101, "0.0.0.0", 5353)]
+        r = self.whole(self.verifier(allow_loopback=True))
+        self.assertEqual(r["network"]["status"], "violation")
+        self.assertEqual(r["network_label"], "network: violation")
+        self.assertFalse(r["allow_interaction"])
+        self.assertNotIn("connections", r["network"]["evidence"])
+
+    def test_a_non_browser_process_refuses_in_both_modes(self):
+        # the launcher (python, the job's birth) is in the job and explained, but it is not the browser
+        self.n.tcp_rows = [(100, 5, "10.0.0.2", 50012, "198.51.100.7", 443)]
+        for v in (self.local(), self.verifier(allow_loopback=True)):
+            r = self.whole(v)
+            self.assertEqual(r["network"]["status"], "violation", r["network"])
+            self.assertFalse(r["allow_interaction"])
+        r = self.whole(self.local())
+        self.assertIn("outside the job's own browser tree", " ".join(r["network"]["reasons"]))
+        self.assertEqual([c["browser_tree"] for c in r["network"]["evidence"]["connections"]], [False])
+
+    def test_a_non_browser_udp_binding_refuses_in_local_page_mode(self):
+        self.n.udp_rows = [(100, "0.0.0.0", 5353)]
+        r = self.whole(self.local())
+        self.assertEqual(r["network"]["status"], "violation")
+        self.assertIn("outside the job's own browser tree", " ".join(r["network"]["reasons"]))
+
+    def test_an_unexplained_engine_in_the_job_is_not_the_browser_tree(self):
+        # an engine image in the job whose parent was never a member: no measured provenance, so not ours to accept
+        self.n.add(150, "msedge.exe", "msedge.exe " + self.ours, job=True, ppid=77)
+        self.n.tcp_rows = [(150, 5, "10.0.0.2", 50013, "204.79.197.200", 443)]
+        r = self.whole(self.local())
+        self.assertEqual(r["network"]["status"], "violation")
+
+    def test_an_out_of_job_profile_holder_refuses_in_local_page_mode(self):
+        v = self.local()
+        v.before()
+        self.n.add(705, "msedge.exe", "msedge.exe --type=utility " + self.ours)
+        self.n.tcp_rows = [(705, 5, "10.0.0.2", 50014, "204.79.197.200", 443)]
+        v.sample()
+        v.after()
+        r = v.verdict()
+        self.assertEqual(r["network"]["status"], "violation")
+        self.assertFalse(r["allow_interaction"])
+
+    def test_a_public_or_account_page_refuses(self):
+        self.n.tcp_rows = list(self.EDGE_TRAFFIC)
+        for page in ("https://example.org/", "http://login.microsoftonline.com/", "http://alex:pw@127.0.0.1:5000/",
+                     "http://alex@localhost:5000/", "file:///C:/x.html", "about:blank", "http://10.0.0.5:8080/",
+                     "http://127.0.0.1.example.org/", "not a url"):
+            v = self.verifier(allow_loopback=True, network_mode="local-page", pages=[self.PAGE, page])
+            v.before()
+            gate = v.gate()
+            self.assertFalse(gate["allow_interaction"], page)                  # refused before any input
+            self.assertEqual(gate["network"]["status"], "violation", page)
+            self.assertIn("refuses this page", " ".join(gate["network"]["reasons"]), page)
+
+    def test_local_page_mode_must_name_its_pages_and_keeps_the_allowlist_empty(self):
+        no_pages = self.verifier(allow_loopback=True, network_mode="local-page")
+        no_pages.before()
+        self.assertIn("names no pages", " ".join(no_pages.gate()["network"]["reasons"]))
+        listed = self.local(allow_remote=[self.allowed()])
+        listed.before()
+        self.assertIn("allowlist empty", " ".join(listed.gate()["network"]["reasons"]))
+        typo = self.verifier(network_mode="local-pages", pages=[self.PAGE])
+        typo.before()
+        self.assertFalse(typo.gate()["allow_interaction"])
+
+    def test_local_page_mode_still_refuses_a_listener_beyond_loopback(self):
+        self.n.tcp_rows = [(101, 2, "0.0.0.0", 9222, "0.0.0.0", 0)]
+        self.assertEqual(self.whole(self.local())["network"]["status"], "violation")
+
+    def test_local_page_mode_still_needs_loopback_allowed_for_loopback(self):
+        self.n.tcp_rows = [(100, 5, "127.0.0.1", 50002, "127.0.0.1", 9222)]
+        r = self.whole(self.verifier(network_mode="local-page", pages=[self.PAGE]))
+        self.assertEqual(r["network"]["status"], "violation")
+
+    def test_local_page_mode_leaves_the_other_checks_alone(self):
+        self.n.tcp_rows = list(self.EDGE_TRAFFIC)
+        self.n.desktops["Default"].append((101, True))                       # our window on Alex's desktop
+        r = self.whole(self.local(), lambda: (self.root / "repo" / "a.txt").write_text("changed!", "utf-8"))
+        self.assertEqual(r["network"]["status"], "observed")
+        self.assertEqual((r["windows"]["status"], r["writes"]["status"]), ("violation", "violation"))
+        self.assertFalse(r["allow_interaction"])
+
+    def test_a_socket_table_failure_is_still_unknown_in_local_page_mode(self):
+        self.n.net_fails = True
+        r = self.whole(self.local())
+        self.assertEqual(r["network"]["status"], "unknown")
+        self.assertEqual(r["network_label"], "network: unknown, not contained")
+
+    def test_not_local_page(self):
+        self.assertIsNone(nv.not_local_page("http://127.0.0.1:8000/lens.html"))
+        self.assertIsNone(nv.not_local_page("http://localhost:8000/"))
+        self.assertIsNone(nv.not_local_page("http://[::1]:8000/"))
+        self.assertIn("account", nv.not_local_page("http://u:p@127.0.0.1/"))
+        self.assertIn("not loopback", nv.not_local_page("https://example.org/"))
+
     # -- limits a consumer needs proven (c10251)
     def test_must_prove_refuses_interaction_while_the_limit_stands(self):
         r = self.whole(self.verifier(must_prove=["writes.transient"]))

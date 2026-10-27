@@ -1,0 +1,65 @@
+{
+  "state": {},
+  "events": [
+    {
+      "type": "open",
+      "key": "Terminal",
+      "window": {
+        "preferred": [
+          1250,
+          900
+        ]
+      }
+    },
+    {
+      "type": "open",
+      "key": "Browser",
+      "window": {
+        "preferred": [
+          1250,
+          900
+        ]
+      }
+    },
+    {
+      "type": "open",
+      "key": "Discord",
+      "window": {
+        "preferred": [
+          1250,
+          900
+        ]
+      }
+    },
+    {
+      "type": "open",
+      "key": "Spotify",
+      "window": {
+        "preferred": [
+          1250,
+          900
+        ]
+      }
+    },
+    {
+      "type": "open",
+      "key": "Editor",
+      "window": {
+        "preferred": [
+          1250,
+          900
+        ]
+      }
+    },
+    {
+      "type": "open",
+      "key": "Agora board",
+      "window": {
+        "preferred": [
+          1250,
+          900
+        ]
+      }
+    }
+  ]
+}

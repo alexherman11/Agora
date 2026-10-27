@@ -1,0 +1,9 @@
+{
+ "zone": "America/Los_Angeles",
+ "meeting": {"title": "Watsonville tenants council evening", "at": "2026-11-04T02:00Z", "where": "Watsonville community room"},
+ "items": [
+  {"order": 1, "title": "Welcome and interpretation"},
+  {"order": 2, "title": "Tenant protections public comment", "comment": {"seats": 12, "minutes": 2, "closes": "2026-11-04T01:45Z"}},
+  {"order": 3, "title": "Next steps and outcome"}
+ ]
+}

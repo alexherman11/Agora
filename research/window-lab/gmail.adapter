@@ -1,0 +1,10 @@
+# Gmail, read-only: headers of new mail (sender and subject), never the body; nothing is marked read.
+# Needs GMAIL_ADDRESS and GMAIL_APP_PASSWORD in the repository's .env (an app password from the Google account).
+imap imap.gmail.com every 60
+login "env:GMAIL_ADDRESS" "env:GMAIL_APP_PASSWORD"
+folder INBOX
+each '.'
+  key "$id"
+  do append $into line="$from_name: $subject" words="$subject" user="$from_name" from="$from_address"
+  # notify "Mail from $from_name: $subject"
+  # do create $tasks kind=task title="Reply to $from_name: $subject"

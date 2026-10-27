@@ -1,0 +1,80 @@
+[
+  {
+    "case": "workers",
+    "hidden": true,
+    "ready": {
+      "ready-workers": {
+        "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0"
+      }
+    },
+    "before_hang": {
+      "good": 41,
+      "bad": 36,
+      "workers": 2,
+      "hang-start": 1
+    },
+    "after_hang": {
+      "good": 101,
+      "bad": 36,
+      "workers": 5,
+      "hang-start": 1
+    },
+    "runtime_version": "155.0.4283.62",
+    "processes": [
+      {
+        "pid": 5656,
+        "kind": "Utility"
+      },
+      {
+        "pid": 59044,
+        "kind": "Gpu"
+      },
+      {
+        "pid": 84144,
+        "kind": "Utility"
+      },
+      {
+        "pid": 107804,
+        "kind": "Browser"
+      },
+      {
+        "pid": 109716,
+        "kind": "Renderer"
+      }
+    ],
+    "runtime_process_memory": [
+      {
+        "pid": 107804,
+        "private_bytes": 33652736,
+        "working_set": 108937216
+      },
+      {
+        "pid": 92636,
+        "private_bytes": 2457600,
+        "working_set": 10833920
+      },
+      {
+        "pid": 59044,
+        "private_bytes": 61202432,
+        "working_set": 64397312
+      },
+      {
+        "pid": 84144,
+        "private_bytes": 12611584,
+        "working_set": 42496000
+      },
+      {
+        "pid": 5656,
+        "private_bytes": 7606272,
+        "working_set": 21131264
+      },
+      {
+        "pid": 109716,
+        "private_bytes": 31043584,
+        "working_set": 58216448
+      }
+    ],
+    "private_bytes": 148574208,
+    "working_set": 306012160
+  }
+]

@@ -1,0 +1,35 @@
+# Integration workflow correction — 23 October 2026
+
+This is a bounded repair of the existing landing path, not a second queue or deployment service.
+
+## One owner, one dependency bundle
+
+The integration owner carries the exact candidate and dependency manifest through preparation, judging, publication, runtime activation and world enablement. These are separate recorded stages. An approved source candidate is not proof of an activated runtime, and a working live view is not proof that its source is in main.
+
+1. Preserve every changed runtime dependency in an exact manifest and candidate. Keep the continuity candidate `9231514b497564c0b6030c6e50522284e453cb4c` intact; do not reuse the superseded publication runner. Combine compatible branches through ordinary serialized judging, rather than recreating peer changes or copying an old whole file over main.
+2. Before world installation, run the read-only `deployment_preflight.py MANIFEST --root C:/Projects/Agora4`. The manifest has a nonempty `files` map of repository-relative paths to reviewed SHA256 values. Every byte sequence must exist in committed main and match the working checkout; main movement during inspection refuses. This includes the complete changed dependency slice, not just a new selector file. The author supplies that closure: the checker does not infer imports.
+3. Judge the coherent candidate through the existing landing queue. Keep overlapping shared-runtime publication behind this bundle so parking cannot silently remove needed runtime repairs from the checkout. Independent source work can continue. Do not clear locks, skip health, replace a refusal with an approval, or promote against a changed base.
+4. Coordinate the existing guarded idle-only activation with the final publication boundary. Record previous resident `want` values and worker capacity outside the restarting House. Apply only an owner-authorized quiet window, let active turns finish, verify idle and normal Guard admission, publish, verify the activated revision, then restore the exact settings on success or failure. Never rely on the ordinary landing grace timeout to interrupt active turns.
+5. Only then install/enable dependent world objects through `deployment_preflight.deploy_line(root, files, line, url=..., world=..., actor=...)`. This uses the mandatory `/api/deploy` gate in the existing desk command dispatcher. Supply the complete reviewed dependency manifest. The answering backend checks committed main, current bytes, its own running revision and source hashes captured before its imports. Missing/stale/uncommitted dependencies refuse before opening the world. An older backend rejects the route instead of silently ignoring a manifest. Each admitted command still uses the ordinary observation fences, actors, events and undo path. Keep the policy's existing off switch. Update the same task at the stage transition, including the exact failure or next owner.
+
+The read-only CLI still reports `runtime_verified: false`. Successful `/api/deploy` receipts report `source_verified: true`; actual live behavior still requires its own check. The gate covers reviewed tracked Python, JavaScript, HTML, CSS, style and lens dependencies; unsupported or absent startup files refuse. It is an installation boundary, not a new general world permission system. Ordinary `/api/do` stays unchanged. Existing installers must switch their write transport to this mandatory route; this change does not pretend old scripts already use it. The continuity activation owner should use it for verb installation and enabling the policy after the combined source has landed and the guarded idle activation is verified. No request is automatically retried after a missing/uncertain receipt.
+
+## Comparable world evidence without repeating every code test
+
+Each landing comparison copies one world through the existing locked copier. Baseline, candidate, and any split-batch checks use that same private copy. The cache records a SHA256 content identity from the supported loader's world facts, events, revisions and counters, plus opaque digests of the store/undo sidecars. Same-size changes with preserved timestamps invalidate it. No exported transcript inspection or direct pickle inspection is used.
+
+A complete code judgment remains reusable for the same commit. When the copied world revision changes, the judge refreshes `styles`, `help notes`, `lenses`, and `test_store`, plus the compilation checks that health always runs. Structured failure attribution lets those results replace only the old world-dependent results. Existing code failures remain present. Missing, malformed or incomplete receipts fall back to ordinary full health; a selected pass alone can never authorize publication. Old cache entries without the new evidence require revalidation.
+
+This removes comparison against an older world's lens set. It does not claim that an arbitrary external producer remains unchanged, or that the world cannot change after judging; installation still requires the committed-source/runtime checks above. Source changes, real new failures and changed candidate bases still require the normal checks.
+
+## Cleanup without log flooding or unsafe ownership assumptions
+
+The landing room attempts unknown legacy scratch once per reset, without changing read-only attributes or security ACLs. It retains anything it cannot remove. Complete error lists are compressed into SHA256-named receipts under `house-state/cleanup-evidence`; a private temporary file is flushed and atomically published. The ordinary landing log and stderr contain counts, up to eight bounded samples, and the receipt path. Identical evidence is reused rather than appended thousands of times. Failure to preserve pre-judgment evidence refuses that cleanup stage. After judgment/publication, cleanup or reporting failures are separate warnings on the actual outcome; they never erase a successful landing or mask its original error.
+
+The private fixture creators for landing wait, landing return and worker pool now use the existing owner-scoped Git-object cleanup instead of `ignore_errors` or no cleanup. They report retained scratch and fail their cleanup check. Read-only Git attributes may be cleared only for those fixtures the test itself created; no process termination, lease alteration or broad worktree deletion is involved.
+
+## Verification record
+
+The focused regression suite exercises world drift, same-world reuse, incomplete and legacy receipts, same-snapshot comparison, exact committed source checks, concurrent main movement, and bounded output with all 21,000 errors recoverable from their receipt. Existing landing/cleanup/final-candidate fences are also run. Exact counts and candidate hashes are recorded in the accompanying implementation evidence before handoff.
+
+Useful measures are source/world mismatch refusals, overlapping runtime files parked, health evaluations per accepted candidate, cleanup time and diagnostic bytes, and candidate-ready-to-activation time. Worktree count alone is not an execution-load measure.

@@ -1,0 +1,85 @@
+{
+  "native": true,
+  "checks": [
+    {
+      "name": "Mount, bad settings and infinite loop stop only their parts",
+      "ok": true
+    },
+    {
+      "name": "A never-painted worker has no fictitious last-good loading snapshot",
+      "ok": true
+    },
+    {
+      "name": "Actual WebView2 scratch window is never shown",
+      "ok": true
+    },
+    {
+      "name": "A separate worker answers after its looping sibling is killed",
+      "ok": true
+    },
+    {
+      "name": "Click failure keeps last good rendering marked stale",
+      "ok": true
+    },
+    {
+      "name": "Timers and animation callbacks are attributed to their owners",
+      "ok": true
+    },
+    {
+      "name": "Healthy board menu still writes actual facts",
+      "ok": true
+    },
+    {
+      "name": "Healthy board retains real pointer drag",
+      "ok": true
+    },
+    {
+      "name": "Another person updates the board while parts are stopped",
+      "ok": true
+    },
+    {
+      "name": "Try again recovers after a module fix",
+      "ok": true
+    },
+    {
+      "name": "Default look-view is compact; full plan is explicit",
+      "ok": true
+    },
+    {
+      "name": "Agent can read painted text, computed styles and health without pixels",
+      "ok": true
+    },
+    {
+      "name": "Repeated crashes/hang are quarantined as private facts",
+      "ok": true
+    },
+    {
+      "name": "Alpha colours and CSS padding shorthand accepted and painted",
+      "ok": true
+    },
+    {
+      "name": "Unpaintable style refused atomically at write time",
+      "ok": true
+    },
+    {
+      "name": "Display labels preserve domain value and drop identity",
+      "ok": true
+    },
+    {
+      "name": "Personal scope is discoverable and absent for another viewer",
+      "ok": true
+    },
+    {
+      "name": "Initials formatting leaves underlying name unchanged",
+      "ok": true
+    },
+    {
+      "name": "A peer fact change plays its declared theme motion",
+      "ok": true
+    },
+    {
+      "name": "Trusted in-page infinite loop is quarantined by the native parent and board recovers",
+      "ok": true
+    }
+  ]
+}

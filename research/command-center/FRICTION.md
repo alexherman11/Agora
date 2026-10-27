@@ -4,7 +4,7 @@
 
 Every note in the world with a `family=` prop, grouped by status (a769: open, curing, cured; unchecked is imported from the hand-written log, F1 to F32, and not yet checked). To add one: `do create f747 title="..." text="..." family=<family> status=open`.
 
-## open (73)
+## open (78)
 
 ### F2. Scripts cannot say who is running them
 
@@ -491,7 +491,37 @@ a11365 · family=deployment · status=open
 
 22 Oct: drag repair a7987 failed judging because new composition and crew lenses require modules:/crew: terms absent from committed candidate source. Rowan verified live compilation; a11325 records uncommitted supporting code and a backend swap. Existing integration a11327 now owns supported preservation, dependency review and ordinary landing. Preserve world objects and peer edits; do not weaken health. Future activation must keep live lens dependencies available to ordinary candidate judging.
 
-## curing (48)
+### test_door sometimes loses one gesture across a deskd swap, so landings fail at random
+
+a11696 · family=house · status=open
+
+builder-2 (a11200), 22 Oct. The landing room refused a11200 with test_door: 'every gesture sent across the swaps made exactly one event' failed (113 sent). The branch adds only two read-only scripts that nothing imports. RAN on that branch merged with current main, three times in a row: fail (127 sent, {'none': ['door-test-17288-106'], 'twice': [], 'errors': []}), pass (123), pass (121). So it is intermittent and inherited, not caused by the branch. What fails: one gesture sent while the door swaps deskd made no event and got no error. A live press during a code swap could be lost silently the same way (imagined; not reproduced live). Two needs: the door's swap hand-off should never drop an in-flight gesture, and until then the landing room should not refuse a branch on this one check alone. Not fixed here: door.py is outside this audit card.
+
+### 'look' at a room doesn't count as seeing its props: a prop on it stays stale until 'examine'
+
+a11881 · family=reading · status=open
+
+Juniper, 22 Oct 17:24: setting wake= on my own corner was refused 'stale (e12596)' three times, once right after 'look f581'. 'examine f581' then let it through at once. A resident reasonably takes look as seeing. Ask: make look count as seeing the room's own props, or have the stale refusal say 'examine it first'.
+
+### A worker cannot run node for a brought card's .cjs suites
+
+a11937 · family=missing-word · status=open
+
+worker-a11877, 22 Oct. a11877 brought a8420's selection-menu source, whose named acceptance includes two node suites (test_composer_quote.cjs, test_send_receipts.cjs). In the worker, 'node ...' needs approval and is refused, while 'python ...' runs. So a card can be commissioned to run suites the worker is not allowed to start. Missing word: a per-card grant for the interpreters a card's brought suites need (node beside python), set by JEFF when the card names them. Asked Pike on a11877 (c11935).
+
+### A draft source file in notation/ is live at once: feeds.py overwritten
+
+a12568 · family=builder · status=open
+
+Claude, 22 Oct, 19:45. Writing the adapter runner, I wrote notation/feeds.py with an editor tool that overwrites without asking; feeds.py already existed (the house's agent activity feed, a5988). The house restarted onto the new code, crashed importing feeds.Feeds, and was down from 19:45:42 to 19:51:21; any resident turn running at 19:45 was cut. Restored from HEAD (it had no uncommitted changes), renamed mine adapters.py. The house restarts on any source change in notation/, so a file written there, even a draft, is live at once. Missing: a way to try a source file beside the house without the house adopting it (a scratch folder the house does not watch), and the habit of checking a name is free before writing it.
+
+### Cancelling a card just admitted still starts a worker turn, and nothing shows whether a turn is live
+
+a13270 · family=house · status=open
+
+Seen 23 Oct, 17:17 (a13174, Sable): I set commission=cancelled on a card the house had admitted moments before. The card read 'cancelled' while a fresh worker turn was starting on it; the worker read the cancel on arrival and stood down cleanly (e37201: nothing requested, read or committed). So nothing was interrupted this time, but only because the worker checked. The ambiguity: from the world, a resident can't tell whether a card has a live turn, a starting one, or none, so 'cancel' can't say whether it prevented future dispatch or cut a turn, and JEFF's 'no forced stops' can't be honoured with certainty. Wanted: the card shows its turn state (none, starting, running, ending) beside commission, and cancel's receipt says which of those it met: 'no turn; future dispatch prevented' or 'a turn is running; it will see this when it reads'.
+
+## curing (49)
 
 ### F13. A lens named like its room makes the room's name ambiguous
 
@@ -848,6 +878,12 @@ a9641 · family=source · status=curing
 
 Missing world word: one grouped actions:<recipient>:<policy> reading with exact action-reasons evidence. Existing sayings.answered uses a later-message heuristic and cannot supply this contract. a9377 adds two source plugins sharing one read-only evaluator; world notes retain design/review eligibility, labels and Later policy. Source work is built and checked only on isolated in-memory worlds, not installed in production. Follow-up friction: legacy comments retain mark but drop arbitrary request_kind fields, so original askers must classify exact roots through signed reply marks; untyped asks stay diagnostic. A general typed-root authoring verb can be commissioned separately; do not create production fixtures or infer types from prose.
 
+### Task-linked next steps were missing from resident continuity
+
+a11956 · family=harness · status=curing
+
+READ: resident wake had recent conversation and blocked/queued work, but no task-linked cross-project resume projection or task-specific review deadline. IMPLEMENTED candidate: task_next_steps.py projects canonical tasks/promises; ordinary task-next, task-revise, task-review, task-verify and task-followup world verbs retain state. Small host hooks inject bounded current context and queue one-shot reviews using the existing durable inbox. No new task database, executor, memory store or model calls. RAN: 134 tests and 29 subtests pass. Source integration and idle-only activation pending; live opt-in is off.
+
 ## unchecked (8)
 
 ### Reader words and quiet references missing from the world (a6460)
@@ -911,7 +947,7 @@ a8490 · family=silence · status=unchecked
 
 Missing world word: explicit followups attach/ack/pending/receipts. Read: current House.news preserves pending calls, but Resident.send's delivered flag attests only successful pipe flush; listeners' handed-on ids are not recipient acknowledgment. Source-only preparation on Keep JEFF moving adds an isolated obligation journal and exact staged Desk/House hunks; no live imports, timers, retries, process launches or new host authority. A deployment-blocked comment/prop is not an executable landing gate: refusal must precede serialized landing mutation, not only the post-land restart flag. This separate lifecycle repair remains unimplemented. (worker-a8438, 21 Oct)
 
-## cured (69)
+## cured (70)
 
 ### F1. A chat reply is signed "Alex" whoever sends it
 
@@ -1497,6 +1533,12 @@ Current, landed6b9aaea: direct-child birth checkpoint and verified cleanup prove
 Historical gap and staging record (superseded for direct-child proof): Missing generic launcher capability: persist exact direct-child birth and startup facts before ResumeThread, then clean up only the same birth. Existing post-start WMI metadata denial leaves unknown ownership. Staged repair and evidence: [[Sandbox ownership — suspended child checkpoint and retained-run reconciliation]]. Offline tests pass; real fake-run preflight refused on full-screen state and no child started. Legacy and delegated runtime ownership remain unknown; no cleanup bypass. JEFF owns later admitted fake run and supported browser receipt transfer; not landed or live.
 JEFF c9588 authorised the missing house-side observation provider as well. Source now prepared: fixed main house-state publication, bounded freshness and unsafe/unknown refusal in fake checker; offline tests pass. This increment touches HOUSE_FILES and ordinary landing/house refresh is explicitly allowed. Real fake ownership proof follows only after landing; native browser/mail and delegated children stay unadmitted. Evidence in the linked checkpoint note.
 
+### An adapter that should run with the house needs a keeper.py edit
+
+a12400 · family=missing-word · status=cured
+
+Twitch chat bridge (Claude, 22 Oct): a long-running adapter that carries something from outside into the world had to be added to keeper.py's list of children by hand. Missing world-level word: a thing in the world that says 'keep this program running while the house runs' (a service note with its command and off switch), so adapters join and leave without a source edit. Second rub: a prop edit by an adapter needs an examine first (fence), so status writes cost two lines.
+
 ## active (1)
 
 ### Home-base single-instance identity was a PID file, not a host guarantee (a6928)
@@ -1504,6 +1546,15 @@ JEFF c9588 authorised the missing house-side observation provider as well. Sourc
 a6970 · family=host · status=active
 
 Missing host word: one home base for a world/door, with unknown distinct from absent. This is below the world: lenses cannot atomically exclude another Windows process or verify creation time on a termination handle. Source a6928 adds hud_lifecycle.py, two-miss supervision, a named OS mutex, and identity-verified duplicate cleanup/stop. Ran: test_hud_lifecycle.py --demo, 36 tests OK; fake-copy start/reconcile preserves hud.pid; real private named mutex excludes a second process. Native WMI, window-health and live HUD termination not run. Evidence and API references: research/window-lab/hud-lifecycle.md.
+
+## landed (1)
+
+### The dictionary needed source: an entry is a word the desk reads
+
+a13518 · family=desk · status=landed
+
+Claude, 23 Oct (a13316): the dictionary needed source. Missing world-level word: an entry, a note that says what kind of word it is (word= do, see, hear, hold) and what it is bound to (from= bound=), read by help, examine and dispatch. Before, a help note's title words were read only by help: adding inspect to examine's title changed help and never what the desk answered, and aliases lived in code (COMMAND_ALIAS, moo.SYNONYMS). Source added once (8d3978f): dictionary.py, sources/dictionary.py (rows dictionary), and small hooks in desk_knife (repl, help, examine), verbs (builtin_words, _world_word, describe) and helpnotes (lookup by bound=, check). From now on renaming, aliasing, rewriting help, translating and who may are edits to notes. Still missing: a host word's alias reaching the home base (lens lines send host words as written), and binding a kernel alias in a stored line at save (a1156 binds only world verbs). help dictionary says how it works.
+Second edit, 23 Oct (3165466), found by the lending shelf trial: a verb note's ## es section printed inline among its help, and its takes read as $1 $2. Missing world-level word: a translation section in a verb note, and its takes said in its own first line. Now help names the section (read <verb> #es prints it) and takes come from the first # line.
 
 ## live-freshness-checked (1)
 
@@ -1524,7 +1575,7 @@ RERAN offline:20 guard-context tests OK1.136s;13 house-restart tests OK0.584s. P
 Raw20 rows retained in own worktree research/window-lab/sandbox-ownership/freshness-live-20261022.json (PowerShell UTF-16 redirection), SHA256 b0181122449bba4efa82896b86cb4e80c9f2b9bfd3a69c9145f97cc1dcd92618. Source recipe and old baseline remain preserved. This finite result meets this card's freshness acceptance only; future slow OS/native probes still refuse when stale. No restart performed here, no policy/settings/account/input change. Do not call live freshness complete from offline tests.
 Health finished at copied event e26902: 303.7s, exit1. Python/scripts, guard context and restart checks passed; 95 help notes correct; 103 lenses compile, 0 unexpected refusals. Failures include temp PermissionError across scene and multiple suites; artifact_view errors28; host_route_parent errors21; task_flow errors1; worker_yield errors18; reach four assertions; textedit lock timeout; door timeout; owned fixture teardown Access denied; painter checks failed. Other failures have not been independently reproduced on main. Followups frozen staging is demonstrably already incompatible with unchanged HEAD: expected house hash40b9a403 versus HEAD LF535e71a3 / CRLF4bd83434; its cfg anchor occurs twice on HEAD. Its manifest remains unchanged; no staged integration approval inferred. Final git diff --check passed. Read FRESHNESS.md for reproduction. Required post-landing live20 is now complete as recorded above; broad-health failures remain unresolved and unchanged.
 
-## source-pending (14)
+## source-pending (16)
 
 ### Adding independent HUD checks needed a shared-list edit (a6749)
 
@@ -1618,6 +1669,18 @@ Missing world word: charts:<note>[/marks], numeric rows into scaled bars, segmen
 a11556 · family=host · status=source-pending
 
 Missing host distinction, not a new lens word: restart admission reused the native-run fullscreen/name allowlist as a restart veto. Alex m11543 requests targeted restart checks. a11546 stages a restart-only predicate; native/browser containment unchanged. Games, failed/unknown/changing observations and locked/presentation states still refuse. No live settings change or activation.
+
+### Packed repeat items need measured layout (source candidate)
+
+a11836 · family=missing-word · status=source-pending
+
+Read: grid fill emits ordinary auto-fill rows; variable-height list items leave holes. No existing measured packing word was found. Requested source capability: opt-in grid fill <min> pack, generic to repeats, using measured heights and minimum-content spans without changing partition navigation, DOM order or world facts. Source candidate and staged help/undo: research/text-desk-lab/notation/grid-pack.md. Synthetic geometry and compiler checks passed; guarded painted acceptance remains owed. The existing commission supplies the requested fix; no live lens/style was changed.
+
+### Automatic Comment lacked target identity and an explicit semantic consumer
+
+a12874 · family=lens · status=source-pending
+
+a12734: actionless bound parts lost their item before painting, sayings lacked exact passage provenance, and prepare targeted a literal mounted composer path. Shared staged source adds readable target metadata, saying/object snapshots, comments off and comments accept plus role-bound visible consumer lookup. No per-view Comment declarations for sources, no new executor or logged draft. Native editable right-click remains native; keyboard/selection control shares actions. [[Comment anywhere — shared build checkpoint and exact test boundaries]] records ten Python tests and ten existing composer mocks passing; new combined harness and wider suite blocked by exact sandbox EPERM/temp write refusals. Painted check and world pairing remain owed. Not ready/live; no workaround or native retry.
 
 ## source-staged (1)
 

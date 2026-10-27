@@ -1,0 +1,45 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Lines · Agora</title>
+<link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="kd.css">
+<style>
+  main { display: flex; flex-direction: column; gap: 10px; padding-bottom: 16px; }
+  #log { flex: 1; overflow: auto; background: var(--card); border: 1px solid var(--faint); border-radius: 6px; padding: 10px 12px; }
+  .said { color: var(--accent); font: 13.5px/1.45 var(--mono); margin-top: 8px; }
+  .said::before { content: "› "; }
+  .ans { color: var(--quiet); }
+  .ans.refused { color: var(--warn); }
+  .happen { color: var(--hush); font: 12px/1.4 var(--mono); }
+  form { display: flex; gap: 8px; }
+  form input { flex: 1; font-family: var(--mono); }
+  .hint { font-size: 12.5px; color: var(--hush); }
+  .hint code { font-family: var(--mono); color: var(--accent); cursor: pointer; }
+</style></head>
+<body>
+<main>
+  <div class="hint">Lines go to the new kernel as you. Try: <code>help</code> <code>look</code> <code>window.list</code> <code>holds</code> <code>rows button</code> <code>look guy</code> <code>undo</code></div>
+  <div id="log"></div>
+  <form id="f"><input id="line" autocomplete="off" spellcheck="false" placeholder="a line, e.g. window.open feed to=left"><button class="act">Say</button></form>
+</main>
+<script src="kd.js"></script><script src="theme-live.js"></script>
+<script>
+"use strict";
+const { el } = KD;
+KD.chrome("Lines");
+const log = document.getElementById("log");
+function add(node) { log.append(node); log.scrollTop = log.scrollHeight; }
+const SEE = new Set(["look", "l", "help", "?", "rows", "holds", "status", "window.list"]);
+async function say(line) {
+  add(el("div", { cls: "said" }, line));
+  const word = line.trim().split(/\s+/)[0].toLowerCase();
+  const out = SEE.has(word) ? await KD.see(line) : await KD.act(line);
+  add(el("pre", { cls: `ans${out.ok === false ? " refused" : ""}` }, out.text || (out.ok ? "ok" : "refused")));
+}
+document.getElementById("f").onsubmit = (e) => { e.preventDefault(); const i = document.getElementById("line"); const v = i.value.trim(); if (v) { say(v); i.value = ""; } };
+for (const c of document.querySelectorAll(".hint code")) c.onclick = () => say(c.textContent);
+KD.stream((h) => {
+  if (h.word === "hello" || h.word === "world") return;
+  add(el("div", { cls: "happen" }, `~ ${h.by ? h.by + ": " : ""}${h.text || h.word}${h.record ? " [r" + h.record + "]" : ""}`));
+});
+document.getElementById("line").focus();
+</script>
+</body></html>

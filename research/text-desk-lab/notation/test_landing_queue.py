@@ -103,8 +103,10 @@ g("config", "user.name", "test")
 g("config", "core.autocrlf", "false")
 g("add", "-A")
 g("commit", "-q", "-m", "start")
-(n / "sessions" / "frontier.pickle").write_bytes(b"a world")
-(n / "sessions" / "frontier.log.jsonl").write_bytes(b"{}\n")
+import explore
+# The cache now identifies actual world facts through the supported loader.
+# Keep a valid tiny world, not an opaque placeholder pretending to be a pickle.
+explore.save_desk(n / "sessions" / "frontier.pickle", explore.fresh())
 
 sys.path.insert(0, str(HERE))
 import landing   # noqa: E402  (reads LANDING_LIVE and LANDING_ROOM as it loads)
@@ -381,7 +383,7 @@ kept, worlds = {}, []
 def fake_health(world, cwd, **how):
     worlds.append(world)
     return {"ok": True, "failed": [], "lenses_ok": [], "text": ""}
-with patch.object(landing, "health", side_effect=fake_health), patch.object(landing, "copy_world"):
+with patch.object(landing, "health", side_effect=fake_health), patch.object(landing, "copy_world", return_value="fixture-revision"):
     landing.judged("copy-one", was, kept)
     landing.judged("copy-two", was, kept)
     landing.judged("copy-one", was, kept)

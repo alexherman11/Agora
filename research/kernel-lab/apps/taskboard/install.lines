@@ -1,0 +1,199 @@
+# Task board v2: structure, appearance and actions are world definitions; summarize delegates inference to model.
+# Say each non-comment physical line through /do. install.py skips existing definitions.
+make kind=kind name=taskboard-task help="Task board task"
+make kind=kind name=taskboard-lane help="Task board lane"
+make kind=taskboard-lane name=Backlog order=0
+make kind=taskboard-lane name=Now order=1
+make kind=taskboard-lane name=Done order=2
+verb task-add takes="title=<text> to=<lane> who=<name> when=<date> source=<key> status=<text> text=<text>" steps="make kind=taskboard-task title=$title lane=$to who=$who when=$when source=$source source_status=$status text=$text seats=1" help="task-add title=\"A title\" to=Backlog who=Alex when=2026-10-24 source=local status=open text=\"Details\": add a card. Source status remains the imported status."
+verb task-move takes="<id> to=<lane>" steps="set $1 lane=$to" help="task-move <task> to=Backlog|Now|Done: move a card. Look first when typing. History reads its record; undo reverses the move."
+verb task-assign takes="<id> who=<name>" steps="set $1 who=$who" help="task-assign <task> who=<name>: assign the work. Look first. History reads the actual record."
+verb task-done takes="<id>" steps="set $1 lane=Done" help="task-done <task>: finish the card in one undoable act. Its own happening triggers the board announcement rule."
+verb task-note takes="<id> text=<text>" steps="set $1 note=$text" help="task-note <task> text=\"A note\": record a note on the card. History keeps earlier notes. Undo takes it back."
+verb task-priority takes="<id> priority=<1..4>" steps="set $1 priority=$priority" help="task-priority <id> priority=<1..4>: Set priority 1 red, 2 orange, 3 blue, 4 grey; sorted within lanes."
+verb task-colour takes="<id> colour=<name>" steps="set $1 colour=$colour" help="task-colour <id> colour=<name>: Card colour: paper, rose, peach, sage, sky, lilac."
+verb task-note-colour takes="<id> colour=<name>" steps="set $1 note_colour=$colour" help="task-note-colour <id> colour=<name>: Note colour: paper, rose, peach, sage, sky, lilac."
+verb task-note-style takes="<id> style=<normal|strong|slant>" steps="set $1 note_style=$style" help="task-note-style <id> style=<normal|strong|slant>: Set the note text style; Markdown marks remain editable."
+verb task-filter takes="<id> priority=<all|1..4>" steps="set $1 filter=$priority" help="task-filter <id> priority=<all|1..4>: Choose All or a priority chip; this shared board filter is a world fact."
+verb task-rename takes="<id> title=<text>" steps="set $1 title=$title editing=no" help="task-rename <id> title=<text>: Rename a task, retaining its full text and history; use Summarize to refresh short."
+verb task-edit takes="<id>" steps="set $1 editing=yes" help="task-edit <id>: Show the inline rename field; enter saves it."
+verb task-text takes="<id> text=<text>" steps="set $1 text=$text" help="task-text <id> text=<text>: Edit the full task text as Markdown."
+verb task-remove takes="<id>" steps="forget $1" help="task-remove <id>: Remove a task; undo brings it back with its history."
+make kind=taskboard-settings name=taskboard filter=all model=qwen2.5:3b
+make kind=style name=taskboard text="token paper = #FAF9F6
+token card = #FFFFFF
+token ink = #263746
+token accent = #3F697D
+token sage = #457564
+token warn = #A24E2C
+token gap = 8
+token ramp = 1.15
+token text = ui 15/1.5
+token sheet = paper
+token line = ink at 18%
+token faint = ink at 10%
+token quiet = ink at 82%
+token hush = ink at 62%
+role sheet : on paper, ink, text, pad gap x2, between gap
+role heading : text up 2 medium, ink
+role lane : on accent at 4%, pad gap, corner gap, between gap
+role lane.backlog : on accent at 12%, accent, text medium, pad gap, corner gap /2
+role lane.now : on warn at 10%, warn, text medium, pad gap, corner gap /2
+role lane.done : on sage at 12%, sage, text medium, pad gap, corner gap /2
+role card : on card, ink, text, pad gap x1.5, edge faint, corner gap, space below gap, between gap /2
+role title : text medium, ink
+role body : text down, quiet
+role meta : text down 2, hush
+role tools : between gap, pad gap /2
+role tool : text down, accent, on accent at 6%, pad gap /2, corner gap /2
+role tool.on : on accent at 14%, accent
+role fold : text down 2, hush
+role group : between gap /2
+role event : border top faint, pad gap /2
+role landing : on sage at 12%, edge sage, corner gap
+role refusal : text down, warn, on warn at 8%, pad gap
+
+token p1 = #CF514A
+token p2 = #C58332
+token p3 = #507EBC
+token p4 = #9BA3AC
+role summary : between gap
+role icon : width gap x2, height gap x2
+role provenance : text down 3, hush
+role input : on card, ink, edge faint, pad gap, corner gap /2, height gap x4
+role smalltool : text down 2, hush, pad gap /2
+role empty : text, hush, pad gap x3
+role note : on card, pad gap x2, corner gap
+role editor : text, ink, height gap x18, pad gap
+role editor.strong : text strong, ink, height gap x18, pad gap
+role editor.slant : text slant, ink, height gap x18, pad gap
+token pastel_rose = #FBE9E8
+role card.rose : on pastel_rose, ink, text, pad gap x1.5, edge faint, corner gap, space below gap, between gap /2
+role note.rose : on pastel_rose, pad gap x2, corner gap
+token pastel_peach = #FFF0DC
+role card.peach : on pastel_peach, ink, text, pad gap x1.5, edge faint, corner gap, space below gap, between gap /2
+role note.peach : on pastel_peach, pad gap x2, corner gap
+token pastel_sage = #EAF3E9
+role card.sage : on pastel_sage, ink, text, pad gap x1.5, edge faint, corner gap, space below gap, between gap /2
+role note.sage : on pastel_sage, pad gap x2, corner gap
+token pastel_sky = #E8F1FA
+role card.sky : on pastel_sky, ink, text, pad gap x1.5, edge faint, corner gap, space below gap, between gap /2
+role note.sky : on pastel_sky, pad gap x2, corner gap
+token pastel_lilac = #F0EBF8
+role card.lilac : on pastel_lilac, ink, text, pad gap x1.5, edge faint, corner gap, space below gap, between gap /2
+role note.lilac : on pastel_lilac, pad gap x2, corner gap
+"
+make kind=lens name=taskboard style=taskboard text="root : column, role sheet
+  the tag:taskboard-settings
+  as view
+  let backlog = count(tag:taskboard-task,prop:lane=Backlog)
+  let now = count(tag:taskboard-task,prop:lane=Now)
+  let done = count(tag:taskboard-task,prop:lane=Done)
+  heading : text \"Task board\", role heading
+  hint : text \"A little space for what matters. Drag to move · right-click for actions.\", role meta
+  toolbar : row, role tools
+    add : text \"\", role input, hint \"Add a task… try Fix the bar p1\", commit enter, on edit do summarize.add text=\"$value\"
+    undo : text \"Undo my last act\", role tool, on click do undo
+  filters : row, role tools
+    pall : text \"All tasks\", role tool, role tool.on when $filter = \"all\", on click do task-filter $item priority=all
+    p1 : text \"P1\", role tool, role tool.on when $filter = 1, on click do task-filter $item priority=1
+    p2 : text \"P2\", role tool, role tool.on when $filter = 2, on click do task-filter $item priority=2
+    p3 : text \"P3\", role tool, role tool.on when $filter = 3, on click do task-filter $item priority=3
+    p4 : text \"P4\", role tool, role tool.on when $filter = 4, on click do task-filter $item priority=4
+    summary : text \"Summarize board\", role tool, on click do summarize.all
+  empty : text \"A clear board. Add your first task above; p1–p4 sets its priority.\", role empty
+    only when count(tag:taskboard-task) = 0
+  board : row, grid 1fr 1fr 1fr, gap x2
+    backlog : column, role lane, on drop card do task-move $carried to=Backlog
+      heading : text \"Backlog · $backlog\", role lane.backlog
+      summary : text \"Summarize lane\", role smalltool, on click do summarize.all lane=Backlog
+      cards : column, of tag:taskboard-task,prop:lane=Backlog as task, by priority, each card
+    now : column, role lane, on drop card do task-move $carried to=Now
+      heading : text \"Now · $now\", role lane.now
+      summary : text \"Summarize lane\", role smalltool, on click do summarize.all lane=Now
+      cards : column, of tag:taskboard-task,prop:lane=Now as task, by priority, each card
+    done : column, role lane, on drop card do task-move $carried to=Done
+      heading : text \"Done · $done\", role lane.done
+      summary : text \"Summarize lane\", role smalltool, on click do summarize.all lane=Done
+      completed : column, fold \"Completed tasks\", role group
+        cards : column, of tag:taskboard-task,prop:lane=Done as task, by priority, each card
+  help : column, fold \"Help & shortcuts\", role group
+    prose : text \"Quick add: description p1–p4 (default p4). Click Details for full text and notes. Right-click a card for priorities, colour, moves, assignment, rename, summary and removal. Drag across lanes. Done folds. All/P1–P4 filter the board. Undo reverses your last act; if another edit depends on it, it refuses safely.\", role body
+    notes : text \"Notes: Ctrl+B bold · Ctrl+I italic · Ctrl+E Markdown source · Ctrl+S save. Checklist source: - [ ] item. Right-click the note for six colours and three styles. Changes and undo stay in History. Summary labels always name the source. Model setting: model-settings model=qwen2.5:3b. Off: off model stops inference; off summarize stops board adapters.\", role body
+card : column, role card, carry
+  only when $view.filter = \"all\" or $priority = $view.filter
+  let description = $short when $short != \"\"
+  let description = $title otherwise
+  role card.rose when $colour = \"rose\"
+  role card.peach when $colour = \"peach\"
+  role card.sage when $colour = \"sage\"
+  role card.sky when $colour = \"sky\"
+  role card.lilac when $colour = \"lilac\"
+  on menu \"Priority · P1\" do task-priority $item priority=1
+  on menu \"Priority · P2\" do task-priority $item priority=2
+  on menu \"Priority · P3\" do task-priority $item priority=3
+  on menu \"Priority · P4\" do task-priority $item priority=4
+  on menu \"Colour · Paper\" do task-colour $item colour=paper
+  on menu \"Colour · Rose\" do task-colour $item colour=rose
+  on menu \"Colour · Peach\" do task-colour $item colour=peach
+  on menu \"Colour · Sage\" do task-colour $item colour=sage
+  on menu \"Colour · Sky\" do task-colour $item colour=sky
+  on menu \"Colour · Lilac\" do task-colour $item colour=lilac
+  on menu \"Move · Backlog\" do task-move $item to=Backlog
+  on menu \"Move · Now\" do task-move $item to=Now
+  on menu \"Move · Done\" do task-move $item to=Done
+  on menu \"Assign · me\" do task-assign $item who=Alex
+  on menu \"Assign · my agent\" do task-assign $item who=JEFF
+  on menu \"Rename\" do task-rename $item title=\"$value\"
+  on menu \"Summarize\" do summarize.task $item
+  on menu \"Remove · undo brings it back\" do task-remove $item
+  summary : row, role summary
+    p1 : text \"<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='var(--t-p1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' ><g fill='none'> <path d='M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z' /> <line x1='4' x2='4' y1='22' y2='15' /> </g></svg>\", picture, role icon
+      only when $priority = 1
+    p2 : text \"<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='var(--t-p2)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' ><g fill='none'> <path d='M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z' /> <line x1='4' x2='4' y1='22' y2='15' /> </g></svg>\", picture, role icon
+      only when $priority = 2
+    p3 : text \"<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='var(--t-p3)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' ><g fill='none'> <path d='M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z' /> <line x1='4' x2='4' y1='22' y2='15' /> </g></svg>\", picture, role icon
+      only when $priority = 3
+    p4 : text \"<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='var(--t-p4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' ><g fill='none'> <path d='M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z' /> <line x1='4' x2='4' y1='22' y2='15' /> </g></svg>\", picture, role icon
+      only when $priority = 4
+    short : text \"$description\", role title, clamp 1
+  provenance : text \"$short_source\", role provenance
+    only when $short_source != \"\"
+  details : column, fold \"Details\", role group
+    title : text \"$title\", role input, hint \"Full description / rename\", on edit do task-rename $item title=\"$value\"
+    full : text \"$text\", markdown, role body, on edit do summarize.save $item field=text text=\"$value\"
+    who : text \"Assigned to $who · source: $source_status\", role meta
+    editor : column, role note
+      on menu \"Note colour · Paper\" do task-note-colour $item colour=paper
+      role note.rose when $note_colour = \"rose\"
+      on menu \"Note colour · Rose\" do task-note-colour $item colour=rose
+      role note.peach when $note_colour = \"peach\"
+      on menu \"Note colour · Peach\" do task-note-colour $item colour=peach
+      role note.sage when $note_colour = \"sage\"
+      on menu \"Note colour · Sage\" do task-note-colour $item colour=sage
+      role note.sky when $note_colour = \"sky\"
+      on menu \"Note colour · Sky\" do task-note-colour $item colour=sky
+      role note.lilac when $note_colour = \"lilac\"
+      on menu \"Note colour · Lilac\" do task-note-colour $item colour=lilac
+      on menu \"Note style · normal\" do task-note-style $item style=normal
+      on menu \"Note style · strong\" do task-note-style $item style=strong
+      on menu \"Note style · slant\" do task-note-style $item style=slant
+      heading : text \"Notes\", role title
+      toolbar : row, role tools
+        bold : text \"Bold\", role tool, on click press Ctrl+B
+        italic : text \"Italic\", role tool, on click press Ctrl+I
+        source : text \"Checklist / source\", role tool, on click press Ctrl+E
+        save : text \"Save\", role tool, on click press Ctrl+S
+      prose : text \"$note\", markdown, role editor, hint \"Write a note…\", on edit do summarize.save $item field=note text=\"$value\"
+        role editor.strong when $note_style = \"strong\"
+        role editor.slant when $note_style = \"slant\"
+      tip : text \"Checklist: - [ ] item · Ctrl+B bold · Ctrl+I italic · Ctrl+S save\", role meta
+    history : column, fold \"History\", role group
+      created : text \"Created $made_at by $by · changed $changed_at\", role meta
+      trail : column, of history:$task.id as event, each event
+event : column, role event
+  action : text \"$word · $changes\", role body
+  by : text \"$by · $at\", role meta
+"
+make kind=rule name="Task board automatic summaries" on=make of_kind=taskboard-task do="summarize.task $target"
+make kind=rule name="Task board Done announcement" on=task-done of_kind=taskboard-task do="post \"Task completed\" about=$target"

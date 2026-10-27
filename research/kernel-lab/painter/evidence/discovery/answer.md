@@ -1,0 +1,13 @@
+1. **Events calendar: yes, as a calendar view.** Use calendar (`dk155`) with month “2026-10”, inside a column with a heading and event list; add popover (`dk166`) for details. Bind event parts to visible facts and connect date selection to an authorized word. Its help explicitly excludes recurrence, time zones, and a scheduling backend.
+
+2. **Kanban over shared tasks: yes.** Arrange board (`dk131`) → lane (`dk132`) → card (`dk133`), with flag (`dk134`) for priority and menu (`dk135`) for actions. Repeat shared task rows within lanes, filter by lane, and sort by priority. Connect a lane’s “drop card” gesture to `task-move`, using the carried task ID and receiving lane name. The existing lanes are Backlog (`dk83`), Now (`dk84`), and Done (`dk85`).
+   
+   Actual tasks read include “Fix the bar before the neighbourhood demo” (`dk105`, Backlog), “Set aside a break” (`dk121`, Now), and “Thank the setup team” (`dk128`, Done). These are shared facts that multiple views can display.
+
+3. **Feed with avatars, posts, and input: yes.** Put input (`dk137`) above list (`dk151`). Repeat visible posts as rows containing avatar (`dk146`) and markdown (`dk142`). Bind the avatar to the author and Markdown to the post text; connect the input’s change gesture to the `post` word (`dk26`), with its value quoted as data. Posting remains subject to membership and the documented five-posts-per-day limit. Markdown excludes raw HTML; portraits use supplied inline assets.
+
+4. **3D CAD editor: not with the supplied pieces alone.** Layers, layout, inputs, and pixel-surface (`dk160`) could form interface scaffolding. Its help explicitly says it is 2D only and supplies no 3D CAD or geometry engine. A working editor needs a new 3D scene model, geometry engine, renderer, editing interactions, and authorized persistence words.
+
+5. **Collaborative desktop publishing editor: not with the supplied pieces alone.** Editor (`dk138`), toolbar (`dk161`), gallery (`dk157`), and grid/split layout can form a basic writing workspace with media. The editor handles plain text or Markdown source. Pagination, a typography/layout engine, and concurrent rich-text editing are missing; shared facts and refreshes do not supply those capabilities.
+
+I read the world guide (`dk130`), purpose searches, component help cards, and task rows using only `see`. **Nothing changed; neither board was modified. No code was needed or edited.** These answers describe documented capabilities; I did not open or visually inspect a rendered application.

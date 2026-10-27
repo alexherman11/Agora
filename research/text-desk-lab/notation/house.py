@@ -58,6 +58,7 @@ Python, once no resident is mid-turn.
 """
 
 import glob
+import hashlib
 import json
 import os
 import queue
@@ -75,6 +76,8 @@ import desk_mcp      # noqa: E402  the same path a desk tool call takes
 import export_docs   # noqa: E402  load(): the world under its lock, read only
 import charter
 import conversation_policy
+from house_lease import HouseOwned, house_lease  # noqa: E402
+import quota_policy  # noqa: E402
 import resident_continuity
 import host_route_parent
 import explore       # noqa: E402  _alive(): is a pid still running
@@ -84,6 +87,7 @@ import plan_usage    # noqa: E402  a6646: provider plan windows and durable paus
 import scripts_mirror  # noqa: E402  a6249: Alex's scripts as notes, kept in step with their files
 import workshop      # noqa: E402  workers for what the world can't change yet
 import task_flow
+import task_next_steps
 import guard_context
 import house_restart  # noqa: E402  a10269: a restart asked for from the world
 
@@ -104,7 +108,10 @@ COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", 
             "undo", "table", "run", "script", "scripts", "rule", "rules", "clock", "why", "compare", "vars", "set",
             "rows", "scene", "worktree", "go", "wake", "plan", "apply", "export", "sync", "x", "ex", "?"}
 DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400", "workers": "1", "worker_model": "", "worker_pool": "",
-            "timers": "off", "rest_wakes": "on", "claude_start_threshold": "off"}
+            "timers": "off", "rest_wakes": "on", "claude_start_threshold": "off",
+            # Alex, 27 Oct: every desk agent compacts at 400k context. The house note's compact_at changes it ("off"
+            # leaves Claude's own default); a model with a smaller window is capped to that window by Claude itself
+            "compact_at": "400k"}
 RESTART = 75         # the exit code that asks keeper.py to start the house again at once, on the new code
 # Alex, 30 Sep ("changes shouldn't need everyone resting"; "I'd rather be able to change the code while they work"):
 # only the files the house itself runs (workshop.HOUSE_FILES) ask it to restart, and a restart waits this long for
@@ -166,7 +173,10 @@ def find_claude():
     if os.environ.get("HOUSE_CLAUDE"):
         return os.environ["HOUSE_CLAUDE"], "?"
     found = []
-    for path in [shutil.which("claude")] + sorted(glob.glob(os.path.expandvars(r"%APPDATA%\Claude\claude-code\*\claude.exe"))):
+    # the desktop app keeps <version>\claude.exe, and since 2.1.30x <version>\<build>\claude.exe
+    kept = r"%APPDATA%\Claude\claude-code"
+    for path in [shutil.which("claude")] + sorted(glob.glob(os.path.expandvars(kept + r"\*\claude.exe"))
+                                                  + glob.glob(os.path.expandvars(kept + r"\*\*\claude.exe"))):
         if not path:
             continue
         try:
@@ -189,6 +199,15 @@ def clean_env(fake):
     env["DESKD"] = os.environ.get("DESKD", "")
     if fake:
         env["ANTHROPIC_BASE_URL"] = f"http://127.0.0.1:{fake}"
+    return env
+
+
+def compacting(env, house):
+    """The house note's compact_at (default 400k) as the context size at which a Claude child compacts its
+    conversation; "off" leaves Claude's own default. Claude caps it to a model's smaller window itself."""
+    at = str(getattr(house, "compact_at", None) or DEFAULTS["compact_at"]).strip()
+    if at.lower() != "off":
+        env = dict(env, CLAUDE_CODE_AUTO_COMPACT_WINDOW=at)
     return env
 
 
@@ -263,7 +282,8 @@ def unmarked_in(reply):
 def deskd_do(world, who, text, whole=False, stored=None, kind=None, as_of=None):
     """Send desk lines to deskd ($DESKD) one by one, as explore.py prints them; a refused line refuses only itself (a6437,
     carry_on: the desk skips a later line that depends on it, and the text ends saying what ran). -> the text,
-    or None when no deskd answers (then the caller runs them itself). whole: each line is one command (a736).
+    or None only when deskd is explicitly disabled. HTTP failures never replay.
+    whole: each line is one command (a736).
     kind (a3204): the line is signed `who` but is the house's own, 'rest' or 'wake'; it is sent as by=house with that
     kind. A line without it is `who`'s own."""
     import urllib.error
@@ -283,11 +303,10 @@ def deskd_do(world, who, text, whole=False, stored=None, kind=None, as_of=None):
             with urllib.request.urlopen(urllib.request.Request(url + "/api/do", body, {"Content-Type": "application/json"}),
                                         timeout=120) as f:
                 r = json.loads(f.read().decode("utf-8"))
-        except (urllib.error.URLError, OSError, ValueError):
-            if k == 0:
-                return None
-            out.append("ERR deskd stopped answering; the lines above were applied, this one and the rest were not")
-            break
+        except (urllib.error.URLError, OSError, ValueError) as exc:
+            raise RuntimeError(
+                f"Desk outcome uncertain at line {k + 1}; do not replay. "
+                f"Inspect world history. Prior receipts: {out!r}") from exc
         said = r.get("text") or ("ERR " + str(r.get("error")))
         out.append(f"> {line}\n{said}\n")
         tally.add(line, said, r.get("error"))
@@ -451,6 +470,38 @@ class Resident:
                 pending.get("message_contexts") or [])
         self.save()
 
+    def recover_applied_relay(self):
+        """Stage a known applied receipt, never re-execute its command batch.
+
+        The running House owns this journal. Received/applying/ambiguous states
+        remain held. Moving receipt and journal in one save survives a restart
+        without staging it twice; pipe delivery retains its existing limits.
+        """
+        relay = self.state.get("relay_pending")
+        if (self.busy or hasattr(self, "cid") or not isinstance(relay, dict)
+                or relay.get("phase") != "applied" or not isinstance(relay.get("receipt"), str)
+                or any(self.state.get(k) for k in ("pending", "handoff"))):
+            return False
+        original = self.state
+        self.state = dict(original)
+        receipt = ("~ saved receipt of commands already applied; do not replay the batch. "
+                   "Follow the newest instructions before continuing.\n" + relay["receipt"])
+        self.state["undelivered"] = "\n\n".join(
+            part for part in (self.state.get("undelivered", ""), receipt) if part)
+        self.state["relay_recovered"] = dict(relay, recovered_at=now(),
+            receipt_sha256=hashlib.sha256(relay["receipt"].encode()).hexdigest())
+        self.state.pop("relay_pending")
+        self.state.pop("woke", None)
+        self.state.pop("at_rest", None)
+        try:
+            self.save()
+        except Exception:
+            self.state = original
+            raise
+        self.log("relay_receipt_recovered", {
+            "receipt_sha256": self.state["relay_recovered"]["receipt_sha256"]})
+        return True
+
     def recover_delivery(self):
         """Recover a staged inbox batch or unfinished pipe write after restart.
 
@@ -495,12 +546,21 @@ class Resident:
             raise ValueError(f"{self.rid}: unknown resident provider {provider}")
         self.state["session_provider"] = provider
         self.state["session_model"] = model
+        self.state["session_reasoning"] = props.get("reasoning", "medium")
+        self.save()
+        child_env = compacting(clean_env(self.house.fake), self.house)
+        if provider == "claude" and props.get("quota_failover") == "on" and not self.house.fake:
+            child_env = quota_policy.claude_environment(self.house.claude, child_env)
+            effort = props.get("reasoning", "medium")
+            if effort not in ("low", "medium", "high", "xhigh", "max"):
+                raise ValueError("unsupported Claude subscription effort; no substitution")
+            cmd += ["--effort", effort]
         if self.state.get("session"):
             cmd += ["--resume", self.state["session"]]
         else:                                  # a fresh memory: first arrival, or the conversation was lost
             self.state["welcome_due"] = "a fresh conversation"
             self.save()
-        self.proc = subprocess.Popen(cmd, cwd=self.dir, env=clean_env(self.house.fake), stdin=subprocess.PIPE,
+        self.proc = subprocess.Popen(cmd, cwd=self.dir, env=child_env, stdin=subprocess.PIPE,
                                      stdout=subprocess.PIPE, stderr=open(self.dir / "stderr.log", "a", encoding="utf-8"),
                                      text=True, encoding="utf-8", errors="replace", bufsize=1)
         source = self._bind_child(self.proc)
@@ -554,13 +614,14 @@ class Resident:
         out is recorded before it is written, so a process that died under us (its failure may already be in the
         queue) loses nothing: the pipe error is logged and the failure is judged from the process's own events."""
         props = (self.house.load().nodes.get(self.rid) or {}).get("props") or {}
-        if props.get("role") == "resident" and resident_continuity.switching(self.state, props):
+        if not hasattr(self, "cid") and resident_continuity.switching(self.state, props):
             # The current turn may finish, but no receipt/news starts an extra
             # turn on the old provider. Preserve the complete packet for the new
             # conversation (or for operator repair if portable handover is absent).
             self.state["undelivered"] = "\n\n".join(
                 part for part in (self.state.get("undelivered", ""), text) if part)
             self.state.pop("at_rest", None)
+            self.state.pop("relay_pending", None)
             self.save()
             self.busy = False
             self.log("provider_deferred", {"from": resident_continuity.provider_of(self.state),
@@ -575,12 +636,19 @@ class Resident:
         if previous.get("carry"):
             text = previous["carry"] + "\n\n" + text
             carry = "\n".join(part for part in (previous["carry"], carry) if part)
+        # Only opt-in residents receive canonical task context. Workers keep their existing protocol.
+        if not hasattr(self, "cid"):
+            next_steps = task_next_steps.context(self.house.load(), self.rid, self.state,
+                force=kind in {"wake", "door"} or bool(previous or self.state.get("welcome_due") or self.state.get("handover_due")))
+            if next_steps:
+                text += "\n\n" + next_steps
         if self.state.get("welcome_due"):      # entering the desk with a fresh memory: the welcome comes first
             welcome = self.house.welcome_for(self)
             if welcome:
                 self.log("welcome", self.state["welcome_due"])
                 text = welcome + "\n\n---\n" + text
             self.state.pop("welcome_due", None)
+        self.state.pop("relay_pending", None)
         self.state["last_sent"] = now()
         handoff = self.state.pop("handoff", {})
         refs = list(dict.fromkeys(previous.get("image_comments", [])
@@ -689,6 +757,15 @@ class Resident:
                 self.reply = []
                 self.reply_source = None
             elif t == "result":
+                result_id = ev.get("turn_id")
+                if result_id and result_id == self.state.get("last_result_id"):
+                    self.reply, self.reply_source = [], None
+                    continue
+                if result_id:
+                    self.state["last_result_id"] = result_id
+                if not hasattr(self, "cid"):
+                    self.state["relay_pending"] = {
+                        "text": "\n".join(self.reply), "phase": "received"}
                 self.busy = False
                 self.state["turns"] = self.state.get("turns", 0) + 1
                 self.state["last_turn"] = now()
@@ -745,10 +822,13 @@ class House:
         self.dir = STATE / world
         self.dir.mkdir(parents=True, exist_ok=True)
         self.claude, self.claude_version = find_claude()
+        self.compact_at = DEFAULTS["compact_at"]
         self.workshop = workshop.Workshop(self)
         self.feeds = feeds.Feeds(world, self.dir)
         self.usage = usage.Usage(world, self.dir)
         self.plans = plan_usage.Plans(self)
+        if not fake:
+            self.plans.refresh_held_codex()
         self.scripts = scripts_mirror.Scripts(world, self.dir, allowed=None if not fake else False)
         self.charter_state = {}
         # No setting/world property can enable this; no journal/backend opened.
@@ -773,8 +853,12 @@ class House:
         sent; its chat lines and thread replies are judged on what that turn was shown."""
         text = deskd_do(self.world, who, line, whole, stored, kind, as_of)
         if text is None:
-            text, _ = desk_mcp.run_desk({"line": line, "as": who, "session": self.world, "whole": whole, "stored": stored,
+            text, failed = desk_mcp.run_desk({"line": line, "as": who, "session": self.world,
+                                         "whole": whole, "stored": stored,
                                          **({"as_of": as_of} if as_of is not None else {})})
+            if failed:
+                raise RuntimeError(
+                    "Desk transport failed; inspect the outcome before retrying: " + text)
         return text
 
     def misses(self, r, actor, lines):
@@ -916,7 +1000,8 @@ class House:
         def asked(s):
             # a1590: asked_by= holds the person once a world has persons (p2919), a name before: by person when it
             # can, by name when it can't (Claude c2998 (1))
-            return bool(s) and persons.holds(w, (s.get("props") or {}).get("asked_by") or "", actor)
+            return bool(s) and persons.holds(w, task_flow.comment_lead(w, s)
+                or (s.get("props") or {}).get("asked_by") or "", actor)
         mine = {n["subject"] for n in w.nodes.values() if n["type"] == "appearance" and self._inside(w, n, r.rid)}
         for e in w.events[start:]:
             if rooms.same_person(w, str(e.get("by") or "").split("/")[0], actor) or e.get("undone"):
@@ -932,6 +1017,9 @@ class House:
             if notices:
                 for notice in notices:
                     if rooms.same_person(w, notice["recipient"], actor):
+                        notice = task_flow.accept_notice(r.state, notice)
+                        if notice is None:
+                            continue
                         inbox.append(task_flow.delivery_text(notice))
                         urgent = True
                         self._knocked(r, e, s, resting)
@@ -941,7 +1029,9 @@ class House:
                 # your commission (landed, landed then reverted, the worker stopped, failed) reaches you as the worker's
                 # does; everything else the house writes is its bookkeeping. Sable's a1062 and a1101 failed this
                 # morning, and the only sign was their absence from a view that hides failures.
-                if not (e["verb"] == "comment" and asked(s)):
+                if not (e["verb"] == "comment" and (asked(s) or (
+                    task_flow.comment_lead(w, s) and any(
+                        rooms.same_person(w, x, actor) for x in rooms.comment_to(e))))):
                     continue
             said = " ".join(str(v) for k, v in args.items() if isinstance(v, str) and k != "mark")   # a5007: a mark is said in words
             waits = resting and rooms.kind_of(w, e.get("by")) != "person"     # kept, first and marked for it
@@ -1014,7 +1104,7 @@ class House:
                 self._knocked(r, e, s, resting)
             elif quiet:
                 continue
-            elif rooms.comment_falls_back(e) and sid in mine:
+            elif rooms.comment_falls_back(e) and sid in mine and not task_flow.comment_lead(w, s):
                 inbox.append(f"~ {e['by']} {'asks a question' if asks else 'commented'} on \"{s['title']}\" ({e['id']}): {said[:300]}")
                 urgent = True
                 self._knocked(r, e, s, resting)
@@ -1023,6 +1113,10 @@ class House:
                              f"({e['id']}): {said[:1500]}")
                 urgent = True
                 self._knocked(r, e, s, resting)
+        attention = task_next_steps.collect(w, r.rid, r.state, start, now())
+        if attention:
+            inbox.append(attention)
+            urgent = True
         r.state["cursor"] = len(w.events)
         r.save()
         return urgent
@@ -1198,6 +1292,7 @@ class House:
                 print(f"house: charter mirror: {type(exc).__name__}: {exc}", flush=True)
             w = self.load()
         cfg = self.settings(w)
+        self.compact_at = cfg.get("compact_at") or DEFAULTS["compact_at"]
         corners = self.corners(w)
         open_ = [s for s in w.subjects.values() if (s.get("props") or {}).get("objective") == "open"]
         objective = bool(open_)
@@ -1227,6 +1322,28 @@ class House:
                     r.save()
                 self.set_status(r, corner, "asleep" if actor else "unnamed")
                 continue
+            if r.state.get("relay_pending") and not r.busy:
+                if not r.recover_applied_relay():
+                    self.set_status(r, corner, "recovery-needed")
+                    continue
+            corner = quota_policy.apply(self, r, corner)
+            props = corner.get("props") or {}
+            model = props.get("model") or cfg["model"]
+            try:
+                resident_continuity.validate(r.state, props, model)
+            except ValueError as exc:
+                r.state["provider_error"] = str(exc)
+                r.save()
+                self.set_status(r, corner, "error")
+                continue
+            changed_model = (r.state.get("session_model", model) != model
+                             or r.state.get("session_reasoning", props.get("reasoning", "medium"))
+                             != props.get("reasoning", "medium"))
+            if changed_model and not resident_continuity.switching(r.state, props):
+                if r.busy:
+                    continue
+                if r.alive():
+                    r.stop()  # same-provider resume keeps its token and unfinished input
             if resident_continuity.switching(r.state, props):
                 if r.busy:
                     continue  # let the in-flight turn finish; send() parks its follow-up
@@ -1260,7 +1377,18 @@ class House:
                     self.set_status(r, corner, "paused" if r.state.get("retry_kind") == "limit" else "error")
                     continue
                 first = not r.started
-                r.start(props.get("model") or cfg["model"])
+                try:
+                    r.start(props.get("model") or cfg["model"])
+                except (ValueError, OSError, subprocess.SubprocessError) as exc:
+                    # One unavailable subscription must not starve the rest of the house.
+                    detail = str(exc) if isinstance(exc, ValueError) else type(exc).__name__
+                    r.state.update(
+                        provider_error=detail, retry_kind="startup", retry_at=now() + 300)
+                    r.save()
+                    self.set_status(r, corner, "error")
+                    continue
+                if r.state.pop("provider_error", None) is not None:
+                    r.save()
                 r.started = True
                 # 3 Oct (Pike e5914, Sable e5917): a restart for new code started every resident's process and woke each
                 # one for a whole turn with no caller, at every landing of a house file, through any rest. A resident
@@ -1453,7 +1581,14 @@ class House:
         attempts, rest = rest_in(commands_in(text))
         n0 = len(w.events)
         # a5068: news runs only between turns, so the cursor is where this turn's input left off (a2870 Revision 2)
+        if attempts:
+            r.state["relay_pending"] = {"text": text, "phase": "applying"}
+            r.save()
         receipt = self.act(actor, "\n".join(attempts), whole=True, as_of=r.state.get("cursor")) if attempts else ""
+        if attempts:
+            r.state["relay_pending"].update(phase="applied", receipt=receipt)
+            resident_continuity.remember(r.state, "receipt", receipt)
+            r.save()
         host_receipts = getattr(text, "host_receipts", ())
         if host_receipts:
             receipt = "\n".join(([receipt] if receipt else []) + list(host_receipts))
@@ -1507,6 +1642,7 @@ class House:
     def rest(self, r, seconds, why):
         """The resident rests: until someone calls (seconds=0), or for that long. A call still reaches it (Alex: he
         can talk with them at any point); an open objective and wake_every wait until the rest is over."""
+        r.state.pop("relay_pending", None)
         r.state["quiet"], r.state["at_rest"] = 0, True
         if seconds:
             r.state["rest_until"], r.state["rest_for"] = now() + seconds, seconds
@@ -1547,7 +1683,7 @@ class House:
         n = r.state.get("failures", 0) + 1
         reset = limit_reset((why or {}).get("detail") if isinstance(why, dict) else "")
         detail = (why or {}).get("detail", "") if isinstance(why, dict) else ""
-        if reset or workshop.usage_limited(detail):
+        if quota_policy.quota_error(detail):
             provider = r.state.get("session_provider", "claude")
             plans = getattr(self, "plans", None)
             reset = (plans.reset(provider) if plans else 0) or reset
@@ -1573,6 +1709,11 @@ class House:
                                      "turns": r.state.get("turns", 0), "last_turn": r.state.get("last_turn"),
                                      "last_sent": r.state.get("last_sent"), "status": r.status,
                                      "failures": r.state.get("failures", 0), "retry_at": r.state.get("retry_at"),
+                                     "provider": r.state.get("session_provider", "claude"),
+                                     "model": r.state.get("session_model"),
+                                     "reasoning": r.state.get("session_reasoning"),
+                                     "provider_error": r.state.get("provider_error"),
+                                     "recovery_needed": bool(r.state.get("relay_pending")),
                                      "rest_until": r.state.get("rest_until"), "quiet": r.state.get("quiet", 0),
                                      "wakes_at": r.wakes_at, "held": len(r.state.get("for_you") or []),
                                      "said": r.state.get("said", [])}
@@ -1597,6 +1738,14 @@ class House:
         return None
 
     def run(self):
+        try:
+            with house_lease(self.dir):
+                return self._run_owned()
+        except HouseOwned:
+            print(f"house: world {self.world} already has an owner; not starting", flush=True)
+            return ANOTHER
+
+    def _run_owned(self):
         other = self.another_house()
         if other:
             print(f"house: another house (pid {other}) is running world {self.world}; not starting a second", flush=True)

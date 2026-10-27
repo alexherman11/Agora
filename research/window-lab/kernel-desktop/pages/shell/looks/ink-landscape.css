@@ -1,0 +1,70 @@
+/* ink-landscape: parchment and ink, square edges, mono type and icons */
+/* A stand-in theme for the shell builder, using exactly the variable names of agora-wm/CONTRACTS.md section 1
+   (palette, roles, type, shape, surface, motion), plus the few extras the shell reads (named at the end). The pages
+   load the host's real /theme.css first and fall back to a look from this folder only when that is absent. */
+:root {
+  --ag-base00: #f1e6bf;
+  --ag-base01: #e8dba9;
+  --ag-base02: #cfc08f;
+  --ag-base03: #8c8566;
+  --ag-base04: #5d5b46;
+  --ag-base05: #2f3a36;
+  --ag-base06: #232d2a;
+  --ag-base07: #161e1c;
+  --ag-base08: #a2442f;
+  --ag-base09: #a8692a;
+  --ag-base0A: #9a7d1c;
+  --ag-base0B: #4a7a52;
+  --ag-base0C: #1f6f78;
+  --ag-base0D: #2b5f8a;
+  --ag-base0E: #7a4c8c;
+  --ag-base0F: #7d5a3c;
+  --ag-bg: #f1e6bf;
+  --ag-surface: #f6edcb;
+  --ag-raised: #f3e7b6;
+  --ag-bar: #efe3b8;
+  --ag-ink: #2f3a36;
+  --ag-ink-muted: #5f5c45;
+  --ag-accent: #1f6f78;
+  --ag-accent-ink: #f6edcb;
+  --ag-ok: #4a7a52;
+  --ag-warn: #a8692a;
+  --ag-danger: #a2442f;
+  --ag-info: #1f6f78;
+  --ag-border: #b9ab7e;
+  --ag-focus: #1f6f78;
+  --ag-select: #cfc08f;
+  --ag-scrim: rgba(241, 230, 191, .6);
+  --ag-font-ui: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
+  --ag-font-mono: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
+  --ag-font-display: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
+  --ag-text: 13px;
+  --ag-scale: 1.1;
+  --ag-radius-s: 0px;
+  --ag-radius-m: 0px;
+  --ag-radius-l: 0px;
+  --ag-radius-pill: 0px;
+  --ag-border-w: 1px;
+  --ag-gap-inner: 6px;
+  --ag-gap-outer: 8px;
+  --ag-bar-height: 30px;
+  --ag-dock-size: 54px;
+  --ag-bar-opacity: 0;
+  --ag-window-opacity: 1;
+  --ag-backdrop: none;
+  --ag-shadow: none;
+  --ag-dur-fast: 60ms;
+  --ag-dur-med: 100ms;
+  --ag-dur-slow: 180ms;
+  --ag-ease: linear;
+  /* extras the shell reads (not in CONTRACTS section 1): */
+  --ag-island-opacity: .94;
+  --ag-icon-style: mono;
+  --ag-icon-plate: #f3e7b6;
+  --ag-motion-reduce: 0;
+  --ag-island-outline: 1;
+  --ag-wallpaper-size: cover;
+  --ag-wallpaper-pos: center;
+  --ag-wallpaper-dim: transparent;
+  --ag-wallpaper: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1600 900%22 preserveAspectRatio=%22xMidYMid slice%22%3E %3Cdefs%3E %3Cfilter id=%22grain%22 x=%220%22 y=%220%22 width=%22100%25%22 height=%22100%25%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%222%22 seed=%224%22/%3E%3CfeColorMatrix type=%22matrix%22 values=%220 0 0 0 0.16 0 0 0 0 0.15 0 0 0 0 0.12 0 0 0 1.6 -0.55%22/%3E%3C/filter%3E %3Cfilter id=%22rough%22 x=%22-5%25%22 y=%22-5%25%22 width=%22110%25%22 height=%22110%25%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.018 0.03%22 numOctaves=%224%22 seed=%229%22 result=%22t%22/%3E%3CfeDisplacementMap in=%22SourceGraphic%22 in2=%22t%22 scale=%2226%22/%3E%3C/filter%3E %3ClinearGradient id=%22mist%22 x1=%220%22 y1=%220%22 x2=%220%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%23f1e6bf%22 stop-opacity=%220%22/%3E%3Cstop offset=%221%22 stop-color=%22%23f1e6bf%22 stop-opacity=%22.92%22/%3E%3C/linearGradient%3E %3Cpattern id=%22hatch%22 width=%227%22 height=%227%22 patternUnits=%22userSpaceOnUse%22 patternTransform=%22rotate(32)%22%3E%3Cpath d=%22M0 0 V7%22 stroke=%22%232c2b22%22 stroke-width=%221.1%22 opacity=%22.55%22/%3E%3C/pattern%3E %3Cpattern id=%22hatch2%22 width=%225%22 height=%225%22 patternUnits=%22userSpaceOnUse%22 patternTransform=%22rotate(-24)%22%3E%3Cpath d=%22M0 0 V5%22 stroke=%22%232c2b22%22 stroke-width=%221%22 opacity=%22.6%22/%3E%3C/pattern%3E %3C/defs%3E %3Crect width=%221600%22 height=%22900%22 fill=%22%23efe3bb%22/%3E %3Crect width=%221600%22 height=%22900%22 filter=%22url(%23grain)%22 opacity=%22.35%22/%3E %3Cg filter=%22url(%23rough)%22%3E %3Cpath d=%22M-40 640 L120 520 L210 560 L330 430 L440 500 L520 470 L660 610 L760 640 L-40 700 Z%22 fill=%22%23c9bb92%22 opacity=%22.7%22/%3E %3Cpath d=%22M880 700 L960 480 L1010 420 L1060 330 L1110 250 L1150 160 L1190 230 L1230 300 L1300 380 L1390 330 L1440 420 L1500 520 L1640 610 L1640 760 L880 760 Z%22 fill=%22%23b8a97c%22/%3E %3Cpath d=%22M880 700 L960 480 L1010 420 L1060 330 L1110 250 L1150 160 L1190 230 L1230 300 L1300 380 L1390 330 L1440 420 L1500 520 L1640 610 L1640 760 L880 760 Z%22 fill=%22url(%23hatch)%22/%3E %3Cpath d=%22M1080 760 L1150 540 L1215 470 L1270 560 L1330 520 L1440 700 L1520 760 Z%22 fill=%22url(%23hatch2)%22 opacity=%22.8%22/%3E %3Cpath d=%22M-20 760 L90 600 L170 660 L250 560 L370 690 L470 650 L560 760 Z%22 fill=%22%23a69a74%22 opacity=%22.85%22/%3E %3Cpath d=%22M-20 760 L90 600 L170 660 L250 560 L370 690 L470 650 L560 760 Z%22 fill=%22url(%23hatch2)%22/%3E %3C/g%3E %3Crect y=%22560%22 width=%221600%22 height=%22340%22 fill=%22url(%23mist)%22/%3E %3C/svg%3E");
+}

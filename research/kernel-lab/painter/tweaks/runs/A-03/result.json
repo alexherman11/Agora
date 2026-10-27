@@ -1,0 +1,83 @@
+{
+  "exit": 0,
+  "timed_out": false,
+  "seconds": 34.86,
+  "answer": "Updated taskboard-components (dk170) to hide Done only for Alex using an arrangement condition. No JavaScript code was necessary. Shared task/lane facts and the other board are unchanged.\n\nVerified with `look-view`: Alex\u2019s view contains only Backlog and Now. Pixels were not visually inspected. Change receipt: r229.",
+  "board": "A",
+  "number": 3,
+  "request": "Hide the Done lane, just for me.",
+  "changes": [
+    {
+      "thing": "dk170",
+      "kind": "lens",
+      "field": "text",
+      "category": "lens",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "view-preference",
+      "field": "for",
+      "category": "lens",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "view-preference",
+      "field": "forgotten",
+      "category": "lens",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "view-preference",
+      "field": "in:dk1",
+      "category": "lens",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "view-preference",
+      "field": "kind",
+      "category": "lens",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "view-preference",
+      "field": "lens",
+      "category": "lens",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "view-preference",
+      "field": "made_by",
+      "category": "lens",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "view-preference",
+      "field": "sees",
+      "category": "lens",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "view-preference",
+      "field": "text",
+      "category": "lens",
+      "lines": 1
+    }
+  ],
+  "lines": 9,
+  "landed": [
+    "lens"
+  ],
+  "success": true,
+  "board_proof": true,
+  "proof_passed": 11,
+  "proof_checks": 11,
+  "wall_seconds": 45.75
+}

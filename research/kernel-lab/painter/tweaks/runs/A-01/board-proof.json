@@ -1,0 +1,57 @@
+[
+  {
+    "check": "Cards still show their authoritative titles",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "Focused-card priority shortcut writes the fact",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "Card menu remains available with its action set",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "Detail drawer reads real history",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "Multiline Markdown saves to authoritative facts",
+    "ok": false,
+    "detail": "timed out waiting"
+  },
+  {
+    "check": "Pointer drag keeps the spring ghost",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "Pointer drop writes the task-move fact",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "Competing stale pointer refuses",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "Native quick-add preserves priority and description",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "Removal forgets the card",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "Undo restores card and record trail",
+    "ok": true,
+    "detail": ""
+  }
+]

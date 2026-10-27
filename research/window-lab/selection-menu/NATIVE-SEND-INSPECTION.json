@@ -1,0 +1,69 @@
+{
+  "world_event": "e18572",
+  "events": 18574,
+  "lens": "jeff-chat",
+  "rev": 34,
+  "edit_parts": [
+    {
+      "part": "say",
+      "commit": "explicit",
+      "actions": [
+        {
+          "on": "edit",
+          "when": "talk != \"\" and (($draft.topic or \"\") != \"\" or ($draft.reply_to or \"\") != \"\" or ($draft.reply_thread or \"\") != \"\")",
+          "line": "do append $d.talk line=\"$value\" about=$(pointing) quote=\"$(held)\" words_before=\"$(wbefore)\" words_after=\"$(wafter)\" heading=\"$(wheading)\"; read $w; do prop $w quote=\"\" quoting=\"\" quote_in=\"\"; read $draft; do prop $draft topic=\"\" reply_to=\"\" quote=\"\" reply_in=\"\" reply_thread=\"\" reply_kind=\"\"",
+          "commands": 5
+        },
+        {
+          "on": "edit",
+          "when": "talk != \"\" and not (($draft.topic or \"\") != \"\" or ($draft.reply_to or \"\") != \"\" or ($draft.reply_thread or \"\") != \"\")",
+          "line": "do append $d.talk line=\"$value\" about=$(pointing) quote=\"$(held)\" words_before=\"$(wbefore)\" words_after=\"$(wafter)\" heading=\"$(wheading)\"; read $w; do prop $w quote=\"\" quoting=\"\" quote_in=\"\"",
+          "commands": 3
+        },
+        {
+          "on": "edit",
+          "when": "talk = \"\" and (($draft.topic or \"\") != \"\" or ($draft.reply_to or \"\") != \"\" or ($draft.reply_thread or \"\") != \"\")",
+          "line": "look f3402; do create f3402 kind=chat title=\"Talk: $d.title\" talk_of=$d.item with=\"$me,$(route)\" describe=\"$(rules)\"; read $d.item; do prop $d.item talk=$new; do append $new line=\"$value\" about=$(pointing) quote=\"$(held)\" words_before=\"$(wbefore)\" words_after=\"$(wafter)\" heading=\"$(wheading)\"; read $w; do prop $w quote=\"\" quoting=\"\" quote_in=\"\"; read $draft; do prop $draft topic=\"\" reply_to=\"\" quote=\"\" reply_in=\"\" reply_thread=\"\" reply_kind=\"\"",
+          "commands": 9
+        },
+        {
+          "on": "edit",
+          "when": "talk = \"\" and not (($draft.topic or \"\") != \"\" or ($draft.reply_to or \"\") != \"\" or ($draft.reply_thread or \"\") != \"\")",
+          "line": "look f3402; do create f3402 kind=chat title=\"Talk: $d.title\" talk_of=$d.item with=\"$me,$(route)\" describe=\"$(rules)\"; read $d.item; do prop $d.item talk=$new; do append $new line=\"$value\" about=$(pointing) quote=\"$(held)\" words_before=\"$(wbefore)\" words_after=\"$(wafter)\" heading=\"$(wheading)\"; read $w; do prop $w quote=\"\" quoting=\"\" quote_in=\"\"",
+          "commands": 7
+        }
+      ]
+    },
+    {
+      "part": "say",
+      "commit": "explicit",
+      "actions": [
+        {
+          "on": "edit",
+          "when": "elsewhere = \"no\" and ($draft.reply_thread or \"\") = \"\" and (($draft.topic or \"\") != \"\" or ($draft.reply_to or \"\") != \"\" or ($draft.reply_thread or \"\") != \"\")",
+          "line": "do append a5080 line=\"$value\" default_to=\"$draft.to\" captures=\"$draft.context\" context_from=\"$draft\" reply_to=\"$draft.reply_to\" about=\"$(about)\"; read $draft; do prop $draft topic=\"\" reply_to=\"\" quote=\"\" reply_in=\"\" reply_thread=\"\" reply_kind=\"\"",
+          "commands": 3
+        },
+        {
+          "on": "edit",
+          "when": "elsewhere = \"no\" and ($draft.reply_thread or \"\") = \"\" and not (($draft.topic or \"\") != \"\" or ($draft.reply_to or \"\") != \"\" or ($draft.reply_thread or \"\") != \"\")",
+          "line": "do append a5080 line=\"$value\" default_to=\"$draft.to\" captures=\"$draft.context\" context_from=\"$draft\" reply_to=\"$draft.reply_to\" about=\"$(about)\"",
+          "commands": 1
+        },
+        {
+          "on": "edit",
+          "when": "elsewhere = \"yes\"",
+          "line": "do append $draft.reply_in line=\"$value\" reply_to=\"$draft.reply_to\"; read $draft; do prop $draft topic=\"\" reply_to=\"\" quote=\"\" reply_in=\"\" reply_thread=\"\" reply_kind=\"\"",
+          "commands": 3
+        },
+        {
+          "on": "edit",
+          "when": "($draft.reply_thread or \"\") != \"\"",
+          "line": "do comment $draft.reply_in id=$draft.reply_thread line=\"$value\"; read $draft; do prop $draft topic=\"\" reply_to=\"\" quote=\"\" reply_in=\"\" reply_thread=\"\" reply_kind=\"\"",
+          "commands": 3
+        }
+      ]
+    }
+  ],
+  "native_chain_pair_refusal": "line 1: `on edit quoted do` needs commit explicit, exactly one plain `on edit` without quote bindings, and one quoted action consuming $quote_text; each sends one command"
+}

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "owner": {
+    "pid": 29412,
+    "created": 134375337726892902,
+    "exe": "C:\\Users\\Alex\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+  },
+  "guard": {
+    "pid": 49800,
+    "created": 134375337833887559,
+    "exe": "C:\\Users\\Alex\\AppData\\Local\\Programs\\Python\\Python312\\pythonw.exe"
+  },
+  "released": true,
+  "windows": [],
+  "reason": "off"
+}

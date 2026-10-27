@@ -1,0 +1,14 @@
+# The site keeps its own lint settings: its pages are long HTML strings.
+line-length = 120
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[lint.isort]
+known-local-folder = ["agora_entry", "conftest"]
+
+[lint.per-file-ignores]
+"agora_entry/pages.py" = ["E501"]
+"agora_entry/fake_google.py" = ["E501"]
+"scenario/evening.py" = ["E501"]

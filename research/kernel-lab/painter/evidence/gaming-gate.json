@@ -1,0 +1,319 @@
+[
+  {
+    "at": "2026-10-24T21:46:16.635847+00:00",
+    "attempt": 0,
+    "reasons": [
+      "full-screen foreground application"
+    ],
+    "processes": [
+      {
+        "ProcessName": "EdgeGameAssist",
+        "Id": 35864
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 4824
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 30880
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 14032
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 15692
+      }
+    ]
+  },
+  {
+    "at": "2026-10-24T21:51:17.946305+00:00",
+    "attempt": 1,
+    "reasons": [
+      "full-screen foreground application"
+    ],
+    "processes": [
+      {
+        "ProcessName": "EdgeGameAssist",
+        "Id": 35864
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 4824
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 30880
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 14032
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 15692
+      }
+    ]
+  },
+  {
+    "at": "2026-10-24T21:56:19.486321+00:00",
+    "attempt": 2,
+    "reasons": [
+      "full-screen foreground application"
+    ],
+    "processes": [
+      {
+        "ProcessName": "EdgeGameAssist",
+        "Id": 35864
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 4824
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 30880
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 14032
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 15692
+      }
+    ]
+  },
+  {
+    "at": "2026-10-24T22:01:20.808820+00:00",
+    "attempt": 3,
+    "reasons": [
+      "full-screen foreground application"
+    ],
+    "processes": [
+      {
+        "ProcessName": "EdgeGameAssist",
+        "Id": 35864
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 4824
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 30880
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 14032
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 15692
+      }
+    ]
+  },
+  {
+    "at": "2026-10-24T22:06:22.260217+00:00",
+    "attempt": 4,
+    "reasons": [
+      "full-screen foreground application"
+    ],
+    "processes": [
+      {
+        "ProcessName": "EdgeGameAssist",
+        "Id": 35864
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 4824
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 30880
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 14032
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 15692
+      }
+    ]
+  },
+  {
+    "at": "2026-10-24T22:11:23.480719+00:00",
+    "attempt": 5,
+    "reasons": [
+      "full-screen foreground application"
+    ],
+    "processes": [
+      {
+        "ProcessName": "EdgeGameAssist",
+        "Id": 35864
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 4824
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 30880
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 14032
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 15692
+      }
+    ]
+  },
+  {
+    "at": "2026-10-24T22:16:24.843961+00:00",
+    "attempt": 6,
+    "reasons": [
+      "full-screen foreground application"
+    ],
+    "processes": [
+      {
+        "ProcessName": "EdgeGameAssist",
+        "Id": 35864
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 4824
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 30880
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 14032
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 15692
+      }
+    ]
+  },
+  {
+    "at": "2026-10-24T22:21:26.093397+00:00",
+    "attempt": 7,
+    "reasons": [
+      "full-screen foreground application"
+    ],
+    "processes": [
+      {
+        "ProcessName": "EdgeGameAssist",
+        "Id": 35864
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 4824
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 30880
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 14032
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 15692
+      }
+    ]
+  },
+  {
+    "at": "2026-10-24T22:26:27.463555+00:00",
+    "attempt": 8,
+    "reasons": [
+      "full-screen foreground application"
+    ],
+    "processes": [
+      {
+        "ProcessName": "EdgeGameAssist",
+        "Id": 35864
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 4824
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 30880
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 14032
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 15692
+      }
+    ]
+  },
+  {
+    "at": "2026-10-24T22:31:28.827709+00:00",
+    "attempt": 9,
+    "reasons": [
+      "full-screen foreground application"
+    ],
+    "processes": [
+      {
+        "ProcessName": "EdgeGameAssist",
+        "Id": 35864
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 4824
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 30880
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 14032
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 15692
+      }
+    ]
+  },
+  {
+    "at": "2026-10-24T22:36:30.165956+00:00",
+    "attempt": 10,
+    "reasons": [],
+    "processes": [
+      {
+        "ProcessName": "EdgeGameAssist",
+        "Id": 35864
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 4824
+      },
+      {
+        "ProcessName": "GameInputRedistService",
+        "Id": 30880
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 14032
+      },
+      {
+        "ProcessName": "GameInputSvc",
+        "Id": 15692
+      }
+    ]
+  }
+]

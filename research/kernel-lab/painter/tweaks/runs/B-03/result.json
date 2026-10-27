@@ -1,0 +1,127 @@
+{
+  "exit": 0,
+  "timed_out": false,
+  "seconds": 55.91,
+  "answer": "Updated taskboard-js (dk176) to hide the entire Done lane for Alex using private preference dk179.\n\nInline code was necessary; I edited and explicitly reviewed/reactivated it. Shared tasks, lanes, and the other board are unchanged.\n\nLimitation: the widget is not mounted, so I could not inspect the visual result.",
+  "board": "B",
+  "number": 3,
+  "request": "Hide the Done lane, just for me.",
+  "changes": [
+    {
+      "thing": "dk177",
+      "kind": "grant",
+      "field": "revoked",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "grant",
+      "field": "by",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "grant",
+      "field": "kind",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "grant",
+      "field": "only",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "grant",
+      "field": "to",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "grant",
+      "field": "where",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "grant",
+      "field": "words",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "view-preference",
+      "field": "for",
+      "category": "lens",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "view-preference",
+      "field": "hide_done",
+      "category": "lens",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "view-preference",
+      "field": "in:dk1",
+      "category": "lens",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "view-preference",
+      "field": "kind",
+      "category": "lens",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "view-preference",
+      "field": "lens",
+      "category": "lens",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "view-preference",
+      "field": "made_by",
+      "category": "lens",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "view-preference",
+      "field": "sees",
+      "category": "lens",
+      "lines": 1
+    },
+    {
+      "thing": "dk176",
+      "kind": "widget",
+      "field": "code",
+      "category": "source",
+      "lines": 8
+    }
+  ],
+  "lines": 22,
+  "landed": [
+    "facts",
+    "lens",
+    "source"
+  ],
+  "success": true,
+  "board_proof": true,
+  "proof_passed": 11,
+  "proof_checks": 11,
+  "wall_seconds": 65.31
+}

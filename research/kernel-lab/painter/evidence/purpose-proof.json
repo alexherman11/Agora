@@ -1,0 +1,38 @@
+[
+  {
+    "check": "Long rows are actually windowed in the DOM",
+    "ok": true
+  },
+  {
+    "check": "Scrolling reaches the actual last fact row",
+    "ok": true
+  },
+  {
+    "check": "Agent reading describes all bound rows",
+    "ok": true
+  },
+  {
+    "check": "Split separator is keyboard resizable",
+    "ok": true
+  },
+  {
+    "check": "Desktop grid has authored proportions",
+    "ok": true
+  },
+  {
+    "check": "390 CSS pixel rule composes the same view in one column",
+    "ok": true
+  },
+  {
+    "check": "Input has its readable accessible name",
+    "ok": true
+  },
+  {
+    "check": "Pixel surface has 2D pixels and an accessible label",
+    "ok": true
+  },
+  {
+    "check": "Absolute placement is authored in the lens",
+    "ok": true
+  }
+]

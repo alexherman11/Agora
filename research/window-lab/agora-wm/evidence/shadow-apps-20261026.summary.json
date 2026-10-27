@@ -1,0 +1,23 @@
+{
+  "samples": 421,
+  "apps": [
+    "ChatGPT",
+    "Discord",
+    "Spotify",
+    "WindowsTerminal",
+    "chrome",
+    "claude",
+    "explorer",
+    "python"
+  ],
+  "would_move_samples": {},
+  "would_minimise_samples": {},
+  "gated_samples": {
+    "notification gate 2": 421
+  },
+  "infeasible_samples": 0,
+  "meaning": "counts are observations, not distinct actions; no window titles recorded",
+  "seconds": 120.109,
+  "hook_events": 2872,
+  "native_mutating": false
+}

@@ -1,0 +1,33 @@
+{
+  "samples": 412,
+  "apps": [
+    "ChatGPT",
+    "Discord",
+    "Spotify",
+    "WindowsTerminal",
+    "chrome",
+    "claude",
+    "explorer",
+    "msedge",
+    "python"
+  ],
+  "would_move_samples": {
+    "ChatGPT": 824,
+    "Spotify": 412
+  },
+  "would_minimise_samples": {
+    "Discord": 412,
+    "WindowsTerminal": 1236,
+    "chrome": 412,
+    "claude": 412,
+    "explorer": 824,
+    "msedge": 412,
+    "python": 824
+  },
+  "gated_samples": {},
+  "infeasible_samples": 0,
+  "meaning": "counts are observations, not distinct actions; no window titles recorded",
+  "seconds": 120.187,
+  "hook_events": 3005,
+  "native_mutating": false
+}

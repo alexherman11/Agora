@@ -1,0 +1,23 @@
+{
+  "at": "2026-10-26T19:52:17.867718+00:00",
+  "task_count": 26,
+  "before_hash": "4c202bfe191a2132d6479d943fee14e13e3e13645f8e4edef15125c7f36740f0",
+  "window_provider_on": false,
+  "tasks_unchanged": true,
+  "histories_unchanged": true,
+  "arrangements_unchanged": true,
+  "saved_windows_unchanged": true,
+  "window_provider_state_preserved": true,
+  "after_hash": "4c202bfe191a2132d6479d943fee14e13e3e13645f8e4edef15125c7f36740f0",
+  "prior_resident_task_hash": "1bcedb871a6d230d42cce35f56ad8281acf8fc12be242c4bd22cfaacfdf955dd",
+  "exact_prior_hash_without_derived_groups": true,
+  "live_compact_reading": true,
+  "counts": {
+    "flag": 26,
+    "menu": 26,
+    "card": 26,
+    "lane": 3,
+    "board": 1
+  },
+  "widget_source_hash": "ce28c6b91da7e8b6d40cc0be08c527abf6aea6bffbc98cf1ec54e31c31a7f404"
+}

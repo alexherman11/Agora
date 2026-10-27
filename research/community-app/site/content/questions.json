@@ -1,0 +1,41 @@
+{
+  "_note": "Draft wording by Claude, 23 Oct 2026, for Alex to rewrite. Leaders can change these questions here without touching code. Never add a question about where someone lives.",
+  "version": 1,
+  "intro": "Two quick questions and you're in.",
+  "questions": [
+    {
+      "key": "display_name",
+      "label": "Your name, as neighbours will see it",
+      "help": "We use real names in chat, so people know who they're talking to. First name and last initial is fine.",
+      "type": "text",
+      "required": true,
+      "max": 60,
+      "prefill": "name",
+      "placeholder": "e.g. Maya R."
+    },
+    {
+      "key": "help",
+      "label": "How would you like to help?",
+      "help": "Pick any. You can change this later.",
+      "type": "choices",
+      "required": false,
+      "options": [
+        {"value": "meetings", "label": "Come to meetings"},
+        {"value": "neighbours", "label": "Talk with neighbours"},
+        {"value": "research", "label": "Research and reading"},
+        {"value": "online", "label": "Spread the word online"},
+        {"value": "skills", "label": "Design, writing or tech"},
+        {"value": "watching", "label": "Just keeping up for now"}
+      ]
+    },
+    {
+      "key": "neighbourhood",
+      "label": "Your neighbourhood (optional)",
+      "help": "Just the area, like Seabright or Live Oak, so we can connect you with people nearby.",
+      "type": "text",
+      "required": false,
+      "max": 40,
+      "placeholder": "e.g. Seabright"
+    }
+  ]
+}

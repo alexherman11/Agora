@@ -1,0 +1,111 @@
+{
+  "checks": [
+    {
+      "check": "App installed entirely through HTTP lines",
+      "ok": true,
+      "detail": "13 declarations"
+    },
+    {
+      "check": "Second install changes no facts or records",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Dictionary help: task-add",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Dictionary help: task-move",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Dictionary help: task-assign",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Dictionary help: task-done",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Dictionary help: task-note",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Alex and agent work simultaneously",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Agent move has real authorship",
+      "ok": true,
+      "detail": "agent"
+    },
+    {
+      "check": "Three lanes paint through unchanged lens.js",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Real pointer drag moves Now to Done",
+      "ok": true,
+      "detail": "ok set tb52 [r23] \u00b7 lane=Done\n~ task-done, one act [r23]"
+    },
+    {
+      "check": "Second simultaneous pointer drop is stale",
+      "ok": true,
+      "detail": "refused: stale: tb52 changed since it was painted (lane, r23); nothing was done. The view will repaint."
+    },
+    {
+      "check": "Lane button still moves through lens.js",
+      "ok": true,
+      "detail": "ok set tb52 [r25] \u00b7 lane=Now\n~ task-move, one act [r25]"
+    },
+    {
+      "check": "Competing move from the old painted card is stale",
+      "ok": true,
+      "detail": "refused: stale: tb52 changed since it was painted (lane, r25); nothing was done. The view will repaint."
+    },
+    {
+      "check": "Undo restores Done and its record stays in history",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "History fold paints raw records, direct edits and undo",
+      "ok": true,
+      "detail": "10 rows linked to actual records"
+    },
+    {
+      "check": "Dates paint from the kernel clock and records",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Hidden screenshot captured",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Done own-word rule announces in Feed",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Claim appears in the real record trail",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Scratch world replays exactly",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "records": 27,
+  "incomplete": []
+}

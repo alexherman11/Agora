@@ -1,0 +1,34 @@
+{
+  "prepared": "98627ab4274c3bbd31a5f19af4da51065f266929",
+  "main": "09ef2530ec848cbbcf0afc5d0934737095c3cc69",
+  "inventory": {
+    "research/task-wakes/INTEGRATION-PREFLIGHT.md": "2993138492727176193b9c3f5c159772487208ab6c4ed8d12f378a97afeb4e3d",
+    "research/task-wakes/REVIEW.md": "380ee8cb49f44a88c559cd5bac7f9362f9aa0fdaaffdc443a999ab3c0e1d22a3",
+    "research/task-wakes/WORLD-POLICY.md": "63c95e9c6c770b457fcaed7984ce52fcf69e2a10bcd0af6b49430967a487beb0",
+    "research/task-wakes/candidate.patch": "52c3eca60b213d52789a29196b2ec6e9456fc23cfe935cc417d8491bcc8564db",
+    "research/task-wakes/captured-metadata.json": "60251921a7f2b5d455a6538eb80e8de27a6cd52c41be076acab077045ffd76da",
+    "research/task-wakes/manifest.json": "3767b2f19b2b6916259ba5718020e2b48896e80d7b2f310f6f5c7838da250dcf",
+    "research/task-wakes/measure.py": "9172a82d958ce8652bd32424af366d7438997b4aec1ab4e6be92c2f8112e6283",
+    "research/task-wakes/replay.py": "d6c810f40a3fc656803c6762e9cf8d22e75ecfe8d6de25f52d17f7b88e6c6d11",
+    "research/task-wakes/stage.py": "0e2516465ba5bb08819ead9e072ae2d3b175d273dbd226cf28befe2064d3685f",
+    "research/task-wakes/test_candidate.py": "4af35bff1c9803e6454bb6b56aec798dcacd6952f9821b651dda2ec41340893e"
+  },
+  "files": {
+    "task_flow.py": {
+      "base_sha256": "ce9c8676c896ddca7eda3aa1a476f94dd73741ba45c788283a858ad1236f944f",
+      "output_sha256": "e398cc6a6d49cd1eeb20165333de74b22f9673cc8743012e774c95e35d655dff",
+      "edit_groups": 6
+    },
+    "house.py": {
+      "base_sha256": "9ec463f3552eb30dd7b15684823c1dc089d2cae7f189a71bab4119921b61a390",
+      "output_sha256": "93bd5b3300c5ee792176d2c6272b0bcf3c07a1ee4953161ea98e2250120719f8",
+      "edit_groups": 4
+    },
+    "rooms.py": {
+      "base_sha256": "d5f9bc7a78f795ab3bd97f992b9c7b20835efe362fda3800b836d34ab985d3a0",
+      "output_sha256": "40a3211cae0f76b9cfa642deae61abe32d18062d3929b158f48d9c656a95083b",
+      "edit_groups": 2
+    }
+  },
+  "patch_sha256": "52c3eca60b213d52789a29196b2ec6e9456fc23cfe935cc417d8491bcc8564db"
+}

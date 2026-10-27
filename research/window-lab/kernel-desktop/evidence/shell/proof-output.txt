@@ -1,0 +1,69 @@
+spike 1, window shape (hidden desktop, WebView2 in pywebview; evidence/shell/spike-window.json and four PNGs):
+  A-pywebview-transparent: corner pixel in the window's own paint (0, 0, 0); hit test at the corner passes to the window behind: False, at the centre reaches this window: True; layered=False key=0x0; blended edge pixels per corner 73
+  B-colorkey-black: corner pixel in the window's own paint (1, 2, 3); hit test at the corner passes to the window behind: True, at the centre reaches this window: False; layered=True key=0x30201; blended edge pixels per corner 73
+  C-colorkey-edge-tone: corner pixel in the window's own paint (205, 180, 254); hit test at the corner passes to the window behind: True, at the centre reaches this window: False; layered=True key=0xfeb4cd; blended edge pixels per corner 62
+  D-region: corner pixel in the window's own paint (255, 255, 255); hit test at the corner passes to the window behind: True, at the centre reaches this window: True; layered=False key=0x0; blended edge pixels per corner 781
+spike 2, WorkerW desktop layer (hidden desktop, evidence/shell/spike-desktop.json):
+  shell_window: 0
+  progman: 0
+  workerw: 0
+  defview_anywhere: False
+  attach_workerw_result: not tried: there is no Progman on this desktop to send 0x052C to
+  layer_mode: bottom
+  layer_exstyle_toolwindow: True
+  layer_exstyle_noactivate: True
+  layer_exstyle_appwindow: False
+  z_front_first_initial: ['app-B', 'layer-A']
+  z_after_a_raise: ['layer-A', 'app-B']
+  z_after_keep_loop: ['app-B', 'layer-A']
+  layer_below_app_after_loop: True
+  layer_became_foreground: False
+live desktop structure, read-only (no message sent): Progman present: True; its direct children: ['SHELLDLL_DefView']; WorkerW top-level windows: 16 of which visible: 0. So SHELLDLL_DefView is Progman's own child (the 24H2 structure), not inside a WorkerW
+full screen: full-real-seabright-day.png 3840x2160 (top bar, dock and desktop layer in real:seabright-day; 3 fake app windows in their gapped places)
+full screen: full-real-dusk.png 3840x2160 (top bar, dock and desktop layer in real:dusk; 3 fake app windows in their gapped places)
+full screen: full-real-night-metal.png 3840x2160 (top bar, dock and desktop layer in real:night-metal; 3 fake app windows in their gapped places)
+full screen: full-real-ink-landscape.png 3840x2160 (top bar, dock and desktop layer in real:ink-landscape; 3 fake app windows in their gapped places)
+full screen: full-standin-seabright-day.png 3840x2160 (top bar, dock and desktop layer in standin:seabright-day; 3 fake app windows in their gapped places)
+full screen: full-standin-dusk.png 3840x2160 (top bar, dock and desktop layer in standin:dusk; 3 fake app windows in their gapped places)
+popovers: 24 images (launcher, app menu, calendar, notifications, media, quick settings, JEFF, off armed, dock menu, dock preview, dock launcher)
+dock real:seabright-day with 3 running apps: 10 items, pill 631x52 css px, reserve 72 css px
+dock real:seabright-day with 8 running apps: 15 items, pill 876x52 css px, reserve 72 css px
+dock real:seabright-day with 16 running apps: 23 items, pill 1268x52 css px, reserve 72 css px
+dock real:dusk with 3 running apps: 10 items, pill 679x56 css px, reserve 84 css px
+dock real:dusk with 8 running apps: 15 items, pill 944x56 css px, reserve 84 css px
+dock real:dusk with 16 running apps: 23 items, pill 1368x56 css px, reserve 84 css px
+dock real:night-metal with 3 running apps: 10 items, pill 535x44 css px, reserve 68 css px
+dock real:night-metal with 8 running apps: 15 items, pill 740x44 css px, reserve 68 css px
+dock real:night-metal with 16 running apps: 23 items, pill 1068x44 css px, reserve 68 css px
+dock real:ink-landscape with 3 running apps: 10 items, pill 559x46 css px, reserve 70 css px
+dock real:ink-landscape with 8 running apps: 15 items, pill 774x46 css px, reserve 70 css px
+dock real:ink-landscape with 16 running apps: 23 items, pill 1118x46 css px, reserve 70 css px
+dock sets: 12 images
+seam real:seabright-day: desktop layer alone vs bar+dock windows over it with their parts hidden: 31025 of 8294400 pixels differ, 8251 by more than 2 levels, largest difference 9, inside (6, 43, 2817, 2160)
+seam real:dusk: desktop layer alone vs bar+dock windows over it with their parts hidden: 94338 of 8294400 pixels differ, 49073 by more than 2 levels, largest difference 12, inside (0, 26, 2855, 2160)
+seam real:ink-landscape: desktop layer alone vs bar+dock windows over it with their parts hidden: 2109 of 8294400 pixels differ, 327 by more than 2 levels, largest difference 71, inside (1327, 2055, 2513, 2160)
+seam standin:dusk: desktop layer alone vs bar+dock windows over it with their parts hidden: 126287 of 8294400 pixels differ, 49034 by more than 2 levels, largest difference 35, inside (0, 19, 2863, 2160)
+keyboard and screen reader: [top] accessibility tree: 12 landmarks and controls, 0 controls without a name; [top] ArrowRight walks 8 controls: Agora launcher | Edge, focused app. Open its window menu | Calendar and notifications. Monday, October 26, 2026, 5:48 PM | Notifications, none unread | Media: Harbor Lights by The Seabright Players, playing | Quick settings. Network connected, volume 70%, battery 86%, charging | JEFF is here. Open JEFF | Turn the desktop off (press twice); [top] Enter on the launcher opens it; focus is in: {'tag': 'input', 'label': 'Open an app or say a line', 'role': ''}; [top] Escape closes it and focus returns to: {'tag': 'button', 'label': 'Agora launcher', 'role': ''}; [dock] accessibility tree: 18 landmarks and controls, 0 controls without a name; [dock] ArrowRight walks 17 controls: Agora launcher | Lines, 1 window | Help, not running | Board, not running | Task board, 1 window | Appe
+  full report: evidence/shell/a11y-report.txt
+interaction, window manager answering (fixture wm.windows rows):
+  ok   click on an app that is not in front -> wm.focus: ['wm.focus w2_0']
+  ok   click again on the app now in front -> wm.minimise: ['wm.minimise w2_0']
+  ok   click on a minimised app -> wm.restore: item class 'item minimised'; ['wm.restore w3_0']
+  ok   click on a pinned app that is not running -> window.launch: ['window.launch path=C:\\Program Files\\Windows NT\\Accessories\\wordpad.exe']
+  ok   middle click -> a new window (window.launch): ['window.launch path=C:\\Windows\\System32\\notepad.exe']
+  ok   right click -> menu with the app's windows, new window, pin/unpin, close: ['Edge window 1', 'Edge window 2', 'Edge window 3', 'New window', 'Remove from dock', 'Pin in place', 'Close all windows']
+  ok   menu: Pin in place -> wm.pin: ['wm.pin w1_0']
+  ok   menu: Close all windows -> wm.close for each: ['wm.close w1_0', 'wm.close w1_1', 'wm.close w1_2']
+  ok   hover -> preview card with a tile per window, and a thumbs request to the host: 2 tiles, 17 thumbs call(s)
+  ok   moving away closes the preview
+interaction, window manager off (fallback to window.desktop / window.activate):
+  ok   click -> window.activate handle=...: ['window.activate handle=w2_0']
+  ok   menu in fallback: no pin-in-place (it needs the window manager); windows, new window, keep in dock and close still work: ['notes.txt - Notepad', 'New window', 'Keep in dock', 'Close window']
+top bar:
+  ok   off: first press only arms it
+  ok   off: second press -> wm.mode off, then off window: ['wm.mode off', 'off window']
+  ok   media popover: play/pause -> media.play: ['media.play']
+  ok   quick settings: show CPU in the bar is a switch that writes a setting: ['make kind=shell-settings show_cpu=yes']
+  ok   an optional reading appears only after the setting says so: CPU 14%
+interaction: 17 of 17 checks passed
+(ran in 187 s)

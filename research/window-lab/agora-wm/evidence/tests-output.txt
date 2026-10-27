@@ -1,0 +1,26 @@
+L0 fuzz: 2000 sequences x 30 events = 60000 events; invariants passed
+Module kernel: real process, offers/help, title-free reading, no reading record, fenced mode/exclusion, undo, owner denial passed
+test_all_resize_corners (test_engine.EngineTests.test_all_resize_corners) ... ok
+test_fixed_obstacle_and_pin_clamp (test_engine.EngineTests.test_fixed_obstacle_and_pin_clamp) ... ok
+test_fuzz (test_engine.EngineTests.test_fuzz) ... ok
+test_impossible_fixed_geometry_explicit (test_engine.EngineTests.test_impossible_fixed_geometry_explicit) ... ok
+test_unaffected_component_and_minimal_zero (test_engine.EngineTests.test_unaffected_component_and_minimal_zero) ... ok
+test_gating_skips_move_and_reports_apps (test_manager.ManagerTests.test_gating_skips_move_and_reports_apps) ... ok
+test_ghost_defers_neighbours_until_release (test_manager.ManagerTests.test_ghost_defers_neighbours_until_release) ... ok
+test_live_capability_and_off_same_release (test_manager.ManagerTests.test_live_capability_and_off_same_release) ... ok
+test_overlapping_unmanageable_obstacles_allowed (test_manager.ManagerTests.test_overlapping_unmanageable_obstacles_allowed) ... ok
+test_refused_size_becomes_learned_minimum_then_obstacle (test_manager.ManagerTests.test_refused_size_becomes_learned_minimum_then_obstacle) ... ok
+test_settings_validate_before_live (test_manager.ManagerTests.test_settings_validate_before_live) ... ok
+test_shadow_zero_mutations_privacy_and_determinism (test_manager.ManagerTests.test_shadow_zero_mutations_privacy_and_determinism) ... ok
+test_contract_help_and_owner (test_manager.ModuleIntentTests.test_contract_help_and_owner) ... ok
+test_leave_alone_and_manage_are_undoable_world_lines (test_manager.ModuleIntentTests.test_leave_alone_and_manage_are_undoable_world_lines) ... ok
+test_modes_are_fenced_intent_and_live_disabled (test_manager.ModuleIntentTests.test_modes_are_fenced_intent_and_live_disabled) ... ok
+test_atomic_replace_retries_transient_windows_reader_lock (test_watchdog.WatchdogSafety.test_atomic_replace_retries_transient_windows_reader_lock) ... ok
+test_reused_process_identity_and_missing_cookie_never_restore (test_watchdog.WatchdogSafety.test_reused_process_identity_and_missing_cookie_never_restore) ... ok
+test_leased_geometry_never_becomes_world_facts (test_source_seam.SourceSeam.test_leased_geometry_never_becomes_world_facts) ... ok
+test_real_protocol_help_reading_intent_undo_and_owner (test_module_kernel.KernelIntegration.test_real_protocol_help_reading_intent_undo_and_owner) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 27.848s
+
+OK

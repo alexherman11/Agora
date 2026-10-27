@@ -1,0 +1,124 @@
+{
+  "checks": [
+    {
+      "number": 1,
+      "check": "Laptop opens three unchanged painter panes",
+      "ok": true,
+      "detail": "Feed, Council, Help at 1440px"
+    },
+    {
+      "number": 2,
+      "check": "Phone shows exactly one pane",
+      "ok": true,
+      "detail": "390px, the same three views available"
+    },
+    {
+      "number": 3,
+      "check": "A word rearranges panes",
+      "ok": true,
+      "detail": "pane.move Feed to=Help, admitted by the door"
+    },
+    {
+      "number": 4,
+      "check": "A mouse drag rearranges panes by the same word",
+      "ok": true,
+      "detail": "real Chrome mouse input: Help onto Council"
+    },
+    {
+      "number": 5,
+      "check": "Another neighbour retains their layout",
+      "ok": true,
+      "detail": "Luis has not moved"
+    },
+    {
+      "number": 6,
+      "check": "A touch swipe shows Council on the concurrent phone",
+      "ok": true,
+      "detail": "Chrome touch input, not synthetic DOM events"
+    },
+    {
+      "number": 7,
+      "check": "A Feed post arrives live in Council on the phone",
+      "ok": true,
+      "detail": "sb51, ordinary post as Maya; no reload"
+    },
+    {
+      "number": 8,
+      "check": "Who-sees filters every laptop and phone pane",
+      "ok": true,
+      "detail": "Maya sees her own private post and help in all three panes on both hosts"
+    },
+    {
+      "number": 9,
+      "check": "Who-sees excludes private things in every other neighbour pane",
+      "ok": true,
+      "detail": "Luis cannot see Maya’s draft or private help"
+    },
+    {
+      "number": 10,
+      "check": "Feed uses the desktop painter and identities",
+      "ok": true,
+      "detail": "same lens URL, exact painted node keys; native window not started"
+    },
+    {
+      "number": 11,
+      "check": "Council uses the desktop painter and identities",
+      "ok": true,
+      "detail": "same lens URL, exact painted node keys; native window not started"
+    },
+    {
+      "number": 12,
+      "check": "Help uses the desktop painter and identities",
+      "ok": true,
+      "detail": "same lens URL, exact painted node keys; native window not started"
+    },
+    {
+      "number": 13,
+      "check": "Painted post maps to its one kernel thing",
+      "ok": true,
+      "detail": "sb51 -> a408; shared data, no copies"
+    },
+    {
+      "number": 14,
+      "check": "Painter JavaScript is byte-for-byte unchanged",
+      "ok": true,
+      "detail": "served source equals desk-shell/lens.js"
+    },
+    {
+      "number": 15,
+      "check": "Reload keeps the personal tiling",
+      "ok": true,
+      "detail": "new document, stored tree unchanged"
+    },
+    {
+      "number": 16,
+      "check": "Rearranging preserves the existing painter and draft",
+      "ok": true,
+      "detail": "Chrome moveBefore keeps iframe state and host composer"
+    },
+    {
+      "number": 17,
+      "check": "Split and close keep the same underlying things",
+      "ok": true,
+      "detail": "four panes, then three; post remains"
+    },
+    {
+      "number": 18,
+      "check": "A resize word persists personal proportions",
+      "ok": true,
+      "detail": "60 percent to the first column"
+    },
+    {
+      "number": 19,
+      "check": "Screenshots captured at both requested widths",
+      "ok": true,
+      "detail": "1440×900 and 390×844 PNGs"
+    },
+    {
+      "number": 20,
+      "check": "Facts replay preserves personal layouts and posts",
+      "ok": true,
+      "detail": "exact state comparison; no words re-executed"
+    }
+  ]
+}

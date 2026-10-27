@@ -545,34 +545,128 @@ def own_draft(args):
     return m.group(1) if m else None
 
 
-def deliver(cid, args):
-    """Put the capture's id on the person's draft: 'do prop <draft> context=<ids>' (Codex, Talk a4708 e9820, m5109).
-    The draft is read just before, and the id joins those already there, in order, at most eight; if the draft
-    changed between, the desk refuses and it is read again. Only the ids enter the world; the draft shows each as a
-    chip, unsent until Send. Returns (ok, what was said)."""
+def _field(t, name, pat):
+    """The words of one prop as `examine` prints it, up to the next prop (k=) or the next ' · ', as a list of pat."""
     import re
+    m = re.search(rf"\b{name}=(.*)", t)
+    return re.findall(pat, re.split(r"\s[\w-]+=|\s·", m.group(1))[0]) if m else []
+
+
+def _changed(t):
+    return "changed since" in t or "since your last look" in t
+
+
+class Pending:
+    """Release requests a reservation through the existing Desk route, before
+    capture processing. Only confirmed admission binds the draft and generation.
+    An already accepted Send cannot be ordered behind this separate request.
+    Only a token enters the world, never the capture's private contents."""
+    n = 0
+
+    def __init__(self, args):
+        Pending.n += 1
+        self.args, self.token, self.draft, self.said = args, f"wait-{os.getpid()}-{time.time_ns()}{Pending.n}", None, ""
+        self.marked = threading.Event()
+        self.admitted = False
+        self.generation = None
+
+    def mark(self):
+        try:
+            self.draft = own_draft(self.args) if self.args.draft == "auto" else self.args.draft
+            if self.draft:
+                ok, self.said = _change(self.args, self.draft, lambda ctx, pend: (ctx, [*pend, self.token]),
+                                       reservation=self)
+                self.admitted = ok
+        except Exception as e:            # keep the capture, but never retarget a failed reservation
+            self.said = f"{type(e).__name__}: {e}"
+        finally:
+            self.marked.set()
+
+    def start(self):
+        threading.Thread(target=self.mark, daemon=True).start()
+        return self
+
+    def drop(self):
+        """Explicit cancellation only: remove this reservation, never another."""
+        if not self.marked.wait(15):
+            return False, "capture reservation is still unknown; not changing the draft"
+        if self.admitted and self.draft:
+            return _change(self.args, self.draft, lambda ctx, pend: (ctx, [p for p in pend if p != self.token]),
+                           reservation=self)
+        return True, ""
+
+
+def _change(args, draft, how, reservation=None):
+    """Read the draft and set its context and pending in one prop, from what it holds now: how(ctx, pending) -> (ctx,
+    pending), or a text that refuses. If the draft changed between, the desk refuses and it is read again."""
     t = ""
-    draft = own_draft(args) if args.draft == "auto" else args.draft
-    if not draft:
-        return False, f"{args.who} has no chat draft (a note with role=conversation-draft actor={args.who}); {cid} is kept, not attached"
-    for _ in range(3):
+    for _ in range(4):
         ok, t = _do(args, f"examine {draft}")
         if not ok:
             return False, t
-        m = re.search(r"\bcontext=(.*)", t)            # up to the next prop (k=) or the next ' · '
-        held = re.findall(r"cap-\d+", re.split(r"\s[\w-]+=|\s·", m.group(1))[0]) if m else []
-        ids = list(dict.fromkeys([*held, cid]))
-        if len(ids) > DRAFT_MAX:
-            return False, f"the draft holds {DRAFT_MAX} captures already; {cid} is kept, not attached"
-        ok, t = _do(args, f'do prop {draft} context="{" ".join(ids)}"')
+        import re
+        found = re.search(r"\bcapture_generation=(\d+)(?:\s|$)", t)
+        generation = found.group(1) if found else "0"
+        if reservation is not None:
+            if reservation.generation is None:
+                reservation.generation = generation
+            if reservation.generation != generation:
+                return False, "capture message generation changed; capture kept, not attached"
+        ctx, pend = _field(t, "context", r"cap-\d+"), _field(t, "pending", r"wait-\d+-\d+")
+        got = how(ctx, pend)
+        if isinstance(got, str):
+            return False, got
+        ctx2, pend2 = got
+        if (ctx2, pend2) == (ctx, pend):
+            return True, t
+        ok, t = _do(args, f'do prop {draft} context="{" ".join(ctx2)}" pending="{" ".join(pend2)}"'
+                    f' capture_if_generation="{generation}" capture_if_context="{" ".join(ctx)}"'
+                    f' capture_if_pending="{" ".join(pend)}"')
         if ok:
             return True, t
-        if "changed since" not in t and "since your last look" not in t:
+        if not _changed(t):
             return False, t
     return False, t
 
 
-def report(cid, env, timing, args):
+def deliver(cid, args, pending=None):
+    """Put the capture's id on the person's draft: 'do prop <draft> context=<ids>' (Codex, Talk a4708 e9820, m5109).
+    The draft is read just before, and the id joins those already there, in order, at most eight; if the draft
+    changed between, the desk refuses and it is read again. Only the ids enter the world; the draft shows each as a
+    chip, unsent until Send. a10486: with the drag's Pending, the draft is the one it marked, and the id replaces its
+    token in the same prop, so the draft is never seen with neither. Returns (ok, what was said)."""
+    if pending is not None:
+        if not pending.marked.wait(15) or not pending.admitted or not pending.draft:
+            return False, "capture reservation was not confirmed; capture kept, not attached"
+        draft = pending.draft
+    else:
+        draft = own_draft(args) if args.draft == "auto" else args.draft
+    if not draft:
+        return False, f"{args.who} has no chat draft (a note with role=conversation-draft actor={args.who}); {cid} is kept, not attached"
+    token, full = (pending.token if pending is not None else None), []
+    refusal = f"the draft holds {DRAFT_MAX} captures already; {cid} is kept, not attached"
+
+    def how(ctx, pend):
+        if token is not None and token not in pend:
+            return "capture reservation was removed or consumed; capture kept, not attached"
+        ids, rest = list(dict.fromkeys([*ctx, cid])), [p for p in pend if p != token]
+        full[:] = [len(ids) > DRAFT_MAX]
+        if full[0]:                       # fail closed: Send must not silently omit the promised capture
+            return refusal
+        return ids, rest
+    ok, t = _change(args, draft, how, reservation=pending)
+    return (False, refusal) if ok and full and full[0] else (ok, t)
+
+
+def clear_pending(args):
+    """Explicit bulk cancellation only; never call at startup or on a processing failure."""
+    draft = own_draft(args) if args.draft == "auto" else args.draft
+    if draft:
+        return _change(args, draft, lambda ctx, pend: (ctx, []))
+    return True, ""
+
+
+def report(cid, env, timing, args, pending=None):
     print(f"{cid}: {env['rect'][2]}x{env['rect'][3]} at {env['rect'][0]},{env['rect'][1]}, native={env['native']}, "
           f"{len(env['refs'])} world object(s), {'pixels ' + 'x'.join(map(str, env['image_size'])) if env['image_size'] else 'no pixels'}; "
           f"release to kept {timing['kept']} ms ({', '.join(f'{k} {v}' for k, v in timing.items())})", flush=True)
@@ -586,18 +680,20 @@ def report(cid, env, timing, args):
         print("   words in the pixels:", " ".join(env["image_text"].split())[:200], flush=True)
     if args.draft:
         try:
-            ok, t = deliver(cid, args)
+            ok, t = deliver(cid, args, pending)
             import re
             where = re.search(r"\bprop (a\d+) context=", t) if ok else None
             print(f"   on the draft {where.group(1) if where else args.draft}: " + ("yes" if ok else "no: " + (t.strip().splitlines() or [""])[-1][:200]), flush=True)
         except Exception as e:
             print(f"   not put on the draft {args.draft}: {e}", flush=True)
+            # Keep a failed reservation visible. Send times out with the words retained;
+            # only the person's explicit cancellation may release it.
 
 
 # --- the overlay: an invisible catcher while Ctrl+Alt is held, and the selection as it is dragged -------------------
 class Overlay:
-    def __init__(self, on_done, on_down=None, on_arm=None, parent=None):
-        self.on_done, self.on_down, self.on_arm = on_done, on_down, on_arm
+    def __init__(self, on_done, on_down=None, on_arm=None, parent=None, on_cancel=None):
+        self.on_done, self.on_down, self.on_arm, self.on_cancel = on_done, on_down, on_arm, on_cancel
         self.parent, self.checked = parent, 0.0        # a5834: the home base that started us; we end with it
         self.proc = WNDPROC(self.wndproc)
         inst = kernel32.GetModuleHandleW(None)
@@ -655,6 +751,8 @@ class Overlay:
         self.start = None
         self.hide()
         print(f"cancelled ({why}): nothing captured", flush=True)
+        if self.on_cancel:
+            self.on_cancel()
 
     def tick(self):
         """Every 15 ms: arm while Ctrl+Alt is held, disarm when let go, Escape cancels a drag."""
@@ -690,6 +788,8 @@ class Overlay:
         dwmapi.DwmFlush()                       # the selection is off the screen before its pixels are read
         if r[2] < 6 or r[3] < 6:
             print("cancelled (a click, not a drag): nothing captured", flush=True)
+            if self.on_cancel:
+                self.on_cancel()
             return
         self.on_done(r, t0)
 
@@ -781,8 +881,13 @@ def main():
                 since = time.perf_counter()
                 threading.Thread(target=prefetch, args=((r[0], r[1]), helper, args.door, (), since, args.events, args.parent), daemon=True).start()
                 time.sleep(args.drag_ms / 1000)
-            cid, env, timing = capture(r, helper, args, since=since)
-            report(cid, env, timing, args)
+            p = Pending(args).start() if args.draft else None      # a10486: the release, as the drag's own
+            try:
+                cid, env, timing = capture(r, helper, args, since=since)
+            except Exception:
+                # A failed capture must not release a Send that was waiting for it.
+                raise
+            report(cid, env, timing, args, p)
             return 0
         if args.show:
             r = [int(v) for v in args.show.split(",")]
@@ -807,19 +912,45 @@ def main():
             down[0] = time.perf_counter()
             threading.Thread(target=prefetch, args=(point, helper, args.door, ov.ours, down[0], args.events, args.parent), daemon=True).start()
 
+        # Registration occurs at release, through the existing serialized Desk
+        # path, before expensive capture processing. Never promise that an
+        # asynchronous drag-start thread has already reached the house.
+        coming = [None]
+
         def on_down(point):
             threading.Thread(target=prefetch, args=(point, helper, args.door, ov.ours, down[0], args.events, args.parent), daemon=True).start()
 
-        ov = Overlay(lambda r, t0: jobs.put((r, t0)), on_down, on_arm, parent=args.parent)
+        def on_cancel():
+            p, coming[0] = coming[0], None
+            if p:
+                threading.Thread(target=p.drop, daemon=True).start()
+
+        def on_done(r, t0):
+            p, coming[0] = coming[0], None
+            if args.draft:
+                p = Pending(args)
+                p.mark()
+                if not p.admitted:
+                    print("capture reservation not admitted; capture will stay private", flush=True)
+            jobs.put((r, t0, p))
+
+        ov = Overlay(on_done, on_down, on_arm, parent=args.parent, on_cancel=on_cancel)
+        # An interrupted reservation remains visible after restart. Clearing it here
+        # would let a waiting Send proceed without the capture it promised to carry.
 
         def worker():
             while True:
-                r, t0 = jobs.get()
+                r, t0, p = jobs.get()
                 if r is None:
                     return
                 try:
                     cid, env, timing = capture(r, helper, args, ov.ours, t0, down[0])
-                    report(cid, env, timing, args)
+                except Exception as e:
+                    print("capture failed:", type(e).__name__, e, flush=True)
+                    # Leave its reservation pending: Send must refuse, keeping the words.
+                    continue
+                try:
+                    report(cid, env, timing, args, p)
                 except Exception as e:
                     print("capture failed:", type(e).__name__, e, flush=True)
 
@@ -831,7 +962,7 @@ def main():
         except KeyboardInterrupt:
             pass
         ov.hide()
-        jobs.put((None, None))
+        jobs.put((None, None, None))
         print("control screen off", flush=True)
         return 0
     finally:

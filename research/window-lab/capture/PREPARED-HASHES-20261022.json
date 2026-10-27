@@ -1,0 +1,124 @@
+{
+  "head": "b58cc7e691a0a85d636a2eee71ff031dfe007b6e",
+  "main": "09ef2530ec848cbbcf0afc5d0934737095c3cc69",
+  "request": "e29429",
+  "checkpoint_checks": [
+    [
+      "research/text-desk-lab/notation/desk-shell/lens.js",
+      true
+    ],
+    [
+      "research/text-desk-lab/notation/desk_knife.py",
+      true
+    ],
+    [
+      "research/text-desk-lab/notation/lens_ir.py",
+      true
+    ],
+    [
+      "research/text-desk-lab/notation/message_context.py",
+      true
+    ],
+    [
+      "research/text-desk-lab/notation/scene.py",
+      true
+    ],
+    [
+      "research/text-desk-lab/notation/test_capture_admission.py",
+      true
+    ],
+    [
+      "research/text-desk-lab/notation/test_scene.py",
+      true
+    ],
+    [
+      "research/window-lab/capture/ADMISSION-CHECKPOINT-20261022.md",
+      true
+    ],
+    [
+      "research/window-lab/capture/ADMISSION-HASHES-20261022.json",
+      true
+    ],
+    [
+      "research/window-lab/capture/TAKEOVER-20261022.md",
+      true
+    ],
+    [
+      "research/window-lab/capture/capture.py",
+      true
+    ],
+    [
+      "research/window-lab/capture/probe_pending_engine.py",
+      true
+    ],
+    [
+      "research/window-lab/capture/run_admission_tests.py",
+      true
+    ],
+    [
+      "research/window-lab/capture/test_deliver.py",
+      true
+    ],
+    [
+      "research/window-lab/capture/test_pending_offline.py",
+      true
+    ],
+    [
+      "research/window-lab/capture/test_wait_deadline.js",
+      true
+    ],
+    [
+      "research/window-lab/capture/test_wait_send.py",
+      true
+    ],
+    [
+      "research/window-lab/capture/test_world_hunks.py",
+      true
+    ],
+    [
+      "research/window-lab/capture/wait_landed.js",
+      true
+    ],
+    [
+      "research/window-lab/capture/wait_patches.py",
+      true
+    ],
+    [
+      "research/window-lab/capture/wait_sent.js",
+      true
+    ],
+    [
+      "research/window-lab/capture/wait_shown.js",
+      true
+    ],
+    [
+      "research/window-lab/capture/world-bases-20261022.json",
+      true
+    ]
+  ],
+  "files": {
+    "research/text-desk-lab/notation/desk-shell/lens.js": "5c7d088992a369675d9455a9f7fcb83133e846f6f85f9303e7b7423eaa558105",
+    "research/text-desk-lab/notation/desk_knife.py": "d96747bdbfe61f61d65863f6235a1dc3eafd7faf25f598ced0de0c77060436bf",
+    "research/text-desk-lab/notation/lens_ir.py": "ffb5fbf76ccafb43de9699bf0d957fbebda2348c8737d211cbe695c1369c3046",
+    "research/text-desk-lab/notation/message_context.py": "f1b7201a147db5d7d4aeffa8d52f95d7aec3094348e68ecf1c14c6fe5f1b642c",
+    "research/text-desk-lab/notation/scene.py": "34ac95652f4406f59948cf99167c12b4008e840d3b5243ba07a714c5d800187c",
+    "research/text-desk-lab/notation/test_capture_admission.py": "b88c6e18c6cf234db82136abd0f9a8bf65023717eeee6ca693ba029428e92c64",
+    "research/text-desk-lab/notation/test_scene.py": "fb19bb92a65d2d567dfd6d1962466f2885eaa0b10e9ee844fc1bc8a958b0001a",
+    "research/window-lab/capture/ADMISSION-CHECKPOINT-20261022.md": "62f07341d3810c1a964756e72b08b63ad5e66aad90b8c47b4362aa67e58b8ac6",
+    "research/window-lab/capture/ADMISSION-HASHES-20261022.json": "c66a8196e926119950968403aa53a5a3b96004b01778a04fa5e7df1ed651143d",
+    "research/window-lab/capture/TAKEOVER-20261022.md": "eebefa6c7e7349b39780c8b5080cd4a33ef92c72aa07f49969c3a7ea903044a6",
+    "research/window-lab/capture/capture.py": "769092a365cd3c0799bc814d0e2fa93177ab3d2340e9a66841f374189b5b388d",
+    "research/window-lab/capture/probe_pending_engine.py": "f4d8618b02bdbfe885583a4a9276e1bf58b9972ace61c5813c8f79ae54771977",
+    "research/window-lab/capture/run_admission_tests.py": "3cbf2bc59ac9f45364b56236431382cb0dfb68ef00fc4000f9c0fd42fffbbb0b",
+    "research/window-lab/capture/test_deliver.py": "8706af763419a40c53aa70ff83b302400cfb734ff2bf9cde8f1e4a83a2e776d2",
+    "research/window-lab/capture/test_pending_offline.py": "cb6105460f0c74f3506f73323e460ef4329f2cda119aa029af441ec374b5a216",
+    "research/window-lab/capture/test_wait_deadline.js": "438290c1168b05d95a0683aa2727797a7982c441ec752cce7cd7240dc9963022",
+    "research/window-lab/capture/test_wait_send.py": "d3304a46fe6f7016aab265b824a49f0f99dc1148d696e7a7b03a2bc841c0a216",
+    "research/window-lab/capture/test_world_hunks.py": "0a49b100d5c66d870acf71f67d7d53c8fec7eae4486710c9af85de46ee31de9b",
+    "research/window-lab/capture/wait_landed.js": "0c03bd1a8f597dfee343036da9df54f37719262689a2013ad155f35cfe5dbb95",
+    "research/window-lab/capture/wait_patches.py": "4fb2317fdeb3a1802ccbe81480eafde282a0b623a7445a5e3df148b49bd47f9c",
+    "research/window-lab/capture/wait_sent.js": "d648fa36140a799f2e373b4022b4870e9397aa41f1ecdde8e7a36f83ff26d0dc",
+    "research/window-lab/capture/wait_shown.js": "b247daaaf55232b4b4a35106ea47aa40bf6b3da4e39aa7fe43e52a83a5c94ddf",
+    "research/window-lab/capture/world-bases-20261022.json": "92eb7b44588f45bbf689d33f496d076fe38dc476eb2593c03a181fc1431416ad"
+  }
+}

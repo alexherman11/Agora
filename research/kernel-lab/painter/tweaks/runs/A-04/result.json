@@ -1,0 +1,167 @@
+{
+  "exit": 0,
+  "timed_out": false,
+  "seconds": 23.39,
+  "answer": "Updated `taskboard-components` (dk170) with 8px card padding and two-line limits for titles and note excerpts.\n\nNo code was necessary. Only board-scoped styles changed; the other board and shared facts remain untouched.\n\n`look-view` confirms the styles. Visual appearance could not be inspected.",
+  "board": "A",
+  "number": 4,
+  "request": "Make cards more compact: at most two lines of text, less padding.",
+  "changes": [
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "for",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "in:dk1",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "kind",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "lens",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "made_by",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "padding",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "part-style",
+      "field": "target",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "for",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "in:dk1",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "kind",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "lens",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "lines",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "made_by",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk180",
+      "kind": "part-style",
+      "field": "target",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk181",
+      "kind": "part-style",
+      "field": "for",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk181",
+      "kind": "part-style",
+      "field": "in:dk1",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk181",
+      "kind": "part-style",
+      "field": "kind",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk181",
+      "kind": "part-style",
+      "field": "lens",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk181",
+      "kind": "part-style",
+      "field": "lines",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk181",
+      "kind": "part-style",
+      "field": "made_by",
+      "category": "style",
+      "lines": 1
+    },
+    {
+      "thing": "dk181",
+      "kind": "part-style",
+      "field": "target",
+      "category": "style",
+      "lines": 1
+    }
+  ],
+  "lines": 21,
+  "landed": [
+    "style"
+  ],
+  "success": true,
+  "board_proof": true,
+  "proof_passed": 11,
+  "proof_checks": 11,
+  "wall_seconds": 32.75
+}

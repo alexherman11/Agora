@@ -1,0 +1,12 @@
+{
+  "base": "71a622d",
+  "scope": "Offline only; no native retry or ready",
+  "files": {
+    "research/window-lab/sandbox_window.py": "30308d97f6ac34958d64811e64fe31234f6d0a411df74d9b815b890bc1d24409",
+    "research/window-lab/paint/paint.py": "2b73e80395b48dd1296af10256c01f73ea563d8407967125f1138ad8d1c4a49b",
+    "research/window-lab/paint/test_paint.py": "cb706353a7ccb0e7247eb2dabe44b6aa902af0f83d9946934634fe64d1e5605f",
+    "research/window-lab/paint/NETWORK.patch": "624a322a40ee1d312ea12b139a6ce0fc77c309082470f993a834fb5ba151446c",
+    "research/window-lab/paint/NETWORK-OFFLINE.md": "84262bcd3e65930347a4bdd8631952c5742a941c6a6b289851eb370219cb99f4",
+    "research/window-lab/paint/README.md": "a8a4cb004b8f6e170a50248637f98212dbf1a983360df9c7ac38f97efcdba811"
+  }
+}

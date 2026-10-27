@@ -1,0 +1,16 @@
+root : column, role sheet
+  head : text "Your feed", role heading
+  hint : text "From around the place. Open Lines to share something with a post.", role meta
+  list : column, role sheet, of tag:post as p, by pinned, each card
+card : column, role card
+  who : text "$by", role meta
+  pinned : text "pinned by $pinned", role mark
+    only when ($pinned or "") != ""
+  t : text "$text"
+  n : row, role actions
+    l : text "♡ $likes", role tool, on click do like $item
+      tip "Like" "Your vote is sealed."
+    p : text "Pin", role tool, on click do pin $item
+      tip "Pin for the place" "Leaders can keep this post near the top."
+    k : text "Keep in dock", role tool, on click do make kind=pin bar=taskbar shows=$item
+      tip "Keep in dock" "Open this post from the bottom bar."

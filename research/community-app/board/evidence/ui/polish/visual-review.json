@@ -1,0 +1,340 @@
+{
+  "reviewer": "Codex builder",
+  "date": "2026-10-26",
+  "main_pngs": 53,
+  "before_pngs_opened": 10,
+  "before_after_pairs": 10,
+  "extra_pngs_opened": [
+    "compose-choose-1440.png",
+    "compose-choose-390.png",
+    "date-tile-standalone.png"
+  ],
+  "fixes_from_visual_review": [
+    "Hidden phone thread now retains reason and Undo; no reply form for hidden content.",
+    "Explicit quote consumes the selected passage.",
+    "Poll totals use singular vote.",
+    "Phone picker reaches Saved and admitted leader queue.",
+    "Capture readiness waits for navigation and attachment loading."
+  ],
+  "boundary": "Hidden Chromium raster review at 1440x900 and 390x844; no physical phone or screen-reader audit.",
+  "screenshots": [
+    {
+      "name": "agent-badge-1440.png",
+      "sha256": "e650899e287c74e8615644b85bad0531f097d7115c2ddd6169ecb5f590d2e097",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "agent-badge-390.png",
+      "sha256": "88b2a7886a2f56a641d93a5d7377e2acf8f259b7146bcaa98ac96d0f166a9665",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "compose-event-1440.png",
+      "sha256": "c924ba30addcf18a9d61f3df4ecd4433e594d3d94990ad5b4b9dfb61f112433e",
+      "reviewed": true,
+      "method": "Opened final PNG with view_image"
+    },
+    {
+      "name": "compose-event-390.png",
+      "sha256": "bbd6fdc96c390c99616bc70cf5841b3220bbe9521143b6cee516dbc78a99b376",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "compose-lost-pet-1440.png",
+      "sha256": "29cf357583cb1d0c8a600487b7ca9a4cbfe24a41f35df50d38a7486fd7cdcfb1",
+      "reviewed": true,
+      "method": "Opened final PNG with view_image"
+    },
+    {
+      "name": "compose-lost-pet-390.png",
+      "sha256": "913b5d99a01909e089e198b32244093511bcb176c6c93452c6e34acae242f282",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "csv-table-1440.png",
+      "sha256": "d21ac2934a941f4f185fa811610c334f07b37985cf35ef14d83db013b766dac9",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "csv-table-390.png",
+      "sha256": "da3502856bc6121fc213fccbabdad41749838172e3e33d8f88e50d284e7ec187",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "decision-1440.png",
+      "sha256": "48fc44e4255a2195d5d52c399de4111a01add2b2fbe76f8bbdc1a72b2c7261f3",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "decision-390.png",
+      "sha256": "006fbe69389afdf7b5f468e6b761ab4ce9cdf39b99e1d1a17680d9cb74382fee",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "empty-channel-1440.png",
+      "sha256": "8c9c442151a2f5308a3d971beba3579e15ab239090b5ce9d0a2cdcc207824bfa",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "empty-channel-390.png",
+      "sha256": "51e2e75cd41e145b6fefc8bfdf99eb431465b0adc8dafb820fe2f9ddb35f235d",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "event-full-slots-1440.png",
+      "sha256": "a08a2c969d7ed3d9c005fbe07498ac391ca0afdb8dd37f00b9ba56201d8e2082",
+      "reviewed": true,
+      "method": "Opened final PNG with view_image"
+    },
+    {
+      "name": "event-full-slots-390.png",
+      "sha256": "0a4f4e15240dbf1bf35043bc11fb586f6af59306aa70b5ae9582259f16b83479",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "fault-isolation-1440.png",
+      "sha256": "75acc3b1cf130dd8d6b68c25c03687866f2a070bd3f89e81d7b0bb2d6ac1c580",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "fault-isolation-390.png",
+      "sha256": "db0d275ecd49a64a45aa514db8dae8cedb3f8871021b2f88facc4164b1234ca2",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "feed-catchup-1440.png",
+      "sha256": "0763ffffb2c126565414be455e48f70cbca7e3466cddb4bf7cd781261fbe162c",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "feed-catchup-390.png",
+      "sha256": "25439d1384875aa754bb5ba1f38b8b0b2b45facecd82372a19453a54e9747a43",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "first-paint-1440.png",
+      "sha256": "0763ffffb2c126565414be455e48f70cbca7e3466cddb4bf7cd781261fbe162c",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "hidden-post-notice-1440.png",
+      "sha256": "623d81f4a0843bf9b2d9362412d17d64c219dcdfe2f26d951680eb0c637f7864",
+      "reviewed": true,
+      "method": "Opened final PNG with view_image"
+    },
+    {
+      "name": "hidden-post-notice-390.png",
+      "sha256": "071a44a8189200e054ece9984fbd3b36b433d0832b57464f0bb886ccd5bcda55",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "kind-announcement-1440.png",
+      "sha256": "b80b1d52d5c0810ef92bb5e5e5e6070192721dd745c07338fe9c0cfe6059d20e",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "kind-announcement-390.png",
+      "sha256": "dd30c8396dd4decc83365376a5bdd68701de086ce87cf5bb4eb57c94aa321b5d",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "kind-ask-1440.png",
+      "sha256": "4b389844df13e0e8bf0ff6414135fc8ec5cb29b165b9651f3d61593ad712209c",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "kind-ask-390.png",
+      "sha256": "49b8b9a352d1b60f9c1e3932f1e81cfa487bd22331baec6b4f8c8d0cc4df2596",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "kind-discussion-1440.png",
+      "sha256": "cf97db37a7a631b369b4d382e2b389e443d1dc8d037de35006364780bc53f629",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "kind-discussion-390.png",
+      "sha256": "f025e5e60625e904cd26afe1b2ab885198ec2563481607bf646573cc93e8cb34",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "kind-document-1440.png",
+      "sha256": "6d0f0ccb99c2f81a4ed7d76424b886e3641c1702814d2f5a041adb4d880b94d2",
+      "reviewed": true,
+      "method": "Opened final PNG with view_image"
+    },
+    {
+      "name": "kind-document-390.png",
+      "sha256": "f7a71a39368f7fa125c73aa67a65128514d68705282b5b562f8cad70c31be974",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "kind-event-1440.png",
+      "sha256": "48aa7053a73f867e3cdf83967d96611b0375b25e16a30e001e2a79c7a6a3b523",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "kind-event-390.png",
+      "sha256": "08146bd606a7e0e49e52b48c89befcf9fb410d84d8c75f0b4a72bb6ae5cec812",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "kind-lost-pet-1440.png",
+      "sha256": "437a13ebe52d119ed62dbba0ee60858a5e75d4ca15eaf03a5341ffe17a83af1b",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "kind-lost-pet-390.png",
+      "sha256": "95623784f414adbb1ad1648273d5a0807cb18635905edd9c1c5d54b2bfbc815c",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "kind-offer-1440.png",
+      "sha256": "226e53192625d3a703154cb62b3eaa4d7a961f44dc9f0b2d6ac8ae7dc12e3714",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "kind-offer-390.png",
+      "sha256": "d50a587196878223c3263711826310e2832bb7b3a36718402dee102856b4a63d",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "kind-poll-1440.png",
+      "sha256": "85f7aaef7094aad049c760cc03542f685ac847a9752fb2ae338f88efe71e98be",
+      "reviewed": true,
+      "method": "Opened final PNG with view_image"
+    },
+    {
+      "name": "kind-poll-390.png",
+      "sha256": "405a1a7f6a93903cb40dbfd1552ce406efb7be50b441166145d86e5196fbc6b6",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "kind-question-1440.png",
+      "sha256": "48fc44e4255a2195d5d52c399de4111a01add2b2fbe76f8bbdc1a72b2c7261f3",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "kind-question-390.png",
+      "sha256": "006fbe69389afdf7b5f468e6b761ab4ce9cdf39b99e1d1a17680d9cb74382fee",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "leaders-queue-1440.png",
+      "sha256": "619c319433e3c7004c85ae4a30419730b6b1ece0e6e524eb3fd983a55c993ecc",
+      "reviewed": true,
+      "method": "Opened final PNG with view_image"
+    },
+    {
+      "name": "leaders-queue-390.png",
+      "sha256": "49483e30428439eb96f4a11ddd16078f1db0f815e8de5be8613137251f664ca7",
+      "reviewed": true,
+      "method": "Opened final PNG with view_image"
+    },
+    {
+      "name": "pdf-page-1440.png",
+      "sha256": "daea87a02aec8525ca9431f547f9ea89b8de7d35f55e3a54245cab355617d9d8",
+      "reviewed": true,
+      "method": "Opened final PNG with view_image"
+    },
+    {
+      "name": "pdf-page-390.png",
+      "sha256": "68a605653511387d321d2434079fa9244174058993ffe83f857cb33ee43f71fe",
+      "reviewed": true,
+      "method": "Opened final PNG with view_image"
+    },
+    {
+      "name": "pdf-page-quote-1440.png",
+      "sha256": "ad70a83a30f7b51050e4e14c054128c21cfb763d237e8185f1f02c1ad5dfa8a2",
+      "reviewed": true,
+      "method": "Opened final PNG with view_image"
+    },
+    {
+      "name": "pdf-page-quote-390.png",
+      "sha256": "79d8a1cce4e1bde71b9e9f75f41c484936f2c4629e32cb42f1f41e9879d97700",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "photo-1440.png",
+      "sha256": "01af0dab9885534f92ffccfb5072d598bcacf06167c64f31a986476ce17b0825",
+      "reviewed": true,
+      "method": "Opened final PNG with view_image"
+    },
+    {
+      "name": "photo-390.png",
+      "sha256": "8febf226a88c10713d871fd33d1080f778951f99fb220a97f10528f8d89d306f",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "poll-after-closing-1440.png",
+      "sha256": "2adc74107f7e1d18d9ef1155ad1f7df06988e8a067fdb9bedf65a3847bb39181",
+      "reviewed": true,
+      "method": "Opened final PNG with view_image"
+    },
+    {
+      "name": "poll-after-closing-390.png",
+      "sha256": "e7f6440c3755f594934a73f97fc154440ebad9268b68ae298a05fd64dbe172bc",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "search-results-1440.png",
+      "sha256": "025a1e8941c7ce6b97aa52de980ac75b382470611acb629051113b04cf69b6c1",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "search-results-390.png",
+      "sha256": "4be88a442013c167137d689814e3ee3ff55cc2bfdf611c9e9d74e45e4c7d2b0a",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    },
+    {
+      "name": "thread-with-quotes-1440.png",
+      "sha256": "bec5a2b2b7303239f29e3b15d27943539bccebbe23fa040612cd497136c29bf3",
+      "reviewed": true,
+      "method": "Opened final PNG with view_image"
+    },
+    {
+      "name": "thread-with-quotes-390.png",
+      "sha256": "b894e299ce0640e32302844ffcd1d47f8a707fc7932023b26d5cf6be699040c7",
+      "reviewed": true,
+      "method": "Opened byte-identical PNG with view_image; SHA256 rechecked after final run"
+    }
+  ]
+}

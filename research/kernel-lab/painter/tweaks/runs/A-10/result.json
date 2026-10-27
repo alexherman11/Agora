@@ -1,0 +1,19 @@
+{
+  "exit": 0,
+  "timed_out": false,
+  "seconds": 18.03,
+  "answer": "Two p1 tasks have been in Doing (called **Now** here) for more than three days:\n\n- **Set aside a break** \u2014 `dk121`: entered Now on October 18, about 6 days ago.\n- **Keep original notes alongside summary** \u2014 `dk125`: entered Now on October 20, about 4 days ago.\n\nThis uses lane history; later notes don\u2019t reset the time.\n\nNothing changed on either board or in shared facts. No code was necessary. This is a facts/history reading; I did not inspect the visual board.",
+  "board": "A",
+  "number": 10,
+  "request": "Which p1 tasks have been sitting in Doing for more than three days?",
+  "changes": [],
+  "lines": 0,
+  "landed": [
+    "reading"
+  ],
+  "success": true,
+  "board_proof": true,
+  "proof_passed": 11,
+  "proof_checks": 11,
+  "wall_seconds": 27.48
+}

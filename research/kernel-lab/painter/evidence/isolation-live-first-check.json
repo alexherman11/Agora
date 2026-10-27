@@ -1,0 +1,11 @@
+{
+  "at": "2026-10-26T19:44:31.593695+00:00",
+  "outcome": "First preservation assertion failed on derived read metadata; retained as failure.",
+  "task_count": 26,
+  "before_hash": "1bcedb871a6d230d42cce35f56ad8281acf8fc12be242c4bd22cfaacfdf955dd",
+  "after_hash": "4c202bfe191a2132d6479d943fee14e13e3e13645f8e4edef15125c7f36740f0",
+  "histories_unchanged": true,
+  "arrangements_unchanged": true,
+  "window_provider_state_preserved": true,
+  "difference_verified_afterwards": "Removing only the derived groups column from all current task rows exactly reproduces before_hash. The restart adopted an existing repository rows-reading addition; no task fact or history changed."
+}

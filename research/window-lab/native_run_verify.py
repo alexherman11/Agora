@@ -46,6 +46,24 @@ ENGINE_IMAGES = ("msedgewebview2.exe", "msedge.exe")
 VIOLATION, UNKNOWN, OBSERVED = "violation", "unknown", "observed"
 MAX_FILES = 20000                 # per root; more is unknown, never a partial clean
 MAX_HASH_BYTES = 1 << 30          # per run-owned root
+
+
+class EnumerationIncomplete(OSError):
+    """Bounded API metadata, with no window names or process content."""
+    def __init__(self, api, code, visited, callback_failed=False):
+        super().__init__(code, "Native enumeration incomplete")
+        self.winerror = code
+        self.enumeration = {"api": api, "complete": False, "error": code,
+                            "visited": visited, "callback_failed": callback_failed}
+
+
+def enumeration_error(exc):
+    result = error(exc)
+    if isinstance(exc, EnumerationIncomplete):
+        result["enumeration"] = dict(exc.enumeration)
+    return result
+
+
 LISTEN = 2
 TCP_STATES = {1: "closed", 2: "listen", 3: "syn-sent", 4: "syn-received", 5: "established", 6: "fin-wait-1",
               7: "fin-wait-2", 8: "close-wait", 9: "closing", 10: "last-ack", 11: "time-wait", 12: "delete-tcb"}
@@ -108,6 +126,27 @@ def resolve_allowed(host, port, *, lookup=socket.getaddrinfo, wall=time.time):
     ips = sorted({i[4][0] for i in infos})
     return {"host": host, "port": port, "ips": ips, "resolved_at": wall(), "how": "socket.getaddrinfo, system "
             "resolver, before launch"}
+
+
+LOCAL_PAGE = "local-page"
+
+
+def not_local_page(url):
+    """None if the url is one of our own local pages (http or https on a loopback address, with no user or password
+    in it), else why not. A public page, an account or a login is never a local page (a13146, JEFF m13143)."""
+    from urllib.parse import urlsplit
+    try:
+        u = urlsplit(str(url))
+        host, _ = u.hostname, u.port
+    except ValueError:
+        return f"not a page address: {str(url)[:120]!r}"
+    if u.scheme not in ("http", "https"):
+        return f"not an http page on this machine ({u.scheme or 'no'} scheme): {str(url)[:120]!r}"
+    if u.username is not None or u.password is not None:
+        return "names an account (user or password in the address)"
+    if not host or not (host == "localhost" or is_loopback(host)):
+        return f"not one of our own pages (host {host!r} is not loopback)"
+    return None
 
 
 def worst(statuses):
@@ -206,10 +245,15 @@ class Native:
             raise c.WinError(c.get_last_error())
         try:
             entry, out = PROCESSENTRY32W(dwSize=c.sizeof(PROCESSENTRY32W)), []
+            c.set_last_error(0)
             ok = self.k.Process32FirstW(snap, c.byref(entry))
             while ok:
                 out.append((int(entry.th32ProcessID), int(entry.th32ParentProcessID), entry.szExeFile))
+                c.set_last_error(0)
                 ok = self.k.Process32NextW(snap, c.byref(entry))
+            err = c.get_last_error()
+            if err != 18:  # ERROR_NO_MORE_FILES is Toolhelp completion, not desktop completion.
+                raise EnumerationIncomplete("Toolhelp", err, len(out))
             return out
         finally:
             self.k.CloseHandle(snap)
@@ -268,19 +312,26 @@ class Native:
         h = self.u.OpenDesktopW(desktop, 0, False, 0x0001 | 0x0040)       # DESKTOP_READOBJECTS | DESKTOP_ENUMERATE
         if not h:
             raise c.WinError(c.get_last_error())
-        out = []
+        out, failures = [], []
 
         @self.enum_type
         def each(hwnd, _):
-            pid = w.DWORD()
-            self.u.GetWindowThreadProcessId(hwnd, c.byref(pid))
-            out.append((int(pid.value), bool(self.u.IsWindowVisible(hwnd))))
-            return True
+            try:
+                pid = w.DWORD()
+                if not self.u.GetWindowThreadProcessId(hwnd, c.byref(pid)) or not pid.value:
+                    failures.append("owner unavailable")
+                    return False
+                out.append((int(pid.value), bool(self.u.IsWindowVisible(hwnd))))
+                return True
+            except Exception:
+                failures.append("callback failed")
+                return False
         try:
-            if not self.u.EnumDesktopWindows(h, each, 0) and not out:
-                err = c.get_last_error()
-                if err:
-                    raise c.WinError(err)
+            c.set_last_error(0)
+            ok = self.u.EnumDesktopWindows(h, each, 0)
+            err = c.get_last_error()  # before CloseDesktop or any other API
+            if not ok or failures:
+                raise EnumerationIncomplete("EnumDesktopWindows", err, len(out), bool(failures))
             return out
         finally:
             self.u.CloseDesktop(h)
@@ -462,7 +513,15 @@ class Verifier:
           "allow_remote": [resolve_allowed(host, port), ...] (host, port, ips and DNS provenance; a bare [ip, port]
           has no provenance and is unknown), "allow_loopback": bool, "require_engine_report": bool,
           "births": [{"pid", "created", "exe"}] (the launcher's measured birth receipts, sandbox_window's manifest
-          "owners"), "must_prove": [NOT_PROVEN keys this consumer needs proven; each one present refuses]}
+          "owners"), "must_prove": [NOT_PROVEN keys this consumer needs proven; each one present refuses],
+          "network_mode": "local-page" (optional; a13146), "pages": [every address the run opens]}
+    network_mode "local-page" (JEFF m13143, after Alex: 'network is fine if it's reasonable'), asked for explicitly by
+    a run that opens only our own local pages: remote TCP connections and UDP bindings beyond loopback made by the job's
+    own browser tree (members explained by measurement whose image is an engine image) are recorded, each with its
+    process, address, port and protocol, and do not refuse; the check is labelled 'network: observed, not contained'.
+    Still refused in that mode: a page that is not ours or names an account (pages are required), a remote allowlist
+    that is not empty, any such connection from a process outside the browser tree, and a listener beyond loopback.
+    The other checks are unchanged. Nothing in this mode is containment, and the label never claims it.
     A member is explained only by measurement: it matches a birth receipt (pid, creation time, image path), or its
     recorded parent pid is an explained member created no later than it. Its role is read from its own command line
     (role_of). Nothing a caller says about a pid explains it.
@@ -494,6 +553,22 @@ class Verifier:
         self.births = []
         for b in births:
             self.add_birth(b)
+        self.seen_net = []                     # local-page mode: [(pid, protocol, address, port, state)] recorded
+        mode = self.run.setdefault("network_mode", None)
+        if mode not in (None, LOCAL_PAGE):
+            self._bad("network", f"unknown network_mode {mode!r}: only {LOCAL_PAGE!r} is a mode")
+        elif mode == LOCAL_PAGE:
+            pages = self.run.get("pages")
+            if not isinstance(pages, list) or not pages:
+                self._bad("network", "local-page mode names no pages: it is for our own local pages only, so the "
+                                     "run must say every page it opens")
+            for p in pages if isinstance(pages, list) else []:
+                why = not_local_page(p)
+                if why:
+                    self._bad("network", f"local-page mode refuses this page: {why}")
+            if self.run["allow_remote"]:
+                self._bad("network", "local-page mode keeps the remote allowlist empty; it had "
+                                     f"{len(self.run['allow_remote'])} entr(ies)")
 
     def add_birth(self, birth):
         """A launcher's measured birth receipt: {"pid": int, "created": FILETIME int, "exe": absolute path}. It explains
@@ -555,7 +630,8 @@ class Verifier:
                 self._unknown("family", f"before launch, {len(unreadable)} engine-named process(es) could not be "
                                         f"read to rule out our profile ({unreadable})")
         except OSError as exc:
-            self._unknown("family", f"before launch, the process list failed: {error(exc)}")
+            self._unknown("family", "before launch, the process list failed: "
+                          f"{enumeration_error(exc)}")
         pre["owned"] = {r: snapshot_root(r, hash_files=True) for r in self.owned}
         pre["watched"] = {r: snapshot_root(r, hash_files=False, exclude=self.owned + self.run["exclude"])
                           for r in self.run["watched_roots"]}
@@ -583,7 +659,7 @@ class Verifier:
             procs = n.processes()
         except OSError as exc:
             procs = None
-            self._unknown("family", f"process list failed at a sample: {error(exc)}")
+            self._unknown("family", f"process list failed at a sample: {enumeration_error(exc)}")
         parents = {pid: (ppid, image) for pid, ppid, image in procs or []}
         for pid in snap["pids"]:
             try:
@@ -630,7 +706,7 @@ class Verifier:
                                         f"our profile")
             s["outside_named"] = [p["pid"] for p in named]
         except OSError as exc:
-            self._unknown("family", f"process list failed at a sample: {error(exc)}")
+            self._unknown("family", f"process list failed at a sample: {enumeration_error(exc)}")
             named = []
         ours = members | {p["pid"] for p in named}
         # 3. windows: the sandbox desktop (expected), Default (must hold none of ours)
@@ -645,7 +721,8 @@ class Verifier:
                     self._bad("windows", f"{len(mine)} window(s) of job/profile processes on the Default desktop "
                                          f"(pids {sorted({p for p, _ in mine})})")
             except OSError as exc:
-                self._unknown("windows", f"desktop {desk} could not be enumerated: {error(exc)}")
+                self._unknown("windows", f"desktop {desk} could not be enumerated: "
+                              f"{enumeration_error(exc)}")
         # 4. sockets
         try:
             tcp = [r for r in n.tcp() if r[0] in ours]
@@ -682,6 +759,7 @@ class Verifier:
     def _judge_net(self, tcp, udp):
         allow = self._allow()
         loop = self.run["allow_loopback"]
+        local = self.run["network_mode"] == LOCAL_PAGE
         for pid, st, la, lp, ra, rp in tcp:
             where = f"pid {pid} {TCP_STATES.get(st, st)} {la}:{lp} -> {ra}:{rp}"
             if st == LISTEN:
@@ -697,14 +775,31 @@ class Verifier:
                     self._bad("network", f"loopback connection, not allowed for this run: {where}")
                 continue
             if (ra, rp) not in allow:
-                self._bad("network", f"remote endpoint not in the allowlist: {where}")
+                if local:
+                    self._seen(pid, "tcp", ra, rp, TCP_STATES.get(st, st))   # judged by who made it (_network)
+                else:
+                    self._bad("network", f"remote endpoint not in the allowlist: {where}")
         for pid, la, lp in udp:
             if is_loopback(la):
                 if not loop:
                     self._bad("network", f"UDP bound on loopback, not allowed for this run: pid {pid} {la}:{lp}")
+            elif local:
+                self._seen(pid, "udp", la, lp, "bound (remotes not observable)")
             else:
                 self._unknown("network", f"UDP bound beyond loopback (its remotes are not observable): pid {pid} "
                                          f"{la}:{lp}")
+
+    def _seen(self, pid, protocol, address, port, state):
+        with self._lock:
+            if (pid, protocol, address, port, state) not in self.seen_net:
+                self.seen_net.append((pid, protocol, address, port, state))
+
+    def browser_tree(self):
+        """Job members explained by measurement (provenance) whose own image is an engine image: the job's own
+        browser. A launcher, console host, any other process, or an unexplained member is not in it."""
+        how, _ = self.provenance()
+        images = {i.lower() for i in self.run["engine_images"]}
+        return {pid for pid in how if self.members[pid]["exe"].lower() in images}
 
     def _judge_engine(self, rep, members):
         bp, folder = rep.get("browser_pid"), rep.get("user_data_folder")
@@ -765,7 +860,8 @@ class Verifier:
                 self._unknown("family", f"after cleanup, {len(unreadable)} engine-named process(es) could not be "
                                         f"read: {unreadable}")
         except OSError as exc:
-            self._unknown("family", f"after cleanup, the process list failed: {error(exc)}")
+            self._unknown("family", "after cleanup, the process list failed: "
+                          f"{enumeration_error(exc)}")
         try:
             post["job"] = self.scope.snapshot()
             post["io"] = self.native.job_io(self.scope.handle)
@@ -798,6 +894,10 @@ class Verifier:
         out["allow_interaction"] = (all(out[k]["status"] == OBSERVED for k in judged)
                                     and not out["blocking_limits"])
         out["coverage"] = self._coverage()
+        # the label never claims containment: local-page mode observes the browser's traffic, it does not stop it
+        status = out["network"]["status"]
+        out["network_label"] = out["network"]["label"] = (
+            f"network: {status}, not contained" if self.run["network_mode"] == LOCAL_PAGE else f"network: {status}")
         return out
 
     def _coverage(self):
@@ -885,6 +985,19 @@ class Verifier:
 
     def _network(self):
         extra = [] if any("tcp" in s for s in self.samples) else ["no socket table was read"]
+        local = self.run["network_mode"] == LOCAL_PAGE
+        connections = []
+        if local:
+            tree = self.browser_tree()
+            for pid, protocol, address, port, state in list(self.seen_net):
+                m = self.members.get(pid) or {}
+                connections.append({"pid": pid, "process": m.get("exe"), "role": m.get("role"),
+                                    "browser_tree": pid in tree, "protocol": protocol, "address": address,
+                                    "port": port, "state": state})
+                if pid not in tree:
+                    self._bad("network", f"{protocol} {address}:{port} ({state}) by pid {pid} "
+                                         f"({m.get('exe') or 'not a job member'}), outside the job's own browser "
+                                         f"tree: local-page mode accepts only the browser's own traffic")
         status, unk = self._status("network", extra)
         endpoints = sorted({(r[4], r[5]) for s in self.samples for r in s.get("tcp", [])
                             if r[1] != LISTEN and not is_unspecified(r[4])})
@@ -894,14 +1007,14 @@ class Verifier:
                 for ip in e.get("ips") or []:
                     allow[(ip, e["port"])] = e.get("host")
         cov = self._coverage()
+        evidence = {"remote_endpoints": [[ip, port, ("loopback" if is_loopback(ip) else allow.get((ip, port)))]
+                                         for ip, port in endpoints],
+                    "allow_remote": self.run["allow_remote"], "allow_loopback": self.run["allow_loopback"]}
+        if local:
+            evidence.update(mode=LOCAL_PAGE, pages=self.run.get("pages"), connections=connections)
         return check(status, f"TCP endpoints and UDP bindings of job members (and of out-of-job profile holders) at "
                              f"{cov['samples']} sample(s), requested every {self.interval} s, largest gap "
-                             f"{cov['max_gap_s']} s", {"remote_endpoints": [
-                                 [ip, port, ("loopback" if is_loopback(ip) else allow.get((ip, port)))]
-                                 for ip, port in endpoints],
-                                                       "allow_remote": self.run["allow_remote"],
-                                                       "allow_loopback": self.run["allow_loopback"]},
-                     self.findings["network"] + unk, NOT_PROVEN["network"])
+                             f"{cov['max_gap_s']} s", evidence, self.findings["network"] + unk, NOT_PROVEN["network"])
 
     def _writes(self):
         extra, ev = [], {}

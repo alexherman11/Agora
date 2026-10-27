@@ -1,0 +1,5 @@
+# Runtime data: the store, the secret key and the test outbox.
+var/
+# Alex writes this himself; it holds keys.
+.env
+__pycache__/

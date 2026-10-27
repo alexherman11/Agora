@@ -1,0 +1,39 @@
+{
+  "actor": "alex",
+  "world_event": "e18572",
+  "events_before": 18574,
+  "events_after": 18574,
+  "node_count": 2588,
+  "composers": [
+    {
+      "key": "home/tiles/lens:home-tiling/stage/f5664/body/tiling/a6802/body/lens:jeff-chat/chat/a5082/dock/say",
+      "acts": [
+        {
+          "on": "edit",
+          "line": "do append a5080 line=\"$value\" default_to=\"jeff\" captures=\"\" context_from=\"a5082\" reply_to=\"\" about=\"\""
+        }
+      ],
+      "paint": {
+        "kind": "text",
+        "wrap": "prose",
+        "role": "input",
+        "lines": [
+          1,
+          12
+        ],
+        "hint": "Write to JEFF, or anyone above\u2026",
+        "commit": "explicit"
+      },
+      "definition": {
+        "path": "chat/room/dock/say",
+        "hash": "666f697772b2",
+        "lens": "jeff-chat",
+        "id": "s5209"
+      }
+    }
+  ],
+  "same_keys_after_cold_recompile": true,
+  "cold_keys": [
+    "home/tiles/lens:home-tiling/stage/f5664/body/tiling/a6802/body/lens:jeff-chat/chat/a5082/dock/say"
+  ]
+}

@@ -1,0 +1,9 @@
+root : column, role sheet
+  h : text "Hidden in plain sight", role title
+  sub : text "Your discoveries open the next stop. Everyone goes at their own pace.", role meta
+  points : column, of tag:poll,collection=block as p, by order, each point
+point : column, role card
+  h : text "Stop $p.order · $p.title", role title
+  t : text "$p.text"
+  map : text "$p.lat, $p.lon", role meta
+  n : text "$p.votes_solved discoveries · sealed counts only", role meta

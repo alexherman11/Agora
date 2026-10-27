@@ -1,0 +1,640 @@
+[
+  {
+    "event": {
+      "record": "r16",
+      "at": "2026-10-24T18:06:57Z",
+      "by": "Alex",
+      "word": "task-add",
+      "facts": [
+        {
+          "aspect": "kind",
+          "value": "taskboard-task"
+        },
+        {
+          "aspect": "title",
+          "value": "Prepare the neighbourhood meeting"
+        },
+        {
+          "aspect": "lane",
+          "value": "Backlog"
+        },
+        {
+          "aspect": "who",
+          "value": "Alex"
+        },
+        {
+          "aspect": "when",
+          "value": "2026-10-24"
+        },
+        {
+          "aspect": "source",
+          "value": "proof"
+        },
+        {
+          "aspect": "source_status",
+          "value": "open"
+        },
+        {
+          "aspect": "text",
+          "value": "Ready for our community evening"
+        },
+        {
+          "aspect": "seats",
+          "value": "1"
+        },
+        {
+          "aspect": "made_by",
+          "value": "tb2"
+        }
+      ],
+      "changes": "kind=taskboard-task; title=Prepare the neighbourhood meeting; lane=Backlog; who=Alex; when=2026-10-24; source=proof; source_status=open; text=Ready for our community evening; seats=1; made_by=Alex",
+      "sealed": false
+    },
+    "record": {
+      "at": "2026-10-24T18:06:57Z",
+      "by": "tb2",
+      "words": "task-add title=\"Prepare the neighbourhood meeting\" to=Backlog who=Alex when=2026-10-24 source=proof status=open text=\"Ready for our community evening\"",
+      "parts": [
+        {
+          "word": "make",
+          "target": null,
+          "words": "make kind=taskboard-task title='Prepare the neighbourhood meeting' lane=Backlog who=Alex when=2026-10-24 source=proof source_status=open text='Ready for our community evening' seats=1",
+          "facts": [
+            [
+              "tb51",
+              "kind",
+              "0",
+              "taskboard-task"
+            ],
+            [
+              "tb51",
+              "title",
+              "0",
+              "Prepare the neighbourhood meeting"
+            ],
+            [
+              "tb51",
+              "lane",
+              "0",
+              "Backlog"
+            ],
+            [
+              "tb51",
+              "who",
+              "0",
+              "Alex"
+            ],
+            [
+              "tb51",
+              "when",
+              "0",
+              "2026-10-24"
+            ],
+            [
+              "tb51",
+              "source",
+              "0",
+              "proof"
+            ],
+            [
+              "tb51",
+              "source_status",
+              "0",
+              "open"
+            ],
+            [
+              "tb51",
+              "text",
+              "0",
+              "Ready for our community evening"
+            ],
+            [
+              "tb51",
+              "seats",
+              "0",
+              "1"
+            ],
+            [
+              "tb51",
+              "made_by",
+              "0",
+              "tb2"
+            ],
+            [
+              "tb51",
+              "in:tb1",
+              "0",
+              16
+            ]
+          ],
+          "entry": "tb31"
+        }
+      ],
+      "entry": "tb43",
+      "v": 1,
+      "seq": 16,
+      "prev": "e7d1176c97123a4b72cf8c5d",
+      "digest": "6edfe40f5eea9a50b29c714d"
+    }
+  },
+  {
+    "event": {
+      "record": "r18",
+      "at": "2026-10-24T18:06:57Z",
+      "by": "Alex",
+      "word": "task-move",
+      "facts": [
+        {
+          "aspect": "lane",
+          "value": "Now"
+        }
+      ],
+      "changes": "lane=Now",
+      "sealed": false
+    },
+    "record": {
+      "at": "2026-10-24T18:06:57Z",
+      "by": "tb2",
+      "words": "task-move tb51 to=Now",
+      "parts": [
+        {
+          "word": "set",
+          "target": "tb51",
+          "words": "set tb51 lane=Now",
+          "facts": [
+            [
+              "tb51",
+              "lane",
+              "ff3db2efd44b4f79",
+              "Now"
+            ]
+          ],
+          "entry": "tb32"
+        }
+      ],
+      "entry": "tb44",
+      "v": 1,
+      "seq": 18,
+      "prev": "0919c9a982d4d0c9e045f03f",
+      "digest": "5c76359daeca9934b2679d40"
+    }
+  },
+  {
+    "event": {
+      "record": "r20",
+      "at": "2026-10-24T18:06:57Z",
+      "by": "Alex",
+      "word": "task-assign",
+      "facts": [
+        {
+          "aspect": "who",
+          "value": "Claude"
+        }
+      ],
+      "changes": "who=Claude",
+      "sealed": false
+    },
+    "record": {
+      "at": "2026-10-24T18:06:57Z",
+      "by": "tb2",
+      "words": "task-assign tb51 who=Claude",
+      "parts": [
+        {
+          "word": "set",
+          "target": "tb51",
+          "words": "set tb51 who=Claude",
+          "facts": [
+            [
+              "tb51",
+              "who",
+              "4510a172d93e13e3",
+              "Claude"
+            ]
+          ],
+          "entry": "tb32"
+        }
+      ],
+      "entry": "tb45",
+      "v": 1,
+      "seq": 20,
+      "prev": "f1d25b0f750330baa97bb495",
+      "digest": "0280b4df451ec942b1a21649"
+    }
+  },
+  {
+    "event": {
+      "record": "r21",
+      "at": "2026-10-24T18:06:57Z",
+      "by": "Alex",
+      "word": "task-note",
+      "facts": [
+        {
+          "aspect": "note",
+          "value": "Bring the latest agenda"
+        }
+      ],
+      "changes": "note=Bring the latest agenda",
+      "sealed": false
+    },
+    "record": {
+      "at": "2026-10-24T18:06:57Z",
+      "by": "tb2",
+      "words": "task-note tb51 text=\"Bring the latest agenda\"",
+      "parts": [
+        {
+          "word": "set",
+          "target": "tb51",
+          "words": "set tb51 note='Bring the latest agenda'",
+          "facts": [
+            [
+              "tb51",
+              "note",
+              "0",
+              "Bring the latest agenda"
+            ]
+          ],
+          "entry": "tb32"
+        }
+      ],
+      "entry": "tb47",
+      "v": 1,
+      "seq": 21,
+      "prev": "0280b4df451ec942b1a21649",
+      "digest": "43d7021f2ad78dd75f022a65"
+    }
+  },
+  {
+    "event": {
+      "record": "r22",
+      "at": "2026-10-24T18:06:57Z",
+      "by": "Alex",
+      "word": "set",
+      "facts": [
+        {
+          "aspect": "detail",
+          "value": "Ordinary edit outside the app words"
+        }
+      ],
+      "changes": "detail=Ordinary edit outside the app words",
+      "sealed": false
+    },
+    "record": {
+      "at": "2026-10-24T18:06:57Z",
+      "by": "tb2",
+      "words": "set tb51 detail=\"Ordinary edit outside the app words\"",
+      "parts": [
+        {
+          "word": "set",
+          "target": "tb51",
+          "words": "set tb51 detail=\"Ordinary edit outside the app words\"",
+          "facts": [
+            [
+              "tb51",
+              "detail",
+              "0",
+              "Ordinary edit outside the app words"
+            ]
+          ],
+          "entry": "tb32"
+        }
+      ],
+      "entry": "tb32",
+      "v": 1,
+      "seq": 22,
+      "prev": "43d7021f2ad78dd75f022a65",
+      "digest": "76080643ab7ff87be2e5d416"
+    }
+  },
+  {
+    "event": {
+      "record": "r17",
+      "at": "2026-10-24T18:06:57Z",
+      "by": "Alex",
+      "word": "task-add",
+      "facts": [
+        {
+          "aspect": "kind",
+          "value": "taskboard-task"
+        },
+        {
+          "aspect": "title",
+          "value": "Check the invitation text"
+        },
+        {
+          "aspect": "lane",
+          "value": "Backlog"
+        },
+        {
+          "aspect": "who",
+          "value": "Alex"
+        },
+        {
+          "aspect": "when",
+          "value": "2026-10-24"
+        },
+        {
+          "aspect": "source",
+          "value": "proof"
+        },
+        {
+          "aspect": "source_status",
+          "value": "open"
+        },
+        {
+          "aspect": "text",
+          "value": "Ready for our community evening"
+        },
+        {
+          "aspect": "seats",
+          "value": "1"
+        },
+        {
+          "aspect": "made_by",
+          "value": "tb2"
+        }
+      ],
+      "changes": "kind=taskboard-task; title=Check the invitation text; lane=Backlog; who=Alex; when=2026-10-24; source=proof; source_status=open; text=Ready for our community evening; seats=1; made_by=Alex",
+      "sealed": false
+    },
+    "record": {
+      "at": "2026-10-24T18:06:57Z",
+      "by": "tb2",
+      "words": "task-add title=\"Check the invitation text\" to=Backlog who=Alex when=2026-10-24 source=proof status=open text=\"Ready for our community evening\"",
+      "parts": [
+        {
+          "word": "make",
+          "target": null,
+          "words": "make kind=taskboard-task title='Check the invitation text' lane=Backlog who=Alex when=2026-10-24 source=proof source_status=open text='Ready for our community evening' seats=1",
+          "facts": [
+            [
+              "tb52",
+              "kind",
+              "0",
+              "taskboard-task"
+            ],
+            [
+              "tb52",
+              "title",
+              "0",
+              "Check the invitation text"
+            ],
+            [
+              "tb52",
+              "lane",
+              "0",
+              "Backlog"
+            ],
+            [
+              "tb52",
+              "who",
+              "0",
+              "Alex"
+            ],
+            [
+              "tb52",
+              "when",
+              "0",
+              "2026-10-24"
+            ],
+            [
+              "tb52",
+              "source",
+              "0",
+              "proof"
+            ],
+            [
+              "tb52",
+              "source_status",
+              "0",
+              "open"
+            ],
+            [
+              "tb52",
+              "text",
+              "0",
+              "Ready for our community evening"
+            ],
+            [
+              "tb52",
+              "seats",
+              "0",
+              "1"
+            ],
+            [
+              "tb52",
+              "made_by",
+              "0",
+              "tb2"
+            ],
+            [
+              "tb52",
+              "in:tb1",
+              "0",
+              17
+            ]
+          ],
+          "entry": "tb31"
+        }
+      ],
+      "entry": "tb43",
+      "v": 1,
+      "seq": 17,
+      "prev": "6edfe40f5eea9a50b29c714d",
+      "digest": "0919c9a982d4d0c9e045f03f"
+    }
+  },
+  {
+    "event": {
+      "record": "r19",
+      "at": "2026-10-24T18:06:57Z",
+      "by": "agent for Alex",
+      "word": "task-move",
+      "facts": [
+        {
+          "aspect": "lane",
+          "value": "Now"
+        }
+      ],
+      "changes": "lane=Now",
+      "sealed": false
+    },
+    "record": {
+      "at": "2026-10-24T18:06:57Z",
+      "by": "tb37",
+      "words": "task-move tb52 to=Now",
+      "parts": [
+        {
+          "word": "set",
+          "target": "tb52",
+          "words": "set tb52 lane=Now",
+          "facts": [
+            [
+              "tb52",
+              "lane",
+              "ff3db2efd44b4f79",
+              "Now"
+            ]
+          ],
+          "entry": "tb32"
+        }
+      ],
+      "entry": "tb44",
+      "for": "tb2",
+      "via": "agent",
+      "v": 1,
+      "seq": 19,
+      "prev": "5c76359daeca9934b2679d40",
+      "digest": "f1d25b0f750330baa97bb495"
+    }
+  },
+  {
+    "event": {
+      "record": "r23",
+      "at": "2026-10-24T18:06:59Z",
+      "by": "Alex",
+      "word": "task-done",
+      "facts": [
+        {
+          "aspect": "lane",
+          "value": "Done"
+        }
+      ],
+      "changes": "lane=Done",
+      "sealed": false
+    },
+    "record": {
+      "at": "2026-10-24T18:06:59Z",
+      "by": "tb2",
+      "words": "task-done tb52",
+      "parts": [
+        {
+          "word": "set",
+          "target": "tb52",
+          "words": "set tb52 lane=Done",
+          "facts": [
+            [
+              "tb52",
+              "lane",
+              "05d1527c0f61201e",
+              "Done"
+            ]
+          ],
+          "entry": "tb32"
+        }
+      ],
+      "entry": "tb46",
+      "press": "alex-mvmpnt82-3zn7jpoe",
+      "saw": {
+        "tb52": {
+          "rev": 19,
+          "aspects": [
+            "in:*",
+            "lane",
+            "kind"
+          ],
+          "participant": true
+        }
+      },
+      "v": 1,
+      "seq": 23,
+      "prev": "76080643ab7ff87be2e5d416",
+      "digest": "292449f01382be6e2f04dc6e"
+    }
+  },
+  {
+    "event": {
+      "record": "r25",
+      "at": "2026-10-24T18:06:59Z",
+      "by": "Alex",
+      "word": "task-move",
+      "facts": [
+        {
+          "aspect": "lane",
+          "value": "Now"
+        }
+      ],
+      "changes": "lane=Now",
+      "sealed": false
+    },
+    "record": {
+      "at": "2026-10-24T18:06:59Z",
+      "by": "tb2",
+      "words": "task-move tb52 to=Now",
+      "parts": [
+        {
+          "word": "set",
+          "target": "tb52",
+          "words": "set tb52 lane=Now",
+          "facts": [
+            [
+              "tb52",
+              "lane",
+              "16552c2580bbe8b8",
+              "Now"
+            ]
+          ],
+          "entry": "tb32"
+        }
+      ],
+      "entry": "tb44",
+      "press": "alex-mvmpntdy-0mgxc30u",
+      "saw": {
+        "tb52": {
+          "rev": 23,
+          "aspects": [
+            "in:*",
+            "lane",
+            "kind"
+          ]
+        }
+      },
+      "v": 1,
+      "seq": 25,
+      "prev": "1aea6d891de17b1796aeaebf",
+      "digest": "164bb44dc2c7db8942aea996"
+    }
+  },
+  {
+    "event": {
+      "record": "r26",
+      "at": "2026-10-24T18:07:00Z",
+      "by": "Alex",
+      "word": "undo",
+      "facts": [
+        {
+          "aspect": "lane",
+          "value": "Done"
+        }
+      ],
+      "changes": "lane=Done",
+      "sealed": false
+    },
+    "record": {
+      "at": "2026-10-24T18:07:00Z",
+      "by": "tb2",
+      "words": "undo r25",
+      "parts": [
+        {
+          "word": "undo",
+          "target": "r25",
+          "words": "undo r25",
+          "facts": [
+            [
+              "tb52",
+              "lane",
+              "05d1527c0f61201e",
+              "Done"
+            ]
+          ],
+          "entry": "tb25"
+        }
+      ],
+      "entry": "tb25",
+      "undoes": 25,
+      "v": 1,
+      "seq": 26,
+      "prev": "164bb44dc2c7db8942aea996",
+      "digest": "0893acaa83436dd633356bf3"
+    }
+  }
+]

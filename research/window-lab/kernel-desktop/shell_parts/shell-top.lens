@@ -1,0 +1,28 @@
+root : shell-bar
+  left : shell-island, side left, label "Launcher and app"
+    launcher : shell-launcher
+      on lines do window.open lines
+      on start do window.start
+    spaces : shell-spaces
+    focused : shell-focused-app
+  middle : shell-island, side middle, label "Date and time"
+    clock : shell-clock
+  right : shell-island, side right, label "Status"
+    cpu : shell-reading, key cpu, label CPU
+    memory : shell-reading, key memory, label RAM
+    notifications : shell-notifications
+      on clear do notice.clear
+    media : shell-media
+      on play do media.play
+      on next do media.next
+      on prev do media.prev
+    tray : shell-tray
+      network : shell-chip, key network
+        on press do window.settings which=network
+      volume : shell-chip, key volume
+        on press do window.settings which=volume
+      battery : shell-chip, key battery
+        on press do window.settings which=battery
+    jeff : shell-jeff
+    power : shell-power
+      on off do off window

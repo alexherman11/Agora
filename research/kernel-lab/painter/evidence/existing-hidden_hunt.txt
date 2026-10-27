@@ -1,0 +1,17 @@
+  ok   twelve kids, three parents and one labelled agent over HTTP · 16 persons including the founding steward; 1 neighbour agent
+  ok   shared instruction stays data; no kid becomes a leader · only Rowan leads the hunt
+  ok   everyone begins with just the first map pin
+  ok   guessing a locked id says no more than an absent id
+  ok   wrong answers are kind; direct vote and injected answer cannot bypass the check · refused: Good try! Look around once more and try another answer.
+  ok   twelve simultaneous discoveries count once each
+  ok   two simultaneous presses by one kid count once
+  ok   visibility follows the reader's own progress
+  ok   sealed leaderboard publishes counts of hidden targets, no identities · sealed counts: 1: 12 · 2: 5 · 3: 3
+  ok   undo relocks the dependent clue for that reader
+  ok   the unchanged painter omits locked text and coordinates
+  ok   no solve record names a child or agent · 20 sealed discovery records
+  ok   the hold word acquires a real kernel lease
+  ok   the stop word releases it
+  ok   replay restores exactly the world · 56 records
+  ok   off ends the module and every hold
+16 of 16 checks passed · 57 records

@@ -1,0 +1,141 @@
+{
+  "exit": 0,
+  "timed_out": false,
+  "seconds": 61.92,
+  "answer": "Updated taskboard-components (dk170) with an 850 ms check-mark animation for observed moves into Done.\n\nCode was necessary: added and explicitly reviewed board-specific component dk179 as Alex. Other board and shared task/lane facts are unchanged.\n\nStructure verified with `look-view`; animation pixels could not be inspected. Initial loads don\u2019t animate; reduced motion uses a brief static check.",
+  "board": "A",
+  "number": 7,
+  "request": "When a card lands in Done, play a small check-mark animation.",
+  "changes": [
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "code",
+      "category": "component code",
+      "lines": 58
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "category",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "example",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "for",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "gestures",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "in:dk1",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "kind",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "limitations",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "made_by",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "name",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "parts",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "purpose",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "reviewed_code",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "settings",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "slots",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk179",
+      "kind": "component",
+      "field": "uses",
+      "category": "facts",
+      "lines": 1
+    },
+    {
+      "thing": "dk170",
+      "kind": "lens",
+      "field": "text",
+      "category": "lens",
+      "lines": 4
+    }
+  ],
+  "lines": 77,
+  "landed": [
+    "component code",
+    "facts",
+    "lens"
+  ],
+  "success": false,
+  "board_proof": true,
+  "proof_passed": 11,
+  "proof_checks": 11,
+  "wall_seconds": 79.09
+}

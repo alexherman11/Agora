@@ -1,0 +1,261 @@
+{
+ "what": "Council night (a13431), run on the kernel over real HTTP on loopback",
+ "labels": {
+  "ran": "every check, count and timing below",
+  "imagined": "the people, their words, the agenda (modules/agenda/agenda-oct28.json) and the summaries; no model was called"
+ },
+ "when": "2026-10-26T19:19Z",
+ "world": {
+  "records": 144,
+  "persons": 41,
+  "agents": 3,
+  "modules": [
+   "agenda (Node)",
+   "tally (Node)"
+  ],
+  "things": 137
+ },
+ "checks": [
+  {
+   "check": "forty people and three agents",
+   "ok": true,
+   "detail": "41 persons (Alex and 40 neighbours), 3 agents"
+  },
+  {
+   "check": "the agenda module brings the agenda in as one act",
+   "ok": true,
+   "detail": "1 record, 6 things, by the agenda module for Dana"
+  },
+  {
+   "check": "only a leader may load an agenda",
+   "ok": true,
+   "detail": "refused: agenda.load is for leaders of Council watch; help agenda.load says more"
+  },
+  {
+   "check": "twelve riders press for nine carpool seats at once",
+   "ok": true,
+   "detail": "9 seats taken, 3 told the car is full: refused: sb121 is taken (3 seats, all claimed); look shows what is open"
+  },
+  {
+   "check": "sixteen sign up at once for twelve two-minute slots",
+   "ok": true,
+   "detail": "12 slots claimed, 4 told it is taken"
+  },
+  {
+   "check": "once each: a second sign-up is refused",
+   "ok": true,
+   "detail": "refused: you have already said claim on sb116; once each. undo takes yours back"
+  },
+  {
+   "check": "undo gives a slot back, and the next neighbour takes it",
+   "ok": true,
+   "detail": "Bea gave theirs back; Priya took it"
+  },
+  {
+   "check": "sign-up closes at a time of day",
+   "ok": true,
+   "detail": "refused: sign-up for sb116 closed at 2026-10-29T00:45Z (a seat was free)"
+  },
+  {
+   "check": "speakers' phone numbers are seen only by leaders",
+   "ok": true,
+   "detail": "absent from a neighbour's look and both of their pages; present in Dana's look and floor page"
+  },
+  {
+   "check": "the feed is a slow lane",
+   "ok": true,
+   "detail": "refused: you have said post 5 times today, the most it takes from one person in a day"
+  },
+  {
+   "check": "forty vote at once in a sealed pulse poll",
+   "ok": true,
+   "detail": "yes 32 · no 8; 20 typed, 20 pressed"
+  },
+  {
+   "check": "no record and no view says who voted how",
+   "ok": true,
+   "detail": "40 vote records, all by 'sealed', none naming a voter"
+  },
+  {
+   "check": "one vote each; undo lets a neighbour change theirs",
+   "ok": true,
+   "detail": "a second vote: 'refused: you have already said vote on sb129; once each. undo takes yours back'; Maya changed hers; still 40 votes"
+  },
+  {
+   "check": "two leaders press Next at once: the meeting moves one item",
+   "ok": true,
+   "detail": "one moved it; the other: 'refused: stale: sb113 changed since it was painted (now, r140); nothing was done. The view will repaint.'"
+  },
+  {
+   "check": "a neighbour's Next is refused",
+   "ok": true,
+   "detail": "refused: agenda.next is for leaders of Council watch; help agenda.next says more"
+  },
+  {
+   "check": "agents' summaries are labelled as agents",
+   "ok": true,
+   "detail": "7 summaries, each made by an agent for its person; the page says 'agent for Maya' on hers"
+  },
+  {
+   "check": "thirty phones follow every 'now speaking'",
+   "ok": true,
+   "detail": "5 moves × 30 phones; seen within p50 235.2 ms, p95 479.3 ms, max 562.7 ms; 0 missed"
+  },
+  {
+   "check": "the outcome is a pinned announcement, with the staff report linked",
+   "ok": true,
+   "detail": "two records from one line (r142, r143); first in a neighbour's feed"
+  },
+  {
+   "check": "a neighbour may not pin",
+   "ok": true,
+   "detail": "refused: pin is for leaders of Seabright; help pin says more"
+  },
+  {
+   "check": "the tally module (Node) reads the feed as Sam may see it",
+   "ok": true,
+   "detail": "most liked:"
+  },
+  {
+   "check": "replaying the log gives the same world",
+   "ok": true,
+   "detail": "144 records replayed"
+  }
+ ],
+ "passed": 21,
+ "of": 21,
+ "timing_ms": {
+  "acts": 114,
+  "act_p50": 22.2,
+  "act_p95": 196.9,
+  "typed_p50": 21.7,
+  "pressed_p50": 22.6,
+  "follow_p50": 235.2,
+  "follow_p95": 479.3,
+  "phone_redraws": 387,
+  "whole_run_s": 13.6
+ },
+ "refused_acts": [
+  {
+   "who": "Maya",
+   "how": "typed",
+   "line": "agenda.load in=sb57",
+   "ok": false,
+   "ms": 2.9,
+   "said": "refused: agenda.load is for leaders of Council watch; help agenda.load says more"
+  },
+  {
+   "who": "Fern",
+   "how": "pressed",
+   "line": "do claim a952",
+   "ok": false,
+   "ms": 24.8,
+   "said": "refused: sb119 is taken (3 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Luis",
+   "how": "pressed",
+   "line": "do claim a960",
+   "ok": false,
+   "ms": 24.7,
+   "said": "refused: sb120 is taken (3 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Abel",
+   "how": "pressed",
+   "line": "do claim a968",
+   "ok": false,
+   "ms": 25.9,
+   "said": "refused: sb121 is taken (3 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Priya",
+   "how": "pressed",
+   "line": "do claim a928",
+   "ok": false,
+   "ms": 7.1,
+   "said": "refused: sb116 is taken (12 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Hana",
+   "how": "pressed",
+   "line": "do claim a928",
+   "ok": false,
+   "ms": 1.6,
+   "said": "refused: sb116 is taken (12 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Nora",
+   "how": "pressed",
+   "line": "do claim a928",
+   "ok": false,
+   "ms": 1.8,
+   "said": "refused: sb116 is taken (12 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Kiko",
+   "how": "pressed",
+   "line": "do claim a928",
+   "ok": false,
+   "ms": 2.1,
+   "said": "refused: sb116 is taken (12 seats, all claimed); look shows what is open"
+  },
+  {
+   "who": "Maya",
+   "how": "typed",
+   "line": "claim sb116",
+   "ok": false,
+   "ms": 1.6,
+   "said": "refused: you have already said claim on sb116; once each. undo takes yours back"
+  },
+  {
+   "who": "Hana",
+   "how": "typed",
+   "line": "claim sb116",
+   "ok": false,
+   "ms": 2.2,
+   "said": "refused: sign-up for sb116 closed at 2026-10-29T00:45Z"
+  },
+  {
+   "who": "Ruth",
+   "how": "typed",
+   "line": "post one more thing about parking",
+   "ok": false,
+   "ms": 1.8,
+   "said": "refused: you have said post 5 times today, the most it takes from one person in a day"
+  },
+  {
+   "who": "Bea",
+   "how": "typed",
+   "line": "vote sb129 no",
+   "ok": false,
+   "ms": 2.9,
+   "said": "refused: you have already said vote on sb129; once each. undo takes yours back"
+  },
+  {
+   "who": "Alex",
+   "how": "pressed",
+   "line": "do agenda.next a904",
+   "ok": false,
+   "ms": 54.1,
+   "said": "refused: stale: sb113 changed since it was painted (now, r140); nothing was done. The view will repaint."
+  },
+  {
+   "who": "Ruth",
+   "how": "pressed",
+   "line": "do agenda.next a904",
+   "ok": false,
+   "ms": 2.1,
+   "said": "refused: agenda.next is for leaders of Council watch; help agenda.next says more"
+  },
+  {
+   "who": "Sam",
+   "how": "typed",
+   "line": "pin sb136",
+   "ok": false,
+   "ms": 3.5,
+   "said": "refused: pin is for leaders of Seabright; help pin says more"
+  }
+ ],
+ "shots": {}
+}

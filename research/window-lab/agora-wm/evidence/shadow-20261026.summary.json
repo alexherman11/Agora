@@ -1,0 +1,14 @@
+{
+  "samples": 416,
+  "apps": [],
+  "would_move_samples": {},
+  "would_minimise_samples": {},
+  "gated_samples": {
+    "notification gate 2": 416
+  },
+  "infeasible_samples": 0,
+  "meaning": "counts are observations, not distinct actions; no window titles recorded",
+  "seconds": 120.016,
+  "hook_events": 3230,
+  "native_mutating": false
+}

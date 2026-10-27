@@ -1,0 +1,1617 @@
+--- a/research/window-lab/browsing/admission_job.py
++++ b/research/window-lab/browsing/admission_job.py
+@@ -5,14 +5,18 @@
+ ownership: the parent checks a held kernel process handle against its live Job.
+ No legacy discovery, job adoption, PID termination or external-runtime cleanup.
+ """
++import hashlib
+ import json
++import math
+ import ntpath
+ import sys
++import threading
+ import time
++from functools import wraps
+ from pathlib import Path
+ 
+ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+-from sandbox_receipts import write, error
++from sandbox_receipts import error, write
+ 
+ 
+ class Refused(RuntimeError):
+@@ -20,6 +24,45 @@
+     def __init__(self, reason):
+         super().__init__(reason)
+         self.reason = reason
++
++
++def guard_details(result, *, now=None):
++    """Bounded metadata from the supported reader; never new admission policy."""
++    result = result if isinstance(result, dict) else {}
++    raw = result.get("observation")
++    raw = raw if isinstance(raw, dict) else {}
++    observed = raw.get("observed_at")
++    age = None
++    if type(observed) in (int, float) and math.isfinite(observed):
++        age = (time.time() if now is None else now) - observed
++        age = round(age, 3) if math.isfinite(age) else None
++    exe = raw.get("foreground_exe")
++    # Only an image basename, never titles, command lines or arbitrary fields.
++    exe = (exe if isinstance(exe, str) and 0 < len(exe) <= 128
++           and ntpath.basename(exe) == exe and not any(ord(c) < 32 for c in exe)
++           else "unknown")
++    reason = result.get("reason")
++    return {
++        "admitted": result.get("admitted") is True,
++        "reason": reason[:200] if isinstance(reason, str) else "not supplied",
++        "foreground_exe": exe,
++        "game": raw.get("game") if type(raw.get("game")) is bool else None,
++        "observation_age_seconds": age,
++    }
++
++
++class GuardRefused(Refused):
++    def __init__(self, details):
++        self.guard = details
++        super().__init__("fresh house guard refused; no admission: " +
++                         json.dumps(details, sort_keys=True))
++
++
++def require_guard(reader):
++    details = guard_details(reader())
++    if not details["admitted"]:
++        raise GuardRefused(details)
++    return details
+ 
+ 
+ def read(path):
+@@ -30,17 +73,210 @@
+     return json.loads(data)
+ 
+ 
++def engine_report(folder, token, host=None, engine=None):
++    """Fixture coordination only; the shared verifier measures kernel provenance."""
++    path = Path(folder) / "engine-request.json"
++    if not path.exists():
++        return None
++    if host is None or engine is None:
++        raise Refused("measured host and engine binding required")
++    with host.lock:
++        return _engine_report(folder, token, host, engine)
++
++
++def _engine_report(folder, token, host, engine):
++    path = Path(folder) / "engine-request.json"
++    request = read(path)
++    receipt = read(Path(folder) / "receipt.json")
++    report = request.get("engine_report")
++    host.envelope(receipt)
++    host.envelope(request, pid_key="host_pid")
++    engine.check(request)
++    if (request.get("request") != token
++            or type(request.get("host_pid")) is not int
++            or request["host_pid"] != receipt.get("pid")
++            or not isinstance(report, dict)
++            or report.get("browser_pid") != request.get("engine_pid")):
++        raise Refused("engine report envelope mismatch")
++    if (read(path) != request or read(Path(folder) / "receipt.json") != receipt):
++        raise Refused("engine report changed during read")
++    host.check()
++    return report
++
++
++def image_key(value):
++    return ntpath.normcase(ntpath.normpath(value))
++
++
++def _locked(method):
++    @wraps(method)
++    def call(self, *args, **kwargs):
++        with self.lock:
++            return method(self, *args, **kwargs)
++    return call
++
++
++class HostFence:
++    """Browser-only correlation fence; not a host service or worker authority.
++
++    An empty reviewed image inventory admits nothing. Process APIs and image
++    hashing are injectable for offline tests; no JSON field supplies provenance.
++    """
++    def __init__(self, scope, native, root, token, desktop, profile, allowed,
++                 processes, digest=None):
++        self.scope, self.native, self.root = scope, native, root
++        self.token, self.desktop = token, desktop
++        self.profile = image_key(str(profile))
++        self.allowed = dict(allowed)
++        self.processes = processes
++        self.digest = digest or (lambda path: hashlib.sha256(Path(path).read_bytes()).hexdigest())
++        self.handles, self.chain, self.binding = {}, [], None
++        self.lock = threading.RLock()
++        self.closed = False
++
++    def _identity(self, pid):
++        if self.closed:
++            raise Refused("host fence closed; no reopen")
++        if pid not in self.handles:
++            handle = self.native.k.OpenProcess(0x1000 | 0x100000, False, pid)
++            if not handle:
++                raise Refused("host identity unavailable")
++            self.handles[pid] = handle
++        handle = self.handles[pid]
++        birth = self.native.of_handle(handle)
++        self.scope.native.verify(self.scope.handle)
++        if birth is None or not self.scope.native.contains(self.scope.handle, handle):
++            raise Refused("host identity ended or outside retained job")
++        return (birth[0], image_key(birth[1]))
++
++    @_locked
++    def pin(self, pid):
++        if self.closed:
++            raise Refused("host fence closed; no reopen")
++        if type(pid) is not int or pid <= 0 or not self.allowed:
++            raise Refused("reviewed host image inventory required")
++        if self.binding:
++            if pid != self.binding["host"]["pid"]:
++                raise Refused("effective host changed")
++            return self.check()
++        try:
++            parents = self._parents()
++            current, seen, chain = pid, set(), []
++            for _ in range(16):
++                if current in seen or current not in parents:
++                    raise Refused("host ancestry missing or cyclic")
++                seen.add(current)
++                birth = self._identity(current)
++                if chain and birth[0] > chain[-1]["created"]:
++                    raise Refused("host ancestry birth order invalid")
++                entry = {"pid": current, "created": birth[0], "exe": birth[1]}
++                chain.append(entry)
++                if current == self.root["pid"]:
++                    if birth != (self.root["created"], image_key(self.root["exe"])):
++                        raise Refused("launcher birth changed")
++                    break
++                expected = self.allowed.get(birth[1])
++                if expected is None or self.digest(birth[1]) != expected:
++                    raise Refused("effective interpreter image not reviewed")
++                current = parents[current]
++            else:
++                raise Refused("host ancestry depth exceeded")
++            # Direct hosts must also match an explicitly reviewed image.
++            first = chain[0]
++            if (first["exe"] not in self.allowed
++                    or self.allowed[first["exe"]] != self.digest(first["exe"])):
++                raise Refused("effective interpreter hash mismatch")
++            first["file_sha256"] = self.allowed[first["exe"]]
++            self.chain = [(entry, parents[entry["pid"]]) for entry in chain]
++            self.binding = {"request": self.token, "job_id": self.scope.descriptor["id"],
++                            "root": dict(chain[-1]), "host": dict(first),
++                            "desktop": self.desktop, "profile": self.profile}
++            return self.check()
++        except BaseException:
++            self.close()
++            raise
++
++    def _parents(self):
++        rows = self.processes()
++        result = {}
++        for pid, parent, _ in rows:
++            if pid in result:
++                raise Refused("ambiguous process snapshot")
++            result[pid] = parent
++        return result
++
++    @_locked
++    def check(self):
++        if self.closed:
++            raise Refused("host fence closed; no reopen")
++        if not self.binding:
++            raise Refused("effective host not pinned")
++        if self.binding["job_id"] != self.scope.descriptor["id"]:
++            raise Refused("retained Job identity changed")
++        parents = self._parents()
++        snapshot = self.scope.snapshot()
++        for entry, parent in self.chain:
++            pid = entry["pid"]
++            if (parents.get(pid) != parent or pid not in snapshot["pids"]
++                    or self._identity(pid) != (entry["created"], entry["exe"])):
++                raise Refused("host provenance changed")
++            if pid != self.root["pid"]:
++                if (entry["exe"] not in self.allowed
++                        or self.digest(entry["exe"]) != self.allowed[entry["exe"]]):
++                    raise Refused("interpreter ancestor hash changed")
++        host = self.binding["host"]
++        if self.digest(host["exe"]) != self.allowed.get(host["exe"]):
++            raise Refused("effective interpreter hash changed")
++        return json.loads(json.dumps(self.binding))
++
++    @_locked
++    def envelope(self, value, pid_key="pid", initial=False):
++        if (value.get("request") != self.token or value.get("desktop") != self.desktop
++                or image_key(str(value.get("profile", ""))) != self.profile
++                or type(value.get(pid_key)) is not int):
++            raise Refused("host envelope mismatch")
++        if initial and not self.binding and value.get("phase") == "importing":
++            if value.get("binding") is not None:
++                raise Refused("unissued host binding")
++            return self.pin(value[pid_key])
++        binding = self.check()
++        if (initial and value.get("phase") == "importing" and value.get("binding") is None
++                and value[pid_key] == binding["host"]["pid"]):
++            return binding  # same pending envelope while the response is read
++        if value[pid_key] != binding["host"]["pid"] or value.get("binding") != binding:
++            raise Refused("host binding mismatch")
++        return binding
++
++    @_locked
++    def close(self):
++        # Retain any handle whose close failed for explicit reconciliation.
++        self.closed = True
++        for pid, handle in list(self.handles.items()):
++            if self.native.k.CloseHandle(handle) == 0:
++                raise Refused("host handle close failed")
++            del self.handles[pid]
++
++
+ class EngineFence:
+     """Pins an engine birth to the parent's retained Job until cleanup."""
+-    def __init__(self, scope, native, root, token):
++    def __init__(self, scope, native, root, token, host=None):
+         self.scope, self.native, self.root, self.token = scope, native, root, token
+         self.engine = None
+         self.handle = None
+         self.birth = None
+-
++        self.host = host
++        self.lock = host.lock if host else threading.RLock()
++        self.closed = False
++
++    @_locked
+     def check(self, request):
++        if self.closed:
++            raise Refused("engine fence closed; no reopen")
++        if self.host:
++            self.host.envelope(request, pid_key="host_pid")
+         if (request.get("request") != self.token
+-                or request.get("host_pid") != self.root["pid"]
++                or request.get("host_pid") != (
++                    self.host.binding["host"]["pid"] if self.host else self.root["pid"])
+                 or type(request.get("engine_pid")) is not int
+                 or request["engine_pid"] <= 0):
+             raise Refused("fixture identity mismatch")
+@@ -53,7 +289,8 @@
+                 raise Refused("engine identity unknown")
+         try:
+             birth = self.native.of_handle(self.handle)
+-            if (birth is None or birth[0] < self.root["created"]
++            minimum = self.host.binding["host"]["created"] if self.host else self.root["created"]
++            if (birth is None or birth[0] < minimum
+                     or ntpath.basename(birth[1]).lower() != "msedgewebview2.exe"
+                     or (self.birth is not None and birth != self.birth)):
+                 raise Refused("engine birth unknown, reused or predates launch")
+@@ -68,19 +305,24 @@
+             self.engine, self.birth = pid, birth
+             return {"request": self.token, "engine_pid": pid, "admitted": True,
+                     "job_id": self.scope.descriptor["id"], "created": birth[0],
+-                    "exe": birth[1], "scope": "offline fixture; enrolled family only"}
++                    "exe": birth[1], "binding": self.host.check() if self.host else None,
++                    "scope": "offline fixture; enrolled family only"}
+         except BaseException:
+             self.close()
+             raise
+ 
++    @_locked
+     def close(self):
++        self.closed = True
+         if self.handle:
+-            self.native.k.CloseHandle(self.handle)
++            if self.native.k.CloseHandle(self.handle) == 0:
++                raise Refused("engine handle close failed")
+             self.handle = None
+ 
+ 
+ def run(api, guard_read, native, name, folder, argv, token,
+-        *, clock=time.monotonic, pause=time.sleep, timeout=40):
++        *, verifier_factory=None, host_images=(), processes=None, digest=None,
++        clock=time.monotonic, pause=time.sleep, timeout=40):
+     """Injected boundaries let tests exercise the real orchestration, without OS calls.
+ 
+     No launch is admitted from a receipt. The shared launcher persists birth and
+@@ -94,18 +336,32 @@
+     result = {"public_navigation": False, "legacy_runtime_closure": "UNKNOWN; untouched",
+               "job_closure": "unknown", "engine_admitted": False, "phase": "preflight"}
+     write(folder / "launch.json", result)  # persistence failure prevents launch
+-    if guard_read().get("admitted") is not True:
+-        result.update(phase="refused", reason="fresh house guard did not admit")
++    if verifier_factory is None:
++        result.update(phase="refused", reason="shared verifier required; no launch")
++        write(folder / "launch.json", result)
++        return result
++    if not host_images or processes is None:
++        result.update(phase="refused",
++                      reason="reviewed effective-host configuration absent; no launch")
++        write(folder / "launch.json", result)
++        return result
++    try:
++        result["guard_admission"] = require_guard(guard_read)
++    except GuardRefused as exc:
++        result.update(phase="refused", reason=exc.reason, guard_admission=exc.guard)
+         write(folder / "launch.json", result)
+         return result
+     with api.Guard(name, "Agora offline admission probe") as guard:
+         with api.job_scope(name) as scope:
+             fence = None
++            host = None
++            verifier = None
+             started = False
+             try:
++                verifier = verifier_factory(scope)
++                verifier.before()
+                 # Re-read immediately before the shared suspended birth.
+-                if guard_read().get("admitted") is not True:
+-                    raise Refused("house guard changed before launch")
++                result["guard_admission"] = require_guard(guard_read)
+                 started = True  # a partially failed start may have created a child
+                 pid = api.start(name, argv, job=scope)
+                 state = api.load(name)
+@@ -119,19 +375,26 @@
+                         or state["launches"][0].get("job_assigned") is not True):
+                     raise Refused("launcher root receipt incomplete")
+                 root = owners[0]
++                host = HostFence(scope, native, root, token, "agora-sandbox-" + name,
++                                 folder / "profile", host_images, processes, digest)
++                fence = EngineFence(scope, native, root, token, host)
++                verifier.engine_report = lambda: engine_report(folder, token, host, fence)
++                verifier.add_birth({k: root[k] for k in ("pid", "created", "exe")})
++                verifier.start_sampling(0.1)
+                 result.update(pid=pid, job=dict(scope.descriptor), phase="waiting_engine")
+                 write(folder / "launch.json", result)
+-                fence = EngineFence(scope, native, root, token)
+                 deadline = clock() + timeout
+                 request = None
+                 while clock() < deadline:
+-                    if guard_read().get("admitted") is not True:
+-                        raise Refused("house guard stale or unsafe during fixture")
++                    result["guard_admission"] = require_guard(guard_read)
+                     receipt = folder / "receipt.json"
+                     if receipt.exists():
+                         child = read(receipt)
+-                        if child.get("pid") != pid:
+-                            raise Refused("child receipt PID mismatch")
++                        first = host.binding is None
++                        binding = host.envelope(child, initial=True)
++                        if first:
++                            result["host_binding"] = binding
++                            write(folder / "host-binding.json", binding)
+                         if child.get("phase") == "child_exit":
+                             if not result["engine_admitted"]:
+                                 raise Refused("child exited without engine admission")
+@@ -142,6 +405,10 @@
+                         current = read(path)
+                         if request is None:
+                             admission = fence.check(current)
++                            observed = verifier.gate()
++                            result["interaction_gate"] = observed
++                            if observed.get("allow_interaction") is not True:
++                                raise Refused("shared verifier refused interaction")
+                             request = current
+                             write(folder / "engine-admission.json", admission)
+                             result["engine_admitted"] = True
+@@ -155,16 +422,28 @@
+                 else:
+                     result.update(phase="deadline_fired", deadline_seconds=timeout)
+             except (Exception, SystemExit) as exc:
++                if isinstance(exc, GuardRefused):
++                    result["guard_admission"] = exc.guard
+                 result.update(phase="refused", error_type=type(exc).__name__,
+                               error=error(exc),
+                               reason=exc.reason if isinstance(exc, Refused)
+                               else "fixture boundary failed; see redacted error")
+             finally:
++                if verifier:
++                    try:
++                        verifier.stop_sampling()
++                    except Exception as exc:
++                        result["verifier_stop_error"] = type(exc).__name__
+                 if fence:
+                     try:
+                         fence.close()
+                     except Exception as exc:
+                         result["engine_handle_close_error"] = type(exc).__name__
++                if host:
++                    try:
++                        host.close()
++                    except Exception as exc:
++                        result["host_handle_close_error"] = type(exc).__name__
+                 if started:
+                     # Must run BEFORE the retained Job handle closes. No fallback.
+                     try:
+@@ -178,6 +457,14 @@
+                                 result["job_closure"] = "proven empty"
+                     except Exception as exc:
+                         result["cleanup"] = {"ok": False, "error_type": type(exc).__name__}
++                if verifier:
++                    try:
++                        verifier.after()
++                        result["native_verification"] = verifier.verdict()
++                    except Exception as exc:
++                        result["native_verification"] = {
++                            "allow_interaction": False, "status": "unknown",
++                            "error_type": type(exc).__name__}
+                 write(folder / "launch.json", result)
+     result["guard_code"], result["guard"] = guard.verdict()
+     write(folder / "launch.json", result)
+--- a/research/window-lab/browsing/admission_probe.py
++++ b/research/window-lab/browsing/admission_probe.py
+@@ -11,8 +11,10 @@
+ import sys
+ import time
+ from pathlib import Path
++
+ from admission_job import read, write
+-from admission_policy import configure, install as install_offline_policy
++from admission_policy import configure
++from admission_policy import install as install_offline_policy
+ 
+ 
+ def main():
+@@ -42,10 +44,14 @@
+     if value.value != name:
+         raise RuntimeError("wrong desktop; no window created")
+     started = time.monotonic()
+-    report = {"desktop": name, "pid": os.getpid(), "events": [], "public_navigation": False}
++    binding = None
++    report = {"desktop": name, "pid": os.getpid(), "request": token,
++              "profile": str(folder / "profile"),
++              "events": [], "public_navigation": False}
+ 
+     def record(phase, **fields):
+         report["phase"] = phase
++        report["binding"] = binding
+         report["events"].append(
+             {"phase": phase, "seconds": round(time.monotonic() - started, 3), **fields}
+         )
+@@ -54,6 +60,22 @@
+         temp.replace(folder / "receipt.json")
+ 
+     record("importing")
++    # The parent measures this candidate PID; it never adopts JSON as authority.
++    bound_deadline = time.monotonic() + 10
++    while not (folder / "host-binding.json").exists():
++        if time.monotonic() >= bound_deadline:
++            record("host_binding_deadline")
++            return
++        time.sleep(.02)
++    binding = read(folder / "host-binding.json")
++    if (binding.get("request") != token
++            or binding.get("host", {}).get("pid") != os.getpid()
++            or binding.get("desktop") != name
++            or Path(binding.get("profile", "")).resolve() != folder / "profile"
++            or not binding.get("job_id")):
++        record("host_binding_refused")
++        return
++    record("host_bound")
+     import clr
+ 
+     clr.AddReference("System.Windows.Forms")
+@@ -62,9 +84,9 @@
+     clr.AddReference(str(lib / "Microsoft.Web.WebView2.Core.dll"))
+     clr.AddReference(str(lib / "Microsoft.Web.WebView2.WinForms.dll"))
+     from Microsoft.Web.WebView2.Core import (
++        CoreWebView2PermissionState,
+         CoreWebView2WebResourceContext,
+         CoreWebView2WebResourceRequestSourceKinds,
+-        CoreWebView2PermissionState,
+     )
+     from Microsoft.Web.WebView2.WinForms import CoreWebView2CreationProperties, WebView2
+     from System import Action, String
+@@ -221,8 +243,18 @@
+                 # through its held Job and process handles. JSON alone proves
+                 # no ownership and grants no host authority.
+                 engine_pid = int(core.BrowserProcessId)
++                engine_report = {
++                    "browser_pid": engine_pid,
++                    "user_data_folder": str(core.Environment.UserDataFolder),
++                    "processes": [
++                        {"pid": int(p.ProcessId), "kind": str(p.Kind)}
++                        for p in core.Environment.GetProcessInfos()
++                    ],
++                }
+                 write(folder / "engine-request.json",
+-                      {"request": token, "host_pid": os.getpid(), "engine_pid": engine_pid})
++                      {"request": token, "host_pid": os.getpid(), "engine_pid": engine_pid,
++                       "desktop": name, "profile": str(folder / "profile"), "binding": binding,
++                       "engine_report": engine_report})
+                 admission_timer = Timer()
+                 timers.append(admission_timer)
+                 admission_timer.Interval = 20
+@@ -237,6 +269,9 @@
+                         if (value.get("request") != token
+                                 or value.get("engine_pid") != engine_pid
+                                 or value.get("admitted") is not True
++                                or value.get("binding") != binding
++                                or type(value.get("created")) is not int
++                                or value["created"] < binding["host"]["created"]
+                                 or not value.get("job_id")
+                                 or int(core.BrowserProcessId) != engine_pid):
+                             raise RuntimeError("parent engine fence refused")
+--- a/research/window-lab/browsing/run_admission.py
++++ b/research/window-lab/browsing/run_admission.py
+@@ -4,26 +4,38 @@
+ Native execution requires a separately admitted guarded lane and lead approval.
+ """
+ import hashlib
++import json
+ import sys
+ import uuid
+ from pathlib import Path
+ 
+-from admission_job import run, write
++from admission_job import guard_details, require_guard, run, write
+ from admission_result import message_boundary_passed
+ 
+ HERE = Path(__file__).resolve().parent
++# Intentionally empty: no installed interpreter identity has been admitted.
++# No environment variable, child receipt or automatic discovery fills this.
++REVIEWED_HOST_IMAGES = {}
+ 
+ 
+ def main():
+     # Lazy imports keep offline tests free from import-time Windows API calls.
+     sys.path.insert(0, str(HERE.parent))
+     sys.path.insert(0, str(HERE.parents[1] / "text-desk-lab" / "notation"))
++    import guard_context
++    if sys.argv[1:] == ["--guard-status"]:
++        print(json.dumps(guard_details(guard_context.read()), sort_keys=True))
++        return 0
++    if sys.argv[1:]:
++        raise ValueError("supported option: --guard-status (read-only)")
++    require_guard(guard_context.read)
++    if not REVIEWED_HOST_IMAGES:
++        print("refused: effective interpreter identity awaits review; no native initialization")
++        return 2
++    import native_run_verify
+     import sandbox_window as sandbox
+-    import guard_context
+     from hud_lifecycle import Windows
+ 
+-    if guard_context.read().get("admitted") is not True:
+-        raise RuntimeError("fresh world-owned guard admission required; no launch")
+     sandbox.STATE.mkdir(parents=True, exist_ok=True)  # same setup as shared open()
+     name = "admit-" + uuid.uuid4().hex[:12]
+     token = uuid.uuid4().hex
+@@ -31,16 +43,34 @@
+     sources = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in (Path(__file__), HERE / "admission_probe.py",
+                          HERE / "admission_result.py", HERE / "admission_job.py",
+-                         HERE / "admission_policy.py")}
++                         HERE / "admission_policy.py", HERE.parent / "native_run_verify.py",
++                         HERE.parent / "sandbox_job.py", HERE.parent / "sandbox_window.py",
++                         HERE.parent / "sandbox_birth.py")}
+     write(folder / "source.json", sources)
++    def verifier(scope):
++        return native_run_verify.Verifier(
++            {"name": name, "profile_roots": [str(folder / "profile")],
++             "scratch_roots": [str(folder)], "watched_roots": [str(HERE)],
++             "exclude": [str(HERE / "__pycache__")],
++             "allow_remote": [], "allow_loopback": False,
++             "require_engine_report": True,
++             # Rowan c10545 / JEFF e26277: ONE local observation only.
++             # Brokered processes and unscanned writes remain NOT PROVEN in
++             # the report, explicitly accepted limits for this fixture alone.
++             # This is never public-web containment acceptance.
++             "must_prove": []},
++            scope)
++    process_reader = native_run_verify.Native()
+     result = run(
+         sandbox, guard_context.read, Windows(), name, folder,
+         [sys.executable, str(HERE / "admission_probe.py"), str(folder),
+-         "agora-sandbox-" + name, token], token)
++         "agora-sandbox-" + name, token], token, verifier_factory=verifier,
++        host_images=REVIEWED_HOST_IMAGES, processes=process_reader.processes)
+     passed = (result.get("phase") == "child_exit"
+               and result.get("engine_admitted") is True
+               and result.get("job_closure") == "proven empty"
+               and result.get("guard_code") == 0
++              and result.get("native_verification", {}).get("allow_interaction") is True
+               and message_boundary_passed(result.get("child", {})))
+     result["offline_message_boundary_passed"] = passed
+     result["native_adversarial_containment"] = "not certified by this message fixture"
+--- a/research/window-lab/browsing/test_admission_job.py
++++ b/research/window-lab/browsing/test_admission_job.py
+@@ -3,18 +3,135 @@
+ All process/Job calls are fakes. No native containment or cleanup certification.
+ """
+ import copy
++import json
+ import os
++import sys
++import threading
++import unittest
++import uuid
+ from pathlib import Path
+-import sys
+ from types import SimpleNamespace as NS
+-import unittest
+ from unittest.mock import patch
+-import uuid
+ 
+ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+ import sandbox_job
++from admission_job import (
++    EngineFence,
++    GuardRefused,
++    engine_report,
++    guard_details,
++    read,
++    require_guard,
++    run,
++    write,
++)
+ from sandbox_birth import capture, intent, persist_then_resume
+-from admission_job import EngineFence, read, run, write
++
++
++class GuardDiagnostics(unittest.TestCase):
++    def test_empty_reviewed_inventory_refuses_before_native_import(self):
++        import io
++
++        import run_admission
++        output = io.StringIO()
++        with patch.dict(sys.modules, {"guard_context": NS(read=lambda: {"admitted": True}),
++                                      "sandbox_window": None}), \
++                patch.object(sys, "argv", ["run_admission.py"]), \
++                patch.object(run_admission, "REVIEWED_HOST_IMAGES", {}), \
++                patch("sys.stdout", output):
++            self.assertEqual(run_admission.main(), 2)
++        self.assertIn("no native initialization", output.getvalue())
++
++    def test_missing_stale_unknown_unsafe_reasons_retained_without_admission(self):
++        for reason in ("house observation missing/unreadable",
++                       "house observation stale/unknown/unsafe"):
++            for observed, game, exe in ((0, False, "editor.exe"),
++                                        (100, None, "unknown"),
++                                        (100, True, "game.exe")):
++                source = {"admitted": False, "reason": reason, "observation": {
++                    "observed_at": observed, "game": game, "foreground_exe": exe}}
++                with self.subTest(reason=reason, game=game), \
++                        self.assertRaises(GuardRefused) as caught:
++                    require_guard(lambda source=source: source)
++                details = caught.exception.guard
++                self.assertEqual(details["reason"], reason)
++                self.assertEqual(details["game"], game)
++                self.assertEqual(details["foreground_exe"], exe)
++
++    def test_projection_is_bounded_metadata_not_host_or_private_content(self):
++        result = guard_details({"admitted": False, "reason": "x" * 300,
++                                "observation": {
++                                    "observed_at": 90, "game": "false",
++                                    "foreground_exe": r"C:\private\thing.exe",
++                                    "title": "never retain", "command": "never retain"}},
++                               now=100)
++        self.assertEqual(result["observation_age_seconds"], 10)
++        self.assertEqual(result["foreground_exe"], "unknown")
++        self.assertIsNone(result["game"])
++        self.assertEqual(len(result["reason"]), 200)
++        self.assertNotIn("never retain", json.dumps(result))
++        self.assertIsNone(guard_details({"observation": {"observed_at": float("nan")}},
++                                        now=100)["observation_age_seconds"])
++        self.assertFalse(guard_details({"admitted": 1})["admitted"])
++
++    def test_status_cli_reads_once_without_importing_launcher(self):
++        import io
++
++        import run_admission
++        calls = []
++        def reader():
++            calls.append("read")
++            return {"admitted": False, "reason": "house observation missing/unreadable"}
++        output = io.StringIO()
++        with patch.dict(sys.modules, {"guard_context": NS(read=reader),
++                                      "sandbox_window": None}), \
++                patch.object(sys, "argv", ["run_admission.py", "--guard-status"]), \
++                patch("sys.stdout", output):
++            self.assertEqual(run_admission.main(), 0)
++        self.assertEqual(calls, ["read"])
++        self.assertFalse(json.loads(output.getvalue())["admitted"])
++
++    def test_initial_refusal_keeps_details_before_importing_launcher(self):
++        import run_admission
++        source = {"admitted": False, "reason": "house observation stale/unknown/unsafe",
++                  "observation": {"game": None, "foreground_exe": "pythonw.exe"}}
++        with patch.dict(sys.modules, {"guard_context": NS(read=lambda: source),
++                                      "sandbox_window": None}), \
++                patch.object(sys, "argv", ["run_admission.py"]), \
++                self.assertRaises(GuardRefused) as caught:
++            run_admission.main()
++        self.assertEqual(caught.exception.guard["foreground_exe"], "pythonw.exe")
++        self.assertIsNone(caught.exception.guard["game"])
++
++
++class Verifier:
++    """Injected observer, never evidence of native containment."""
++    def __init__(self, events):
++        self.events = events
++        self.allow = True
++
++    def before(self):
++        self.events.append("verify_before")
++
++    def add_birth(self, birth):
++        assert set(birth) == {"pid", "created", "exe"}
++        self.events.append("verify_birth")
++
++    def start_sampling(self, interval):
++        self.events.append("verify_start")
++
++    def gate(self):
++        self.events.append("verify_gate")
++        return {"allow_interaction": self.allow}
++
++    def stop_sampling(self):
++        self.events.append("verify_stop")
++
++    def after(self):
++        self.events.append("verify_after")
++
++    def verdict(self):
++        return {"allow_interaction": self.allow}
+ 
+ 
+ class Kernel:
+@@ -31,6 +148,8 @@
+         self.closed.append(handle)
+ 
+     def of_handle(self, handle):
++        if handle == 10:
++            return (100, r"c:\fixture\python.exe")
+         return self.ident
+ 
+ 
+@@ -108,8 +227,10 @@
+         persist_then_resume(self.state, record, birth,
+                             lambda _: self.events.append("persist_birth"),
+                             lambda: (self.events.append("resume") or 1))
+-        write(self.folder / "engine-request.json",
+-              {"request": "token", "host_pid": 10, "engine_pid": 20})
++        write(self.folder / "receipt.json",
++              {"request": "token", "pid": 10, "phase": "importing",
++               "desktop": "agora-sandbox-" + name, "profile": str(self.folder / "profile"),
++               "binding": None})
+         return 10
+ 
+     def load(self, name):
+@@ -133,6 +254,7 @@
+         self.folder = root / ("offline-job-" + uuid.uuid4().hex)
+         os.makedirs(self.folder)
+         self.api = API(self.folder)
++        self.verifier = Verifier(self.api.events)
+         self.native = Kernel()
+         self.now = 0
+         self.guards = 0
+@@ -147,14 +269,36 @@
+ 
+     def guard(self):
+         self.guards += 1
+-        return {"admitted": self.block_at is None or self.guards < self.block_at}
++        return {"admitted": self.block_at is None or self.guards < self.block_at,
++                "reason": "house observation stale/unknown/unsafe",
++                "observation": {"foreground_exe": "unknown", "game": None}}
+ 
+     def pause(self, seconds):
+         self.now += seconds
++        self.bound_receipt("host_bound")
+         if (self.folder / "engine-admission.json").exists():
+-            write(self.folder / "receipt.json", {"phase": "child_exit", "pid": 10})
++            self.bound_receipt("child_exit")
++
++    def bound_receipt(self, phase):
++        path = self.folder / "host-binding.json"
++        if not path.exists():
++            return
++        binding = read(path)
++        envelope = {"request": "token", "desktop": binding["desktop"],
++                    "profile": str(self.folder / "profile"), "binding": binding}
++        pid = binding["host"]["pid"]
++        write(self.folder / "receipt.json", {**envelope, "phase": phase, "pid": pid})
++        request = self.folder / "engine-request.json"
++        if not request.exists():
++            write(request, {**envelope, "host_pid": pid, "engine_pid": 20,
++                            "engine_report": {"browser_pid": 20}})
+ 
+     def execute(self, **kwargs):
++        kwargs.setdefault("verifier_factory", lambda scope: self.verifier)
++        kwargs.setdefault("host_images", {r"c:\fixture\python.exe": "fake-hash"})
++        kwargs.setdefault("digest", lambda _: "fake-hash")
++        kwargs.setdefault("processes", lambda: [(10, os.getpid(), "python.exe"),
++                                               (20, 10, "msedgewebview2.exe")])
+         return run(self.api, self.guard, self.native, "fake-" + uuid.uuid4().hex,
+                    self.folder, [r"C:\fixture\python.exe"], "token",
+                    clock=lambda: self.now, pause=self.pause, timeout=.1, **kwargs)
+@@ -171,21 +315,185 @@
+         self.assertLess(events.index("cleanup"), events.index("close_job"))
+         self.assertLess(events.index("terminate_job"), events.index("close_job"))
+         self.assertIn("UNKNOWN", result["legacy_runtime_closure"])
+-        self.assertEqual(self.native.closed, [20])
++        self.assertEqual(self.native.closed, [20, 10])
++        for first, second in (
++                ("verify_before", "start_suspended"), ("resume", "verify_birth"),
++                ("verify_birth", "verify_start"), ("verify_gate", "verify_stop"),
++                ("verify_stop", "cleanup"), ("cleanup", "verify_after"),
++                ("verify_after", "close_job")):
++            self.assertLess(events.index(first), events.index(second))
++
++    def test_missing_verifier_prevents_any_native_scope(self):
++        result = self.execute(verifier_factory=None)
++        self.assertEqual(result["phase"], "refused")
++        self.assertEqual(self.api.events, [])
++
++    def test_missing_host_configuration_prevents_job_or_start(self):
++        result = self.execute(host_images={})
++        self.assertEqual(result["phase"], "refused")
++        self.assertEqual(self.api.events, [])
++
++    def test_measured_descendant_actual_orchestration(self):
++        original_start = self.api.start
++        def start(name, argv, **kwargs):
++            root = original_start(name, argv, **kwargs)
++            self.api.job.pids.append(11)
++            value = read(self.folder / "receipt.json")
++            write(self.folder / "receipt.json", {**value, "pid": 11})
++            return root
++        self.api.start = start
++        self.native.ident = (120, r"c:\fixture\msedgewebview2.exe")
++        original_identity = self.native.of_handle
++        self.native.of_handle = lambda h: ((110, r"c:\fixture\python.exe")
++                                           if h == 11 else original_identity(h))
++        result = self.execute(processes=lambda: [(10, os.getpid(), "python.exe"),
++                                                (11, 10, "python.exe"),
++                                                (20, 11, "msedgewebview2.exe")])
++        self.assertEqual(result["phase"], "child_exit")
++        self.assertEqual(result["host_binding"]["host"]["pid"], 11)
++        self.assertEqual(result["host_binding"]["root"]["pid"], 10)
++        self.assertEqual(result["job_closure"], "proven empty")
++        self.assertEqual(sorted(self.native.closed), [10, 11, 20])
++
++    def test_actual_host_bound_engine_report_callback(self):
++        original = self.verifier.gate
++        def gate():
++            self.assertEqual(self.verifier.engine_report()["browser_pid"], 20)
++            return original()
++        self.verifier.gate = gate
++        self.assertEqual(self.execute()["phase"], "child_exit")
++
++    def test_forged_receipt_cannot_supply_report_provenance(self):
++        original = self.verifier.gate
++        def gate():
++            value = read(self.folder / "receipt.json")
++            write(self.folder / "receipt.json", {**value, "pid": 999})
++            self.verifier.engine_report()
++            return original()
++        self.verifier.gate = gate
++        result = self.execute()
++        self.assertEqual(result["phase"], "refused")
++        self.assertFalse(result["engine_admitted"])
++        self.assertEqual(result["job_closure"], "proven empty")
++
++    def test_engine_envelope_wrong_profile_refuses(self):
++        original = self.pause
++        def changed(seconds):
++            original(seconds)
++            path = self.folder / "engine-request.json"
++            if path.exists():
++                value = read(path)
++                write(path, {**value, "profile": r"C:\wrong"})
++        self.pause = changed
++        result = self.execute()
++        self.assertEqual(result["phase"], "refused")
++        self.assertFalse(result["engine_admitted"])
++
++    def test_engine_report_read_race_refuses(self):
++        original = self.verifier.gate
++        def gate():
++            original_read = read
++            calls = []
++            def raced(path):
++                value = original_read(path)
++                if Path(path).name == "engine-request.json":
++                    calls.append(1)
++                    if len(calls) == 2:
++                        return {**value, "request": "changed"}
++                return value
++            with patch("admission_job.read", side_effect=raced):
++                self.verifier.engine_report()
++            return original()
++        self.verifier.gate = gate
++        result = self.execute()
++        self.assertEqual(result["phase"], "refused")
++        self.assertFalse(result["engine_admitted"])
++
++    def test_unknown_verifier_gate_blocks_content_but_cleans_job(self):
++        self.verifier.allow = False
++        result = self.execute()
++        self.assertFalse(result["engine_admitted"])
++        self.assertFalse((self.folder / "engine-admission.json").exists())
++        self.assertEqual(result["job_closure"], "proven empty")
++        self.assertFalse(result["native_verification"]["allow_interaction"])
++
++    def test_verifier_before_failure_never_launches(self):
++        self.verifier.before = lambda: (_ for _ in ()).throw(OSError("snapshot"))
++        self.assertEqual(self.execute()["phase"], "refused")
++        self.assertNotIn("start_suspended", self.api.events)
++
++    def test_verifier_after_failure_cannot_claim_success(self):
++        self.verifier.after = lambda: (_ for _ in ()).throw(OSError("snapshot"))
++        result = self.execute()
++        self.assertEqual(result["job_closure"], "proven empty")
++        self.assertEqual(result["native_verification"]["status"], "unknown")
++
++    def test_report_envelope_binding(self):
++        self.assertIsNone(engine_report(self.folder, "token"))
++        report = {"browser_pid": 20, "user_data_folder": "fixture", "processes": []}
++        write(self.folder / "receipt.json", {"pid": 10})
++        request = {"request": "token", "host_pid": 10, "engine_pid": 20,
++                   "engine_report": report}
++        write(self.folder / "engine-request.json", request)
++        host = NS(envelope=lambda *a, **k: None, check=lambda: None,
++                  lock=threading.RLock())
++        engine = NS(check=lambda *a, **k: None)
++        with self.assertRaisesRegex(RuntimeError, "measured host"):
++            engine_report(self.folder, "token")
++        self.assertEqual(engine_report(self.folder, "token", host, engine), report)
++        for field, value in (("request", "forged"), ("host_pid", 99),
++                             ("engine_pid", 99), ("engine_report", None)):
++            write(self.folder / "engine-request.json", {**request, field: value})
++            with self.assertRaises(RuntimeError):
++                engine_report(self.folder, "token", host, engine)
++
++    def test_real_shared_verdict_cannot_prove_required_snapshot_limits(self):
++        import native_run_verify as shared
++        verifier = shared.Verifier(
++            {"name": "offline", "must_prove": ["family.brokered", "writes.unscanned"]},
++            object(), native=object())
++        # Supply ideal observations, not native evidence. Exercise the delivered
++        # verdict implementation, including its immutable observational limits.
++        verifier._family = lambda final: shared.check(
++            shared.OBSERVED, "fixture", {}, [], shared.NOT_PROVEN["family"])
++        verifier._windows = lambda: shared.check(
++            shared.OBSERVED, "fixture", {}, [], shared.NOT_PROVEN["windows"])
++        verifier._network = lambda: shared.check(
++            shared.OBSERVED, "fixture", {}, [], shared.NOT_PROVEN["network"])
++        verifier._writes = lambda: shared.check(
++            shared.OBSERVED, "fixture", {}, [], shared.NOT_PROVEN["writes"])
++        gate = verifier.verdict(final=False)
++        self.assertFalse(gate["allow_interaction"])
++        self.assertIn("family.brokered", gate["blocking_limits"])
++        final = verifier.verdict()
++        self.assertFalse(final["allow_interaction"])
++        self.assertIn("writes.unscanned", final["blocking_limits"])
+ 
+     def test_preflight_guard_refuses_without_job_or_start(self):
+         self.block_at = 1
+-        self.assertEqual(self.execute()["phase"], "refused")
++        result = self.execute()
++        self.assertEqual(result["phase"], "refused")
++        self.assertEqual(result["guard_admission"]["reason"],
++                         "house observation stale/unknown/unsafe")
++        self.assertEqual(read(self.folder / "launch.json")["guard_admission"],
++                         result["guard_admission"])
+         self.assertEqual(self.api.events, [])
+ 
+     def test_guard_rechecked_before_birth(self):
+         self.block_at = 2
+-        self.assertEqual(self.execute()["phase"], "refused")
++        result = self.execute()
++        self.assertEqual(result["phase"], "refused")
++        self.assertEqual(read(self.folder / "launch.json")["guard_admission"]["reason"],
++                         "house observation stale/unknown/unsafe")
+         self.assertNotIn("start_suspended", self.api.events)
+ 
+     def test_guard_lost_during_run_cleans_only_retained_job(self):
+         self.block_at = 3
+-        self.assertEqual(self.execute()["phase"], "refused")
++        result = self.execute()
++        self.assertEqual(result["phase"], "refused")
++        self.assertFalse(result["guard_admission"]["admitted"])
++        self.assertEqual(read(self.folder / "launch.json")["guard_admission"],
++                         result["guard_admission"])
+         self.assertEqual(self.api.job.pids, [])
+ 
+     def test_out_of_job_engine_refuses(self):
+@@ -196,7 +504,7 @@
+         self.assertFalse((self.folder / "engine-admission.json").exists())
+         self.assertEqual(result["job_closure"], "proven empty")
+         # The external engine handle was inspected/closed, never terminated.
+-        self.assertEqual(self.native.closed, [20])
++        self.assertIn(10, self.native.closed)
+ 
+     def test_unknown_engine_refuses(self):
+         self.native.denied = True
+@@ -232,11 +540,11 @@
+         ticks = []
+         def finishing(seconds):
+             self.now += seconds
++            self.bound_receipt("host_bound")
+             if (self.folder / "engine-admission.json").exists():
+                 ticks.append(1)
+                 self.api.job.pids = [10]  # engine exited, host still flushing
+-                write(self.folder / "receipt.json",
+-                      {"phase": "form_closed" if len(ticks) == 1 else "child_exit", "pid": 10})
++                self.bound_receipt("form_closed" if len(ticks) == 1 else "child_exit")
+         self.pause = finishing
+         self.assertEqual(self.execute()["phase"], "child_exit")
+ 
+@@ -331,11 +639,14 @@
+         with self.assertRaises(RuntimeError):
+             fence.check({**good, "engine_pid": 30})
+         fence.close()
++        with self.assertRaisesRegex(RuntimeError, "closed"):
++            fence.check(good)
+ 
+     def test_birth_race_on_same_handle(self):
+         identities = iter([(101, r"c:\fixture\msedgewebview2.exe"),
+                            (102, r"c:\fixture\msedgewebview2.exe")])
+-        self.native.of_handle = lambda _: next(identities)
++        self.native.of_handle = lambda h: ((100, r"c:\fixture\python.exe")
++                                           if h == 10 else next(identities))
+         self.assertFalse(self.execute()["engine_admitted"])
+ 
+ 
+--- /dev/null
++++ b/research/window-lab/browsing/test_admission_host.py
+@@ -0,0 +1,223 @@
++"""Synthetic kernel identities only. No native query or interpreter admission."""
++import sys
++import unittest
++from pathlib import Path
++from types import SimpleNamespace as NS
++
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++from admission_job import HostFence, Refused
++
++
++class Native:
++    def __init__(self):
++        self.ids = {10: (100, r"c:\fixture\launcher.exe"),
++                    11: (110, r"c:\fixture\python.exe"),
++                    12: (120, r"c:\fixture\python.exe"),
++                    30: (130, r"c:\fixture\other.exe")}
++        self.parents = {10: 1, 11: 10, 12: 11, 30: 1}
++        self.closed, self.denied, self.excluded = [], set(), set()
++        self.k = self
++
++    def OpenProcess(self, access, inherit, pid):
++        return None if pid in self.denied else pid
++
++    def CloseHandle(self, handle):
++        self.closed.append(handle)
++
++    def of_handle(self, handle):
++        return self.ids.get(handle)
++
++    def processes(self):
++        return [(pid, parent, "not-authority.exe") for pid, parent in self.parents.items()]
++
++
++class Hosts(unittest.TestCase):
++    def setUp(self):
++        self.native = Native()
++        def verify(handle):
++            if handle != 900:
++                raise RuntimeError("wrong retained Job")
++        self.scope = NS(handle=900, descriptor={"id": "job"},
++                        snapshot=lambda: {"pids": list(self.native.ids),
++                                          "active": len(self.native.ids)},
++                        native=NS(verify=verify,
++                                  contains=lambda job, handle: handle not in self.native.excluded))
++        self.allowed = {r"c:\fixture\python.exe": "synthetic-hash"}
++        self.fence = HostFence(self.scope, self.native,
++                               {"pid": 10, "created": 100, "exe": r"c:\fixture\launcher.exe"},
++                               "token", "desktop", r"C:\fixture\profile",
++                               self.allowed, self.native.processes, lambda path: "synthetic-hash")
++        self.addCleanup(self.fence.close)
++
++    def envelope(self, pid=12):
++        return {"request": "token", "desktop": "desktop",
++                "profile": r"C:\fixture\profile", "pid": pid, "phase": "importing"}
++
++    def test_measured_descendant_and_repeat_pin(self):
++        binding = self.fence.envelope(self.envelope(), initial=True)
++        self.assertEqual(binding["host"]["pid"], 12)
++        self.assertEqual(binding["root"]["pid"], 10)
++        self.assertEqual(self.fence.pin(12), binding)
++        self.assertEqual(len(self.fence.handles), 3)
++        self.assertEqual(self.fence.envelope(self.envelope(), initial=True), binding)
++
++    def test_direct_host_needs_its_own_reviewed_image(self):
++        with self.assertRaises(Refused):
++            self.fence.pin(10)
++        self.setUp()
++        self.fence.allowed[r"c:\fixture\launcher.exe"] = "synthetic-hash"
++        self.assertEqual(self.fence.pin(10)["host"]["pid"], 10)
++
++    def test_empty_allowlist_refuses_without_opening_process(self):
++        self.fence.allowed.clear()
++        with self.assertRaises(Refused):
++            self.fence.pin(12)
++        self.assertEqual(self.fence.handles, {})
++
++    def test_wrong_image_and_wrong_hash(self):
++        for image, digest in ((r"c:\fixture\other.exe", "synthetic-hash"),
++                              (r"c:\fixture\python.exe", "changed")):
++            with self.subTest(image=image):
++                self.setUp()
++                self.native.ids[12] = (120, image)
++                self.fence.digest = lambda path, digest=digest: digest
++                with self.assertRaises(Refused):
++                    self.fence.pin(12)
++                self.assertEqual(self.fence.handles, {})
++
++    def test_unrelated_job_member_is_not_provenance(self):
++        self.native.ids[30] = (130, r"c:\fixture\python.exe")
++        with self.assertRaises(Refused):
++            self.fence.pin(30)
++
++    def test_missing_loop_and_birth_order(self):
++        for parents, birth in (({12: 11}, 110), ({12: 11, 11: 12}, 110),
++                               ({12: 11, 11: 10, 10: 1}, 121)):
++            with self.subTest(parents=parents):
++                self.setUp()
++                self.native.parents = parents
++                self.native.ids[11] = (birth, r"c:\fixture\python.exe")
++                with self.assertRaises(Refused):
++                    self.fence.pin(12)
++                self.assertEqual(self.fence.handles, {})
++
++    def test_duplicate_process_snapshot_is_ambiguous(self):
++        self.fence.processes = lambda: [(12, 11, "x"), (12, 10, "x")]
++        with self.assertRaises(Refused):
++            self.fence.pin(12)
++
++    def test_bounded_ancestry_depth(self):
++        self.native.parents[12] = 50
++        for pid in range(50, 68):
++            self.native.ids[pid] = (100, r"c:\fixture\python.exe")
++            self.native.parents[pid] = pid + 1
++        self.native.parents[67] = 10
++        with self.assertRaisesRegex(Refused, "depth"):
++            self.fence.pin(12)
++        self.assertEqual(self.fence.handles, {})
++
++    def test_post_pin_job_hash_and_membership_races(self):
++        self.fence.pin(12)
++        self.scope.descriptor["id"] = "changed"
++        with self.assertRaises(Refused):
++            self.fence.check()
++        self.scope.descriptor["id"] = "job"
++        self.fence.digest = lambda path: "changed"
++        with self.assertRaises(Refused):
++            self.fence.check()
++        self.fence.digest = lambda path: "synthetic-hash"
++        self.native.excluded.add(11)
++        with self.assertRaises(Refused):
++            self.fence.check()
++
++    def test_unknown_denied_and_outside_job(self):
++        for case in ("unknown", "denied", "outside"):
++            with self.subTest(case=case):
++                self.setUp()
++                self.native.ids[12] = None if case == "unknown" else (120, r"c:\fixture\python.exe")
++                self.native.denied = {12} if case == "denied" else set()
++                self.native.excluded = {12} if case == "outside" else set()
++                with self.assertRaises(Refused):
++                    self.fence.pin(12)
++
++    def test_reused_root_and_host_and_parent_changes(self):
++        self.fence.pin(12)
++        for pid in (10, 11, 12):
++            old = self.native.ids[pid]
++            self.native.ids[pid] = (old[0] + 1, old[1])
++            with self.subTest(pid=pid), self.assertRaises(Refused):
++                self.fence.check()
++            self.native.ids[pid] = old
++        self.native.parents[12] = 10
++        with self.assertRaises(Refused):
++            self.fence.check()
++
++    def test_no_host_replacement_or_dead_handle_reopen(self):
++        self.fence.pin(12)
++        with self.assertRaises(Refused):
++            self.fence.pin(11)
++        self.native.ids.pop(12)
++        with self.assertRaises(Refused):
++            self.fence.check()
++
++    def test_envelope_negative_matrix(self):
++        binding = self.fence.pin(12)
++        valid = {**self.envelope(), "phase": "host_bound", "binding": binding}
++        self.assertEqual(self.fence.envelope(valid), binding)
++        for field, value in (("pid", True), ("pid", 11), ("request", "forged"),
++                             ("desktop", "other"), ("profile", r"C:\other"),
++                             ("binding", None), ("binding", {**binding, "job_id": "other"})):
++            with self.subTest(field=field, value=value), self.assertRaises(Refused):
++                self.fence.envelope({**valid, field: value})
++        # Returned bindings cannot mutate parent-owned state.
++        returned = self.fence.check()
++        returned["host"]["pid"] = 99
++        self.assertEqual(self.fence.check()["host"]["pid"], 12)
++
++    def test_initial_forged_binding_refuses(self):
++        with self.assertRaises(Refused):
++            self.fence.envelope({**self.envelope(), "binding": {"job_id": "job"}}, initial=True)
++
++    def test_pin_rechecks_ancestry_after_open(self):
++        original = self.fence.processes
++        calls = []
++        def raced():
++            calls.append(1)
++            if len(calls) > 1:
++                self.native.parents[12] = 30
++            return original()
++        self.fence.processes = raced
++        with self.assertRaises(Refused):
++            self.fence.pin(12)
++        self.assertEqual(self.fence.handles, {})
++
++    def test_close_is_idempotent_and_preserves_failed_handle(self):
++        self.fence.pin(12)
++        self.fence.close()
++        self.fence.close()
++        self.assertEqual(sorted(self.native.closed), [10, 11, 12])
++        with self.assertRaisesRegex(Refused, "closed"):
++            self.fence.pin(12)
++        self.setUp()
++        self.fence.pin(12)
++        original = self.native.CloseHandle
++        self.native.CloseHandle = lambda handle: (_ for _ in ()).throw(OSError("fake close"))
++        with self.assertRaises(OSError):
++            self.fence.close()
++        self.assertEqual(len(self.fence.handles), 3)
++        self.native.CloseHandle = original
++
++    def test_false_close_result_retains_handle_and_fence_stays_closed(self):
++        self.fence.pin(12)
++        original = self.native.CloseHandle
++        self.native.CloseHandle = lambda handle: 0
++        with self.assertRaises(Refused):
++            self.fence.close()
++        self.assertEqual(len(self.fence.handles), 3)
++        with self.assertRaises(Refused):
++            self.fence.pin(12)
++        self.native.CloseHandle = original
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- /dev/null
++++ b/research/window-lab/browsing/test_enumeration_design.py
+@@ -0,0 +1,122 @@
++"""Offline candidate enumeration regressions, not a native run.
++
++Original characterization preserved byte-for-byte in
++ENUMERATION-DESIGN-BASELINE-a9231.txt. All Windows APIs here are synthetic.
++"""
++import ctypes
++import sys
++import unittest
++from pathlib import Path
++from types import SimpleNamespace
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
++from native_run_verify import EnumerationIncomplete, Native, enumeration_error
++
++
++def proposed_verdict(ok, callback_failed=False):
++    # A zero BOOL, including error 0 or 18, cannot certify an empty desktop.
++    return "observed" if ok and not callback_failed else "unknown"
++
++
++class EnumerationDesign(unittest.TestCase):
++    def current(self, ok, error, visited=0, owner_fails=False, callback_raises=False):
++        closed = []
++        def enumerate_windows(handle, callback, _):
++            for _ in range(visited):
++                callback(100, 0)
++            ctypes.set_last_error(error)
++            return ok
++        def owner(hwnd, pid):
++            if callback_raises:
++                raise OSError("private text must not be retained")
++            if owner_fails:
++                return 0
++            pid._obj.value = 42
++            return 1
++        native = object.__new__(Native)  # never initialize any Windows library
++        native.enum_type = lambda callback: callback
++        native.u = SimpleNamespace(
++            OpenDesktopW=lambda *args: 1,
++            EnumDesktopWindows=enumerate_windows,
++            GetWindowThreadProcessId=owner,
++            IsWindowVisible=lambda hwnd: True,
++            CloseDesktop=lambda handle: (closed.append(handle), ctypes.set_last_error(999)),
++        )
++        # Only thread-local ctypes error bookkeeping; no Windows library calls.
++        incoming_error = ctypes.get_last_error()
++        try:
++            return native.desktop_window_owners("fake-only")
++        finally:
++            self.assertEqual(closed, [1])
++            ctypes.set_last_error(incoming_error)
++
++    def test_retained_error_shape_is_unknown_not_empty(self):
++        with self.assertRaises(OSError):
++            self.current(False, 18)
++        self.assertEqual(proposed_verdict(False), "unknown")
++
++    def test_partial_failure_cannot_return_partial_list(self):
++        with self.assertRaises(EnumerationIncomplete) as caught:
++            self.current(False, 18, visited=1)
++        self.assertEqual(caught.exception.enumeration,
++                         {"api": "EnumDesktopWindows", "complete": False,
++                          "error": 18, "visited": 1, "callback_failed": False})
++        self.assertEqual(proposed_verdict(False), "unknown")
++
++    def test_zero_error_failure_is_unknown(self):
++        with self.assertRaises(EnumerationIncomplete):
++            self.current(False, 0)
++        self.assertEqual(proposed_verdict(False), "unknown")
++
++    def test_success_empty_is_distinct_from_failure(self):
++        self.assertEqual(self.current(True, 0), [])
++        self.assertEqual(proposed_verdict(True), "observed")
++
++    def test_success_ignores_stale_error(self):
++        self.assertEqual(self.current(True, 18), [])
++        self.assertEqual(proposed_verdict(True), "observed")
++
++    def test_callback_failure_cannot_certify_completion(self):
++        for kwargs in ({"owner_fails": True}, {"callback_raises": True}):
++            with self.subTest(kwargs=kwargs), self.assertRaises(EnumerationIncomplete) as caught:
++                self.current(True, 0, visited=1, **kwargs)
++            metadata = enumeration_error(caught.exception)
++            self.assertTrue(metadata["enumeration"]["callback_failed"])
++            self.assertNotIn("private text", str(metadata))
++        self.assertEqual(proposed_verdict(True, callback_failed=True), "unknown")
++
++    def test_success_populated_is_preserved(self):
++        self.assertEqual(self.current(True, 0, visited=2), [(42, True), (42, True)])
++
++    def test_toolhelp_completion_is_not_desktop_completion(self):
++        for ending in (18, 0, 5):
++            for populated in (True, False):
++                closed = []
++                def first(handle, entry, ending=ending, populated=populated):
++                    ctypes.set_last_error(ending)
++                    if populated:
++                        entry._obj.th32ProcessID = 42
++                        entry._obj.th32ParentProcessID = 1
++                        entry._obj.szExeFile = "fake.exe"
++                    return populated
++                def following(handle, entry, ending=ending):
++                    ctypes.set_last_error(ending)
++                    return False
++                native = object.__new__(Native)
++                native.k = SimpleNamespace(CreateToolhelp32Snapshot=lambda *a: 1,
++                                           Process32FirstW=first, Process32NextW=following,
++                                           CloseHandle=lambda h, closed=closed: (closed.append(h),
++                                                                  ctypes.set_last_error(999)))
++                with self.subTest(ending=ending, populated=populated):
++                    if ending == 18:
++                        result = native.processes()
++                        self.assertEqual(result, [(42, 1, "fake.exe")] if populated else [])
++                    else:
++                        with self.assertRaises(EnumerationIncomplete) as caught:
++                            native.processes()
++                        self.assertEqual(caught.exception.enumeration["error"], ending)
++                    self.assertEqual(closed, [1])
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- /dev/null
++++ b/research/window-lab/browsing/ENUMERATION-DESIGN-BASELINE-a9231.txt
+@@ -0,0 +1,75 @@
++"""Offline characterization, not a native run or production repair.
++
++Calls the current shared method with fake user32 functions. The proposed
++classifier below is a design fixture only; no launcher imports or consumes it.
++"""
++import ctypes
++from pathlib import Path
++import sys
++from types import SimpleNamespace
++import unittest
++from unittest.mock import patch
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
++from native_run_verify import Native
++
++
++def proposed_verdict(ok, callback_failed=False):
++    # A zero BOOL, including error 0 or 18, cannot certify an empty desktop.
++    return "observed" if ok and not callback_failed else "unknown"
++
++
++class EnumerationDesign(unittest.TestCase):
++    def current(self, ok, error, visited=0):
++        closed = []
++        def enumerate_windows(handle, callback, _):
++            for _ in range(visited):
++                callback(100, 0)
++            ctypes.set_last_error(error)
++            return ok
++        def owner(hwnd, pid):
++            pid._obj.value = 42
++            return 1
++        native = object.__new__(Native)  # never initialize any Windows library
++        native.enum_type = lambda callback: callback
++        native.u = SimpleNamespace(
++            OpenDesktopW=lambda *args: 1,
++            EnumDesktopWindows=enumerate_windows,
++            GetWindowThreadProcessId=owner,
++            IsWindowVisible=lambda hwnd: True,
++            CloseDesktop=lambda handle: closed.append(handle),
++        )
++        # Keep the interpreter's incoming last-error value unchanged.
++        with patch.object(ctypes, "get_last_error", return_value=error):
++            try:
++                return native.desktop_window_owners("fake-only")
++            finally:
++                self.assertEqual(closed, [1])
++
++    def test_retained_error_shape_is_unknown_not_empty(self):
++        with self.assertRaises(OSError):
++            self.current(False, 18)
++        self.assertEqual(proposed_verdict(False), "unknown")
++
++    def test_current_partial_failure_returns_partial_list(self):
++        self.assertEqual(self.current(False, 18, visited=1), [(42, True)])
++        self.assertEqual(proposed_verdict(False), "unknown")
++
++    def test_current_zero_error_failure_looks_empty(self):
++        self.assertEqual(self.current(False, 0), [])
++        self.assertEqual(proposed_verdict(False), "unknown")
++
++    def test_success_empty_is_distinct_from_failure(self):
++        self.assertEqual(self.current(True, 0), [])
++        self.assertEqual(proposed_verdict(True), "observed")
++
++    def test_success_ignores_stale_error(self):
++        self.assertEqual(self.current(True, 18), [])
++        self.assertEqual(proposed_verdict(True), "observed")
++
++    def test_callback_failure_cannot_certify_completion(self):
++        self.assertEqual(proposed_verdict(True, callback_failed=True), "unknown")
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- a/research/window-lab/native_run_verify.py
++++ b/research/window-lab/native_run_verify.py
+@@ -46,6 +46,24 @@
+ VIOLATION, UNKNOWN, OBSERVED = "violation", "unknown", "observed"
+ MAX_FILES = 20000                 # per root; more is unknown, never a partial clean
+ MAX_HASH_BYTES = 1 << 30          # per run-owned root
++
++
++class EnumerationIncomplete(OSError):
++    """Bounded API metadata, with no window names or process content."""
++    def __init__(self, api, code, visited, callback_failed=False):
++        super().__init__(code, "Native enumeration incomplete")
++        self.winerror = code
++        self.enumeration = {"api": api, "complete": False, "error": code,
++                            "visited": visited, "callback_failed": callback_failed}
++
++
++def enumeration_error(exc):
++    result = error(exc)
++    if isinstance(exc, EnumerationIncomplete):
++        result["enumeration"] = dict(exc.enumeration)
++    return result
++
++
+ LISTEN = 2
+ TCP_STATES = {1: "closed", 2: "listen", 3: "syn-sent", 4: "syn-received", 5: "established", 6: "fin-wait-1",
+               7: "fin-wait-2", 8: "close-wait", 9: "closing", 10: "last-ack", 11: "time-wait", 12: "delete-tcb"}
+@@ -206,10 +224,15 @@
+             raise c.WinError(c.get_last_error())
+         try:
+             entry, out = PROCESSENTRY32W(dwSize=c.sizeof(PROCESSENTRY32W)), []
++            c.set_last_error(0)
+             ok = self.k.Process32FirstW(snap, c.byref(entry))
+             while ok:
+                 out.append((int(entry.th32ProcessID), int(entry.th32ParentProcessID), entry.szExeFile))
++                c.set_last_error(0)
+                 ok = self.k.Process32NextW(snap, c.byref(entry))
++            err = c.get_last_error()
++            if err != 18:  # ERROR_NO_MORE_FILES is Toolhelp completion, not desktop completion.
++                raise EnumerationIncomplete("Toolhelp", err, len(out))
+             return out
+         finally:
+             self.k.CloseHandle(snap)
+@@ -268,19 +291,26 @@
+         h = self.u.OpenDesktopW(desktop, 0, False, 0x0001 | 0x0040)       # DESKTOP_READOBJECTS | DESKTOP_ENUMERATE
+         if not h:
+             raise c.WinError(c.get_last_error())
+-        out = []
++        out, failures = [], []
+ 
+         @self.enum_type
+         def each(hwnd, _):
+-            pid = w.DWORD()
+-            self.u.GetWindowThreadProcessId(hwnd, c.byref(pid))
+-            out.append((int(pid.value), bool(self.u.IsWindowVisible(hwnd))))
+-            return True
+-        try:
+-            if not self.u.EnumDesktopWindows(h, each, 0) and not out:
+-                err = c.get_last_error()
+-                if err:
+-                    raise c.WinError(err)
++            try:
++                pid = w.DWORD()
++                if not self.u.GetWindowThreadProcessId(hwnd, c.byref(pid)) or not pid.value:
++                    failures.append("owner unavailable")
++                    return False
++                out.append((int(pid.value), bool(self.u.IsWindowVisible(hwnd))))
++                return True
++            except Exception:
++                failures.append("callback failed")
++                return False
++        try:
++            c.set_last_error(0)
++            ok = self.u.EnumDesktopWindows(h, each, 0)
++            err = c.get_last_error()  # before CloseDesktop or any other API
++            if not ok or failures:
++                raise EnumerationIncomplete("EnumDesktopWindows", err, len(out), bool(failures))
+             return out
+         finally:
+             self.u.CloseDesktop(h)
+@@ -555,7 +585,8 @@
+                 self._unknown("family", f"before launch, {len(unreadable)} engine-named process(es) could not be "
+                                         f"read to rule out our profile ({unreadable})")
+         except OSError as exc:
+-            self._unknown("family", f"before launch, the process list failed: {error(exc)}")
++            self._unknown("family", "before launch, the process list failed: "
++                          f"{enumeration_error(exc)}")
+         pre["owned"] = {r: snapshot_root(r, hash_files=True) for r in self.owned}
+         pre["watched"] = {r: snapshot_root(r, hash_files=False, exclude=self.owned + self.run["exclude"])
+                           for r in self.run["watched_roots"]}
+@@ -583,7 +614,7 @@
+             procs = n.processes()
+         except OSError as exc:
+             procs = None
+-            self._unknown("family", f"process list failed at a sample: {error(exc)}")
++            self._unknown("family", f"process list failed at a sample: {enumeration_error(exc)}")
+         parents = {pid: (ppid, image) for pid, ppid, image in procs or []}
+         for pid in snap["pids"]:
+             try:
+@@ -630,7 +661,7 @@
+                                         f"our profile")
+             s["outside_named"] = [p["pid"] for p in named]
+         except OSError as exc:
+-            self._unknown("family", f"process list failed at a sample: {error(exc)}")
++            self._unknown("family", f"process list failed at a sample: {enumeration_error(exc)}")
+             named = []
+         ours = members | {p["pid"] for p in named}
+         # 3. windows: the sandbox desktop (expected), Default (must hold none of ours)
+@@ -645,7 +676,8 @@
+                     self._bad("windows", f"{len(mine)} window(s) of job/profile processes on the Default desktop "
+                                          f"(pids {sorted({p for p, _ in mine})})")
+             except OSError as exc:
+-                self._unknown("windows", f"desktop {desk} could not be enumerated: {error(exc)}")
++                self._unknown("windows", f"desktop {desk} could not be enumerated: "
++                              f"{enumeration_error(exc)}")
+         # 4. sockets
+         try:
+             tcp = [r for r in n.tcp() if r[0] in ours]
+@@ -765,7 +797,8 @@
+                 self._unknown("family", f"after cleanup, {len(unreadable)} engine-named process(es) could not be "
+                                         f"read: {unreadable}")
+         except OSError as exc:
+-            self._unknown("family", f"after cleanup, the process list failed: {error(exc)}")
++            self._unknown("family", "after cleanup, the process list failed: "
++                          f"{enumeration_error(exc)}")
+         try:
+             post["job"] = self.scope.snapshot()
+             post["io"] = self.native.job_io(self.scope.handle)

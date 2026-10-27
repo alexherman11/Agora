@@ -1,0 +1,9 @@
+root : shell-dock
+  launcher : shell-dock-button, icon agora:agora, label "Agora launcher", opens launcher
+    on lines do window.open lines
+    on start do window.start
+  apps-start : shell-separator
+  item : shell-dock-item
+  apps-end : shell-separator
+  overview : shell-dock-button, icon agora:overview, label "Overview: all windows"
+    on press do window.open tasks

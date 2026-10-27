@@ -1,0 +1,25 @@
+# Desktop v2: warm paper, airy cards, clear actions. Same painter, no app-specific JS.
+token paper = #F4F5F3
+token card = #FFFFFF
+token ink = #253645
+token accent = #476D86
+token rose = #9D5E74
+token sage = #5D7E68
+token warn = #A24E2C
+token mark = #9A763C
+token gap = 16
+token ramp = 1.2
+token text = ui 15/1.65
+token line = ink at 16%
+token faint = ink at 10%
+token quiet = ink at 85%
+token hush = ink at 64%
+role sheet : on paper, ink, text, pad gap, between gap
+role heading : text up 2 medium, ink
+role meta : text down, hush
+role card : on card, ink, text, pad gap, edge faint, corner gap, between gap
+role mark : text down medium, mark, on mark at 10%, pad gap /2, corner gap /2
+role tool : text down medium, accent, on accent at 8%, pad gap /2, corner gap /2, hover accent at 16%
+role actions : between gap /2, align center
+role refusal : text down, warn, on warn at 8%, pad gap, corner gap /2
+role tip : on ink, card, text down, pad gap /2, corner gap /2

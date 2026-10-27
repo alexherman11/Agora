@@ -1,0 +1,25 @@
+# Help texts the friction study found wrong or misleading (26 Oct 2026), updated 27 Oct for the language Alex approved
+# (dotted families, names where ids go, plain verbs, undo the whole act). Ordinary steward words: one record each,
+# undo takes any back. Applied with `install_topics.py --file help-fixes.lines --always`, after install_renames.py.
+
+word.set task.add help="task.add title=\"A title\" [to=Backlog|Now|Done] [who=<name>] [when=<date>] [text=\"details\"]: add a card to the task board. Only title is needed. done \"A title\" (task.done) finishes it." takes="title=<text> [to=<lane>] [who=<name>] [when=<date>] [source=<key>] [status=<text>] [text=<text>]"
+
+word.set window.open help="window.open <lens or view> [<thing>] [to=<spot> | at=x,y size=w,h] [new=yes]: open a window on the desktop, e.g. window.open feed to=left (or open feed). Any lens (rows lens lists them) or the views lines, thing, help. Spots: left right center big top-left top-right bottom-left bottom-right. Open already: brought forward; new=yes opens another. The window host opens windows only for the desktop's owner and their agents. undo closes it."
+
+word.set window.close help="window.close <window>: close it, by its name or id (window.close Help, or close Help). The receipt says forget, because a closed window is a forgotten window thing; undo opens it again where it was."
+
+word.set rule help="rule on=<word> [kind=<target kind>] do=\"<line>\" [name=<text>]: whenever that word is used (on a thing of that kind), run the line, as the rule's maker. $target and $by are filled when it fires. What a rule does goes back with the act that caused it when that act is undone. rows rule lists rules; set <rule> off=yes stops one. The same as make kind=rule on=<word> of_kind=<kind> do=\"…\" (there the kind is of_kind=)."
+
+word.set verb help="verb <word> steps=\"<line>; <line>\" help=\"<word> <what it takes>: what it does\": a new word made of other words; a family word is family.word (task.archive) unless a module owns the family. Steps are lines separated by ;. $1 $2 are what follows the word, $* all of it, $target its thing, $name a setting name=…; a setting nobody gives is left out. A do verb is one act, so one undo takes all its steps back. e.g. verb tidy steps=\"window.move $1 to=left; window.move $2 to=right\" help=\"tidy <a> <b>: side by side\"."
+
+word.set look help="look [<thing>]: one thing as you may see it, with its facts (look Lines, look dk74). Alone: the feed, pinned posts first, then the newest. Looking is also what lets you change a thing next (set, word.set), so a change never lands on something you have not seen."
+
+word.set media.play help="media.play [start=yes]: play or pause (a toggle) what Windows' media session names. With nothing named it presses nothing, unless start=yes. media.pause and media.resume do only what they say. It acts outside the world, so undo cannot take it back." takes="[start=yes]"
+
+word.set help help="help: how lines work and the words most worth knowing. help <anything>: a word (help window.open), a topic (help windows, help theme, help tasks), a plain verb (help close), a module, a kind of thing, or one thing by name or id. help all lists every word; help check lists help that may mislead."
+
+word.set word.set help="word.set <word> help=\"…\" [aliases=\"…\"] [may=…] [undo=yes|no|external]: change a word's dictionary entry (stewards; leaders for their group's copies). The word's name works; it echoes what changed. Also takes=, once=, sealed=yes|no, status=live|old|hidden, label.<lang>= and help.<lang>=. Implementation cannot be edited."
+
+word.set history help="history [<thing>]: a thing's record trail, oldest first: record, at (UTC), by, word and changed facts; alone, your own latest acts (recent shows everyone's). Only facts you may see are returned; sealed acts never identify their author." takes="[<id>]"
+
+word.set undo help="undo [r<n>]: take back your latest whole act (what you did, and what rules did because of it), or that record. Acts outside the world cannot go back; an undo is itself an act."

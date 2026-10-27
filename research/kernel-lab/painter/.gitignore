@@ -1,0 +1,8 @@
+__pycache__/
+tweaks/runs/**/events.jsonl
+tweaks/runs/**/prompt.md
+tweaks/runs/**/stderr.txt
+tweaks/runs/approval-blocked/
+evidence/discovery/events.jsonl
+evidence/discovery/prompt.md
+evidence/discovery/stderr.txt

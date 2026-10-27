@@ -1,0 +1,50 @@
+/* shell-kit.css: what the bars need inside the painter's frame, on top of pages/shell/shell.css (which the install
+ * puts in front of this, so the look is the same file as the hand-written bar's). Builder draft, 26 Oct 2026.
+ * Like shell.css: no colour of its own, only --ag-* variables and mixes of them. */
+
+/* The painter's shared vocabulary (widgets/common.js) styles every button, input and toast for an app window. A bar is
+   not an app window: give the bar back its own base. */
+html, body { background: transparent !important; }
+body { font: 400 var(--t)/1.35 var(--ag-font-ui); color: var(--ink); padding: 0; min-width: 0; }
+button { cursor: default; border: 0; background: transparent; color: inherit; padding: 0; }
+button:active { transform: none; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--ag-focus); outline-offset: -2px; }
+.launch input { padding: 0; border: 0; border-radius: 0; background: transparent; }
+.toast.shell-toast { bottom: auto; box-shadow: none; background: var(--ag-surface); color: var(--ink); max-width: 70vw; }
+body[data-page="dock"] .toast.shell-toast { top: auto; bottom: calc(var(--ds) + var(--go) + 22px); }
+/* the painter puts a root marker on every part; parts in a bar are inline pieces, not blocks */
+.rail [data-root], .pill [data-root] { min-width: 0; }
+.isle > .btn, .isle > .read, .isle > .spaces { flex: none; }
+.btn.qs .q-chip { display: inline-flex; align-items: center; gap: 4px; }
+.btn.qs .q-chip .q-pct { font-size: .88em; font-weight: 600; }
+.btn.qs .q-chip[data-low="yes"] { color: var(--ag-danger); }
+.btn.qs .q-chip:not(:has(.gl)) { display: none; }
+
+/* right-click any part: the painter's ask menu, dressed as a popover */
+.ask-menu { position: fixed; z-index: 40; width: 300px; padding: 10px; color: var(--ink); background: var(--ag-surface);
+  border: var(--bw) solid var(--ag-border); border-radius: var(--rl); display: flex; flex-direction: column; gap: 6px; }
+.ask-menu .ask-head { display: flex; align-items: baseline; gap: 8px; padding: 2px 4px; }
+.ask-menu .ask-head strong { font-weight: 650; text-transform: capitalize; }
+.ask-menu .ask-head small { margin-left: auto; color: var(--muted); }
+.menu .menu-ask { margin-top: 6px !important; }
+
+/* a stopped part in a bar: a small chip (its last good look, dimmed, and a mark). Press it for the recovery. */
+.rail .component-stopped, .pill .component-stopped { position: relative; display: inline-flex; align-items: center; gap: 6px; flex: none;
+  height: calc(var(--ih) - 6px); max-width: 220px; padding: 0 10px 0 8px; margin: 0; border: 0; overflow: hidden;
+  border-radius: min(var(--rp), var(--rm)); background: color-mix(in srgb, var(--ag-danger) 14%, transparent); color: var(--ag-danger);
+  font: 600 .9em/1 var(--ag-font-ui); white-space: nowrap; }
+.pill .component-stopped { width: calc(var(--ds) - 6px); height: calc(var(--ds) - 8px); justify-content: center; padding: 0; border-radius: min(var(--rm), 16px); }
+.rail .component-stopped > *, .pill .component-stopped > * { display: none; }
+.rail .component-stopped > strong { display: inline; }
+.rail .component-stopped > [data-stale], .pill .component-stopped > [data-stale] { display: inline-flex; opacity: .5; pointer-events: none; margin: 0; }
+.rail .component-stopped:has(> [data-stale]) > strong { display: none; }
+.rail .component-stopped::after, .pill .component-stopped::after { content: "!"; display: inline-grid; place-items: center; width: 15px; height: 15px; flex: none;
+  border-radius: 99px; background: var(--ag-danger); color: var(--ag-accent-ink); font: 700 10px/1 var(--ag-font-ui); }
+.pill .component-stopped::after { position: absolute; top: 3px; right: 3px; }
+.rail .component-stopped:hover, .pill .component-stopped:hover { background: color-mix(in srgb, var(--ag-danger) 22%, transparent); }
+/* turned off just for you: gone from the bar (undo, or personal-view <lens> <part>.enabled=yes, brings it back) */
+.rail .component-stopped[data-off], .pill .component-stopped[data-off] { display: none; }
+.stopped-pop .why { margin: 0 8px 8px; color: var(--muted); max-width: 300px; overflow-wrap: anywhere; }
+.stopped-pop .component-recovery { display: flex; flex-direction: column; gap: 2px; }
+.stopped-pop .component-recovery button { display: flex; align-items: center; height: 34px; padding: 0 10px; border-radius: min(var(--rm), 10px); width: 100%; text-align: left; }
+.stopped-pop .component-recovery button:hover, .stopped-pop .component-recovery button:focus-visible { background: var(--hover); }

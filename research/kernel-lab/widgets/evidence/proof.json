@@ -1,0 +1,28 @@
+{
+  "checks": [
+    "idempotent widget installation",
+    "same eight world tasks rendered",
+    "opaque sandbox has no host DOM",
+    "theme delivered as data",
+    "real pointer drag says task-move",
+    "stale competing edit refused through bridge",
+    "editor stores real guy facts",
+    "overlay background is truly transparent",
+    "overlay paints in full desktop coordinates",
+    "overlay defaults to click through",
+    "bar widget holds a real lease",
+    "hostile fetch blocked",
+    "hostile cookieBlocked blocked",
+    "hostile storage blocked",
+    "hostile top blocked",
+    "hostile pin blocked",
+    "hostile pywebview blocked",
+    "hostile native blocked",
+    "top location unchanged",
+    "ungranted pin wrote no fact",
+    "look returns widget description",
+    "off immediately releases widget holds",
+    "off destroys sandbox frame"
+  ],
+  "count": 23
+}

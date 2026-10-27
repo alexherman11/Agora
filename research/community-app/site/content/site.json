@@ -1,0 +1,36 @@
+{
+  "_note": "Placeholder draft copy by Claude, 23 Oct 2026, for Alex to rewrite. It describes what the place is for in general terms and states no facts about the campaign. Set draft to false once Alex has written his own.",
+  "draft": true,
+  "draft_banner": "Draft wording. Alex will rewrite this page.",
+  "community_name": "Seabright Neighbours",
+  "place": "Santa Cruz, California",
+  "hero": {
+    "title": "Neighbours in Seabright, working together.",
+    "lead": "One place to keep each other informed, share what we learn, and decide together what to do next."
+  },
+  "mission": {
+    "title": "Why we're here",
+    "paragraphs": [
+      "Seabright is changing, and the people who live here want a real say in how. This is where we stay in touch between meetings, so nobody has to rely on a group text to know what's going on.",
+      "Every voice here is heard equally. We use real names, and the tools here are shaped by the people who use them."
+    ]
+  },
+  "doing": {
+    "title": "What we're doing",
+    "items": [
+      {"title": "Staying informed", "body": "News, announcements and what people have learned, in one feed. The important things stay pinned at the top."},
+      {"title": "Showing up", "body": "Meetings and events on a shared map of the neighbourhood, so it's easy to see what's happening and where."},
+      {"title": "Researching together", "body": "Sources, notes and open questions, linked to each other and to the places they're about."}
+    ]
+  },
+  "join": {
+    "title": "How to join",
+    "steps": [
+      {"title": "Get an invite link", "body": "From a neighbour who's already in, or scan the code at a meeting."},
+      {"title": "Continue with Google or your email", "body": "No password to remember. We email you a link if you'd rather not use Google."},
+      {"title": "Tell us your name", "body": "And, if you like, how you'd want to help. That's it."}
+    ],
+    "no_invite": "No invite yet? Ask someone you know in the group, or come to the next meeting."
+  },
+  "footer": "Made by neighbours, for neighbours. Built on Agora."
+}

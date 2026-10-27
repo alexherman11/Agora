@@ -1,0 +1,64 @@
+font sans = Segoe UI, system-ui, sans-serif
+font mono = Cascadia Code, ui-monospace, monospace
+token paper = #F7F5FB
+token card = #FFFFFF
+token ink = #1F1A2B
+token soft = ink at 55%
+token faint = ink at 35%
+token rim = ink at 10%
+token focus = #9146FF4D
+token scrollbar = ink at 18%
+token scrollbar_w = 5
+token gap = 8
+token ramp = 1.14
+token text = sans 15/1.45
+token text.mono = mono 12/1.4
+# the separate window: the same tw.* roles as the HUD panel (twitch-roles.style), on its own paper
+# twitch-chat lens roles (Claude, 23 Oct): appended to home-style for the HUD panel, and the body of twitch-style
+token twpurple = #9146FF
+token twwash = #9146FF14
+token twred = #D91E18
+token twblue = #2B4BEB
+token twgreen = #1E7B1E
+token twfirebrick = #B22222
+token twcoral = #D9603B
+token twyellowgreen = #5F8A12
+token tworangered = #E04000
+token twseagreen = #2E8B57
+token twgoldenrod = #A87A0A
+token twchocolate = #C05A15
+token twcadetblue = #3F7F82
+token twdodgerblue = #1874CD
+token twhotpink = #E0469A
+token twblueviolet = #8A2BE2
+token twspringgreen = #129E5E
+role tw.page : on paper, ink, text, pad gap x2, between gap /2
+role tw.top : between gap, align center
+role tw.chip : text.mono down medium, twpurple, on twwash, pad gap /4, pad left gap, pad right gap, corner gap x2
+role tw.status : text down, soft
+role tw.composer : text, ink, on card, pad gap, edge rim, corner gap
+role tw.feed : pad right gap /2
+role tw.msg : text down, pad gap /4, pad left gap /2, pad right gap /2
+role tw.notice : text down, on twwash, edge twpurple, corner gap, pad gap, space above gap /2, space below gap /2
+role tw.sysline : text down slant, soft, pad gap /4, pad left gap /2
+role tw.name : text down strong, twpurple, pad right gap /2
+role tw.name.red : text down strong, twred, pad right gap /2
+role tw.name.blue : text down strong, twblue, pad right gap /2
+role tw.name.green : text down strong, twgreen, pad right gap /2
+role tw.name.firebrick : text down strong, twfirebrick, pad right gap /2
+role tw.name.coral : text down strong, twcoral, pad right gap /2
+role tw.name.yellowgreen : text down strong, twyellowgreen, pad right gap /2
+role tw.name.orangered : text down strong, tworangered, pad right gap /2
+role tw.name.seagreen : text down strong, twseagreen, pad right gap /2
+role tw.name.goldenrod : text down strong, twgoldenrod, pad right gap /2
+role tw.name.chocolate : text down strong, twchocolate, pad right gap /2
+role tw.name.cadetblue : text down strong, twcadetblue, pad right gap /2
+role tw.name.dodgerblue : text down strong, twdodgerblue, pad right gap /2
+role tw.name.hotpink : text down strong, twhotpink, pad right gap /2
+role tw.name.blueviolet : text down strong, twblueviolet, pad right gap /2
+role tw.name.springgreen : text down strong, twspringgreen, pad right gap /2
+role tw.words : text down, ink
+role tw.when : text down, faint, shy, pad left gap
+role tw.foot : pad top gap /2, border top rim
+role tw.hint : text down, soft
+role tw.tool : text down medium, twpurple, on twwash, pad gap /4, pad left gap, pad right gap, corner gap x2

@@ -31,12 +31,14 @@ broken branch is refused in seconds; main moves only to a commit a whole health 
 branches alone runs just the checks that failed: the ones that break them are refused with their own failure, and the
 rest are judged again together (halves only when none breaks it alone).
 """
+import hashlib
 import json
 import os
 import shutil
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -148,12 +150,15 @@ def room_at(base):
 
 def clean_room():
     """Ignore only isolated tool scratch, not untracked source contamination."""
-    from fixture_cleanup import remove_tree
+    from fixture_cleanup import diagnostic, diagnostic_text, remove_tree
     scratch = ROOM / "research/window-lab/.tmp-agora"
-    errors = remove_tree(scratch)
+    # Legacy scratch has no current ownership proof. Do not chmod it or walk
+    # thousands of permanent access failures twenty times before each judgment.
+    errors = remove_tree(scratch, attempts=1)
     if errors:
-        log("cleanup-warning", path=str(scratch), errors=errors)
-        print("landing: retained tool scratch; could not remove:\n" + "\n".join(errors), file=sys.stderr)
+        receipt = diagnostic(errors, STATE / "cleanup-evidence")
+        log("cleanup-warning", path=str(scratch), **receipt)
+        print("landing: retained tool scratch; could not remove: " + diagnostic_text(receipt), file=sys.stderr)
     # Old tests can still be letting go of scratch. Git must not race their
     # recursive deletion. The exclusion is rooted, not a repository-wide glob.
     args = ("clean", "-ffdxq", "-e", "/research/window-lab/.tmp-agora/")
@@ -183,24 +188,57 @@ def merge_in(branches, why, heads=None):
     return merged, refused
 
 
-def copy_world(world, into):
+def copy_world(world, into, source=None):
     """The live world (its file and its log, and its kept undo copies) beside the room's code, read under its lock, so
     file and log are one moment. A world server holding it in memory has its records on the log already."""
     sys.path.insert(0, str(HERE))
     import explore
-    src = LIVE / NOTATION / "sessions"
+    src = Path(source) if source is not None else LIVE / NOTATION / "sessions"
     dst = into / "sessions"
     dst.mkdir(parents=True, exist_ok=True)
     if not (src / f"{world}.pickle").exists():
-        return                     # a world that is not on disk (a test's, in memory): health builds its own
+        for suffix in ("pickle", "log.jsonl", "undo.sqlite"):
+            (dst / f"{world}.{suffix}").unlink(missing_ok=True)
+        return "no-saved-world"  # health builds an in-memory fixture when no saved world exists
     lock = src / f"{world}.lock"
-    explore.take_lock(lock, tries=1200, pause=0.05)
+    if source is None:
+        explore.take_lock(lock, tries=1200, pause=0.05)
     try:
         for name in (f"{world}.pickle", f"{world}.log.jsonl", f"{world}.undo.sqlite"):
             if (src / name).exists():
                 shutil.copyfile(src / name, dst / name)
+            else:
+                (dst / name).unlink(missing_ok=True)
     finally:
-        explore.release_lock(lock)
+        if source is None:
+            explore.release_lock(lock)
+    return world_identity(world, dst)
+
+
+def world_identity(world, directory):
+    """Content identity through the normal loader and store fact representation.
+
+    Inspect no transcript text. Sidecars are opaque digests because test_store
+    also validates history/undo, not only the current facts. Never save a world.
+    """
+    import explore
+    import store
+    desk = explore.load_desk(directory / f"{world}.pickle")
+    facts = sorted((tid, aspect, value) for (tid, aspect), value in store.flatten(desk.world).items())
+    content = {"facts": facts, "events": store.plain(desk.world.events),
+               "revisions": sorted((sid, s.get("rev")) for group in (desk.world.subjects, desk.world.nodes)
+                                   for sid, s in group.items()),
+               "counters": [getattr(desk.world, "_ids", 0), getattr(desk.world, "_eseq", 0)]}
+    digest = hashlib.sha256(json.dumps(content, ensure_ascii=False, sort_keys=True).encode("utf-8"))
+    for suffix in ("log.jsonl", "undo.sqlite"):
+        path = directory / f"{world}.{suffix}"
+        digest.update(suffix.encode())
+        if path.exists():
+            with path.open("rb") as stream:
+                digest.update(hashlib.file_digest(stream, "sha256").digest())
+        else:
+            digest.update(b"missing")
+    return digest.hexdigest()
 
 
 def health(world, cwd, changed=(), only=(), fail_fast=False, excuse=()):
@@ -224,6 +262,7 @@ def health(world, cwd, changed=(), only=(), fail_fast=False, excuse=()):
     visits = STATE / "test-visits"
     visits.mkdir(parents=True, exist_ok=True)
     env["AGORA_VISIT_TMP"] = str(visits.resolve())
+    env["AGORA_CLEANUP_REPORTS"] = str((STATE / "cleanup-evidence").resolve())
     r = subprocess.run(args, cwd=cwd, capture_output=True, text=True,
                        encoding="utf-8", errors="replace", timeout=1200, env=env)
     lines = (r.stdout or "").strip().splitlines()
@@ -249,29 +288,76 @@ def log(what, **said):
         STATE.mkdir(parents=True, exist_ok=True)
         with open(STATE / "landing-log.jsonl", "a", encoding="utf-8") as f:
             f.write(json.dumps({"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "pid": os.getpid(), "what": what, **said}) + "\n")
+        return True
     except OSError:
-        pass
+        return False
 
 
-def judged(world, sha, kept, **how):
-    """Health of commit `sha` (the room is at it), from what is kept or by running it. Only a whole run is kept: one
-    stopped at a failure, or run for some checks only (`how`, health's options), judges this landing and no other."""
+# These checks inspect the supplied world. Other health checks construct their own fixtures.
+# Refresh them together, including compile checks supplied by every health invocation.
+WORLD_CHECKS = {"styles", "help notes", "lenses", "test_store"}
+
+
+def _refreshable(h):
+    details = h.get("failure_details")
+    return (not h.get("partial") and not h.get("stopped")
+            and isinstance(details, list)
+            and all(isinstance(x, (list, tuple)) and len(x) == 2 for x in details)
+            and [x[1] for x in details] == h.get("failed", [])
+            and WORLD_CHECKS <= set(h.get("ran") or []))
+
+
+def _merge_world_health(cached, fresh):
+    """Reuse a completed code judgment, never promote an incomplete selected run alone."""
+    needed = WORLD_CHECKS | {"python", "scripts"}
+    if (not _refreshable(cached) or fresh.get("stopped")
+            or not needed <= set(fresh.get("ran") or [])
+            or not isinstance(fresh.get("failure_details"), list)
+            or not all(isinstance(x, (list, tuple)) and len(x) == 2 for x in fresh["failure_details"])
+            or [x[1] for x in fresh["failure_details"]] != fresh.get("failed", [])
+            or bool(fresh.get("ok")) != (not fresh.get("failed"))):
+        return None
+    details = [x for x in cached["failure_details"] if x[0] not in needed]
+    details += fresh["failure_details"]
+    return {**cached, **{k: fresh.get(k) for k in ("world_at", "lenses_ok", "lenses_bad")},
+            "failure_details": details, "failed": [x[1] for x in details],
+            "failed_checks": sorted({x[0] for x in details}), "ok": not details,
+            "partial": False, "stopped": False, "reused_code_checks": True,
+            "code_text": (cached.get("code_text") or cached.get("text", "")),
+            "text": (cached.get("code_text") or cached.get("text", "")) + "\nWorld checks refreshed on the same committed code:\n"
+                    + fresh.get("text", "")}
+
+
+def judged(world, sha, kept, snapshot=None, **how):
+    """Code cache is commit-scoped; world results belong to the copied revision."""
     key = f"{world}:{sha}"
-    if key in kept.get("health", {}):
-        return kept["health"][key]
-    copy_world(world, ROOM / NOTATION)
+    version = copy_world(world, ROOM / NOTATION,
+                         **({"source": snapshot["source"]} if snapshot else {}))
+    version = snapshot["version"] if snapshot else version
+    cached = kept.get("health", {}).get(key)
+    if cached and cached.get("world_version") == version:
+        return cached
     t0 = time.time()
-    h = health(world, ROOM / NOTATION, **how)
+    h = None
+    if cached and _refreshable(cached) and not how.get("only"):
+        fresh = health(world, ROOM / NOTATION, only=sorted(WORLD_CHECKS))
+        h = _merge_world_health(cached, fresh)
+    if h is None:
+        h = health(world, ROOM / NOTATION, **how)
     current = git("rev-parse", "HEAD", cwd=ROOM, check=True).stdout.strip()
     if current != sha:
         raise RuntimeError(f"health changed landing-room HEAD from {sha} to {current}; "
                            "judgment discarded; live checkout unchanged")
-    log("health", sha=sha[:7], how={k: v for k, v in how.items() if k != "changed"}, seconds=round(time.time() - t0, 1),
-        ok=h.get("ok"), stopped=h.get("stopped"), failed=(h.get("failed") or [])[:4])
+    log("health", sha=sha[:7], how={k: v for k, v in how.items() if k != "changed"},
+        seconds=round(time.time() - t0, 1), ok=h.get("ok"), stopped=h.get("stopped"),
+        reused_code_checks=bool(h.get("reused_code_checks")), world_version=version,
+        failed=(h.get("failed") or [])[:4])
     h["partial"] = bool(how.get("only")) or bool(h.get("partial")) or bool(h.get("stopped"))
+    h["world_version"] = version
     if not h["partial"]:
-        kept.setdefault("health", {})[key] = {k: h.get(k) for k in ("ok", "world_at", "lenses_ok", "failed",
-                                                                "failed_checks", "text", "seconds")}
+        kept.setdefault("health", {})[key] = {k: h.get(k) for k in
+            ("ok", "world_at", "world_version", "lenses_ok", "lenses_bad", "failed", "failed_checks",
+             "failure_details", "ran", "text", "code_text", "seconds", "reused_code_checks")}
         while len(kept["health"]) > 40:
             kept["health"].pop(next(iter(kept["health"])))
     return h
@@ -525,7 +611,7 @@ def _serve():
             "heads": {b: r["heads"][b][:7] for b in landed if b in r.get("heads", {})},
             "parked": r["parked"] if landed else [], "main_failing": r.get("main_failing") or [],
             "text": next((r["texts"][b] for b in mine if b in r.get("texts", {})), r["text"]),
-            "batch": branches}
+            "batch": branches, "warnings": r.get("warnings", [])}
 
     def answer(q):
         q["waiting"] = [e for e in q["waiting"] if e["id"] not in answers]
@@ -580,7 +666,46 @@ def land(branches, world="frontier", who="?", why=None, _depth=0, wait=20 * 60):
         time.sleep(0.2)
 
 
-def _land(branches, world, who, why, depth):
+def _land(branches, world, who, why, depth, snapshot=None):
+    # One frozen world for both sides of a comparison, including split batches.
+    # This is only a private copy through the existing locked copier, never a live save.
+    if snapshot is not None:
+        return _land_snapshot(branches, world, who, why, depth, snapshot)
+    STATE.mkdir(parents=True, exist_ok=True)
+    root = (STATE / ("landing-world-" + uuid.uuid4().hex)).resolve()
+    if not root.is_relative_to(STATE.resolve()):
+        raise RuntimeError("world snapshot escaped landing state directory")
+    root.mkdir()  # Inherit normal access; mkdtemp's owner-only Windows ACL blocks sandbox readers.
+    result = None
+    try:
+        snapshot = {"source": root / "sessions", "version": copy_world(world, root)}
+        result = _land_snapshot(branches, world, who, why, depth, snapshot)
+        return result
+    finally:
+        from fixture_cleanup import diagnostic, remove_tree
+        # A cleanup/receipt fault after advance must not turn a successful
+        # publication into an ambiguous failure or mask the original exception.
+        warning = None
+        try:
+            errors = remove_tree(root, attempts=2)
+            if errors:
+                warning = {"error_count": len(errors), "snapshot": str(root)}
+                warning.update(diagnostic(errors, STATE / "cleanup-evidence"))
+                if log("snapshot-cleanup-warning", **warning) is False:
+                    warning["log_error"] = "landing log unavailable; cleanup evidence retained separately"
+        except Exception as exc:
+            warning = {**(warning or {"snapshot": str(root)}),
+                       "report_error": f"{type(exc).__name__}: {str(exc)[:400]}"}
+        if warning:
+            if isinstance(result, dict):
+                result.setdefault("warnings", []).append(warning)
+            try:
+                print("snapshot cleanup warning: " + json.dumps(warning), file=sys.stderr)
+            except OSError:
+                pass
+
+
+def _land_snapshot(branches, world, who, why, depth, snapshot):
     out = {"landed": [], "refused": [], "head": None, "heads": {}, "parked": [], "text": "", "texts": {}}
     if not branches:
         return out
@@ -604,6 +729,10 @@ def _land(branches, world, who, why, depth):
         if not todo:
             return out
         room_at(base)
+        cached = kept.get("health", {}).get(f"{world}:{base}")
+        known = None
+        if cached and (cached.get("world_version") == snapshot["version"] or _refreshable(cached)):
+            known = judged(world, base, kept, snapshot=snapshot)
         heads = {}
         merged, refused = merge_in(todo, why, heads)
         out["refused"] += [(b, f"does not merge into main: {w}") for b, w in refused]
@@ -615,8 +744,7 @@ def _land(branches, world, who, why, depth):
         # a5288: the checks nearest what changed start first, and the run stops at the first failure main did not
         # already have (main's own health is kept: it is the last landing's), so a broken branch costs seconds, not
         # a whole health. A run that is not stopped is the whole of health, which is what lets main move
-        known = kept.get("health", {}).get(f"{world}:{base}")
-        after = judged(world, sha, kept, changed=changed, fail_fast=True,
+        after = judged(world, sha, kept, snapshot=snapshot, changed=changed, fail_fast=True,
                        excuse=(known or {}).get("failed_checks") or ())
         # 14 Oct (Codex e9993: a5062 judged again and again from 16:42 while main moved by hand under it): main alone is
         # judged only when the landing fails, to tell what it broke from what was already broken. A landing that passes
@@ -625,13 +753,13 @@ def _land(branches, world, who, why, depth):
         if not after.get("ok", True) or after.get("failed"):
             if known is None:
                 room_at(base)
-                before = judged(world, base, kept)
+                before = judged(world, base, kept, snapshot=snapshot)
             else:
                 before = known
             if after.get("partial") and not faults(before, after):
                 # it stopped at a failure main has too (main's health was not kept when this began): judge it whole
                 room_at(sha)
-                after = judged(world, sha, kept, changed=changed)
+                after = judged(world, sha, kept, snapshot=snapshot, changed=changed)
         _keep(kept)
         bad = faults(before, after)
         if after.get("partial") and not bad:
@@ -653,7 +781,7 @@ def _land(branches, world, who, why, depth):
                 if not one:
                     continue
                 bsha = git("rev-parse", "HEAD", cwd=ROOM, check=True).stdout.strip()
-                alone = judged(world, bsha, kept, only=new) if new else judged(world, bsha, kept)
+                alone = judged(world, bsha, kept, snapshot=snapshot, only=new) if new else judged(world, bsha, kept, snapshot=snapshot)
                 fb = faults(before, alone)
                 if fb:
                     culprits[b] = (fb, alone.get("text", ""))
@@ -663,13 +791,13 @@ def _land(branches, world, who, why, depth):
                     out["refused"].append((b, "judged and not landed: " + "; ".join(fb)[:1500]))
                     out["texts"][b] = text
                 rest = [b for b in merged if b not in culprits]
-                r = _land(rest, world, who, why, depth + 1) if rest else None
+                r = _land(rest, world, who, why, depth + 1, snapshot=snapshot) if rest else None
             else:
                 # none breaks it alone: two of them together do, or the failure comes and goes. Halves, as before
                 half = len(merged) // 2
                 r = None
                 for part in (merged[:half], merged[half:]):
-                    rr = _land(part, world, who, why, depth + 1)
+                    rr = _land(part, world, who, why, depth + 1, snapshot=snapshot)
                     r = rr if r is None else {**rr, **{k: r[k] + rr[k] for k in ("landed", "refused", "parked")},
                                               "heads": {**r["heads"], **rr["heads"]}, "texts": {**r["texts"], **rr["texts"]},
                                               "head": rr["head"] or r["head"], "text": rr["text"] or r["text"],

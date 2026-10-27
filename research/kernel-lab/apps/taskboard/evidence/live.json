@@ -1,0 +1,24 @@
+{
+  "tasks": 23,
+  "lanes": {
+    "Backlog": 20,
+    "Now": 3,
+    "Done": 0
+  },
+  "repeat": {
+    "definitions": 0,
+    "tasks": 0,
+    "records": 0
+  },
+  "word_names": [
+    "task-add",
+    "task-move",
+    "task-assign",
+    "task-done",
+    "task-note"
+  ],
+  "screenshot": "live-board-headless.png",
+  "native_screenshot": false,
+  "window_open_receipt": "window intent already exists\n~ desktop host: shown=false; native visibility is not confirmed",
+  "window_shown": null
+}

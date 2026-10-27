@@ -1,0 +1,20 @@
+[
+  {
+    "windows": 5,
+    "median_ms": 0.298,
+    "p95_ms": 0.349,
+    "max_ms": 1.545
+  },
+  {
+    "windows": 15,
+    "median_ms": 0.811,
+    "p95_ms": 1.056,
+    "max_ms": 1.214
+  },
+  {
+    "windows": 40,
+    "median_ms": 2.223,
+    "p95_ms": 3.38,
+    "max_ms": 4.219
+  }
+]

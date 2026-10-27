@@ -67,7 +67,7 @@ function treeFrom(line){
 }
 async function main(){
   const tree={v:1,root:{axis:"x",kids:[{axis:"y",kids:[{id:"a"},{id:"c"}],weights:[1,1]},{id:"b"}],weights:[1,1]}};
-  const n={key:"tiles",paint:{partition:{tree:JSON.stringify(tree),minimum:[240,140],gap:16,focus:""}},
+  const n={key:"tiles",paint:{partition:{tree:JSON.stringify(tree),minimum:[240,140],gap:16,focus:"",magnetic:true}},
     acts:[{on:"arrange",line:'do prop layout tree="$value" full="$partition_focus"'},{on:"partition-focus",line:'do prop layout full="$value"'}],
     fence:{item:"layout",reads:[["layout",3,["prop:tree","prop:full"]]],defpart:{path:"root/tiles",hash:"one"}}};
   const paint=new Element(), root=new Element("DIV",n); paint.appendChild(root); document.body.appendChild(paint);
@@ -80,8 +80,10 @@ async function main(){
   const a=panel("a"),c=panel("c"),b=panel("b");
   b.el._n.paint.companion=true;
   const sent=[],holds=[];let refreshed=0,refuse=false,externalBusy=false,finishSend=null;
+  let previewPlans=0;
   const ui=install(paint,{busy:()=>externalBusy,hold:x=>holds.push(x),refresh:()=>refreshed++,
-    send:async(node,line,value,extra)=>{sent.push({node,line,extra});if(finishSend)await new Promise(resolve=>{finishSend=resolve;});if(!refuse&&line.includes(' tree="'))n.paint.partition.tree=JSON.stringify(P.encoded(treeFrom(line)));return refuse?{error:"stale"}:{};}},P);
+    send:async(node,line,value,extra)=>{sent.push({node,line,extra});if(finishSend)await new Promise(resolve=>{finishSend=resolve;});if(!refuse&&line.includes(' tree="'))n.paint.partition.tree=JSON.stringify(P.encoded(treeFrom(line)));return refuse?{error:"stale"}:{};}},
+    {...P,previewPlan(...args){previewPlans++;return P.previewPlan(...args);}});
   ui.sync();
   document.body.style.userSelect="text";
   ok(()=>assert.equal(root.dataset.partition,"1"));
@@ -99,7 +101,32 @@ async function main(){
   document.fire("pointermove",{clientX:700,clientY:799});document.fire("pointerup");
   ok(()=>assert.equal(sent.length,0,"header control never starts a drag"));
   ok(()=>assert.equal(selectionClears,0,"controls preserve selection"));
+  const pickupTree=n.paint.partition.tree, pickupBoxes=P.geometry(tree.root,{x:0,y:0,w:1280,h:800}).boxes;
+  const pickupDraft=a.draft, pickupParent=a.draft.parentElement;
   begin();document.fire("pointermove",{clientX:640,clientY:799});
+  const hoverPlan=P.previewPlan(tree,"a",{global:true,side:"bottom"},{x:0,y:0,w:1280,h:800});
+  for(const panel of [a,b,c]) {
+    const box=P.geometry(hoverPlan.tree.root,{x:0,y:0,w:1280,h:800}).boxes[panel.el._n.paint.partition_item];
+    ok(()=>assert.equal(parseFloat(panel.el.style.left),box.x,"hover reflows each real panel"));
+    ok(()=>assert.equal(parseFloat(panel.el.style.height),box.h));
+  }
+  ok(()=>assert.notEqual(b.el.style.height,pickupBoxes.b.h+"px","neighbor moves before release"));
+  ok(()=>assert.equal(n.paint.partition.tree,pickupTree,"hover does not write the world"));
+  ok(()=>assert.equal(sent.length,0));
+  ok(()=>assert.equal(a.draft,pickupDraft,"editor identity retained"));
+  ok(()=>assert.equal(a.draft.parentElement,pickupParent,"editor never reparented"));
+  const solved=previewPlans;
+  for(let i=0;i<20;i++)document.fire("pointermove",{clientX:640+i*.1,clientY:799});
+  ok(()=>assert.equal(previewPlans,solved,"stable target avoids solving on every ghost move"));
+  // This point is in the original b, but the reflowed a now occupies it.
+  // Hit testing our own preview would either cancel or oscillate.
+  document.fire("pointermove",{clientX:900,clientY:500});
+  const frozenTarget=P.hit({x:0,y:0,w:1280,h:800},pickupBoxes,{x:900,y:500},"a");
+  const frozenPlan=P.previewPlan(tree,"a",frozenTarget,{x:0,y:0,w:1280,h:800});
+  const frozenGeo=P.geometry(frozenPlan.tree.root,{x:0,y:0,w:1280,h:800});
+  for(const panel of [a,b,c])ok(()=>assert.equal(panel.el.style.display,frozenGeo.boxes[panel.el._n.paint.partition_item]?"":"none","snap uses pickup geometry"));
+  ui.sync();ok(()=>assert.equal(n.paint.partition.tree,pickupTree,"incoming sync during preview cannot rebase the tree"));
+  document.fire("pointermove",{clientX:640,clientY:799});
   ok(()=>assert.equal(selectionClears,1,"threshold drag clears native text selection"));
   ok(()=>assert.equal(document.body.style.userSelect,"none","carry cannot select article text"));
   const ghost=document.body.children.find(e=>e!==paint), preview=root.children.find(e=>e.className==="landing-box");
@@ -137,7 +164,10 @@ async function main(){
   // Reload from the persisted prop reconstructs the same rectangle.
   ok(()=>assert.equal(parseFloat(a.el.style.width),proposed.w));
   for(const cancel of ["pointercancel","Escape","blur","resize"]){
+    const original=[a,b,c].map(p=>({...p.el.style})), model=n.paint.partition.tree;
+    a.draft.scrollTop=37;
     begin();document.fire("pointermove",{clientX:20,clientY:300});
+    a.draft.scrollTop=0; // stand-in for scroll clamping caused by smaller allocation
     if(cancel==="Escape")document.fire("keydown",{key:"Escape"});
     else if(cancel==="pointercancel")document.fire("pointercancel");
     else window.fire(cancel);
@@ -145,6 +175,9 @@ async function main(){
     ok(()=>assert.equal(sent.length,1,`${cancel} does not persist`));
     ok(()=>assert.ok(!ui.busy()));
     ok(()=>assert.equal(document.body.style.userSelect,"text",`${cancel} restores selection policy`));
+    ok(()=>assert.equal(n.paint.partition.tree,model,`${cancel} preserves exact tree`));
+    ok(()=>assert.equal(a.draft.scrollTop,37,`${cancel} restores reading offset`));
+    for(let i=0;i<3;i++)ok(()=>assert.deepEqual([a,b,c][i].el.style,original[i],`${cancel} restores original panel allocation`));
   }
   ui.sync();
   let handle=root.children.find(e=>e.className==="l-divider"&&e.dataset.axis==="y");
@@ -429,6 +462,49 @@ async function main(){
   }
   ok(()=>assert.equal(a.draft.value,"keep this unsent"));
   ok(()=>assert.equal(a.draft.selectionStart,4,"grip and control guards never alter draft selection"));
+  // The tab fallback uses the same DOM and candidate for keyboard carries.
+  Object.defineProperty(root,"clientHeight",{configurable:true,writable:true,value:480});
+  delete a.el._n.paint.sizing;
+  const narrowTree={v:1,root:{axis:"y",kids:[{id:"a"},{id:"b"},{id:"c"}],weights:[1,1,1]}};
+  for(const width of [320,420,600]){
+    root.clientWidth=width;root.clientHeight=480;n.paint.partition.tree=JSON.stringify(narrowTree);n.paint.partition.focus="";ui.sync();
+    const saved=n.paint.partition.tree, beforeSend=sent.length;
+    ui.key(a.grip,{key:" ",target:a.grip,preventDefault(){}});
+    ui.key(a.grip,{key:"ArrowRight",target:a.grip,preventDefault(){}});
+    const preview=root.children.find(e=>e.className==="landing-box");
+    ok(()=>assert.ok(parseFloat(preview.style.width)>=240,`narrow ${width}: ${JSON.stringify(preview.style)} hidden=${preview.hidden}`));
+    for(const panel of [a,b,c])if(panel.el.style.display!=="none"){
+      ok(()=>assert.ok(parseFloat(panel.el.style.width)>=240));
+      ok(()=>assert.ok(parseFloat(panel.el.style.height)>=140));
+    }
+    document.fire("keydown",{key:"Escape"});
+    ok(()=>assert.equal(n.paint.partition.tree,saved));
+    ok(()=>assert.equal(sent.length,beforeSend));
+    ok(()=>assert.equal(a.draft.parentElement,pickupParent));
+  }
+  root.clientWidth=1280;root.clientHeight=800;n.paint.partition.tree=JSON.stringify(tree);ui.sync();
+  // A real newer authoritative scene wins after an old fenced drop refuses.
+  begin();document.fire("pointermove",{clientX:640,clientY:799});
+  const concurrent={...tree,root:{...tree.root,weights:[3,1]}}, newText=JSON.stringify(concurrent);
+  n.paint.partition.tree=newText;ui.sync();refuse=true;
+  document.fire("pointerup");await settle();ui.sync();refuse=false;
+  ok(()=>assert.equal(n.paint.partition.tree,newText,"refused old candidate cannot overwrite newer layout"));
+  const current=P.geometry(concurrent.root,{x:0,y:0,w:1280,h:800});
+  for(const panel of [a,b,c])ok(()=>assert.equal(parseFloat(panel.el.style.width),current.boxes[panel.el._n.paint.partition_item].w,"latest scene converges"));
+  // Stand-in focus loss: restore body-only loss, never an intentional new
+  // editor, and never replay an obsolete pickup-time caret after typing.
+  a.draft.focus=()=>{document.activeElement=a.draft;};
+  document.activeElement=a.draft;
+  begin();document.fire("pointermove",{clientX:640,clientY:799});
+  a.draft.value+=" more";a.draft.selectionStart=9;document.activeElement=document.body;
+  document.fire("pointercancel");await settle();ui.sync();
+  ok(()=>assert.equal(document.activeElement,a.draft));
+  ok(()=>assert.equal(a.draft.selectionStart,9,"new caret is not reset to pickup position"));
+  ok(()=>assert.equal(a.draft.value,"keep this unsent more"));
+  begin();document.fire("pointermove",{clientX:640,clientY:799});
+  document.activeElement=b.draft;
+  document.fire("pointercancel");await settle();ui.sync();
+  ok(()=>assert.equal(document.activeElement,b.draft,"intentional focus move is not stolen"));
   console.log(`${count} partition DOM gesture checks passed (stand-in; no browser)`);
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
