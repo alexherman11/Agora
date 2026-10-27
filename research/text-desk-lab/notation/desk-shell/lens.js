@@ -671,7 +671,12 @@
     // text in something that carries, with nothing selected: a way to select it
     const leaf = t.closest("[data-key]");
     const carried = !snap && leaf && paint.contains(leaf) && leaf.closest("[data-carry]") && (leaf.textContent || "").trim() ? leaf : null;
-    if (!snap && !entries.length && !carried) return;
+    // 26 Oct (Alex): every right-click ends with a box to ask, in your own words, for a change to what you clicked.
+    // The world's `ask` word decides where it goes (the kernel desk: a request relayed into the Conversation).
+    const askAt = el && paint.contains(el) ? el : leaf && paint.contains(leaf) ? leaf : null;
+    const askItem = askAt && askAt._n ? ((askAt._n.paint && askAt._n.paint.source && askAt._n.paint.source.item)
+      || (askAt._n.fence && askAt._n.fence.item) || "") : "";
+    if (!snap && !entries.length && !carried && !askAt) return;
     e.preventDefault(); closeMenu();
     if (snap) SEL.restore(snap);
     const box = document.createElement("div"); box.id = "menu-pop"; box.setAttribute("role", "menu");
@@ -709,6 +714,22 @@
       closeMenu(); const r = document.createRange(); r.selectNodeContents(carried);
       const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
     }));
+    if (askAt) {
+      const ask = document.createElement("input"); ask.type = "text"; ask.placeholder = "Ask for a change…";
+      ask.className = Style.roleClass("menu.ask"); ask.setAttribute("aria-label", "Ask for a change to this, in your own words");
+      ask.style.cssText = "display:block;box-sizing:border-box;width:100%;min-width:16em;margin-top:6px;padding:6px 8px;font:inherit";
+      ask.addEventListener("keydown", async ev => {
+        ev.stopPropagation();                                             // arrows and letters are the box's, not the menu's
+        if (ev.key === "Escape") { ev.preventDefault(); closeMenu(true); return; }
+        if (ev.key !== "Enter" || ev.isComposing || !ask.value.trim()) return;
+        ev.preventDefault();
+        const raw = ask.value.trim(), where = lens + " · " + askAt._n.key;
+        closeMenu();
+        await send({ key: askAt._n.key + "/ask", fence: askAt._n.fence },
+          `ask ${askItem || "-"} text="${TEXT.esc(raw)}" where="${TEXT.esc(where)}"`, raw);
+      });
+      box.append(ask);
+    }
     document.body.append(box);
     let x = e.clientX, y = e.clientY;
     if (keyed) {                                                                    // the menu key: at the words, or at the part

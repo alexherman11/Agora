@@ -70,7 +70,9 @@ card : column, role card, carry
         art = svg.replace('var(--t-priority)', 'var(--t-p' + str(p) + ')')
         s += f'    p{p} : text "{art}", picture, role icon\n'
         s += f'      only when $priority = {p}\n'
-    s += '''    short : text "$description", role title, clamp 1
+    s += '''    short : text "$title", role title
+  gist : text "$short", role body
+    only when $short_source != "short version, no model"
   provenance : text "$short_source", role provenance
     only when $short_source != ""
   details : column, fold "Details", role group
