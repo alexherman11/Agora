@@ -197,6 +197,11 @@ def make_layer(hwnd, monitor_rect):
     SHELL.md); kept at the bottom of the normal windows by a small loop."""
     ex = user32.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)
     user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (ex | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE) & ~WS_EX_APPWINDOW)
+    # Say "this is the desktop" so full-screen checks (bars stepping back, the guy hiding, the WM's game gate) do not
+    # take the wallpaper for a game when a click puts it in front (gaming_gate.is_desktop reads it, any process).
+    import gaming_gate
+    user32.SetPropW.argtypes = [wt.HWND, wt.LPCWSTR, wt.HANDLE]
+    user32.SetPropW(hwnd, gaming_gate.DESKTOP_PROP, wt.HANDLE(1))
     x, y, w, h = monitor_rect
     mode = os.environ.get("AGORA_DESKTOP_LAYER", "bottom")
     if mode == "workerw":

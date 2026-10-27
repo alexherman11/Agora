@@ -147,6 +147,20 @@ class DesktopTest(unittest.TestCase):
         back = d.wait(lambda: d.window("lines"))                            # back, where it was (on the left)
         self.assertEqual(back["box"][0], 24)
 
+    def test_a_page_from_another_door_on_this_machine_opens_in_its_own_window(self):
+        # 27 Oct: the top bar's JEFF button opens JEFF's conversation, a lens of the frontier desk on 8794
+        d = self.d
+        page = "http://127.0.0.1:8794/lens.html?session=frontier&as=alex&lens=jeff-chat&inspect=0"
+        out = d.say(f'window.open url="{page}" name=JEFF')
+        self.assertTrue(out["ok"], out["text"])
+        w = d.wait(lambda: d.window("page"))
+        self.assertEqual("JEFF", w["name"])
+        again = d.say(f'window.open url="{page}" name=JEFF')                 # the same page is brought forward
+        self.assertIn("open already", again["text"])
+        self.assertEqual(1, sum(1 for x in d.windows() if x["shows"] == "page"))
+        for far in ("https://example.com/", "http://192.168.1.4:8794/", "file:///C:/Windows/win.ini", "http://127.0.0.1/"):
+            self.assertIn("this machine only", d.say(f'window.open url="{far}"')["text"], far)
+
     def test_off_window_closes_all_and_undo_brings_them_back(self):
         d = self.d
         d.say("window.open lines")

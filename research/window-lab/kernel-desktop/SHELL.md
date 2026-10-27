@@ -68,7 +68,7 @@ The desktop layer is not a bar (it is the wallpaper) and stays hand-written.
 | `media` | `shell-media` | `body`, `art`, `title`, `popover` | gestures `play`, `next`, `prev` |
 | `tray` | `shell-tray` | `body`, `popover` | holds chips; the quick-settings popover |
 | `network`, `volume`, `battery` | `shell-chip` | `body`, `glyph`, `value` | `key`, `value yes|no`; gesture `press` (`window.settings which=…`) |
-| `jeff` | `shell-jeff` | `body`, `dot`, `name`, `popover` | gesture `open` (`window.open lines`) |
+| `jeff` | `shell-jeff` | `body`, `dot`, `name`, `popover` | gesture `open` (the `shell-settings` `jeff_open` line; live since 27 Oct: `window.open url=<frontier jeff-chat> name=JEFF`, JEFF's conversation in its own window; default `window.open lines`) |
 | `power` | `shell-power` | `body` | gesture `off` (`off window`), two presses |
 | dock `launcher`, `overview` | `shell-dock-button` | `body` | `icon`, `label`, gesture `press` or `opens launcher` |
 | dock `item` (one per app, keyed) | `shell-dock-item` | `body`, `icon`, `mark`, `count`, `menu`, `preview`, `tile` | facts `state`, `app` on `body` for styles (`shell-dock-item.body[state=front]`) |
@@ -394,3 +394,15 @@ Builder, 27 Oct (minimised painter windows stopped; kernel load from plan reread
 17. `painter/painter.js`: a hidden painter replanned the world on every heard act and every 1.5 s. Missing word: none; the
     painter now waits until it is seen, and the default reread is 5 s (`reconcile_ms` still overrides).
 
+Claude, 27 Oct (Alex: clicking the wallpaper hid the bars; the JEFF button opened Lines):
+
+18. `kd_window.py` `_step_back`, `kd_guy.py`, `gaming_gate.py`, `agora-wm/win32_host.py`: every full-screen check took the
+    desktop layer (a screen-sized window) for a game once a click put it in front, so the bars hid, the guy hid and the WM's
+    gate closed. Now `shell_native.make_layer` marks the layer with the window property `Agora.Desktop`, and
+    `gaming_gate.is_desktop` (Explorer's desktop classes or that mark) is the one test all four use. **Ran**: live, the layer
+    reads `desktop: True`, the gate reads clear; 37 desktop, 16 shell/guy and 20 WM tests pass. Not clicked live (Alex was typing).
+    Missing word: none at world level; "the desktop" needed one shared definition in source.
+19. `kd_window.py` `window.open url=<http://127.0.0.1:port/...> [name=]`: a page from another Agora door on this machine in
+    its own window (loopback http only, refused otherwise; the same url is brought forward). The JEFF button's line is the
+    world thing `Shell settings` (kind=shell-settings, `jeff_open`), so moving JEFF's chat into the new kernel later is one
+    `set`. Missing word: a cross-world reference (a thing in one world that names a view in another); a URL stands in for it.

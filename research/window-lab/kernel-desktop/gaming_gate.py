@@ -8,6 +8,26 @@ HELPERS = {'edgegameassist.exe','gamebarpresencewriter.exe','gameinputredistserv
            'gameoverlayui.exe','gameoverlayui64.exe','gamebar.exe','gamebarftserver.exe'}
 KNOWN = {'rocketleague.exe','fortniteclient-win64-shipping.exe','cs2.exe','dota2.exe','eldenring.exe',
          'helldivers2.exe','valorant-win64-shipping.exe','overwatch.exe','minecraft.exe'}
+# What counts as the desktop, not a full-screen program: Explorer's own windows, and Agora's desktop layer (a
+# screen-sized window under every app that draws the theme's wallpaper; shell_native.make_layer marks it with this
+# window property). Clicking the wallpaper puts it in front, and before 27 Oct that read as a game and hid the bars.
+DESKTOP_CLASSES = ('Progman', 'WorkerW', 'Shell_TrayWnd', 'Shell_SecondaryTrayWnd')
+DESKTOP_PROP = 'Agora.Desktop'
+_u = ctypes.WinDLL('user32', use_last_error=True)
+_u.GetPropW.restype = w.HANDLE
+_u.GetPropW.argtypes = [w.HWND, w.LPCWSTR]
+_u.GetClassNameW.argtypes = [w.HWND, w.LPWSTR, ctypes.c_int]
+
+
+def is_desktop(hwnd):
+    """Is this window the desktop itself (Explorer's, or Agora's wallpaper layer)?"""
+    if not hwnd:
+        return False
+    if _u.GetPropW(hwnd, DESKTOP_PROP):
+        return True
+    cls = ctypes.create_unicode_buffer(128)
+    _u.GetClassNameW(hwnd, cls, 128)
+    return cls.value in DESKTOP_CLASSES
 
 
 class Process(ctypes.Structure):
@@ -37,9 +57,8 @@ def reasons():
     u=ctypes.WinDLL('user32',use_last_error=True);u.GetForegroundWindow.restype=w.HWND
     u.GetWindowRect.argtypes=[w.HWND,ctypes.POINTER(w.RECT)]
     u.GetClassNameW.argtypes=[w.HWND,w.LPWSTR,ctypes.c_int]
-    fg=u.GetForegroundWindow();r=w.RECT();cls=ctypes.create_unicode_buffer(128)
-    u.GetClassNameW(fg,cls,128)
-    if fg and cls.value not in ('Progman','WorkerW','Shell_TrayWnd','Shell_SecondaryTrayWnd'):
+    fg=u.GetForegroundWindow();r=w.RECT()
+    if fg and not is_desktop(fg):
         u.GetWindowRect(fg,ctypes.byref(r))
         if r.left<=0 and r.top<=0 and r.right>=u.GetSystemMetrics(0) and r.bottom>=u.GetSystemMetrics(1):
             out.append('full-screen foreground application')

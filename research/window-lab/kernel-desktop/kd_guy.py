@@ -333,9 +333,8 @@ class Guy:
             return False
         r = wt.RECT()
         user32.GetWindowRect(h, ctypes.byref(r))
-        cls = ctypes.create_unicode_buffer(64)
-        user32.GetClassNameW(h, cls, 64)
-        if cls.value in ("Progman", "WorkerW", "Shell_TrayWnd"):
+        import gaming_gate
+        if gaming_gate.is_desktop(h):          # Explorer's desktop or Agora's wallpaper layer (a click puts it in front)
             return False
         return r.left <= 0 and r.top <= 0 and r.right >= user32.GetSystemMetrics(0) and r.bottom >= user32.GetSystemMetrics(1)
 

@@ -163,7 +163,8 @@ def gate():
     hr=shell.SHQueryUserNotificationState(C.byref(state))
     if hr!=0:reasons.append('notification state unavailable')
     elif state.value in (1,3,4,7):reasons.append(f'notification gate {state.value}')
-    elif state.value==2 and _foreground_exe().lower() not in SHELL_OVERLAYS and _foreground_covers_monitor():
+    elif (state.value==2 and _foreground_exe().lower() not in SHELL_OVERLAYS
+          and not gaming_gate.is_desktop(u.GetForegroundWindow()) and _foreground_covers_monitor()):
         # "Busy" alone is not a game: on 26 Oct Windows reported it with Claude (an ordinary window) in front while
         # Agora's own desktop layer and the Claude app's screen overlay were screen-sized. Gate only when the window
         # in front really covers its monitor.

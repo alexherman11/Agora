@@ -55,6 +55,18 @@ LENS_SIZE = (1180, 1500)        # a lens window's first size, in real pixels
 VIEWS = {"lines": ("Lines", (1500, 760)), "thing": ("Thing", (1000, 820)),
          "help": ("Help", (1200, 1300)), "tasks": ("Running windows", (1100, 1000)),
          "taskbar": ("Agora taskbar", (0, 0))}
+
+
+def local_page(url):
+    """Is this an http page served on this machine (another Agora door, such as the frontier desk on 8794)?"""
+    from urllib.parse import urlsplit
+    try:
+        u = urlsplit(str(url))
+        return u.scheme == "http" and u.hostname in ("127.0.0.1", "localhost") and bool(u.port)
+    except ValueError:
+        return False
+
+
 BAR_H = 66                 # the Agora strip along the bottom, in pixels
 TOP_H = 60                 # a bar along the top (window.open <lens> edge=top)
 # The desktop shell (shell builder, 26 Oct 2026; pages/shell/, shell_native.py, SHELL.md): view -> (name, page, bar kind).
@@ -379,14 +391,13 @@ class GuiScreen(Screen):
     def _step_back(self, wid, hwnd):
         """While another program is full screen (a game), the strip is hidden; it comes back when that ends. The
         shell's own notice (ABN_FULLSCREENAPP) did not reach it in a test (ran 23 Oct), so this looks for itself."""
+        import gaming_gate
         mine = {hwnd}
         while wid in self.bars and user32.IsWindow(hwnd):
             fg = user32.GetForegroundWindow()
             full = False
             if fg and fg not in mine:
-                cls = ctypes.create_unicode_buffer(64)
-                user32.GetClassNameW(fg, cls, 64)
-                if cls.value not in ("Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd"):
+                if not gaming_gate.is_desktop(fg):           # Explorer's desktop or Agora's wallpaper layer
                     x, y, w, h = rect_of(fg)
                     (mx, my, mw, mh), _ = monitor()
                     full = x <= mx and y <= my and x + w >= mx + mw and y + h >= my + mh
@@ -664,7 +675,9 @@ class WindowHost:
              "help": f"window.open <lens or view> [thing] [to=<spot>|at=x,y size=w,h]: open a window on the desktop. Any "
                      f"lens in the world (rows lens lists them; window.open feed), or the views "
                      f"{', '.join(v for v in VIEWS if v != 'taskbar')}. Spots: {spots}. Only the desktop's owner "
-                     f"(and their agents) open windows here. A view open already is brought forward instead; new=yes opens another. undo closes it."},
+                     f"(and their agents) open windows here. A view open already is brought forward instead; new=yes opens another. undo closes it. "
+                     f"window.open url=<http://127.0.0.1:port/...> [name=<title>] opens a page from another Agora door on this machine "
+                     f"(the top bar's JEFF button opens JEFF's conversation this way)."},
             {"word": "window.move", "kind": "do", "takes": "<id> [to=<spot>] [at=<x,y>] [size=<w,h>]", "may": "anyone",
              "help": f"window.move <window> to=<spot> | at=x,y [size=w,h]: put a window somewhere ({spots}). Changes "
                      f"the screen only (where a window sits is not in the world), so nothing is recorded."},
@@ -806,6 +819,20 @@ class WindowHost:
             lines.append(f'make kind=window shows=taskbar name="Agora taskbar" edge=bottom')
             self.made_bar = True
             return {"lines": lines, "saw": {r["id"]: r["rev"] for r in shell}}
+        if word == "window.open" and kv.get("url"):
+            # A page from another Agora door on this machine in a window of its own (27 Oct: the top bar's JEFF
+            # button opens JEFF's conversation, which lives in the frontier desk on 8794). Loopback http only.
+            url = kv["url"]
+            if not local_page(url):
+                return {"refused": "url= takes a page on this machine only: http://127.0.0.1:<port>/... or http://localhost:<port>/..."}
+            same = [r for r in self.rows.values() if r.get("shows") == "page" and r.get("url") == url]
+            if same and kv.get("new") != "yes":
+                said = self.screen.focus(same[0]["id"]) if not self.screen.is_front(same[0]["id"]) else "in front already"
+                return {"text": f"{same[0].get('name')} is open already: {said} (new=yes opens another)"}
+            name = kv.get("name") or (words[0] if words else "Page")
+            self.intent[name] = self.box_for("page", kv, 0)
+            return {"lines": [f"make kind=window shows=page name={json.dumps(name, ensure_ascii=False)} url={json.dumps(url)}"],
+                    "saw": {}}
         if word == "window.open":
             if not words:
                 return {"refused": "window.open needs a view: " + ", ".join(v for v in VIEWS if v != "taskbar")}
@@ -992,6 +1019,11 @@ class WindowHost:
         path = f"/desk/window-origin?win={quote(wid)}&next={quote(path, safe='')}"
         url = (f"http://127.0.0.1:{PORT}/dev/signin?token={quote(self.token)}&next={quote(path)}" if self.token
                else f"http://127.0.0.1:{PORT}{path}")
+        if row.get("shows") == "page":                    # another door's page on this machine: no sign-in of ours
+            if not local_page(row.get("url") or ""):
+                log(f"window {wid}: url is not a page on this machine; not opened")
+                return
+            url = row["url"]
         self.applied[wid] = box
         self.geo.put(wid, box)
 
