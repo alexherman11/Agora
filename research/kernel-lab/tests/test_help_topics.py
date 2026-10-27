@@ -101,3 +101,23 @@ def test_look_by_name_says_which_id_and_help_words_reaches_its_topic(world):
     assert 'all ' in say(k, b, 'help words')['text']                 # no topic called words: the full list
     say(k, a, 'make kind=topic name=words text="Making your own words." words="verb"')
     assert say(k, b, 'help words')['text'].startswith('words: Making your own words.')
+
+
+def test_a_reoffer_refreshes_what_the_module_wrote_and_help_drops_what_it_no_longer_offers(tmp_path):
+    k = Kernel(tmp_path / 'world', {'tag': 'mo', 'name': 'Modules', 'steward': {'account': 'alex', 'name': 'Alex'},
+               'modules': [{'name': 'pad', 'run': ['none'], 'publishes': 'pad.*'}]})
+    a = k.actor_for(k.accounts['alex'])
+    m = k.module_named('pad')
+    k.on_offer(m, [{'word': 'pad.note', 'help': 'pad.note <words>: jot', 'undo': 'external'},
+                   {'word': 'pad.old', 'help': 'pad.old: an old word'},
+                   {'word': 'pad.hint', 'help': 'pad.hint: a hint'}])
+    note, hint = k.find_entry('pad.note'), k.find_entry('pad.hint')
+    say(k, a, 'help pad.hint')
+    say(k, a, 'word-set pad.hint help="pad.hint: the steward\'s words"')
+    said = k.on_offer(m, [{'word': 'pad.note', 'help': 'pad.note <words>: jot it down', 'undo': 'no'},
+                          {'word': 'pad.hint', 'help': 'pad.hint: the module\'s new words'}])
+    assert 'refreshed' in said[0]
+    assert k.state.get(note, 'undo') == 'no' and k.state.get(note, 'help').endswith('jot it down')
+    assert k.state.get(hint, 'help') == "pad.hint: the steward's words"           # a steward's edit stays
+    assert 'pad.old' not in say(k, a, 'help pad')['text']                         # no longer offered: left out
+    assert 'pad.old' in say(k, a, 'help check')['text']

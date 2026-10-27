@@ -72,6 +72,14 @@ Its top frictions now are no longer about help: plain `undo` took back a rule's 
 
 Final runs (**ran**): `research/kernel-lab/tests`: `113 passed, 30 subtests passed in 112.62s`; `research/window-lab/kernel-desktop/test_kdesk.py`: `22 passed in 39.34s`.
 
+## After going live (commit fbc25b03d)
+
+The coordinator found two things once it was live: `help windows` listed `wm.changed`, a word the window manager stopped offering in a3d4a15fa; and a module re-offering its words never refreshed its entries (wm.focus and five others kept `undo=external` after the module changed them to `no`; fixed live with word-set). Built:
+- `kernel.on_offer` refreshes a field (help, takes, undo, may) when the module itself wrote it last; a field a steward changed with word-set stays the steward's, with a notice. This refines SHAPE section 11's "after that the entry is the world's" to "a person's edit is the world's".
+- The kernel remembers each running module's latest offer in memory only (not the world). Help leaves out words that module no longer offers; `help check` names them with `word-set <word> status=hidden` to retire one. Nothing is hidden or deleted on its own.
+
+Ran: `research/kernel-lab/tests` `114 passed, 30 subtests passed`; `test_kdesk.py` `22 passed`.
+
 ## What needs Alex: the language
 
 Seven proposals, each with today/proposed lines, how it works, and what would change my mind: [lines-plainly.html](lines-plainly.html). In one line each: names work where ids go (P1); a few plain verbs that ask the thing's kind what they mean (P2); receipts in the user's words, rule side effects named, honest no-ops (P3); one spelling for families, old names kept as aliases (P4); `who`, `recent`, `kinds`, `on <module>` (P5); agents named everywhere, "me" says whose (P6); `make` warns about unknown kinds, `press <button>` from Lines (P7).

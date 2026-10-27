@@ -1374,6 +1374,9 @@ class Kernel:
         out = []
         with self.lock:
             pattern = self.state.get(mid, "publishes")
+            # what this module offers now, kept in memory only: help hides and help check names the words it dropped
+            self.offered = getattr(self, "offered", {})
+            self.offered[mid] = {(w.get("word") or "").lower() for w in words}
             for w in words:
                 word = (w.get("word") or "").lower()
                 if not self._matches(pattern, word):
@@ -1386,10 +1389,7 @@ class Kernel:
                             f"module:{self.state.get(mid, 'name')}" and self.state.get(e, "bound") == word), None) \
                     or self.find_entry(word)
                 if eid:
-                    if (self.state.get(eid, "takes") or "") != (w.get("takes") or ""):
-                        self.notices.append(f"{self.name(mid)} offers {word} taking '{w.get('takes')}', "
-                                            f"but its entry {eid} says '{self.state.get(eid, 'takes')}'; nothing overwritten")
-                    out.append(f"bound {word} to {eid}")
+                    out.append(self._refresh_offer(mid, eid, word, w))
                     continue
                 kind = w.get("kind", "do")
                 if kind not in ("do", "see", "hear", "hold"):
@@ -1415,6 +1415,45 @@ class Kernel:
                 rec = self._commit(tx, by=mid, words=f"offer {word}", via="offer")
                 out.append(f"published {word} as {e} [r{rec['seq']}]")
         return out
+
+    def _refresh_offer(self, mid, eid, word, w):
+        """A module offers a word it already has. A field the module itself wrote last follows the new offer; a field
+        a steward changed (word-set, or an undo of one) stays the world's, with a notice when they now differ."""
+        new = {"help": (w.get("help") or "").strip(), "takes": w.get("takes") or ""}
+        if w.get("undo") in ("yes", "no", "external"):
+            new["undo"] = w["undo"]
+        if w.get("may") and all(t.strip() in MAY_WORDS for t in w["may"].split(" or ")):
+            new["may"] = w["may"]
+        changed, kept = {}, []
+        for a, v in new.items():
+            if (self.state.get(eid, a) or "") == v:
+                continue
+            seq = self.state.last_seq(eid, a)
+            rec = self.log.records[seq - 1] if seq else {}
+            if not seq or (rec.get("by") == mid and rec.get("via") == "offer"):
+                changed[a] = v
+            else:
+                kept.append(a)
+        if kept:
+            self.notices.append(f"{self.name(mid)} now offers {word} with different {', '.join(kept)}, but a steward "
+                                f"edited its entry {eid}; the steward's edit stays (word-set {word} … to take the new)")
+        if not changed:
+            return f"bound {word} to {eid}"
+        tx = Tx(self)
+        tx.part("offer", eid, f"offer {word}")
+        for a, v in changed.items():
+            tx.set(eid, a, v)
+        rec = self._commit(tx, by=mid, words=f"offer {word}: {', '.join(changed)} refreshed", via="offer")
+        return f"bound {word} to {eid}; refreshed {', '.join(changed)} [r{rec['seq']}]"
+
+    def dropped(self, e):
+        """True when a module word's module runs and no longer offers it (known only since the module's last start)."""
+        frm = str(self.state.get(e, "from") or "")
+        if not frm.startswith("module:"):
+            return False
+        mid = self.module_named(frm[7:])
+        offered = getattr(self, "offered", {}).get(mid)
+        return offered is not None and (self.state.get(e, "bound") or self.state.get(e, "word")) not in offered
 
     # ------------------------------------------------------------------ persons
     def join(self, account, name, invite=None, answers=None, agent=None):

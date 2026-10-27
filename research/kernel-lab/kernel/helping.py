@@ -56,12 +56,18 @@ def _split_help(word, text):
     return usage, desc
 
 
+def _dropped(k):
+    """Module words whose running module no longer offers them (kernel.dropped), as {word: entry}."""
+    return {k.state.get(e, "word"): e for e in k.entries() if hasattr(k, "dropped") and k.dropped(e)}
+
+
 def _visible_entries(k, actor, group):
-    """Each word once: the entry nearest the line's group, if the reader may see it."""
+    """Each word once: the entry nearest the line's group, if the reader may see it. Words a running module no
+    longer offers are left out (help check names them)."""
     from .dictionary import localized
     out = {}
     for e in k.entries():
-        if k.shown(actor.person, e) is None:
+        if k.shown(actor.person, e) is None or (hasattr(k, "dropped") and k.dropped(e)):
             continue
         a = localized(k, actor.person, k.entry(e))
         w = a.get("word")
@@ -279,6 +285,10 @@ def check_page(k, actor, group, pool):
         lines.append(f"  … and {len(problems) - 30} more (rows hold them all)")
     if long:
         lines.append(f"long first lines (over 220 characters), worth trimming: " + ", ".join(long))
+    gone = sorted(_dropped(k))
+    if gone:
+        lines.append("no longer offered by their running module (left out of help): " + ", ".join(gone)
+                     + f". Retire one: word-set {gone[0]} status=hidden")
     lines.append("fix one: help <word>, then word-set <word> help=\"<word> <what it takes>: what it does.\"")
     return {"text": "\n".join(lines), "rows": [{"word": w, "problems": said} for w, said in problems]}
 
