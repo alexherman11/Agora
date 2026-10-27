@@ -29,6 +29,7 @@ from ctypes import wintypes as wt
 user32, gdi32, dwmapi = (ctypes.WinDLL(n, use_last_error=True) for n in ("user32", "gdi32", "dwmapi"))
 user32.SetWindowPos.argtypes = [wt.HWND, wt.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, wt.UINT]
 user32.SetWindowRgn.argtypes = [wt.HWND, wt.HRGN, wt.BOOL]
+user32.GetWindowRgn.argtypes = [wt.HWND, wt.HRGN]
 user32.GetWindowRect.argtypes = [wt.HWND, ctypes.POINTER(wt.RECT)]
 user32.GetClientRect.argtypes = [wt.HWND, ctypes.POINTER(wt.RECT)]
 user32.IsWindow.argtypes = [wt.HWND]
@@ -125,6 +126,16 @@ def bar_placer(view, hwnd, show, scale_fn, hidden_fn):
             ww, hh = min(w, int(DOCK_CSS[0] * s)), int(DOCK_CSS[1] * s)
             wx, wy = x + (w - ww) // 2, y + h - hh
         user32.SetWindowPos(hwnd, HWND_TOPMOST, wx, wy, ww, hh, SWP_NOACTIVATE)
+        # Until the page says where it is solid (set_shape), only the reserved strip takes clicks. 27 Oct: the top bar's
+        # page loaded a sign-in error, never sent its shape, and its whole 560 px window sat over Alex's screen.
+        probe = gdi32.CreateRectRgn(0, 0, 0, 0)
+        unshaped = user32.GetWindowRgn(hwnd, probe) == 0                          # ERROR: no region yet
+        gdi32.DeleteObject(probe)
+        if unshaped:
+            top = 0 if view == "shell-top" else max(0, hh - h)
+            strip = gdi32.CreateRectRgn(0, top, ww, top + min(h, hh))
+            if not user32.SetWindowRgn(hwnd, strip, True):
+                gdi32.DeleteObject(strip)
         if not hidden_fn():
             show(hwnd)
     return placed
