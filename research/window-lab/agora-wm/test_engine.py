@@ -1,7 +1,7 @@
 import random
 import unittest
 from copy import deepcopy
-from engine import State, Window, Rect, solve, valid
+from engine import State, Window, Rect, solve, valid, fit
 
 
 class EngineTests(unittest.TestCase):
@@ -102,6 +102,41 @@ class SquashTests(unittest.TestCase):
         for k,rect in r.placements.items():
             self.assertGreaterEqual(rect.w,int(boxes[k][2]*.6),k);self.assertGreaterEqual(rect.h,int(boxes[k][3]*.6),k)
         self.assertTrue(r.minimise)                      # something gave way, and it was minimised, not squashed
+
+
+class FillFirstTests(unittest.TestCase):
+    def test_restored_windows_fill_free_space_before_minimising_anyone(self):
+        # Live, 26 Oct ~21:55, theme gaps 12/14: Spotify and Terminal on screen, half of it empty. Restoring Lines,
+        # then Claude, then Help minimised the others one by one. Each must fill free space at 60 % or more first.
+        s=State(work=Rect(0,57,3840,2031),gap_inner=12,gap_outer=14)
+        s.windows['spotify']=Window('spotify',preferred=(1222,1949),rect=Rect(2145,71,1222,1949),last_used=1)
+        s.windows['terminal']=Window('terminal',preferred=(1734,927),rect=Rect(399,287,1734,927),last_used=2)
+        for i,(k,size) in enumerate({'lines':(1100,945),'claude':(903,1814),'help':(1200,1300)}.items()):
+            s.windows[k]=Window(k,preferred=size,minimised=True,last_used=-i)
+        self.assertTrue(valid(s))
+        for k in ('lines','claude','help'):
+            before={n:w.rect for n,w in s.windows.items() if not w.minimised}
+            w=s.windows[k];least=(int(w.preferred[0]*.6),int(w.preferred[1]*.6))
+            room=fit(s,w,least=least)                      # is there free space at 60 % or more?
+            r=solve(s,{'type':'restore','key':k});s=r.state
+            self.assertTrue(valid(s),(k,r.notes))
+            self.assertIn(k,r.placements,k)
+            self.assertGreaterEqual(r.placements[k].w,least[0],k);self.assertGreaterEqual(r.placements[k].h,least[1],k)
+            gone=[n for n in before if n in r.minimise]
+            if room:self.assertEqual(gone,[],(k,'minimised while it could fill free space at 60 %'))
+            else:self.assertEqual(len(gone),1,(k,'the screen was full: one window, the least recently used'))
+            for n,box in before.items():
+                if n not in gone:self.assertEqual(r.placements[n],box,(k,n,'opening never moves an existing window'))
+        # Lines fills the bottom-left at 90 %; Claude (needs 541x1088) finds no room, so only Spotify (least
+        # recently used) goes; Help fills the right strip at 64 %. Four windows stay; live it was two.
+        self.assertEqual(sorted(k for k,w in s.windows.items() if w.minimised),['spotify'])
+
+    def test_minimise_only_when_even_sixty_percent_does_not_fit(self):
+        s=State(work=Rect(0,57,3840,2031),gap_inner=12,gap_outer=14)
+        s.windows['a']=Window('a',preferred=(1800,1949),rect=Rect(14,71,1800,1949),last_used=1)
+        s.windows['b']=Window('b',preferred=(1500,1949),rect=Rect(1826,71,1500,1949),last_used=2)
+        r=solve(s,{'type':'open','key':'c','window':{'preferred':(1200,1500)}})   # 488 px free: under 60 % of 1200
+        self.assertEqual(r.minimise,['a']);self.assertTrue(valid(r.state))
 
 
 if __name__=='__main__':unittest.main()

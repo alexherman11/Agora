@@ -105,13 +105,15 @@ def fit(s, w, fill=False, least=None):
     candidates = []
     for r in free_rectangles(s.bounds, occupied(s,(w.key,)),s.gap_inner):
         width,height = (r.w,r.h) if fill else tuple(max(p,m) for p,m in zip(w.preferred,w.minimum))
-        if least and not fill and r.w>=least[0] and r.h>=least[1]:width,height=min(width,r.w),min(height,r.h)
+        reduced=bool(least) and not fill and r.w>=least[0] and r.h>=least[1]
+        if reduced:width,height=min(width,r.w),min(height,r.h)
         if width < w.minimum[0] or height < w.minimum[1] or width>r.w or height>r.h: continue
         x = min(max(w.rect.x if w.rect else r.x,r.x),r.right-width)
         y = min(max(w.rect.y if w.rect else r.y,r.y),r.bottom-height)
         box = Rect(x,y,width,height)
         distance = abs(x-w.rect.x)+abs(y-w.rect.y) if w.rect else 0
-        score = (-width*height,distance,y,x) if fill else (distance,r.w*r.h-width*height,y,x)
+        # fill, or a window that cannot have its preferred size: the biggest spot first, then the nearest
+        score = (-width*height,distance,y,x) if fill or least else (distance,r.w*r.h-width*height,y,x)
         candidates.append((score,box))
     return min(candidates)[1] if candidates else None
 
@@ -189,9 +191,10 @@ def anchor(r, width, bounds):
     return Rect(r.x,r.y,width,r.h)
 
 
-def narrow_pins(s, w):
-    """Make room for w by narrowing pins toward pin_min of their pinned width, in eighths, all together.
-    Returns the spot for w, or None with every pin restored. Never moves a pin off its anchored edge."""
+def narrow_pins(s, w, least=None):
+    """Make room for w by narrowing pins toward pin_min of their pinned width, in eighths, all together, stopping
+    at the first eighth where w fits (preferred, else at least `least`). Returns the spot for w, or None with every
+    pin restored. Never moves a pin off its anchored edge."""
     pins=[v for _,v in sorted(s.windows.items()) if v.pinned and v.rect and not v.minimised and v.key!=w.key]
     if not pins:return None
     original={v.key:v.rect for v in pins}
@@ -200,7 +203,7 @@ def narrow_pins(s, w):
             r=original[v.key];home=v.home or r
             floor=min(r.w,max(v.minimum[0],int(home.w*s.pin_min)))
             v.rect=anchor(r,r.w-(r.w-floor)*step//8,s.bounds)
-        found=fit(s,w)
+        found=fit(s,w) or (fit(s,w,least=least) if least else None)
         if found:return found
     for v in pins:v.rect=original[v.key]
     return None
@@ -279,31 +282,40 @@ def solve(state,event=None):
             else:
                 for v in conflicts:v.minimised=True
         if not w.pinned and w.managed:
+            # Where a new or restored window goes, in this order (WM.md "Opening: fill first"). Each step is tried
+            # only when every earlier one failed, so the least costly answer wins:
+            #   1. free space at its preferred size;
+            #   2. free space at 60 % (SQUASH) or more: the screen is not full yet, so nobody is minimised
+            #      (live, 26 Oct ~21:55: restoring Lines, Claude and Help minimised the others one by one on a
+            #      half-empty screen);
+            #   3. when_full: minimise the least recently used unpinned windows, one at a time, each time trying
+            #      preferred then 60 %; minimisations it turns out not to need are given back;
+            #   4. narrow pins, as little as gets it 60 % or more (a pin stays on screen; something big may make it
+            #      narrower: Alex, 26 Oct);
+            #   5. otherwise it stays minimised and says why.
             previous_minimised={k:v.minimised for k,v in s.windows.items() if k!=key}
+            want=tuple(max(p,m) for p,m in zip(w.preferred,w.minimum))
+            least=(max(w.minimum[0],int(want[0]*SQUASH)),max(w.minimum[1],int(want[1]*SQUASH)))
+            def place():return fit(s,w) or fit(s,w,least=least)
             found=fit(s,w)
             if found is None and s.when_full=='focus':
                 for other in s.windows.values():
                     if other.key!=key and other.managed and not other.pinned:other.minimised=True
-                found=fit(s,w)
+                found=place()
+            if found is None:found=fit(s,w,least=least)
             if found is None and s.when_full=='fill':found=fit(s,w,True)
             if found is None and s.when_full!='fill':
                 victims=[]
                 for v in sorted((v for v in s.windows.values() if v.key!=key and not v.pinned and v.managed
                         and not v.minimised),key=lambda v:(v.last_used,v.key)):
-                    v.minimised=True;victims.append(v);found=fit(s,w)
+                    v.minimised=True;victims.append(v);found=place()
                     if found:break
                 if found:
                     # Give back any minimisation the new window turned out not to need (most recent first).
                     for v in reversed(victims[:-1]):
                         if v.rect and not v.rect.near(found,s.gap_inner) and not any(v.rect.near(b,s.gap_inner) for b in occupied(s,(v.key,key))):
                             v.minimised=False
-            if found is None:
-                # A pin stays on screen, but something big may make it narrower (Alex, 26 Oct).
-                found=narrow_pins(s,w)
-            if found is None:
-                # Still no room: open it smaller rather than not at all, down to SQUASH of what it asked for.
-                want=tuple(max(p,m) for p,m in zip(w.preferred,w.minimum))
-                found=fit(s,w,least=(max(w.minimum[0],int(want[0]*SQUASH)),max(w.minimum[1],int(want[1]*SQUASH))))
+            if found is None:found=narrow_pins(s,w,least)
             if found is None:
                 for k,was in previous_minimised.items():s.windows[k].minimised=was
                 w.minimised=True;notes.append('new window cannot fit around fixed geometry')

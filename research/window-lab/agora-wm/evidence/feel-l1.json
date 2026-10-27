@@ -1,5 +1,5 @@
 {
-  "desktop": "agora-sandbox-wm-feel-1bc30e1395",
+  "desktop": "agora-sandbox-wm-feel-64cb2d7192",
   "tests": [
     {
       "test": "shallow drop: dragged window pushed back to the gap, neighbours untouched",
@@ -69,14 +69,14 @@
   "scale": 1.5,
   "drag_tick_ms": {
     "ticks": 67,
-    "median": 0.38,
-    "p95": 3.908,
-    "max": 5.809,
+    "median": 0.374,
+    "p95": 4.741,
+    "max": 10.406,
     "meaning": "manager.drag_tick incl. feel step and real ghost SetWindowPos calls"
   },
   "alex_before": {
-    "foreground": 10160950,
-    "focus": 10160950,
+    "foreground": 14030788,
+    "focus": 0,
     "cursor": [
       1088,
       1377
@@ -84,8 +84,8 @@
     "input desktop": "Default"
   },
   "alex_after": {
-    "foreground": 10160950,
-    "focus": 10160950,
+    "foreground": 14030788,
+    "focus": 0,
     "cursor": [
       1088,
       1377

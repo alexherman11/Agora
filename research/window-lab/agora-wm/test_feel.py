@@ -281,19 +281,30 @@ class ResizeFeel(unittest.TestCase):
 
 
 class PinFeel(unittest.TestCase):
-    def test_pinned_spotify_narrowed_when_a_big_editor_opens_then_grows_back(self):
+    def test_a_pin_is_not_narrowed_while_the_new_window_fits_at_sixty_percent(self):
+        # Order (WM.md "Opening: fill first"): free space at 60 %+, then minimise the oldest, then narrow pins.
         s = desk(browser=(14, 71, 2500, 1949), spotify_pin=(2826, 71, 1000, 1949))
         r = solve(s, {'type': 'open', 'key': 'editor', 'window': {'preferred': (3100, 1800)}})
         self.assertTrue(valid(r.state))
+        self.assertEqual(r.minimise, ['browser'], 'the oldest goes first')
+        self.assertEqual(r.placements['spotify_pin'], Rect(2826, 71, 1000, 1949), 'the pin keeps its width')
+        self.assertGreaterEqual(r.placements['editor'].w, int(3100 * 0.6))
+
+    def test_a_wide_pin_is_narrowed_when_something_big_opens_then_grows_back(self):
+        # Spotify pinned 2100 wide: with the browser minimised, 1700 px are left, under 60 % of the editor's 3100.
+        s = desk(browser=(14, 71, 1700, 1949), spotify_pin=(1726, 71, 2100, 1949))
+        r = solve(s, {'type': 'open', 'key': 'editor', 'window': {'preferred': (3100, 1800)}})
+        self.assertTrue(valid(r.state))
         self.assertIn('browser', r.minimise, 'the oldest goes first')
+        self.assertNotIn('spotify_pin', r.minimise)
         pin = r.placements['spotify_pin']
         self.assertEqual(pin.right, 3826, 'keeps its screen-side edge')
-        self.assertLess(pin.w, 1000)
-        self.assertGreaterEqual(pin.w, 500)
-        self.assertNotIn('spotify_pin', r.minimise)
+        self.assertLess(pin.w, 2100)
+        self.assertGreaterEqual(pin.w, 1050, 'never under pin_min of its pinned width')
+        self.assertGreater(pin.w, 1050, 'narrowed only as far as needed')
         self.assertGreaterEqual(r.placements['editor'].w, int(3100 * 0.6))
         back = solve(r.state, {'type': 'close', 'key': 'editor'})
-        self.assertEqual(back.placements['spotify_pin'], Rect(2826, 71, 1000, 1949), 'grows back to its pinned width')
+        self.assertEqual(back.placements['spotify_pin'], Rect(1726, 71, 2100, 1949), 'grows back to its pinned width')
 
     def test_pin_stays_on_screen_when_the_work_area_shrinks(self):
         s = desk(spotify_pin=(2826, 71, 1000, 1949))

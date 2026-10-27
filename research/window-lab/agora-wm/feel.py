@@ -255,6 +255,7 @@ class Gesture:
         self.floored = set()
         self.landing = self.start
         self.frame = Frame({}, self.start, 'still')
+        self.plan = (self.base, self.start)
 
     # -- small helpers
     @property
@@ -626,6 +627,13 @@ class Gesture:
         held = {k for k in self.contacts if not self.tr(k)['yielded']}
         layout = self._layout(target, held)
         self.landing = self._landing(T, held, layout)
+        if held and not self._fits(layout, self.landing):
+            # Nowhere free for it at its size (live seed: a yielded neighbour had taken its starting slot): the windows
+            # it covers give way now, in this tick, so the ghosts show it, rather than leaving it overlapping them.
+            held = set()
+            layout = self._layout(target, held)
+            self.landing = self._landing(T, held, layout)
+        self.plan = (layout, self.landing)       # release settles to exactly this
         for k in self.neighbours():
             w = layout.windows.get(k)
             want = None if (w is None or w.minimised) else w.rect
@@ -634,6 +642,11 @@ class Gesture:
                            sorted(k for k in self.contacts if self.tr(k)['yielded']),
                            sorted(k for k in self.neighbours() if self.shown.get(k, 1) is None))
         return self.frame
+
+    def _fits(self, layout, landing):
+        trial = copy_state(layout)
+        trial.windows[self.key].rect = landing
+        return valid(trial)
 
     def _aim(self, k, want, t):
         """Point k's ghost at want, with the settle-back delay and easing."""
@@ -681,11 +694,8 @@ class Gesture:
             result = solve(self.base, {'type': 'noop'})
             result.notes.append('inside the dead zone: put back')
             return result
-        target = self._target(self.T)
-        held = {k for k in self.contacts if not self.tr(k)['yielded']}
-        layout = self._layout(target, held)
-        landing = self._landing(self.T, held, layout)
-        final = copy_state(layout)                 # exactly what the ghosts showed, the dragged window on its outline
+        layout, landing = self.plan                # computed in the release tick itself: what the ghosts showed
+        final = copy_state(layout)                 # the dragged window on its outline
         final.windows[key].rect = landing
         if not valid(final):                       # rare: the outline could not be made legal; settle around it
             final = self._layout(landing, set())

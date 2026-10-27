@@ -33,4 +33,8 @@ All edits are inside `agora-wm/`. `kd_window.py`, the shell, the painter and the
 - **Pins moved from world `wm-pin` things to `screen.json`** (Claude, earlier on 26 Oct). The module still
   parsed them as world rows, so every settings read would have failed once a pin existed. Fixed in
   `wm_module.py`. No world word was missing; this was a stale reader.
+- **Coordinator, 26 Oct:** a module that re-offers its words does not update the `undo` field of dictionary
+  entries that already exist. `wm.focus`, `wm.minimise`, `wm.restore`, `wm.pin`, `wm.unpin` and `wm.arrange` now
+  offer `undo=no`, because they are screen acts and not records. In the live world they were set by hand. The
+  missing world-level word: **re-offering a module word updates its entry** (or a word to refresh one).
 

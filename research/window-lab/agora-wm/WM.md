@@ -385,6 +385,11 @@ the per-frame positions it would need.
    no-overlap rule holds whatever happens: if the outline cannot be made legal, the existing solver settles
    around it.
 
+   *Later the same evening (ran):* each tick now computes one plan (layout and outline), and release settles to
+   exactly that plan, never recomputing it. If the outline can't be legal (no free spot at its size, and a
+   yielded neighbour took its starting slot), the windows it covers give way in that same tick, so the ghosts
+   show it. WYSIWYG: 2000/2000 seeds.
+
    *Changed while building (ran):* the first draft yielded "deep" drops at release (33 % covered). The resize
    filmstrip showed why that is wrong: the ghost said "the edge stops here", and the release pushed the chat
    under the browser as a 160 px strip. A seeded property test now checks that release equals the last frame:
@@ -443,12 +448,29 @@ away also ends with nothing moved: the neighbour slides home after 250 ms, or at
 
 A pin stays on screen. Nothing the WM does minimises it or moves it off the screen. Something big may make it
 narrower:
-- **Opening or restoring a window that doesn't fit** goes through these steps in order:
-  1. Minimise the least recently used unpinned windows (`when_full`).
-  2. If it still doesn't fit, **narrow pins**, keeping each pin's edge nearest the screen edge. A pin narrows
-     down to `pin_min` = **50 %** of the width it was pinned at, and never under its minimum.
-  3. If it still doesn't fit, open the new window smaller, down to 60 % of the size it asked for.
-  4. Only then leave it minimised, as before.
+- **Opening or restoring a window: fill first.** *This superseded my first order the same evening; the
+  coordinator's live bug report and draft.* Live at ~21:55, restoring Lines, then Claude, then Help each
+  minimised the others on a half-empty screen. Alex asked for "tile freely or fill the space", and minimise only
+  "when the screen is full". So "full" now means *no room even at 60 %*. The order, each step tried only when
+  every earlier one fails:
+  1. Free space at its preferred size.
+  2. Free space at **60 % or more** (the biggest such spot, then the nearest). Nobody is minimised.
+  3. `when_full`: minimise the least recently used unpinned windows, one at a time, each time trying preferred,
+     then 60 %. Minimisations it didn't need are given back.
+  4. **Narrow pins**, keeping each pin's edge nearest the screen edge, by as little as gets the new window to
+     60 % or more. A pin never goes under `pin_min` = **50 %** of its pinned width, nor under its minimum.
+  5. Otherwise it stays minimised and says why.
+
+  Why pins come after minimising (agreeing with the coordinator): a pin's width is the person's choice, while a
+  new window's preferred size is the app's guess. So a pin narrows only when even 60 % of the newcomer won't fit
+  beside it ("something big"). **Ran** the live sequence as `test_engine.FillFirstTests`, with theme gaps 12/14:
+  - Lines fills the bottom-left at 90 %.
+  - Claude (needs 541×1088) finds no room, so only Spotify, the least recently used, is minimised.
+  - Help fills the right strip at 64 %.
+  - Four windows stay on screen (live, it was two).
+
+  Would change my mind: if Alex wants a pin to give up some width before *anything* is minimised, move step 4
+  before step 3.
 - **When space frees** (a close or a minimise), a narrowed pin grows back to its pinned width first.
 - **A work-area change** (a bar appears) moves and narrows a pin only as far as needed to keep it on screen.
 - **During drags, pins are walls.** You can drag a pin yourself; where you drop it becomes its new pinned place.
@@ -526,7 +548,7 @@ window leaves the layout until you un-maximise it, and then it comes back like a
 
 **Ran.**
 - **Unit and kernel suites:** `python -m unittest test_engine test_feel test_manager test_watchdog
-  test_source_seam test_module_kernel` printed `Ran 55 tests ... OK` (was 22).
+  test_source_seam test_module_kernel` printed `Ran 55 tests ... OK` (was 22); after the fill-first rework, `Ran 58 tests ... OK`.
 - **Fuzz:** L0 fuzz 60,000 events, with the pin invariants rewritten (a pin may narrow or regrow, never be
   minimised by the WM or leave the screen).
 - **Frame cost**, 20 windows in a packed 5×4 grid, slow diagonal drag, 300 ticks: median 1.5 ms, p95 3.8 ms,
