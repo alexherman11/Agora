@@ -19,7 +19,10 @@
 - **Ran** Claude 2.1.308 directly against the scripted model: warm process, first reply 0.7 s without MCP, 1.7 s with it on the first message, 0.08 s on the second.
 - **Ran** `kernel-lab/tests/test_chat.py` (4) and `test_byo_agent.py` (8, including the batch wire test), and the kernel suite.
 - **Ran** the ported lens in a sandbox, through `/api/scene` and a headless screenshot (`evidence/jeff-chat-sandbox.png`): JEFF's header, lines run under one name, Alex at the right, Answer, the input. Send and Answer gestures through `/api/do`.
-- **Not verified:** the Codex fallback with MCP (no live Codex turn was run); a live Claude turn before JEFF himself went live.
+- **Ran, live (8810), 27 Oct 10:46:** kdesk restarted on this code; jeff-chat installed; his soul (dk837) and the rules (dk838) carried; want=awake. One line from Alex's agent in Shop talk (`@jeff … do one small read with lines`): JEFF on Claude Opus 5.5 answered there twice, first words **2234 ms** after the line (house.who), and read the chats with `lines`. His old corner f5189 is want=asleep.
+- **Ran, hidden:** the JEFF button's line `window.open jeff-chat` opens the lens in a window of its own (sandbox 8833).
+- **Not verified:** the Codex fallback with MCP (no live Codex turn was run); the chat window on Alex's screen (not opened by me: no test windows); a compaction or quota switch live.
+- **Still open on the screen:** an older window `JEFF` (dk821, a page on the old desk's door) may still be open; the button now opens `jeff-chat` instead.
 
 ## Left behind from the old jeff-chat (no kernel source yet)
 
