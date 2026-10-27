@@ -229,8 +229,11 @@ class Builders:
                 kind = e.get('e')
                 if kind == 'init':
                     state['session'] = e['session']
-                    state['turn_started'] = stamp()
+                    state['thread_started'] = stamp()
                     self.event(state, 'init', 'authenticated Codex thread started')
+                elif kind == 'turn_started':
+                    state['turn_started'] = stamp()
+                    state['turn_id'] = e.get('turn')
                     self.phase(state, 'working', 'authenticated Codex turn running')
                 elif kind == 'tool':
                     self.event(state, 'act', e.get('name', 'tool'))
@@ -280,14 +283,14 @@ class Builders:
         with self.lock:
             if state['phase']!='blocked' or state.get('session') or state['task'] in self.children:
                 return {'refused':'retry only applies to a terminal startup failure before any Codex thread'}
-            self.assert_owned(state)
-            if (not state.get('tree') or self.git(state['tree'],'rev-parse','HEAD')!=state['base']
-                    or self.git(state['tree'],'status','--porcelain','--untracked-files=no')):
-                return {'refused':'startup tree has changes; reconcile before retry'}
             if sum(s['phase'] in ACTIVE or s['task'] in self.children for s in self.states.values())>=self.capacity:
                 return {'refused':'both slots occupied'}
             state['phase']='preparing';self.save(state)
             def launch(s):
+                self.assert_owned(s)
+                if (not s.get('tree') or self.git(s['tree'],'rev-parse','HEAD')!=s['base']
+                        or self.git(s['tree'],'status','--porcelain','--untracked-files=no')):
+                    raise RuntimeError('startup tree has changes; reconcile before retry')
                 task=self.session(s['requester']).look(s['task'])
                 self.run_worker(s,self.prompt(s,task))
             threading.Thread(target=self.guarded,args=(state,launch),daemon=True).start()

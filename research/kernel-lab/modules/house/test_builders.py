@@ -169,9 +169,12 @@ def test_retry_retains_claim_tree_and_only_runs_unchanged_prethread_failure(mana
 def test_retry_refuses_changed_source(manager):
     s=state(manager,'blocked');manager.session=lambda _:manager.fixture_door
     manager.git=lambda cwd,*args:'b'
-    with patch.object(B.threading.Thread,'start') as launch:
-        assert 'refused' in manager.retry(msg())
-        launch.assert_not_called()
+    with patch.object(B.threading, 'Thread') as thread:
+        assert manager.retry(msg()).get('external')
+        target=thread.call_args.kwargs['target'];args=thread.call_args.kwargs['args']
+        target(*args)
+    assert s['phase']=='blocked'
+    assert 'tree has changes' in s['detail']
 
 
 def test_main_advancement_blocks_publish_without_git_mutation(manager):
@@ -247,6 +250,7 @@ def test_real_kernel_claim_fence_and_git_lifecycle(tmp_path, monkeypatch):
             b.git(self.tree,'add','value.txt');b.git(self.tree,'commit','-m','fixture repair')
             (self.tree/'BUILD-RESULT.md').write_text('Scripted fixture changed value; independent check must verify it.')
             self.events.put(dict(e='init',session='scripted-session'))
+            self.events.put(dict(e='turn_started',turn='scripted-turn'))
             self.events.put(dict(e='text',text='repair ready'))
             self.events.put(dict(e='result',ok=True))
             return True
@@ -291,3 +295,28 @@ def test_mcp_compatibility_does_not_broaden_other_tools(tmp_path):
         assert params['sandbox']=='workspace-write'
     path.write_text(json.dumps({'mcpServers':{'agora':{},'desk':{}}}))
     with pytest.raises(ValueError):W.thread_parameters(tmp_path,'gpt-6.1-sol','fixture',path)
+
+
+def test_codex_progress_never_publishes_reasoning_or_tool_arguments():
+    assert B.T.reduce({'type':'codex_event','method':'item/completed',
+                       'data':{'item':{'type':'reasoning','text':'private'}}})==[]
+    tool=B.T.reduce({'type':'codex_event','method':'item/started',
+                     'data':{'item':{'type':'commandExecution','command':'secret value'}}})
+    assert tool==[{'e':'tool','name':'commandExecution','input':{}}]
+    assert B.T.reduce({'type':'system','subtype':'init','session_id':'session'})[0]['e']=='init'
+    assert B.T.reduce({'type':'system','subtype':'turn_started','turn_id':'turn'})[0]['e']=='turn_started'
+
+
+def test_codex_public_text_is_not_duplicated_by_final_aggregate():
+    import io, queue
+    events=[{'type':'codex_event','method':'item/completed',
+             'data':{'item':{'type':'agentMessage','text':'Progress'}}},
+            {'type':'assistant','message':{'content':[{'type':'text','text':'Progress'}]}},
+            {'type':'result','is_error':False}]
+    child=B.T.Child.__new__(B.T.Child)
+    child.codex_streamed=False;child.log=lambda *a:None;child.events=queue.Queue()
+    child.proc=SimpleNamespace(stdout=io.StringIO('\n'.join(json.dumps(e) for e in events)),wait=lambda:0)
+    child._read()
+    got=[]
+    while not child.events.empty():got.append(child.events.get())
+    assert [e['text'] for e in got if e['e']=='text']==['Progress']

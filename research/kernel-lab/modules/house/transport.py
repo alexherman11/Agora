@@ -80,6 +80,7 @@ class Child:
 
     def __init__(self, cmd, cwd, env, events, log, stderr=None):
         self.events, self.log = events, log
+        self.codex_streamed = False
         self.proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                      stderr=open(stderr or Path(cwd) / "stderr.log", "a", encoding="utf-8"),
                                      text=True, encoding="utf-8", errors="replace", bufsize=1,
@@ -106,6 +107,12 @@ class Child:
             except json.JSONDecodeError:
                 continue
             self.log("event", ev)
+            if ev.get("type") == "codex_event" and ev.get("method") == "item/completed" and (ev.get("data") or {}).get("item", {}).get("type") == "agentMessage":
+                self.codex_streamed = True
+            if ev.get("type") == "assistant" and self.codex_streamed:
+                continue  # the adapter's final aggregate duplicates already delivered public text
+            if ev.get("type") == "result":
+                self.codex_streamed = False
             for out in reduce(ev):
                 self.events.put(out)
         self.events.put({"e": "exit", "code": self.proc.wait()})
@@ -122,6 +129,16 @@ class Child:
 def reduce(ev):
     """A stream-json event (Claude's, or codex_resident's, which speaks the same shape) -> house events."""
     t = ev.get("type")
+    if t == "system" and ev.get("subtype") == "turn_started":
+        return [{"e": "turn_started", "turn": ev.get("turn_id")}]
+    if t == "codex_event":
+        item = (ev.get("data") or {}).get("item") or {}
+        if ev.get("method") == "item/completed" and item.get("type") == "agentMessage":
+            return [{"e": "text", "text": item.get("text", "")}]
+        if ev.get("method") == "item/started" and item.get("type") in (
+                "commandExecution", "mcpToolCall", "dynamicToolCall", "fileChange", "webSearch"):
+            return [{"e": "tool", "name": str(item.get("tool") or item.get("type")), "input": {}}]
+        return []  # reasoning and raw tool arguments/results never become public activity
     if t == "system" and ev.get("subtype") == "init" and ev.get("session_id"):
         return [{"e": "init", "session": ev["session_id"]}]
     if t == "system" and ev.get("subtype") == "compact_boundary":

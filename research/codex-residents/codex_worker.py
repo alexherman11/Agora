@@ -228,6 +228,7 @@ def serve(args):
             )
             require_subscription(client)
             turn_id = client.turn_start(started.thread.id, text, {"effort": args.reasoning}).turn.id
+            output({"type": "system", "subtype": "turn_started", "turn_id": turn_id})
             finished = threading.Event()
 
             def watch(turn=turn_id, done=finished):
