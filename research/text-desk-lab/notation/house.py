@@ -108,7 +108,10 @@ COMMANDS = {"look", "read", "open", "close", "where", "verbs", "pivot", "find", 
             "undo", "table", "run", "script", "scripts", "rule", "rules", "clock", "why", "compare", "vars", "set",
             "rows", "scene", "worktree", "go", "wake", "plan", "apply", "export", "sync", "x", "ex", "?"}
 DEFAULTS = {"model": "claude-opus-5-5", "breather": "120", "wake_every": "14400", "workers": "1", "worker_model": "", "worker_pool": "",
-            "timers": "off", "rest_wakes": "on", "claude_start_threshold": "off"}
+            "timers": "off", "rest_wakes": "on", "claude_start_threshold": "off",
+            # Alex, 27 Oct: every desk agent compacts at 400k context. The house note's compact_at changes it ("off"
+            # leaves Claude's own default); a model with a smaller window is capped to that window by Claude itself
+            "compact_at": "400k"}
 RESTART = 75         # the exit code that asks keeper.py to start the house again at once, on the new code
 # Alex, 30 Sep ("changes shouldn't need everyone resting"; "I'd rather be able to change the code while they work"):
 # only the files the house itself runs (workshop.HOUSE_FILES) ask it to restart, and a restart waits this long for
@@ -170,7 +173,10 @@ def find_claude():
     if os.environ.get("HOUSE_CLAUDE"):
         return os.environ["HOUSE_CLAUDE"], "?"
     found = []
-    for path in [shutil.which("claude")] + sorted(glob.glob(os.path.expandvars(r"%APPDATA%\Claude\claude-code\*\claude.exe"))):
+    # the desktop app keeps <version>\claude.exe, and since 2.1.30x <version>\<build>\claude.exe
+    kept = r"%APPDATA%\Claude\claude-code"
+    for path in [shutil.which("claude")] + sorted(glob.glob(os.path.expandvars(kept + r"\*\claude.exe"))
+                                                  + glob.glob(os.path.expandvars(kept + r"\*\*\claude.exe"))):
         if not path:
             continue
         try:
@@ -193,6 +199,15 @@ def clean_env(fake):
     env["DESKD"] = os.environ.get("DESKD", "")
     if fake:
         env["ANTHROPIC_BASE_URL"] = f"http://127.0.0.1:{fake}"
+    return env
+
+
+def compacting(env, house):
+    """The house note's compact_at (default 400k) as the context size at which a Claude child compacts its
+    conversation; "off" leaves Claude's own default. Claude caps it to a model's smaller window itself."""
+    at = str(getattr(house, "compact_at", None) or DEFAULTS["compact_at"]).strip()
+    if at.lower() != "off":
+        env = dict(env, CLAUDE_CODE_AUTO_COMPACT_WINDOW=at)
     return env
 
 
@@ -533,7 +548,7 @@ class Resident:
         self.state["session_model"] = model
         self.state["session_reasoning"] = props.get("reasoning", "medium")
         self.save()
-        child_env = clean_env(self.house.fake)
+        child_env = compacting(clean_env(self.house.fake), self.house)
         if provider == "claude" and props.get("quota_failover") == "on" and not self.house.fake:
             child_env = quota_policy.claude_environment(self.house.claude, child_env)
             effort = props.get("reasoning", "medium")
@@ -807,6 +822,7 @@ class House:
         self.dir = STATE / world
         self.dir.mkdir(parents=True, exist_ok=True)
         self.claude, self.claude_version = find_claude()
+        self.compact_at = DEFAULTS["compact_at"]
         self.workshop = workshop.Workshop(self)
         self.feeds = feeds.Feeds(world, self.dir)
         self.usage = usage.Usage(world, self.dir)
@@ -1276,6 +1292,7 @@ class House:
                 print(f"house: charter mirror: {type(exc).__name__}: {exc}", flush=True)
             w = self.load()
         cfg = self.settings(w)
+        self.compact_at = cfg.get("compact_at") or DEFAULTS["compact_at"]
         corners = self.corners(w)
         open_ = [s for s in w.subjects.values() if (s.get("props") or {}).get("objective") == "open"]
         objective = bool(open_)

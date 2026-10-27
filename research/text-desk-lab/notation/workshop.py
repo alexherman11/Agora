@@ -2381,7 +2381,7 @@ class Worker:
                                      actual_effort="", selection_error="", selection_status="resolved")
                 if self.state.get("session"):
                     cmd += ["--resume", self.state["session"]]
-                env = H.clean_env(self.house.fake)
+                env = H.compacting(H.clean_env(self.house.fake), self.house)
                 if (provider == "claude" and not self.house.fake
                         and (self.state.get("last_handoff") or {}).get("to") == "claude"):
                     env = quota_policy.claude_environment(self.house.claude, env)
