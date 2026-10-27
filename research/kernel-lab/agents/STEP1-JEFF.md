@@ -6,7 +6,7 @@
 
 | Piece | Where | What it is |
 |---|---|---|
-| JEFF as a person | `window-lab/kernel-desktop/kdesk.py` (`moving_in`, `LocalEntry`) | His own account `desktop:jeff`, joined through the local entry, and a session of his own (signer `jeff`). A **member** of the place. Not yet a leader: see *Open* below. |
+| JEFF as a person | `window-lab/kernel-desktop/kdesk.py` (`moving_in`, `LocalEntry`) | His own account `desktop:jeff`, joined through the local entry, and a session of his own (signer `jeff`). A member of the place and the leader of `team`, which holds Shop talk. |
 | Batched tools | `kernel-lab/mcp/agora_mcp.py` | Three tools. `see` and `do` take `line` or `lines`; `lines` takes a list and routes each line to `/see` or `/do` by its first word (the Lines window's routing, plus the kernel's other readings). In a list each line is its own call: a refused line refuses only itself. `as=<name>` in one line gives `$<name>` to later lines. |
 | The chat kind | `kernel-lab/kernel/chat.py`, entries in `kernel/words.py` | `make kind=chat name=… [with="Alex, JEFF"]` (with=: only those people see it), `say <chat> <words> [reply_to=] [about=]`, `chat <chat> [limit=] [since=]`. A said line (kind `said`, made only by `say`) is addressed: each @name outside quotes, or with none, in a closed chat everyone else in it. Its happening carries `to`, `said`, `by_id` (`kernel.happening_for`). |
 | The house | `kernel-lab/modules/house/` | A kernel module (`house.py`, `transport.py`, `charter_hook.py`). Runs each `house-agent` thing's agent as one long-lived Claude `-p` stream-json process (Codex through `codex_resident.py --mcp-config`), with MCP as its only tools and its own bearer session. Wakes it only for a said line addressed to it, a task card given to it (`who=`), or `house.wake`. Durable cursor per agent; catches up with `rows said` at start. Compacts at 400k (`house-settings` `compact_at`). Charter as system prompt; the compact hook reads it again. Quota fallback to the agent's `fallback_*` on a verified limit (`quota_policy.quota_error`). Words: `house.who`, `house.wake`, `house.stop`, all answering at once. |
@@ -26,12 +26,15 @@
 
 ## Left behind from the old jeff-chat (no kernel source yet)
 
-The Everything feed (every line to or by Alex, anywhere), the To chips, attaching what is open, captures, voice, usage, commenting on a document's words. JEFF's acts are not yet shown as receipts under his line (the page's mock); the house keeps his last acts in `house.who`.
+The Everything feed (every line to or by Alex, anywhere), the To chips, attaching what is open, captures, voice, usage, commenting on a document's words. 
 
-## Open (asked of the coordinating session, not answered when this was written)
+## Decided by the coordinating session (27 Oct, after the first build)
 
-1. "JEFF is a leader": a leader of the place is a steward in the kernel. He is a member for now; `role <jeff> leader in=<group>` makes him a leader of a group when that is settled.
-2. His plain words: `speaks=text` (the default) says his turn's text into the chat that woke him as he writes it. `set <house-agent> speaks=say` makes only his own `say` lines reach a chat.
+1. **JEFF leads the team.** He is a member of the place and the leader of `team` (an open group the whole place sees), which holds Shop talk. Alex stays the only steward. A steward-only word JEFF needs (module, grant, off, on) is friction to report; Alex decides.
+2. **His words stream into the chat that woke him**, one line per text block as it arrives, with his tool calls as small receipts under that line (`acts`, set only by the line's speaker). Woken by no chat (a task, house.wake), his words and acts go to his own activity record (`house.activity JEFF`, `<world>/modules/house/jeff/activity.jsonl`), never a chat. Thinking blocks are never posted. "Text briefly, like texting" stays in his rules (the charter, dk838).
+
+**Ran:** hidden proof 19 of 19 (`evidence/house-proof.json`), with receipts (`look … · rows chat · frobnicate now · say … (1 refused)`), the team, and a house.wake turn landing in his activity record and in no chat. **Ran, live:** JEFF's line in Shop talk carried the receipt `see: look dk842`.
+**Found and fixed live:** `say <chat> text="…@jeff…"` (what the lens sends) lost its @name, because quoted words are skipped when finding whom a line calls; the text= value is now read whole (b2bb0e61c). Also: a `;` in a typed line is a step break, so a line with one is cut there.
 
 ## Rough spots (source edits and the world-level word each one lacked)
 
