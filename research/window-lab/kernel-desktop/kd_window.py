@@ -257,6 +257,10 @@ class MemScreen(Screen):
         w = self.wins.get(wid)
         return bool(w and not w["min"])
 
+    def tuck(self, wid):
+        if wid in self.wins:
+            self.wins[wid]["min"] = True
+
     def focus(self, wid):
         if self.front == wid and not self.wins[wid]["min"]:
             self.wins[wid]["min"] = True
@@ -419,6 +423,11 @@ class GuiScreen(Screen):
     def shown(self, wid):
         rec = self.wins.get(wid)
         return bool(rec and rec["hwnd"] and user32.IsWindowVisible(rec["hwnd"]) and not user32.IsIconic(rec["hwnd"]))
+
+    def tuck(self, wid):
+        rec = self.wins.get(wid)
+        if rec and rec["hwnd"]:
+            user32.ShowWindow(rec["hwnd"], 7)          # SW_SHOWMINNOACTIVE: tucked away as it was, never activated
 
     def is_front(self, wid):
         rec = self.wins.get(wid)
@@ -586,22 +595,31 @@ class Geometry:
 
     def __init__(self, path):
         self.path, self.lock = path, threading.Lock()
-        self.boxes = {}
+        self.boxes, self.tucked = {}, set()
         if path and path.exists():
             try:
-                self.boxes = {k: tuple(v) for k, v in json.loads(path.read_text(encoding="utf-8")).items()}
+                data = json.loads(path.read_text(encoding="utf-8"))
+                self.tucked = set(data.pop("__tucked__", []))
+                self.boxes = {k: tuple(v) for k, v in data.items()}
             except (OSError, ValueError):
-                self.boxes = {}
+                self.boxes, self.tucked = {}, set()
 
     def get(self, wid):
         return self.boxes.get(wid)
 
-    def put(self, wid, box):
+    def is_tucked(self, wid):
+        return wid in self.tucked
+
+    def put(self, wid, box=None, tucked=None):
         with self.lock:
-            self.boxes[wid] = tuple(int(v) for v in box)
-            if self.path:
+            before = (self.boxes.get(wid), wid in self.tucked)
+            if box is not None:
+                self.boxes[wid] = tuple(int(v) for v in box)
+            if tucked is not None:
+                (self.tucked.add if tucked else self.tucked.discard)(wid)
+            if self.path and before != (self.boxes.get(wid), wid in self.tucked):
                 tmp = self.path.with_suffix(".tmp")
-                tmp.write_text(json.dumps(self.boxes), encoding="utf-8")
+                tmp.write_text(json.dumps({**self.boxes, "__tucked__": sorted(self.tucked)}), encoding="utf-8")
                 os.replace(tmp, self.path)
 
 
@@ -974,6 +992,8 @@ class WindowHost:
         self.geo.put(wid, box)
 
         def on_shown():
+            if self.geo.is_tucked(wid) and not row.get("edge") and not row.get("layer"):
+                self.screen.tuck(wid)
             self.opened += 1
             self.m.happen("window.opened", wid, f"{row.get('name')} is on the screen")
 
@@ -991,10 +1011,11 @@ class WindowHost:
             for wid, row in list(self.rows.items()):
                 if row.get("edge") or row.get("layer") or row.get("shows") == "taskbar":
                     continue
-                rec = self.screen.wins.get(wid) or {}
-                if rec.get("hwnd") and user32.GetPropW(rec["hwnd"], "Agora.WM.Lease"):
-                    self.settle.pop(wid, None)
-                    continue  # WM readings own geometry; never copy its placements into world facts.
+                # Local only, so it is kept even while the window manager places the window: a restart reopens
+                # each window where it really was, tucked away if it was (live, 26 Oct: stale boxes overlapped).
+                hwnd = (self.screen.wins.get(wid) or {}).get("hwnd")
+                if hwnd:
+                    self.geo.put(wid, tucked=bool(user32.IsIconic(hwnd)))
                 box = self.screen.box(wid)
                 if not box or box == self.applied.get(wid):
                     self.settle.pop(wid, None)

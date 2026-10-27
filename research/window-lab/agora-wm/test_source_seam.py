@@ -24,8 +24,8 @@ class SourceSeam(unittest.TestCase):
                 applied={},settle={},m=Mock(),geo=Mock())
             with self.assertRaises(StopIteration):namespace['watch_drags'](instance)
             instance.m.do.assert_not_called()           # a drag is never a world fact (Alex, 26 Oct)
-            if leased:instance.geo.put.assert_not_called()  # the WM owns a leased window's geometry
-            else:instance.geo.put.assert_called_once_with('wt123',(30,40,500,600))
+            # Local only, so kept even while the WM places it: a restart reopens windows where they really were.
+            instance.geo.put.assert_any_call('wt123',(30,40,500,600))
 
 
 if __name__=='__main__':unittest.main()
