@@ -1,10 +1,11 @@
 // Trusted arrangement runtime; component code supplies pixels, never the reading.
 // The entire painter uses the existing guarded widget surface and bridge.
-const {widget} = await agora.ready;
+const {widget, target} = await agora.ready;
 const definition = (await rows('rows widget')).find(w=>w.id===widget.id||w.id===widget);
 const lensName = definition.component_lens;
 let mounted, dragging=false, refreshTimer, menu, menuReturnFocus, currentPlan;
-let viewState={}, renderReadings=new Map();
+// A window opened on a thing starts with it as $view.target (window.open <lens> <thing>)
+let viewState=target?{target}:{}, renderReadings=new Map();
 const moduleCache=new Map();
 const interpolate=(text,env)=>String(text).replace(/\$([\w.-]+)/g,(matched,path,offset,source)=>{
   let value=env;for(const bit of path.split('.'))value=value?.[bit];

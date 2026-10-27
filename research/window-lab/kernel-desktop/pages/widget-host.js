@@ -335,7 +335,9 @@
     // srcdoc has a unique opaque origin. Scripts run after the bridge bootstrap.
     const safe=s=>s.replace(/<\/script/gi,'<\\/script');
     frame.srcdoc=`<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><style id="ag-theme">${String(data.theme.css||'').replace(/<\/style/gi,'<\\/style')}</style><style>html,body{margin:0;min-height:100%;font-family:${data.theme.font};color:${data.theme.ink}}*{box-sizing:border-box}</style>${shell?'<style>html,body{background:transparent!important}:root{color-scheme:normal!important}</style>':''}<script>${safe(bootstrap)}<\/script><script type="module">${safe(data.code)}<\/script>`;
-    frame.onload=()=>send({agora:1,init:{widget:data.widget,name:data.name,surface:data.surface,theme:data.theme}});
+    // a window opened on a thing (window.open <lens> <thing>) hands its lens the thing as $view.target
+    const target=/^[a-z]{1,8}\d+$/.test(q.get('target')||'')?q.get('target'):'';
+    frame.onload=()=>send({agora:1,init:{widget:data.widget,name:data.name,surface:data.surface,theme:data.theme,target}});
     surface.replaceChildren(frame);poll();
   }
   // The page's theme changed (theme-live.js): the window inside wears it too, without a reload.

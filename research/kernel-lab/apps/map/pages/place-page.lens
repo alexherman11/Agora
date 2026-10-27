@@ -1,0 +1,15 @@
+root : place-page
+  head : place-head
+    watch reading:"map.place $view.target"
+    on show do map.show $thing
+    on edit do set $thing $fields
+  coming : place-list, title "Coming up", kind event, fields "title start", add "Plan something here", empty "Nothing planned here yet."
+    watch reading:"map.place $view.target"
+    on add do make kind=event at=$thing $fields
+  notes : place-list, title "Notes", kind note, fields "text", add "Leave a note", empty "No notes yet."
+    watch reading:"map.place $view.target"
+    on add do make kind=note at=$thing $fields
+  talk : place-talk, title "Talk", prompt "Say something about this place"
+    watch reading:"map.place $view.target"
+    on say do post $text about=$thing
+    on like do like $post

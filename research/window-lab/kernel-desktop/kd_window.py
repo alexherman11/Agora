@@ -1065,6 +1065,8 @@ class WindowHost:
         elif row.get('widget'):
             view = 'widget'
             path = f"/desk/widget.html?win={wid}&widget={quote(str(row['widget']))}"
+            if row.get("target"):                         # a window opened on a thing: its lens sees $view.target
+                path += f"&target={quote(str(row['target']))}"
         elif row.get("lens") and row.get("edge"):
             view = "bar"                                  # a bar is the lens alone: no strip to drag or close by
             path = f"/desk/bar.html?win={wid}&lens={quote(str(row['lens']))}&edge={row['edge']}"
