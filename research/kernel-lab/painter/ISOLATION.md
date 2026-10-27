@@ -111,6 +111,17 @@ the native CDP `Page.crash` on one never-shown window: its readiness count
 reloaded. Source/results: `widget_guard.py`, `pages/widget-host.js`,
 `widgets.py`, `evidence/isolation-crash-measurement.json`.
 
+> **Amended (builder, 27 Oct 2026): a minimised window is not a stopped window.** Live, boards tucked by the window
+> manager came back as "stopped answering for 5000 ms", "its renderer exited" or "no widget instance". The host now
+> judges silence only while its page is visible and its own 250 ms clock ticks on time (a late tick means the browser
+> slowed the page, so the silence is the browser's); a frame lost or killed is started again (at most three times in two
+> minutes, and a hidden window waits until it is seen) instead of showing the stopped card; a broker instance reaped
+> for silence (now after 120 s, was 20 s) is opened again by itself, hearing the same words; and a hidden painter plans
+> nothing until it is seen. **Ran:** `window-lab/kernel-desktop/test_minimised_windows.py` 4 passed; the same four
+> against the committed host page failed with the live texts. A board minimised 7 minutes with real throttling in
+> hidden headless Chromium: the old host showed "no widget instance for this viewer" within the first minute; the new
+> one came back with the change made meanwhile painted.
+
 ## General editing handles
 
 - Style writes validate before committing. Exact 3/4/6/8-digit hex and safe

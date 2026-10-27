@@ -283,17 +283,22 @@ async function hearMotion(word){if(heard.has(word))return;heard.add(word);await 
   for(const owner of componentOwners.values())if(owner.element?.isConnected&&!owner.failed&&Object.hasOwn(owner.node.saw,event.target)){
     for(const binding of owner.node.motions||[])if(binding.trigger==='happening '+word)playMotion(owner,binding.token);
   }
-  clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>refresh().catch(tell),80);
+  soon();
 })}
+// A hidden window (minimised, tucked, covered) reads nothing: what it heard, and its safety reread, wait until it is
+// seen again, then one fresh plan catches it up. Six tucked boards no longer replan the world on every act (27 Oct).
+function soon(){if(document.hidden)return;clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>refresh().catch(tell),80)}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)return;clearTimeout(refreshTimer);refresh().catch(tell)});
 for(const word of ['make','set','forget','undo','component','component-action'])await hearMotion(word);
 await refresh();
 // A forgotten/private target may no longer be hearable. Time-dependent bindings
 // also have no world happening. Reconcile the visible projection, without
 // widening the event stream or revealing why a row disappeared.
-// A lens may ask for a slower (or faster) safety reread: reconcile_ms, 500..60000 (default 1500).
+// A lens may ask for a slower (or faster) safety reread: reconcile_ms, 500..60000 (default 5000; was 1500 until 27 Oct,
+// when each reread was a whole-world plan and six windows kept the kernel busy). Heard happenings still refresh at once.
 let reconcileMs=0,reconcileTimer;
-const reconcileWanted=()=>Math.max(500,Math.min(60000,Number(currentPlan?.options?.reconcile_ms)||1500));
+const reconcileWanted=()=>Math.max(500,Math.min(60000,Number(currentPlan?.options?.reconcile_ms)||5000));
 (function reconcile(){
   reconcileMs=reconcileWanted();nativeTimers.clearInterval(reconcileTimer);
-  reconcileTimer=nativeTimers.setInterval(()=>{refresh().catch(tell);if(reconcileWanted()!==reconcileMs)reconcile()},reconcileMs);
+  reconcileTimer=nativeTimers.setInterval(()=>{if(!document.hidden)refresh().catch(tell);if(reconcileWanted()!==reconcileMs)reconcile()},reconcileMs);
 })();

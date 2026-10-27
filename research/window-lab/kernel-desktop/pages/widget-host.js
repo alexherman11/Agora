@@ -8,6 +8,13 @@
   const shell = window.AGORA_SHELL || null;
   let frame, instance, stopped = false, busy = 0, pollTimer, componentView=false, nativeGranted=false, lastLayout=null;
   const phases=new Map();let stallTimer,recovering=false,lastPong=performance.now();
+  // A window that is minimised, tucked or covered is not a stopped window (27 Oct). Chromium slows a hidden page's
+  // timers (after five minutes, chains wake about once a minute) and may freeze or discard its frame's renderer. So the
+  // watchdog judges only while the page is seen and its own clock ticks on time; a frame lost while hidden is started
+  // again when the window is seen; and a broker instance reaped for silence is opened again by itself.
+  let lastTick=performance.now(),quietUntil=0,restartWanted=null,chromed=false,code=null,polling=false,pollFails=0,renewing=null;
+  const restarts=[],heardWords=new Set();
+  const forgive=()=>{const now=performance.now();lastPong=now;lastTick=now;for(const p of phases.values())p.at=now};
   const hooks = new Map();
   const waiting=[];
   let nextCall=0;
@@ -93,8 +100,9 @@
       }else{
         if(!['do','see','hear','theme','describe','upload','project','file','download','download-reading'].includes(op))throw Error('Unknown bridge call');
         if(componentView)await callTurn();
-        result=await post('call',{op:['file','download'].includes(op)?'file-check':op==='download-reading'?'see':op,line:e.data.line,saw:e.data.saw,word:e.data.word,text:e.data.text,name:e.data.name,data:e.data.data,group:e.data.group,view:e.data.view,target:e.data.target,variant:e.data.variant});
+        result=await call({op:['file','download'].includes(op)?'file-check':op==='download-reading'?'see':op,line:e.data.line,saw:e.data.saw,word:e.data.word,text:e.data.text,name:e.data.name,data:e.data.data,group:e.data.group,view:e.data.view,target:e.data.target,variant:e.data.variant});
         if(!result.ok)throw Error(result.text||'Refused');
+        if(op==='hear')heardWords.add(String(e.data.word||''));
         if(op==='file'||op==='download'){
           if(!/^\/files\/[a-zA-Z]+\d+\?variant=(content|thumbnail)$/.test(result.path))throw Error('Invalid file route');
           const response=await fetch(result.path,{credentials:'same-origin',cache:'no-store',redirect:'error'});
@@ -193,6 +201,52 @@
       window.chrome.webview.postMessage(JSON.stringify({agora:'recover-widget-renderer'}));
     });
   }
+  // The broker forgets an instance it has not heard from (a hidden page polls rarely): open a fresh one for the same
+  // widget, hear the same words again, and carry on. Changed code restarts the frame instead.
+  const gone=r=>!r.ok&&/no widget instance|widget host disconnected/.test(r.text||'');
+  function renew(){
+    if(!renewing)renewing=(async()=>{
+      const data=await post('open',{widget:(shell&&shell.widget)||q.get('widget')});
+      if(!data.ok)throw Error(data.text);
+      if(data.code!==code){navigator.sendBeacon('/desk/widget/close',JSON.stringify({instance:data.instance}));restartFrame('This widget changed.');return false}
+      instance=data.instance;nativeGranted=!!data.native;
+      for(const word of heardWords){const r=await post('call',{op:'hear',word});if(!r.ok)heardWords.delete(word)}
+      surface.dataset.renewals=String((+surface.dataset.renewals||0)+1);
+      send({agora:1,event:{word:'widget.changed'}});
+      return true;
+    })().finally(()=>renewing=null);
+    return renewing;
+  }
+  async function call(data){
+    let r=await post('call',data);
+    if(gone(r)&&await renew())r=await post('call',data);
+    return r;
+  }
+  // Start the frame again (a fresh renderer, the same window), at most three times in two minutes; a hidden window
+  // waits until it is seen. Only then does it show the stopped card, with Try again.
+  async function restartFrame(why){
+    if(document.hidden){restartWanted=why;return}
+    restartWanted=null;
+    const now=performance.now();
+    while(restarts.length&&now-restarts[0]>120000)restarts.shift();
+    if(restarts.length>=3){stop(why+' It stopped three times in two minutes.');return}
+    restarts.push(now);recovering=true;
+    try{
+      clearTimeout(pollTimer);phases.clear();frame?.remove();frame=null;
+      if(instance){const old=instance;instance=null;fetch('/desk/widget/close',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({instance:old})}).catch(()=>{})}
+      stopped=false;heardWords.clear();
+      await start();
+      surface.dataset.restarts=String((+surface.dataset.restarts||0)+1);
+    }catch(e){stop(String(e.message||e))}
+    finally{recovering=false;quietUntil=performance.now()+3000}
+  }
+  document.addEventListener('visibilitychange',()=>{
+    forgive();
+    if(document.hidden)return;
+    if(restartWanted)restartFrame(restartWanted);
+    else if(!stopped&&!polling){clearTimeout(pollTimer);poll()}
+  });
+  document.addEventListener('resume',forgive);
   async function recoverStall(part){
     if(recovering||stopped)return;recovering=true;
     const old=frame;phases.clear();
@@ -217,6 +271,10 @@
     }finally{recovering=false}
   }
   stallTimer=setInterval(()=>{
+    // Judge only a seen page whose own clock is on time: a late tick means this page was slowed or frozen, so every
+    // silence measured across it is the browser's, not the frame's.
+    const now=performance.now(),late=now-lastTick>1500;lastTick=now;
+    if(document.hidden||late){forgive();return}
     // Descendants are begun after their containers: attribute a blocked mount
     // to the deepest active part, rather than its innocent layout ancestors.
     const blocked=[...phases.values()].filter(p=>performance.now()-p.at>(p.stage==='module'?10000:2500)).sort((a,b)=>b.path.length-a.path.length);
@@ -224,26 +282,44 @@
     else if(frame&&!stopped&&!recovering){
       send({agora:1,ping:true});
       if(performance.now()-lastPong>5000&&!phases.size){
-        recovering=true;terminateOwnedRenderer().then(()=>stop('This window stopped answering for 5000 ms.')).catch(e=>stop(String(e.message||e))).finally(()=>recovering=false);
+        recovering=true;terminateOwnedRenderer().then(()=>{recovering=false;quietUntil=performance.now()+3000;return restartFrame('This window stopped answering for 5000 ms.')})
+          .catch(e=>{recovering=false;stop(String(e.message||e))});
       }
     }
   },250);
   addEventListener('agora-frame-failed',()=>{
-    if(recovering)return;
-    const part=[...phases.values()].sort((a,b)=>b.path.length-a.path.length)[0];
+    // Our own recovery kills the renderer and its exit arrives a moment later: that is not a second failure.
+    if(recovering||performance.now()<quietUntil)return;
+    // Lost while hidden (Chromium may discard a background frame), or with no part mid-paint: start it again.
+    // A part caught mid-paint while seen is quarantined, as before.
+    const part=!document.hidden&&[...phases.values()].sort((a,b)=>b.path.length-a.path.length)[0];
     if(part)recoverStall(part);
-    else stop('This part stopped · its renderer exited. Reopen this window to try again.');
+    else restartFrame('This part stopped · its renderer exited.');
   });
   async function poll(){
-    if(stopped)return;
-    try{const r=await post('poll');if(!r.ok){stop(r.text);return}for(const event of r.events)send({agora:1,event})}
-    catch{stop('Widget disconnected. Reopen to continue.');return}
-    pollTimer=setTimeout(poll,400);
+    if(stopped||polling)return;
+    polling=true;let wait=400;
+    try{
+      let r=await post('poll');
+      if(gone(r)&&await renew())r=await post('poll');
+      if(!r.ok){
+        polling=false;
+        if(/off or changed/.test(r.text||''))restartFrame(r.text);else stop(r.text);
+        return;
+      }
+      pollFails=0;delete surface.dataset.offline;
+      for(const event of r.events)send({agora:1,event});
+    }catch{
+      // The door may be restarting: wait longer each time, never give up on a window the person can still see.
+      pollFails++;wait=Math.min(10000,400*2**pollFails);surface.dataset.offline='true';
+    }
+    polling=false;
+    if(!stopped)pollTimer=setTimeout(poll,wait);
   }
   async function start(){
-    lastPong=performance.now();
+    forgive();
     const data=await post('open',{widget:(shell&&shell.widget)||q.get('widget')});if(!data.ok)throw Error(data.text);
-    instance=data.instance;
+    instance=data.instance;code=data.code;
     componentView=!!data.component_lens;
     nativeGranted=!!data.native;
     if(shell&&!nativeGranted)throw Error('The '+(data.name||'bar')+' widget holds no window.native grant');
@@ -252,7 +328,7 @@
     if(shell){document.body.classList.add('shell-frame');shell.painted=true}
     else if(q.get('slot'))document.body.classList.add('slot');
     else if(data.surface==='overlay'){document.body.classList.add('overlay');document.documentElement.style.background='transparent'}
-    else {KD.chrome(data.title||data.name);document.querySelectorAll('#receipt')[1]?.remove()}
+    else if(!chromed){chromed=true;KD.chrome(data.title||data.name);document.querySelectorAll('#receipt')[1]?.remove()}
     frame=document.createElement('iframe');frame.title=data.name;frame.name='agora-widget';frame.setAttribute('sandbox','allow-scripts');
     frame.setAttribute('referrerpolicy','no-referrer');
     frame.setAttribute('allow',"camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'; fullscreen 'none'");

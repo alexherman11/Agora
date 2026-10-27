@@ -111,7 +111,7 @@ Alex's open store decisions).
 
 **Smaller general words this needed** (rough spots at the end): `size` in the part-style vocabulary (text size);
 `api.child(name, settings, key)` so a slot repeated per app gets its own owner; a lens fact `reconcile_ms` (the painter's
-1.5 s safety reread, slower for bars); a lens fact `right_click=ask` (any part that does not handle right-click opens the ask menu).
+safety reread, 5 s by default since 27 Oct (was 1.5 s), none while the window is hidden); a lens fact `right_click=ask` (any part that does not handle right-click opens the ask menu).
 
 **What would change my mind.** If the painter frame costs visibly more than the hand-written bar (memory per window, or the
 1.5 s projection reread over a large world: it scans every visible thing), the bars should stay host pages and gain handles by
@@ -382,4 +382,15 @@ Builder, 26 Oct (the bars as components):
 13. `kd_system.py` headless battery: the hidden world had no battery to show. Missing word: a fixture reading set by the test.
 14. Seen, not mine (ran): mid-session, another builder's uncommitted `kernel.py` change read a word's name in a thing position as
     its dictionary entry, so `window.open help` lost its view and 5 desktop tests failed; a later full run passed 68 of 68.
+
+Builder, 27 Oct (minimised painter windows stopped; kernel load from plan rereads):
+
+15. `pages/widget-host.js`: the watchdog took a slowed or hidden page for a hung frame, a lost frame was final, and a reaped
+    instance stopped the window. Missing word: the window's own seen state (visible, hidden, slowed) as something the
+    host reads before judging; a frame restart as an ordinary, bounded act rather than "reopen this window".
+16. `widgets.py`: a plan was compiled twice per `project`, the first inside the kernel lock (the admission ran `look-view
+    plan=yes`), and the broker's lock queued every window behind each compile; the reap was 20 s. Missing word: an admission
+    check that is not a reading (`may look-view`), so a host can ask "allowed?" without paying for the answer.
+17. `painter/painter.js`: a hidden painter replanned the world on every heard act and every 1.5 s. Missing word: none; the
+    painter now waits until it is seen, and the default reread is 5 s (`reconcile_ms` still overrides).
 
