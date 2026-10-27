@@ -249,9 +249,10 @@ class MemScreen(Screen):
         then()
         threading.Event().wait()
 
-    def open(self, wid, view, title, url, box, on_closed, on_shown, bar=False):
-        self.wins[wid] = {"box": box, "view": view, "title": title, "url": url, "min": False}
-        self.front = wid
+    def open(self, wid, view, title, url, box, on_closed, on_shown, bar=False, tucked=False):
+        self.wins[wid] = {"box": box, "view": view, "title": title, "url": url, "min": bool(tucked)}
+        if not tucked:
+            self.front = wid
         threading.Thread(target=on_shown, daemon=True).start()
 
     def close(self, wid):
@@ -310,7 +311,7 @@ class GuiScreen(Screen):
                                                  width=200, height=100)
         self.webview.start(then, gui="edgechromium", private_mode=True)
 
-    def open(self, wid, view, title, url, box, on_closed, on_shown, bar=False):
+    def open(self, wid, view, title, url, box, on_closed, on_shown, bar=False, tucked=False):
         s = scale()
         x, y, w, h = box
         api = PageApi(self, wid)
@@ -337,6 +338,29 @@ class GuiScreen(Screen):
 
         def loaded():
             if rec["hwnd"] is None:
+                if bar and bar != "layer":
+                    # A bar is a tool window before it is ever visible. 27 Oct: shown first, it was for a moment a
+                    # visible frameless Agora window, the window manager took the dock for a tile and moved it.
+                    try:
+                        early = int(win.native.Handle.ToInt64())
+                        ex = user32.GetWindowLongPtrW(early, GWL_EXSTYLE)
+                        user32.SetWindowLongPtrW(early, GWL_EXSTYLE, (ex | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW)
+                    except Exception:
+                        pass
+                if tucked and not bar:
+                    # A window tucked away before a restart comes back tucked, never shown first. 27 Oct: shown and
+                    # then tucked, it looked newly opened to the window manager, which minimised Alex's Claude window
+                    # to make room for it.
+                    try:
+                        early = int(win.native.Handle.ToInt64())
+                        user32.SetPropW(early, "Agora.Window." + wid, wt.HANDLE(1))
+                        user32.SetWindowPos(early, None, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE)
+                        user32.ShowWindow(early, 7)             # SW_SHOWMINNOACTIVE: on the taskbar, tucked, not active
+                        rec["hwnd"] = early
+                        on_shown()
+                        return
+                    except Exception:
+                        pass
                 win.show()
                 time.sleep(0.15)
                 shown_once()
@@ -1062,8 +1086,9 @@ class WindowHost:
             row2 = self.rows.get(wid) or row
             out = self.m.do(f"forget {wid}", saw={wid: row2.get("rev", 0)})
             log(f"{wid} closed on the screen: {out.get('text')}")
-        self.screen.open(wid, view, title, url, box, on_closed, on_shown,
-                         bar=row.get("edge") or ("layer" if row.get("layer") else None) or ("bottom" if view == "taskbar" else None))
+        bar = row.get("edge") or ("layer" if row.get("layer") else None) or ("bottom" if view == "taskbar" else None)
+        self.screen.open(wid, view, title, url, box, on_closed, on_shown, bar=bar,
+                         tucked=bool(self.geo.is_tucked(wid) and not bar))
 
     def watch_drags(self):
         """Every half second: a window Alex moved or resized and then left alone is recorded where he left it."""

@@ -38,3 +38,11 @@ All edits are inside `agora-wm/`. `kd_window.py`, the shell, the painter and the
   offer `undo=no`, because they are screen acts and not records. In the live world they were set by hand. The
   missing world-level word: **re-offering a module word updates its entry** (or a word to refresh one).
 
+- **Claude, 27 Oct: the WM grabbed the dock and minimised Alex's Claude window after a window-module restart.**
+  Two moments when a window looked like something it was not: a bar was shown before it became a tool window, so
+  for a tick it was a visible frameless Agora window, and the WM planned it as a tile (the dock ended up
+  3818×36); and a window tucked before the restart was shown and only then tucked, so the WM took it for a new
+  window and minimised the least recently used one, Alex's Claude window, to make room. Fixed in `kd_window.py`:
+  bars are tool windows before they are shown, and tucked windows come back already tucked. The missing world-level
+  word: **a window's role (bar, tile, layer) that the host declares and the WM reads**, instead of the WM inferring
+  it from window styles at whatever instant it looks.
