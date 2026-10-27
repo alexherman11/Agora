@@ -143,9 +143,19 @@ const Shell = (() => {
   // ------------------------------------------------------------------------------------------------ icons
   const AGORA_APPS = {
     lines: ["Lines", "window.open lines"], help: ["Help", "window.open help"], board: ["Board", "window.open board"],
-    taskboard: ["Task board", "window.open taskboard"], appearance: ["Appearance", "window.open appearance"],
+    taskboard: ["Task board", "window.open taskboard-components"], appearance: ["Appearance", "window.open appearance"],
     feed: ["Feed", "window.open feed"], thing: ["Thing", "window.open thing"], tasks: ["Running windows", "window.open tasks"],
   };
+  // Which Agora app a window or button belongs to, for its icon: the lens name itself, else a family by name
+  // (seabright-board is a board, taskboard-components a task board). "thing" is the plain fallback.
+  const appOf = (name) => {
+    const n = (name || "").toLowerCase();
+    if (AGORA_APPS[n]) return n;
+    for (const [re, app] of [[/task/, "taskboard"], [/board/, "board"], [/appearance|theme/, "appearance"], [/feed/, "feed"],
+                             [/help/, "help"], [/lines|chat/, "lines"]]) if (re.test(n)) return app;
+    return "thing";
+  };
+  const opensLens = (line) => ((line || "").match(/^window\.open (\S+)/) || [])[1] || "";
   const iconUrl = (ref, size = 128) => {
     if (!ref) return "";
     if (ref.startsWith("agora:")) return `/desk/shell/apps/${ref.slice(6).replace(/[^a-z0-9-]/g, "")}.svg`;
@@ -190,14 +200,14 @@ const Shell = (() => {
           if (w.agora && (!o || o.edge || /^(taskbar|shell-)/.test(o.shows || ""))) return [];
           const shows = (o && o.shows) || w.shows || "";
           return [{ key: String(w.key), app: (o && o.name) || w.app || nice((w.exe || "").split(/[\\/]/).pop().replace(/\.exe$/i, "")), exe: w.exe || "",
-            icon: w.agora ? "agora:" + (AGORA_APPS[shows] || shows === "thing" ? shows : "thing") : refOf(w.icon) || (w.exe ? "exe:" + w.exe : ""),
+            icon: w.agora ? "agora:" + appOf(shows) : refOf(w.icon) || (w.exe ? "exe:" + w.exe : ""),
             agora: w.agora || "", state: w.state || "normal", focused: !!w.focused, managed: w.managed !== false, why: w.why || "", shows, space: w.space || "" }];
         });
       }
       this.wmOK = false;               // the window manager is off: the native shell is the fallback
       const [a, b] = await Promise.all([this.see("window.list"), this.see("window.desktop")]);
       const mine = (a.rows || []).filter((w) => w.kind === "window" && !w.edge && !/^(taskbar|shell-)/.test(w.shows || ""))
-        .map((w) => ({ key: w.id, app: w.name || nice(w.shows), exe: "", icon: "agora:" + (AGORA_APPS[w.shows] ? w.shows : "thing"),
+        .map((w) => ({ key: w.id, app: w.name || nice(w.shows), exe: "", icon: "agora:" + appOf(w.shows),
           agora: w.id, state: w.shown === false ? "minimised" : "normal", focused: !!w.front, managed: false, shows: w.shows, title: w.name }));
       const theirs = (b.rows || []).filter((w) => w.handle).map((w) => ({
         key: String(w.handle), app: nice(w.program), exe: w.path || "", icon: w.ref || (w.path ? "exe:" + w.path : "hwnd:" + w.handle),
@@ -518,7 +528,7 @@ const Shell = (() => {
       const pins = await Data.pins();
       const entries = [
         ...names.filter((n) => AGORA_APPS[n]).map((n) => ({ name: AGORA_APPS[n][0], icon: "agora:" + n, line: AGORA_APPS[n][1] })),
-        ...pins.map((p) => ({ name: p.label || p.name || "Pinned", icon: p.path ? "exe:" + p.path : "agora:thing", line: p.does || `window.launch path=${p.path}` })),
+        ...pins.map((p) => ({ name: p.label || p.name || "Pinned", icon: p.path ? "exe:" + p.path : "agora:" + appOf(opensLens(p.does)), line: p.does || `window.launch path=${p.path}` })),
       ];
       const input = h("input", { type: "text", placeholder: "Open an app, or say a line", "aria-label": "Open an app or say a line", autocomplete: "off", spellcheck: "false", "data-autofocus": "" });
       const grid = h("div", { cls: "apps", role: "list" });
@@ -703,14 +713,17 @@ const Shell = (() => {
         .filter((n) => AGORA_APPS[n] && (["lines", "help", "thing", "tasks"].includes(n) || S.lenses.has(n) || window.__fx));
       const pinned = [];
       for (const n of apps) pinned.push({ id: "app:" + n, app: AGORA_APPS[n][0], exe: "", icon: "agora:" + n, wins: [], line: AGORA_APPS[n][1], launcher: n, pin: { id: "" } });
+      const launched = new Set(pinned.map((p) => p.line));
       for (const p of S.pins) {
         const exe = p.path || "";
-        pinned.push({ id: exe ? exe.toLowerCase() : "pin:" + p.id, app: p.label || p.name || (exe.split(/[\\/]/).pop() || "Pinned").replace(/\.exe$/i, ""), exe, icon: exe ? "exe:" + exe : "agora:thing", wins: [], line: p.does || `window.launch path=${exe}`, pin: p });
+        if (!exe && launched.has(p.does)) continue;           // the same app as a launcher already in the dock
+        pinned.push({ id: exe ? exe.toLowerCase() : "pin:" + p.id, app: p.label || p.name || (exe.split(/[\\/]/).pop() || "Pinned").replace(/\.exe$/i, ""), exe, icon: exe ? "exe:" + exe : "agora:" + appOf(opensLens(p.does)), wins: [], line: p.does || `window.launch path=${exe}`, pin: p });
       }
-      // an Agora app that is running shares the slot of its launcher
+      // a running Agora window shares the slot of whatever opens it (a launcher, or a button that says window.open)
       const slotted = new Set();
       for (const p of pinned) {
-        const k = p.launcher ? [...g.keys()].find((x) => x.startsWith("agora:") && g.get(x).wins.some((w) => w.shows === p.launcher)) : p.id;
+        const lens = p.launcher || opensLens(p.line);
+        const k = lens ? [...g.keys()].find((x) => x.startsWith("agora:") && !slotted.has(x) && g.get(x).wins.some((w) => w.shows === lens || (p.launcher && appOf(w.shows) === p.launcher))) : p.id;
         const run = k && g.get(k);
         if (run && !slotted.has(k)) { Object.assign(p, { wins: run.wins }); slotted.add(k); }
       }
