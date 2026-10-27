@@ -54,6 +54,7 @@ class State:
     reflow: str = 'gentle'
     clock: int = 0
     gesture: dict | None = None
+    displacement: dict = field(default_factory=dict)  # victim -> causal stack, newest last
     pin_min: float = PIN_MIN
 
     @property
@@ -74,7 +75,7 @@ class Result:
 def copy_state(s):
     """Cheap structural copy: Rects are frozen, Windows are copied one level. Same result as deepcopy, ~20x faster."""
     return replace(s,windows={k:replace(w) for k,w in s.windows.items()},obstacles=list(s.obstacles),
-        gesture=deepcopy(s.gesture))
+        gesture=deepcopy(s.gesture), displacement=deepcopy(s.displacement))
 
 
 def occupied(s, exclude=()):
@@ -223,7 +224,7 @@ def regrow_pins(s):
 
 def gentle(s):
     for k,w in sorted(s.windows.items()):
-        if not w.rect or w.minimised or w.pinned or not w.managed: continue
+        if not w.rect or w.minimised or w.pinned or not w.managed or k in s.displacement: continue
         r=w.rect
         # One bounded growth step, never a relocation. Only on close/minimise.
         goal=Rect(r.x,r.y,max(r.w,min(w.preferred[0],r.w+max(1,w.preferred[0]//8))),
@@ -233,9 +234,101 @@ def gentle(s):
                 w.rect=q;break
 
 
+
+def adaptive(s, incoming):
+    """Bounded repacking before eviction. Pins and unmanaged geometry remain fixed.
+    Prefer large useful tiles, then their learned minima. Never wakes hidden apps.
+    """
+    movable=[w for w in s.windows.values() if not w.minimised and w.managed and not w.pinned]
+    fixed=list(s.obstacles)+[w.rect for w in s.windows.values()
+        if not w.minimised and w.rect and (w.pinned or not w.managed)]
+    if not movable or len(movable)>16:return False
+    for scale in (1, .85, .7, .6, .45, 0):
+        budget=[300]
+        sizes={w.key:tuple(max(m,round(p*scale)) for p,m in zip(w.preferred,w.minimum)) for w in movable}
+        orders=[sorted(movable,key=lambda w:(-sizes[w.key][0]*sizes[w.key][1],w.key)),
+                sorted(movable,key=lambda w:(w.key!=incoming,-w.last_used,w.key))]
+        def pack(todo,blocks,result):
+            if not todo:return result
+            if budget[0]<=0:return None
+            budget[0]-=1
+            w=todo[0];width,height=sizes[w.key];candidates=[]
+            for r in free_rectangles(s.bounds,blocks,s.gap_inner):
+                if width>r.w or height>r.h:continue
+                for x,y in ((r.x,r.y),(r.right-width,r.y),(r.x,r.bottom-height)):
+                    q=Rect(x,y,width,height)
+                    distance=abs(x-w.rect.x)+abs(y-w.rect.y) if w.rect else 0
+                    candidates.append((r.w*r.h-width*height,distance,q))
+            for _,_,q in sorted(set(candidates))[:8]:
+                found=pack(todo[1:],blocks+[q],{**result,w.key:q})
+                if found is not None:return found
+            return None
+        for order in orders:
+            found=pack(order,fixed,{})
+            if found is not None:
+                for key,rect in found.items():s.windows[key].rect=rect
+                return True
+    return False
+
+
+def placement(w):return (w.rect,w.minimised)
+
+
+def remember_displacement(s,before,cause):
+    for key,old in before.windows.items():
+        w=s.windows.get(key)
+        if key==cause or not w or old.minimised or not w.managed:continue
+        if placement(w)!=placement(old):
+            s.displacement.setdefault(key,[]).append({'cause':cause,'before':placement(old),
+                'after':placement(w),'released':False})
+
+
+def restore_displacement(s,cause):
+    """Release only this opener's debt; buried debt waits for newer opens to close.
+    A changed victim invalidates its debt. Batch exact restoration handles swaps;
+    a blocked restore stays pending, never pushes other windows out of the way.
+    """
+    for key in list(s.displacement):
+        if key not in s.windows:del s.displacement[key];continue
+        for entry in s.displacement[key]:
+            if entry['cause']==cause:entry['released']=True
+    proposals={}
+    for key,stack in list(s.displacement.items()):
+        w=s.windows[key]
+        if not stack or not w.managed or placement(w)!=stack[-1]['after']:
+            del s.displacement[key];continue
+        count=0;target=placement(w)
+        for entry in reversed(stack):
+            if not entry['released']:break
+            target=entry['before'];count+=1
+        if count:proposals[key]=(target,count)
+    trial=copy_state(s)
+    for key,(target,_) in proposals.items():trial.windows[key].rect,trial.windows[key].minimised=target
+    if valid(trial):
+        for key,(target,count) in proposals.items():
+            s.windows[key].rect,s.windows[key].minimised=target
+            del s.displacement[key][-count:]
+    else:
+        for key,(target,count) in proposals.items():
+            w=s.windows[key];rect,hidden=target
+            if hidden:continue
+            if rect and s.bounds.contains(rect) and rect.w>=w.minimum[0] and rect.h>=w.minimum[1] and not any(
+                    rect.near(b,s.gap_inner) for b in occupied(s,(key,))):
+                w.rect=rect;w.minimised=False;del s.displacement[key][-count:]
+            elif w.minimised and rect:
+                found=fit(s,replace(w,preferred=(rect.w,rect.h),rect=rect),least=w.minimum)
+                if found:
+                    w.rect=found;w.minimised=False
+                    s.displacement[key][-1]['after']=placement(w)
+    s.displacement={k:v for k,v in s.displacement.items() if v}
+
+
 def solve(state,event=None):
     s=copy_state(state);e=event or {'type':'arrange'};kind=e['type'];notes=[]
     key=e.get('key');w=s.windows.get(key)
+    if kind=='open' and w is not None:kind='restore'
+    if kind in ('minimise','restore','pin','unpin','drag-start','resize-start','drag-move','drag-end','resize-move','resize-end','manual'):
+        s.displacement.pop(key,None)
     if kind=='open':
         data=dict(e.get('window',{}));key=data.pop('key',key)
         if 'rect' in data and not isinstance(data['rect'],Rect):data['rect']=Rect(*data['rect'])
@@ -282,36 +375,23 @@ def solve(state,event=None):
             else:
                 for v in conflicts:v.minimised=True
         if not w.pinned and w.managed:
-            # Where a new or restored window goes, in this order (WM.md "Opening: fill first"). Each step is tried
-            # only when every earlier one failed, so the least costly answer wins:
-            #   1. free space at its preferred size;
-            #   2. free space at 60 % (SQUASH) or more: the screen is not full yet, so nobody is minimised
-            #      (live, 26 Oct ~21:55: restoring Lines, Claude and Help minimised the others one by one on a
-            #      half-empty screen);
-            #   3. when_full: minimise the least recently used unpinned windows, one at a time, each time trying
-            #      preferred then 60 %; minimisations it turns out not to need are given back;
-            #   4. narrow pins, as little as gets it 60 % or more (a pin stays on screen; something big may make it
-            #      narrower: Alex, 26 Oct);
-            #   5. otherwise it stays minimised and says why.
+            # Preserve a free open, then repack visible tiles within usable minima.
+            # Only if bounded repacking fails do LRU victims give way. No process closes.
             previous_minimised={k:v.minimised for k,v in s.windows.items() if k!=key}
             want=tuple(max(p,m) for p,m in zip(w.preferred,w.minimum))
             least=(max(w.minimum[0],int(want[0]*SQUASH)),max(w.minimum[1],int(want[1]*SQUASH)))
             def place():return fit(s,w) or fit(s,w,least=least)
             found=fit(s,w)
-            if found is None and s.when_full=='focus':
-                for other in s.windows.values():
-                    if other.key!=key and other.managed and not other.pinned:other.minimised=True
-                found=place()
             if found is None:found=fit(s,w,least=least)
-            if found is None and s.when_full=='fill':found=fit(s,w,True)
-            if found is None and s.when_full!='fill':
+            if found is None and adaptive(s,key):found=s.windows[key].rect
+            if found is None:
                 victims=[]
                 for v in sorted((v for v in s.windows.values() if v.key!=key and not v.pinned and v.managed
                         and not v.minimised),key=lambda v:(v.last_used,v.key)):
                     v.minimised=True;victims.append(v);found=place()
+                    if found is None and adaptive(s,key):found=s.windows[key].rect
                     if found:break
                 if found:
-                    # Give back any minimisation the new window turned out not to need (most recent first).
                     for v in reversed(victims[:-1]):
                         if v.rect and not v.rect.near(found,s.gap_inner) and not any(v.rect.near(b,s.gap_inner) for b in occupied(s,(v.key,key))):
                             v.minimised=False
@@ -320,6 +400,8 @@ def solve(state,event=None):
                 for k,was in previous_minimised.items():s.windows[k].minimised=was
                 w.minimised=True;notes.append('new window cannot fit around fixed geometry')
             else:w.rect=found
+    if kind in ('open','restore') and key in s.windows and not s.windows[key].minimised:
+        remember_displacement(s,state,key)
     if kind=='work-area':
         # A pin stays on screen: moved and narrowed only as far as the new work area needs.
         for k,v in sorted(s.windows.items()):
@@ -344,6 +426,7 @@ def solve(state,event=None):
                 accepted.append(v.rect)
             else:v.minimised=True
     if kind in ('close','minimise'):
+        restore_displacement(s,key)
         regrow_pins(s)
         if s.reflow=='gentle':gentle(s)
     if not valid(s):notes.append('infeasible fixed geometry: pins/obstacles retained; no safe global solution')

@@ -863,14 +863,24 @@ class WindowHost:
             lines.append(f'make kind=window shows=taskbar name="Agora taskbar" edge=bottom')
             self.made_bar = True
             return {"lines": lines, "saw": {r["id"]: r["rev"] for r in shell}}
+        if word == "window.open":
+            # Native reconciliation lags the admitted world. A just-closed window
+            # can still be in self.rows; a just-opened one may not be there yet.
+            # Decide reuse from the caller's current world, leaving disposal to reconcile.
+            current = self.m.see("rows window", use=use)
+            if current.get("ok") is False or "rows" not in current:
+                return {"refused": "could not read current windows; try opening again"}
+            open_rows = current["rows"] or []
         if word == "window.open" and kv.get("url"):
             # A page from another Agora door on this machine in a window of its own (27 Oct: the top bar's JEFF
             # button opens JEFF's conversation, which lives in the frontier desk on 8794). Loopback http only.
             url = kv["url"]
             if not local_page(url):
                 return {"refused": "url= takes a page on this machine only: http://127.0.0.1:<port>/... or http://localhost:<port>/..."}
-            same = [r for r in self.rows.values() if r.get("shows") == "page" and r.get("url") == url]
+            same = [r for r in open_rows if r.get("shows") == "page" and r.get("url") == url]
             if same and kv.get("new") != "yes":
+                if same[0]["id"] not in self.screen.wins:
+                    return {"text": f"{same[0].get('name')} is opening already (new=yes opens another)"}
                 said = self.screen.focus(same[0]["id"]) if not self.screen.is_front(same[0]["id"]) else "in front already"
                 return {"text": f"{same[0].get('name')} is open already: {said} (new=yes opens another)"}
             name = kv.get("name") or (words[0] if words else "Page")
@@ -891,17 +901,19 @@ class WindowHost:
                     return {"refused": f"no lens or view called {view}; rows lens lists the lenses, and the views are "
                                        f"{', '.join(v for v in VIEWS if v != 'taskbar')}"}
             thing = target or (words[1] if len(words) > 1 else "")
-            same = [r for r in self.rows.values() if r.get("shows") == view and (r.get("target") or "") == thing]
+            same = [r for r in open_rows if r.get("shows") == view and (r.get("target") or "") == thing]
             if same and kv.get("new") != "yes" and view != "taskbar" and not (kv.get("to") or kv.get("at")):
+                if same[0]["id"] not in self.screen.wins:
+                    return {"text": f"{same[0].get('name')} is opening already (new=yes opens another)"}
                 said = self.screen.focus(same[0]["id"]) if not self.screen.is_front(same[0]["id"]) else "in front already"
                 return {"text": f"{same[0].get('name')} is open already: {said} (new=yes opens another)"}
-            n = sum(1 for r in self.rows.values() if r.get("shows") == view)
+            n = sum(1 for r in open_rows if r.get("shows") == view)
             edge = kv.get("edge") or ("bottom" if view == "taskbar" else "")
             if edge and edge not in ("top", "bottom"):
                 return {"refused": "edge is top or bottom: a bar along that edge of the screen"}
             if edge and not lens and view != "taskbar":
                 return {"refused": "only a lens (or the taskbar) can be a bar: window.open <lens> edge=top"}
-            taken = [r for r in self.rows.values() if r.get("edge") == edge] if edge else []
+            taken = [r for r in open_rows if r.get("edge") == edge] if edge else []
             if taken:
                 return {"refused": f"the {edge} edge holds {taken[0].get('name')} already; window.close it first"}
             box = self.box_for(view, dict(kv, edge=edge), n)

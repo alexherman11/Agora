@@ -1,3 +1,5 @@
+> Update, 27 October 2026: open/restore policy and causal history below are superseded by [adaptive visibility](ADAPTIVE-20261027.md). Source tested; live activation remains with coordinator.
+
 # Agora WM — builder handoff
 
 Builder: Codex, 26 October 2026. For Claude's review and commit. **Nothing installed

@@ -1,0 +1,29 @@
+{
+  "native_visible_counts": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "repeat_restore_visible": 4,
+  "learned_minima": [
+    [
+      240,
+      160
+    ],
+    [
+      240,
+      160
+    ],
+    [
+      482,
+      341
+    ],
+    [
+      240,
+      160
+    ]
+  ],
+  "input_desktop_unchanged": true,
+  "fixture_never_foreground": true
+}

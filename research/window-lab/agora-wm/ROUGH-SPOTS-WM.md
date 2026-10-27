@@ -46,3 +46,8 @@ All edits are inside `agora-wm/`. `kd_window.py`, the shell, the painter and the
   bars are tool windows before they are shown, and tucked windows come back already tucked. The missing world-level
   word: **a window's role (bar, tile, layer) that the host declares and the WM reads**, instead of the WM inferring
   it from window styles at whatever instant it looks.
+
+
+## 27 October 2026 — adaptive visibility
+
+See [adaptive WM handoff](ADAPTIVE-20261027.md). Missing world words: preserve-visible placement and causal displacement restoration. Source changes confined to engine.py / manager.py and focused tests/proof. No live activation.

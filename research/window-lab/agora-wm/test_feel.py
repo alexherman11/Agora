@@ -286,14 +286,15 @@ class PinFeel(unittest.TestCase):
         s = desk(browser=(14, 71, 2500, 1949), spotify_pin=(2826, 71, 1000, 1949))
         r = solve(s, {'type': 'open', 'key': 'editor', 'window': {'preferred': (3100, 1800)}})
         self.assertTrue(valid(r.state))
-        self.assertEqual(r.minimise, ['browser'], 'the oldest goes first')
+        self.assertEqual(r.minimise, [], 'reflow before eviction')
         self.assertEqual(r.placements['spotify_pin'], Rect(2826, 71, 1000, 1949), 'the pin keeps its width')
-        self.assertGreaterEqual(r.placements['editor'].w, int(3100 * 0.6))
+        self.assertGreaterEqual(r.placements['editor'].w, r.state.windows['editor'].minimum[0])
 
     def test_a_wide_pin_is_narrowed_when_something_big_opens_then_grows_back(self):
         # Spotify pinned 2100 wide: with the browser minimised, 1700 px are left, under 60 % of the editor's 3100.
         s = desk(browser=(14, 71, 1700, 1949), spotify_pin=(1726, 71, 2100, 1949))
-        r = solve(s, {'type': 'open', 'key': 'editor', 'window': {'preferred': (3100, 1800)}})
+        s.windows['browser'].minimum=(1700,1949)
+        r = solve(s, {'type': 'open', 'key': 'editor', 'window': {'preferred': (3100, 1800), 'minimum': (1860,1080)}})
         self.assertTrue(valid(r.state))
         self.assertIn('browser', r.minimise, 'the oldest goes first')
         self.assertNotIn('spotify_pin', r.minimise)

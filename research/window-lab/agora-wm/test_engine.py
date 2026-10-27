@@ -34,7 +34,7 @@ class EngineTests(unittest.TestCase):
                     self.assertEqual(old_visible,r.placements,(seed,step,'avoidable movement'))
                 if e['type']=='open':
                     for k,box in old_visible.items():
-                        if k in r.placements and not before.windows[k].pinned:
+                        if k in r.placements and not before.windows[k].pinned and fit(before, s.windows[e['key']]):
                             self.assertEqual(box,r.placements[k],(seed,step,'open shuffled an existing window'))
                 for k,w in before.windows.items():
                     if not (w.pinned and k in s.windows and w.rect and not w.minimised):continue
@@ -86,7 +86,7 @@ class EngineTests(unittest.TestCase):
         s=solve(s,{'type':'open','key':'b','window':{'preferred':(400,300)}}).state
         self.assertFalse(s.windows['a'].minimised)
         s.when_full='minimise-oldest'
-        result=solve(s,{'type':'open','key':'impossible','window':{'preferred':(3000,3000)}})
+        result=solve(s,{'type':'open','key':'impossible','window':{'preferred':(3000,3000),'minimum':(3000,3000)}})
         self.assertEqual(result.minimise,['impossible'])
 
 
@@ -121,22 +121,22 @@ class FillFirstTests(unittest.TestCase):
             r=solve(s,{'type':'restore','key':k});s=r.state
             self.assertTrue(valid(s),(k,r.notes))
             self.assertIn(k,r.placements,k)
-            self.assertGreaterEqual(r.placements[k].w,least[0],k);self.assertGreaterEqual(r.placements[k].h,least[1],k)
+            self.assertGreaterEqual(r.placements[k].w,w.minimum[0],k);self.assertGreaterEqual(r.placements[k].h,w.minimum[1],k)
             gone=[n for n in before if n in r.minimise]
             if room:self.assertEqual(gone,[],(k,'minimised while it could fill free space at 60 %'))
-            else:self.assertEqual(len(gone),1,(k,'the screen was full: one window, the least recently used'))
+            else:self.assertEqual(gone,[],(k,'reflow preserves these windows'))
             for n,box in before.items():
-                if n not in gone:self.assertEqual(r.placements[n],box,(k,n,'opening never moves an existing window'))
+                if room and n not in gone:self.assertEqual(r.placements[n],box,(k,n,'free open preserves existing geometry'))
         # Lines fills the bottom-left at 90 %; Claude (needs 541x1088) finds no room, so only Spotify (least
         # recently used) goes; Help fills the right strip at 64 %. Four windows stay; live it was two.
-        self.assertEqual(sorted(k for k,w in s.windows.items() if w.minimised),['spotify'])
+        self.assertEqual(sorted(k for k,w in s.windows.items() if w.minimised),[])
 
     def test_minimise_only_when_even_sixty_percent_does_not_fit(self):
         s=State(work=Rect(0,57,3840,2031),gap_inner=12,gap_outer=14)
         s.windows['a']=Window('a',preferred=(1800,1949),rect=Rect(14,71,1800,1949),last_used=1)
         s.windows['b']=Window('b',preferred=(1500,1949),rect=Rect(1826,71,1500,1949),last_used=2)
         r=solve(s,{'type':'open','key':'c','window':{'preferred':(1200,1500)}})   # 488 px free: under 60 % of 1200
-        self.assertEqual(r.minimise,['a']);self.assertTrue(valid(r.state))
+        self.assertEqual(r.minimise,[]);self.assertTrue(valid(r.state))
 
 
 if __name__=='__main__':unittest.main()

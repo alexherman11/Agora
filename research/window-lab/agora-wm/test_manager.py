@@ -187,16 +187,16 @@ class LiveFeel(unittest.TestCase):
         self.assertNotIn('video',self.m.state.windows);self.assertNotIn('save',self.m.state.windows)
         self.assertEqual({r['key'] for r in self.m.reading()},{'browser','chat','notes','video','save'})
 
-    def test_pinned_spotify_is_narrowed_not_minimised_when_a_big_editor_opens(self):
+    def test_pinned_spotify_stays_put_when_other_tiles_can_shrink(self):
         # Spotify pinned wide: with the browser minimised, 1600 px remain, under 60 % of the editor's 3000.
         browser=app('browser',(16,73,1600,1945),'chrome');spotify=app('spotify',(1632,73,2192,1945),'Spotify')
         self.m.configure(DEFAULTS,['spotify']);self.m.ingest([browser,spotify],WORK);self.m.switch('live');self.native.reset_mock()
         editor=app('editor',(300,200,3000,1800),'Code',_preferred=(3000,1800))
         self.m.ingest([browser,spotify,editor],WORK)
         placed=self.placed();pin=placed.get(spotify['ref'].hwnd)
-        self.assertIsNotNone(pin,'the pin was narrowed');self.assertEqual(pin.right,3824);self.assertGreaterEqual(pin.w,2192//2);self.assertLess(pin.w,2192)
+        self.assertIsNone(pin,'the pin needs no movement');self.assertTrue(valid(self.m.state))
         minimised=[c.args[0].hwnd for c in self.native.minimise.call_args_list]
-        self.assertIn(browser['ref'].hwnd,minimised);self.assertNotIn(spotify['ref'].hwnd,minimised)
+        self.assertEqual(minimised,[],'reflow keeps all three visible')
 
 
 class Quiet(unittest.TestCase):

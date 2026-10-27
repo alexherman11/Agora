@@ -63,6 +63,7 @@ class Manager:
         self.settings=candidate;self.feel=feel;self.state.pin_min=feel.pin_min
         self.changed.update(self.pins^set(pins))
         new_pins=set(pins)
+        for key in self.pins^new_pins:self.state.displacement.pop(key,None)
         for key in new_pins-self.pins:
             w=self.state.windows.get(key)
             if w and w.rect and not w.minimised:w.pinned=True;w.home=w.rect
@@ -150,7 +151,7 @@ class Manager:
         self.state.work=work
         if self.boot or resumed:
             # Starting/resuming uses actual geometry, never replays stale drag debt.
-            self.state.windows={}
+            self.state.windows={};self.state.displacement={}
             for i,row in enumerate(current.values()):
                 r=Rect(*row['rect']);pinned=row['key'] in self.pins
                 self.state.windows[row['key']]=Window(row['key'],tuple(row.get('_preferred',(r.w,r.h))),
@@ -161,6 +162,7 @@ class Manager:
         for key in sorted(set(self.state.windows)-set(current)):
             self.changed.add(key);self.pending.pop(key,None)
             if self.gesture and self.gesture.key==key:self._drop_gesture()
+            self.state.displacement.pop(key,None)
             if key in everything:
                 # Still open, but floating now (maximised, or an owned popup): it leaves the layout without a reflow,
                 # so un-maximising finds its place free. It comes back like a newly opened window.
@@ -203,6 +205,7 @@ class Manager:
             dragging=self.gesture is not None and self.gesture.key==key
             if w.pinned and old and old['rect']!=row['rect'] and not pending and not dragging and key!=self.released \
                     and row['state']!='minimised' and old['state']!='minimised':
+                self.state.displacement.pop(key,None)
                 w.rect=r;w.home=r   # you moved your pin: that is its new place (the WM only narrows or regrows it)
             if pending and self.mode=='live' and now-pending['at']>=.35:
                 if pending.get('kind')=='minimise':
@@ -233,7 +236,8 @@ class Manager:
             if dragging and self.gesture:
                 self._show(self.gesture.step(r,now*1000),r)
             elif old and old['rect']!=row['rect'] and not pending and not w.pinned and key!=self.released \
-                    and row['state']!='minimised':
+                    and row['state']!='minimised' and old['state']!='minimised':
+                # A restore changes geometry too; it is not a manual drag.
                 # A self-resizer or move without native modal hooks still gets reconciled.
                 self.state=solve(self.state,{'type':'drag-end','key':key,'rect':r.values()}).state
         # Unmanaged windows are fixed within windows; no duplicate obstacles.
@@ -333,6 +337,8 @@ class Manager:
         row=next((r for r in self.rows if r['key']==key),None)
         if not row or not self._managed(row):raise PermissionError('window is no longer manageable')
         if verb in ('minimise','restore') and key in self.pins:raise PermissionError('unpin before minimising/restoring')
+        if verb in ('minimise','restore'):
+            self.state=solve(self.state,{'type':'manual','key':key}).state
         self.lease.heartbeat();self.lease.save(row['ref'])
         return getattr(self.native,verb)(row['ref'])
 
