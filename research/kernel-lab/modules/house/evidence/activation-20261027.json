@@ -101,5 +101,38 @@
     "Native physical dock/top-right clicks were not automated; the hidden component tests cover their dispatch and real window.open calls cover loaded host behavior.",
     "Real Spotify/Claude launch sequence and tactile feel are not certified. Hidden four-window proof and live Lines/Map/JEFF nonoverlap passed.",
     "Writing import has not occurred; source corrections are in progress and exact fixture/Git denied operations remain stopped."
-  ]
+  ],
+  "writing_final": {
+    "recorded_utc": "2026-10-27T22:49:23Z",
+    "phase": "received",
+    "turns": 3,
+    "reported_tests": "Ran 10 tests in 1.652s, OK",
+    "source_review": "independent read-only review; prior findings corrected",
+    "sha256": {
+      "import_old_world.py": "c969eaa15d7de66b4d738860ec877c3dd16fe207988365178f55bf13e6ae0d22",
+      "old-world-manifest.json": "4b87d3d788ff531243f7fb8d15b7426a7147449e3a6341958464fa69c2aa201a",
+      "writing-components.js": "84d33dee69d687fc0cdb67f82f686914c85d7b35ba74436a4d67cea642482747",
+      "test_import_old_world.py": "2a57c37d980a5774c170b48113ef57d5633631c7ec50424f78faf331f6564eb8",
+      "OLD-WORLD-IMPORT.md": "eb597e3e39b6538db368ec240f996fd42ff95f9d95b41603ecf1121587aafdf1"
+    },
+    "committed": false,
+    "real_kernel_test_run": false,
+    "live_imported": false,
+    "board_receipts": [
+      {
+        "task": "dk954",
+        "records": [
+          "r1776"
+        ],
+        "status": "blocked"
+      },
+      {
+        "task": "dk970",
+        "records": [
+          "r1777"
+        ],
+        "status": "blocked"
+      }
+    ]
+  }
 }
