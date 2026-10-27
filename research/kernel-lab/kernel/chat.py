@@ -69,7 +69,9 @@ def say(k, actor, st, entry, tx, group, saw=None):
     reply = st.kv.get("reply_to")
     if reply and (k.state.get(reply, "kind") != "said" or k.shown(actor.person, reply) is None):
         raise Refused(f"reply_to={reply}: no said line you can see is called that")
-    to, unknown = addressed(k, chat, st.text or text, actor.person)     # st.text keeps its quotes
+    # the words as said, with their own quotes: text=<value> is the whole of them (the lens sends that); else the
+    # line, whose parse drops quotes around words
+    to, unknown = addressed(k, chat, text if "text" in st.kv else (st.text or text), actor.person)
     outside = [p for p in to if people and p not in people]
     t = tx.mint()
     tx.set(t, "kind", "said")

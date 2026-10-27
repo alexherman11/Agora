@@ -58,6 +58,8 @@ class Chats(unittest.TestCase):
         self.assertIn("to JEFF", called["text"])
         self.assertIn("no one here is called @nobody", called["text"])
         self.assertEqual(self.k.state.get(called["made"][0], "to"), self.jeff)
+        lensed = self.run_as(self.pike, f'say {shop} text="@jeff from the lens, not \\"@alex\\" though"')
+        self.assertEqual(self.k.state.get(lensed["made"][0], "to"), self.jeff)
 
     def test_said_lines_are_made_only_by_say_and_undo_takes_one_back(self):
         shop = self.run_as(self.jeff, 'make kind=chat name="Shop talk"')["made"][0]
