@@ -652,7 +652,7 @@ class WindowHost:
             {"word": "window.settings", "kind": "do", "takes": "which=network|volume|battery|time", "may": "anyone",
              "help": "window.settings which=network|volume|battery|time: open the corresponding Windows settings."},
             {"word": "window.launch", "kind": "do", "takes": "path=<exe>", "may": "anyone",
-             "help": "window.launch path=<absolute executable>: launch a pinned Windows program. A pin is a button with bar=taskbar, path=<exe> and does=window.launch."},
+             "help": "window.launch path=<absolute executable or Start menu shortcut>: launch a pinned Windows program. A pin is a button with bar=taskbar, path=<exe> (its icon) and does=window.launch path=<exe or .lnk/.url> (a game starts through its Steam shortcut)."},
             {"word": "window.shell", "kind": "do", "takes": "on|off", "may": "anyone",
              "help": "window.shell on|off: the desktop shell (SHELL.md): a slim top bar, a centred dock and Agora's own desktop "
                      "layer, in place of the old top bar and taskbar. on forgets the old bars' window things and makes the three "
@@ -777,7 +777,11 @@ class WindowHost:
                 ok = native_shell.settings(kv.get('which'))
             else:
                 path = Path(kv.get('path', ''))
-                ok = path.is_absolute() and path.is_file() and path.suffix.lower() == '.exe'
+                # A program, or a Start menu shortcut (a Steam or Epic game starts through its launcher: Rocket League,
+                # 27 Oct). Shortcuts only from the Start menu folders, so a pin cannot open an arbitrary file.
+                starts = [Path(os.environ.get(v, '')) / 'Microsoft/Windows/Start Menu/Programs' for v in ('APPDATA', 'PROGRAMDATA')]
+                shortcut = path.suffix.lower() in ('.lnk', '.url') and any(s in path.parents for s in starts if str(s) != '.')
+                ok = path.is_absolute() and path.is_file() and (path.suffix.lower() == '.exe' or shortcut)
                 if ok:
                     os.startfile(str(path))
             return {'external': True, 'text': f'{word}: done'} if ok else {'refused': 'that Windows target is not available now'}
