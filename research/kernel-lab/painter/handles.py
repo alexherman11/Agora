@@ -9,8 +9,10 @@ TOKENS = dict(paper='#FAF9F6', card='#FFFFFF', ink='#35433D', muted='#929B99', a
               red='#CF514A', orange='#C58332', blue='#507EBC', grey='#9BA3AC', rose='#FBE9E8',
               peach='#FFF0DC', sage='#EAF3E9', sky='#E8F1FA', lilac='#F0EBF8',
               small='8px', medium='12px', large='16px', soft='12px', round='50%')
-STYLE_KEYS = ('color','background','radius','padding','gap','glow','lines','emphasis')
-META = {'id','rev','by','kind','lens','target','made','changed','made_by','made_at','changed_at','name','title','personal','for','sees','from','origin','forgotten','pinned'}
+STYLE_KEYS = ('color','background','radius','padding','gap','glow','lines','emphasis','size')
+# via_actor: the kernel's own attribution on anything an agent makes (words._agent_origin); without it here every
+# part-style an agent made was refused at paint time (found 26 Oct by the shell's "make the clock bigger" test).
+META = {'id','rev','by','kind','lens','target','made','changed','made_by','made_at','changed_at','name','title','personal','for','sees','from','origin','forgotten','pinned','via_actor'}
 COLOUR = re.compile(r'(?:#(?:[a-f0-9]{3}|[a-f0-9]{4}|[a-f0-9]{6}|[a-f0-9]{8})|transparent|black|white|red|blue|green|grey|gray|orange|purple|pink|yellow)',re.I)
 MEASURE = re.compile(r'(?:0|\d+(?:\.\d+)?(?:px|rem|em|%|vh|vw))')
 TARGET = re.compile(r'[\w-]+(?:\.[\w-]+)?(?:\[[\w-]+=[\w-]+\])?')

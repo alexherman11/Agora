@@ -342,6 +342,13 @@ watchdog records quarantine and verifies renderer ownership before restarting
 the view. It refuses to kill a renderer shared with another view. ISOLATION.md
 records actual evidence and the recovery boundary.
 
+> **Superseded in part (builder draft, 26 Oct 2026, the shell's bars as components).** Paint health is screen state now:
+> `component-health` keeps observations in the kernel process's memory, per viewer, never recorded and without painted text
+> or styles; quarantine is local too; `component-action off` is the viewer's own `view-preference` (`<part>.enabled=no`);
+> `paint-clear` (stewards) forgets the old `paint-report` things in one act. `size` joins the style vocabulary;
+> `api.child(name, settings, key)`, `api.ask(event)` and lens facts `right_click=ask`, `reconcile_ms` are new.
+> See painter/health.py and window-lab/kernel-desktop/SHELL.md. The paragraph below is the earlier design.
+
 `component-health` is a painter-only word restricted to its own lens. Reports
 are private `paint-report` facts for the viewer; component cards and `components`
 derive `health`, `last_error` and `quarantined` from those reports. Each failure

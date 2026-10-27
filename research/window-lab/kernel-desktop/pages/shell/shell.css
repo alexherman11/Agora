@@ -250,3 +250,8 @@ html[data-reduce="yes"] *, html[data-reduce="yes"] *::before, html[data-reduce="
 
 /* the proof's seam check: the window with its parts hidden shows only the wallpaper slice */
 body.hide .rail, body.hide .pill { visibility: hidden; }
+
+/* the component host (SHELL.md, "The bars as components"): the wallpaper slice here, the bar's painter frame in front */
+body.shell-host #widget-surface { position: fixed; inset: 0; z-index: 2; margin: 0; padding: 0; }
+body.shell-host #widget-surface iframe { width: 100%; height: 100%; border: 0; display: block; background: transparent; color-scheme: normal; }
+body.hide #widget-surface { visibility: hidden; }

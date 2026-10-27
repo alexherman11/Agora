@@ -14,11 +14,12 @@ const interpolate=(text,env)=>String(text).replace(/\$([\w.-]+)/g,(matched,path,
   for(const ch of source.slice(0,offset)){if(escaped){escaped=false;continue}if(ch==='\\'){escaped=true;continue}if(ch==='"')quoted=!quoted}
   return quoted?String(value??'').replace(/\\/g,'\\\\').replace(/"/g,'\\"'):Q(value);
 });
-function closeMenu(){menu?.remove();menu=null;if(menuReturnFocus?.isConnected)menuReturnFocus.focus();menuReturnFocus=null}
+function closeMenu(){const had=!!menu;menu?.remove();menu=null;if(menuReturnFocus?.isConnected)menuReturnFocus.focus();menuReturnFocus=null;if(had)dispatchEvent(new CustomEvent('agora-menu',{detail:{open:false}}))}
 // 26 Oct (Alex): every menu ends with a box to ask, in your own words, for a change to what it is about.
 // The world's `ask` word decides where it goes (the kernel desk: a request relayed into the Conversation for Claude).
 function askBox(node){
-  const thing=Object.keys(node.saw||{})[0]||node.gestures?.map(g=>g.env&&Object.values(g.env).find(v=>v&&typeof v==='object'&&v.id)?.id).find(Boolean)||'-';
+  // A part with no bound thing (a bar's clock) asks about its lens: the thing that arranges it.
+  const thing=Object.keys(node.saw||{})[0]||node.gestures?.map(g=>g.env&&Object.values(g.env).find(v=>v&&typeof v==='object'&&v.id)?.id).find(Boolean)||currentPlan?.lens||'-';
   const box=document.createElement('input');box.type='text';box.placeholder='Ask for a change…';
   box.setAttribute('aria-label','Ask for a change to this, in your own words');box.className='menu-ask';
   box.style.cssText='display:block;box-sizing:border-box;width:100%;margin-top:6px;padding:7px 10px;font:inherit;font-size:12px;border:1px solid var(--ag-border,#e4e7e1);border-radius:8px;background:var(--ag-surface,#fff);color:inherit';
@@ -40,6 +41,32 @@ function openMenu(node,x,y){
   menu.style.top=Math.max(8,Math.min(y,innerHeight-r.height-10))+'px';
   P.navigation(menu,{menu:true});menu.querySelector('button')?.focus();
 }
+// 26 Oct (shell components): right-click any part to ask. A component calls api.ask(event); a lens with the fact
+// right_click=ask gives every part that does not handle right-click itself the same menu.
+function openAsk(node,x,y){
+  if(!node)return;closeMenu();menuReturnFocus=document.activeElement;
+  const label=String(node.name||node.component||'part').replace(/[-_]+/g,' ');
+  menu=el('div',{class:'menu ask-menu',role:'menu','aria-label':'Ask for a change to '+label,'data-path':node.path});
+  const kind=node.component.replace(/^shell-/,'').replace(/-/g,' ');
+  menu.append(el('div',{class:'ask-head'},el('strong',{},label),kind!==label?el('small',{},kind):''),askBox(node));
+  document.body.append(menu);const r=menu.getBoundingClientRect();
+  menu.style.left=Math.max(8,Math.min(x,innerWidth-r.width-10))+'px';
+  menu.style.top=Math.max(8,Math.min(y,innerHeight-r.height-10))+'px';
+  menu.querySelector('input')?.focus();
+  dispatchEvent(new CustomEvent('agora-menu',{detail:{open:true}}));
+}
+function nodeAt(target){
+  const n=target?.closest?.('[data-path]');if(!n||!currentPlan)return null;
+  const path=n.dataset.path,base=path.split('#')[0];
+  const found=findNode(currentPlan.tree,path)||findNode(currentPlan.tree,base);
+  return found&&path!==found.path?{...found,path}:found;
+}
+document.addEventListener('contextmenu',e=>{
+  if(e.defaultPrevented||currentPlan?.options?.right_click!=='ask')return;
+  if(e.target.closest?.('input,textarea,[contenteditable=true],.menu'))return;
+  const node=nodeAt(e.target);if(!node)return;
+  e.preventDefault();openAsk(node,e.clientX,e.clientY);
+});
 async function fire(node,event,values={}){
   const gesture=node.gestures.find(g=>g.event===event);
   if(!gesture)throw Error('No gesture '+event+' on '+node.path);
@@ -94,7 +121,12 @@ function renderTrusted(node){
   const boundP=Object.fromEntries(Object.entries(P).map(([key,value])=>[key,typeof value==='function'?owned(value,owner):value]));
   const api={P:boundP,el:owned(P.node,owner),button:owned(P.press,owner),part:owned((name,tag,attrs,...kids)=>part(node,name,tag,attrs,...kids),owner),palette,flag,Q,
     children:node.children,render,settings:node.settings,facts:node.facts,node,
-    child:(name,settings={})=>{const child=node.children.find(c=>c.name===name);if(!child)throw Error('Arrange child slot '+name);return render({...child,settings:{...child.settings,...settings},display:{...child.display,...settings}})},
+    child:(name,settings={},key)=>{const child=node.children.find(c=>c.name===name);if(!child)throw Error('Arrange child slot '+name);
+      // key: one owner (health, failure, cleanup) per repeated instance, painted at <slot path>#<key>
+      const path=key===undefined||key===null?child.path:child.path+'#'+String(key).replace(/[^\w.:-]/g,'_').slice(0,120);
+      return render({...child,path,settings:{...child.settings,...settings},display:{...child.display,...settings}})},
+    askBox:()=>askBox(node),
+    ask:(event,target)=>{event?.preventDefault?.();const n=target?nodeAt(target)||node:nodeAt(event?.target)||node;openAsk(n,event?.clientX??0,event?.clientY??0)},
     display:key=>node.display?.[key]??node.settings[key],format:(key,value,fallback='text')=>P.formatValue(value,node.formats?.[key]||fallback),guard:fn=>owned(fn,owner),
     setTimeout:(fn,ms)=>scoped(owner,()=>setTimeout(fn,ms)),setInterval:(fn,ms)=>scoped(owner,()=>setInterval(fn,ms)),
     requestAnimationFrame:fn=>scoped(owner,()=>requestAnimationFrame(fn)),
@@ -160,13 +192,13 @@ function applyStyles(plan){
       if(key==='lines')declarations.push(`display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:${val};overflow:hidden`);
       else if(key==='emphasis')declarations.push('font-weight:'+val);
       else if(key==='glow')declarations.push(`box-shadow:0 0 18px ${wear(val)}`);
-      else declarations.push(({radius:'border-radius'}[key]||key)+':'+(key==='color'||key==='background'?wear(val):val));
+      else declarations.push(({radius:'border-radius',size:'font-size'}[key]||key)+':'+(key==='color'||key==='background'?wear(val):val));
     }
     rules.push(selector+'{'+declarations.map(d=>d.replace(/;|$/g,m=>m===';'?'!important;':'!important')).join(';')+'}');
   }
   const style=el('style',{id:'part-styles'},rules.join('\n'));document.head.append(style);
 }
-let refreshInFlight,refreshAgain=false;
+let refreshInFlight,refreshAgain=false,repaintAll=false;
 function keepTextSelection(){
   const selection=getSelection();if(!selection||selection.isCollapsed)return;
   const root=selection.anchorNode?.parentElement?.closest('[data-path][data-part]');
@@ -193,7 +225,8 @@ async function refreshOnce(){
   // that captured DOM; its old facts must survive until the fenced drop.
   if(dragging)return;
   const fingerprint=p=>JSON.stringify(p,(key,value)=>key==='parts'?undefined:key==='health'?{quarantined:value.quarantined,action_epoch:value.action_epoch}:value);
-  if(currentPlan&&fingerprint(plan)===fingerprint(currentPlan)){currentPlan=plan;return}
+  if(currentPlan&&!repaintAll&&fingerprint(plan)===fingerprint(currentPlan)){currentPlan=plan;return}
+  repaintAll=false;
   for(const c of plan.components){
     const old=moduleCache.get(c.name);if(old?._source===c.code)continue;
     if(!c.trusted||!plan.parts.some(p=>p.component===c.name&&!p.health.quarantined)){moduleCache.delete(c.name);continue}
@@ -234,7 +267,8 @@ async function refreshOnce(){
 addEventListener('ag-theme',()=>{
   Object.assign(P.tokens,themeTokens());
   // Components that took colours at mount (a card's tint) are mounted again; drafts live in api.draft and survive.
-  if(currentPlan){applyTokens(currentPlan);applyStyles(currentPlan);currentPlan=null;refresh().catch(tell)}
+  // (repaintAll, not currentPlan=null: a part that paints on its own clock, a dock adding an app, still has a plan)
+  if(currentPlan){applyTokens(currentPlan);applyStyles(currentPlan);repaintAll=true;refresh().catch(tell)}
 });
 function playMotion(owner,token){
   const defaults={settle:{from:{opacity:.5,transform:'translateY(6px)'},to:{opacity:1,transform:'none'},duration:200},pulse:{from:{transform:'scale(.96)'},to:{transform:'scale(1)'},duration:180}};
@@ -256,4 +290,10 @@ await refresh();
 // A forgotten/private target may no longer be hearable. Time-dependent bindings
 // also have no world happening. Reconcile the visible projection, without
 // widening the event stream or revealing why a row disappeared.
-setInterval(()=>refresh().catch(tell),1500);
+// A lens may ask for a slower (or faster) safety reread: reconcile_ms, 500..60000 (default 1500).
+let reconcileMs=0,reconcileTimer;
+const reconcileWanted=()=>Math.max(500,Math.min(60000,Number(currentPlan?.options?.reconcile_ms)||1500));
+(function reconcile(){
+  reconcileMs=reconcileWanted();nativeTimers.clearInterval(reconcileTimer);
+  reconcileTimer=nativeTimers.setInterval(()=>{refresh().catch(tell);if(reconcileWanted()!==reconcileMs)reconcile()},reconcileMs);
+})();

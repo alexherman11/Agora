@@ -2,7 +2,11 @@
 'use strict';
 (() => {
   const q = new URLSearchParams(location.search), surface = document.querySelector('#widget-surface');
-  let frame, instance, stopped = false, busy = 0, pollTimer, componentView=false;
+  // A shell page (pages/shell/top.html, dock.html) hosts its bar's painter here: window.AGORA_SHELL = {page, widget,
+  // fallback(text)}. No chrome, no receipt, a transparent frame over the page's wallpaper slice, and the narrow native
+  // bridge below when the broker says the widget holds window.native.
+  const shell = window.AGORA_SHELL || null;
+  let frame, instance, stopped = false, busy = 0, pollTimer, componentView=false, nativeGranted=false, lastLayout=null;
   const phases=new Map();let stallTimer,recovering=false,lastPong=performance.now();
   const hooks = new Map();
   const waiting=[];
@@ -16,6 +20,9 @@
     return r.json();
   };
   const stop = text => {
+    // A shell bar never shows a whole-window card (its window is mostly see-through and clipped): the page paints the
+    // hand-written bar instead, and the shell page tries the components again later.
+    if(shell?.fallback){stopped=true;clearTimeout(pollTimer);frame?.remove();frame=null;shell.fallback(text,!!shell.painted);return}
     stopped=true; clearTimeout(pollTimer); frame?.remove(); frame=null;
     const receipt=document.querySelector('#receipt'); if(receipt) receipt.textContent=text;
     surface.dataset.stopped='true'; native.paint=null; native.hits=[];
@@ -48,7 +55,8 @@
       hear:async(word,fn)=>{await call('hear',{word});if(!listeners.has(word))listeners.set(word,[]);listeners.get(word).push(fn);return()=>{listeners.set(word,listeners.get(word).filter(f=>f!==fn))}},
       theme:()=>call('theme').then(r=>r.theme),describe:text=>call('describe',{text}),
       componentPhase:data=>parent.postMessage({agora:1,op:'component-phase',...data},'*'),
-      hitAreas:rects=>call('hits',{rects}),paintArea:rect=>call('paint',{rect})};
+      hitAreas:rects=>call('hits',{rects}),paintArea:rect=>call('paint',{rect}),
+      native:(name,...args)=>call('native',{name,args})};
     Object.defineProperty(window,'agora',{value:Object.freeze(api),writable:false,configurable:false});
   })();`;
   const csp = "default-src 'none'; connect-src 'none'; script-src 'unsafe-inline' blob:; style-src 'unsafe-inline'; img-src data: blob:; font-src 'none'; media-src blob:; object-src 'none'; frame-src 'none'; worker-src blob:; base-uri 'none'; form-action 'none'";
@@ -76,6 +84,7 @@
     busy++;
     try{
       let result;
+      if(op==='native'){result=await nativeCall(String(e.data.name||''),Array.isArray(e.data.args)?e.data.args:[]);send({agora:1,id,result});return}
       if(op==='hits'||op==='paint'){
         if(document.body.dataset.surface!=='overlay')throw Error('This surface is not an overlay');
         if(op==='hits')native.hits=(Array.isArray(e.data.rects)?e.data.rects:[]).slice(0,32).map(rect);
@@ -109,6 +118,58 @@
       send({agora:1,id,result});
     }catch(err){send({agora:1,id,error:String(err.message||err)})}finally{busy--;waiting.shift()?.()}
   });
+  // ---- window.native: what a shell bar may ask its own window, validated here, in the trusted page. Nothing else
+  // crosses: no session, no DOM, no other host function. kd_window's PageApi also refuses outside a shell window.
+  const finite=(v,lo,hi)=>Number.isFinite(+v)?Math.max(lo,Math.min(hi,+v)):lo;
+  async function toWindow(name,...args){
+    (window.__native=window.__native||[]).push([name,...args]);
+    if(window.__native.length>200)window.__native.splice(0,100);
+    const api=window.pywebview&&window.pywebview.api;
+    if(!api||!api[name])return null;
+    try{return await api[name](...args)}catch(err){return null}
+  }
+  async function nativeCall(name,args){
+    if(!shell||!nativeGranted)throw Error('This view holds no native grant (window.native)');
+    const W=innerWidth,H=innerHeight,dpr=window.devicePixelRatio||1;
+    if(name==='layout'){
+      const spec=args[0]&&typeof args[0]==='object'?args[0]:{};
+      const shape=(Array.isArray(spec.shape)?spec.shape:[]).slice(0,32).map(r=>{
+        const x=finite(r&&r.x,0,W),y=finite(r&&r.y,0,H);
+        return {x,y,w:finite(r&&r.w,0,W-x),h:finite(r&&r.h,0,H-y),r:finite(r&&r.r,0,400)};
+      }).filter(r=>r.w>0&&r.h>0);
+      lastLayout={reserve:Math.round(finite(spec.reserve,0,400)),shape};
+      window.__shape=lastLayout;
+      return await toWindow('layout',JSON.stringify(lastLayout),dpr);
+    }
+    if(name==='thumbs'){
+      const tiles=(Array.isArray(args[0])?args[0]:[]).slice(0,8).filter(t=>t&&/^\d{1,12}$/.test(String(t.hwnd||''))).map(t=>{
+        const x=finite(t.x,0,W),y=finite(t.y,0,H);return {hwnd:String(t.hwnd),key:String(t.key||'').slice(0,80),x,y,w:finite(t.w,0,W-x),h:finite(t.h,0,H-y)};
+      });
+      window.__thumbs=tiles;
+      return await toWindow('thumbs',JSON.stringify(tiles),dpr);
+    }
+    if(name==='title'){
+      const handle=String(args[0]||'');
+      if(!/^\d{1,12}$/.test(handle))throw Error('A window title needs a numeric window handle');
+      return String((await toWindow('title',handle))||'').slice(0,300);
+    }
+    if(name==='icon'){
+      // An app's icon for the frame, which has no network: the same owner-only routes the hand-written bar reads
+      // (/desk/icon, an Agora app's svg), fetched here and handed back as bytes, as files are.
+      const ref=String(args[0]||''),size=[64,96,128,192,256].includes(+args[1])?+args[1]:128;
+      let url;
+      if(/^agora:[a-z0-9-]{1,40}$/.test(ref))url='/desk/shell/apps/'+ref.slice(6)+'.svg';
+      else if(/^(exe|hwnd|pkg|aumid):/.test(ref)&&ref.length<=600)url='/desk/icon?ref='+encodeURIComponent(ref)+'&size='+size;
+      else throw Error('An icon needs an exe:, hwnd:, pkg:, aumid: or agora: reference');
+      const r=await fetch(url,{credentials:'same-origin',redirect:'error'});
+      if(!r.ok)return null;
+      const blob=await r.blob();
+      return /^image\//.test(blob.type)?{blob}:null;
+    }
+    throw Error('Unknown native call: layout, thumbs, title or icon');
+  }
+  // pywebview's API arrives a moment after the page; the last layout is sent again then, so no bar is left unshaped.
+  addEventListener('pywebviewready',()=>{if(lastLayout)toWindow('layout',JSON.stringify(lastLayout),window.devicePixelRatio||1)});
   let downloadId=0;
   async function downloadBlob(blob,name){
     const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;
@@ -181,12 +242,15 @@
   }
   async function start(){
     lastPong=performance.now();
-    const data=await post('open',{widget:q.get('widget')});if(!data.ok)throw Error(data.text);
+    const data=await post('open',{widget:(shell&&shell.widget)||q.get('widget')});if(!data.ok)throw Error(data.text);
     instance=data.instance;
     componentView=!!data.component_lens;
+    nativeGranted=!!data.native;
+    if(shell&&!nativeGranted)throw Error('The '+(data.name||'bar')+' widget holds no window.native grant');
     document.body.classList.toggle('quiet-receipts',data.receipts==='quiet');
     document.body.dataset.surface=data.surface;
-    if(q.get('slot'))document.body.classList.add('slot');
+    if(shell){document.body.classList.add('shell-frame');shell.painted=true}
+    else if(q.get('slot'))document.body.classList.add('slot');
     else if(data.surface==='overlay'){document.body.classList.add('overlay');document.documentElement.style.background='transparent'}
     else {KD.chrome(data.title||data.name);document.querySelectorAll('#receipt')[1]?.remove()}
     frame=document.createElement('iframe');frame.title=data.name;frame.name='agora-widget';frame.setAttribute('sandbox','allow-scripts');
@@ -194,7 +258,7 @@
     frame.setAttribute('allow',"camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'; fullscreen 'none'");
     // srcdoc has a unique opaque origin. Scripts run after the bridge bootstrap.
     const safe=s=>s.replace(/<\/script/gi,'<\\/script');
-    frame.srcdoc=`<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><style id="ag-theme">${String(data.theme.css||'').replace(/<\/style/gi,'<\\/style')}</style><style>html,body{margin:0;min-height:100%;font-family:${data.theme.font};color:${data.theme.ink}}*{box-sizing:border-box}</style><script>${safe(bootstrap)}<\/script><script type="module">${safe(data.code)}<\/script>`;
+    frame.srcdoc=`<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><style id="ag-theme">${String(data.theme.css||'').replace(/<\/style/gi,'<\\/style')}</style><style>html,body{margin:0;min-height:100%;font-family:${data.theme.font};color:${data.theme.ink}}*{box-sizing:border-box}</style>${shell?'<style>html,body{background:transparent!important}:root{color-scheme:normal!important}</style>':''}<script>${safe(bootstrap)}<\/script><script type="module">${safe(data.code)}<\/script>`;
     frame.onload=()=>send({agora:1,init:{widget:data.widget,name:data.name,surface:data.surface,theme:data.theme}});
     surface.replaceChildren(frame);poll();
   }

@@ -40,11 +40,13 @@ KERNEL_ENTRIES = [
     _k('component', 'do', '<id>', 'stewards', 'yes',
        help='component <thing>: review the current inline JavaScript bytes for trusted in-page execution. Changed or unreviewed code starts in Worker quarantine. Repeated failures also quarantine a part; component-action <lens> path=<part> action=clear is steward-only. Component gestures retain viewer-narrowed widget grants.'),
     _k('look-view', 'see', '<window or lens>', 'anyone', 'no',
-       help='look-view <window, widget or component lens> [plan=yes]: compact settings, parts, gestures, health and last painted observations; plan=yes adds full bindings/modules/tree. help personal-view explains just for me; help part-style explains validated styles.'),
+       help="look-view <window, widget or component lens> [plan=yes]: compact settings, parts, gestures and this screen's paint health (kept on the screen, never in the world); plan=yes adds full bindings/modules/tree. help personal-view explains just for me; help part-style explains validated styles."),
     _k('component-health', 'do', '<lens> data=<JSON>', 'anyone', 'no',
-       help='Painter instance reports its own bounded paint observations and failures. Reports are private to its viewer; they are observations, not verified pixels.'),
+       help='Painter instance reports its own failures and recovery. Kept on this screen (the kernel process memory, per viewer), never recorded: no painted text, no styles, no log line. A restart forgets it.'),
     _k('component-action', 'do', '<lens> path=<part> action=retry|previous|off|clear', 'anyone', 'yes',
-       help='Recover one part: retry, undo its latest code/setting field change, or turn it off for me. clear removes quarantine and requires a steward. Concurrent edits refuse previous. No unrelated world fields change.'),
+       help='Recover one part: retry (also turns it back on for you), undo its latest code/setting field change (previous, recorded), or turn it off for you (off: a private view-preference <part>.enabled=no; undo takes it back). clear removes quarantine and requires a steward. Concurrent edits refuse previous. Quarantine and health stay on the screen.'),
+    _k('paint-clear', 'do', '', 'stewards', 'yes',
+       help='paint-clear: forget every old paint-report thing (screen state the painter used to keep in the world) in one act, one record. Paint health is kept on the screen now. undo brings them back.'),
     _k('personal-view','do','<lens> [part.setting=value] [text=<arrangement>]','members','yes',
        help='Just for me: personal-view <lens> part.setting=value. Also part.format.setting=initials|relative-date|count and part.labels.setting=<JSON map>, or text=<personal arrangement>. Owned private preference; shared facts stay shared. undo removes it.'),
     _k('personal-style','do','<lens> target=<part> [color=...]','members','yes',
@@ -814,13 +816,13 @@ from .inpage import widget
 from .blobs import upload, attach, file_result, file_read
 from .world_words import dictionary_copy, group_word, clock, forgotten
 from painter.arrangement import component, look_view, components, component_card
-from painter.health import component_health, component_action, personal_view, personal_style
+from painter.health import component_health, component_action, personal_view, personal_style, paint_clear
 
 KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant": grant, "widget": widget, "describe": describe,
           'upload': upload, 'attach': attach, 'file-result': file_result, 'file-read': file_read,
           'dictionary-copy': dictionary_copy, 'group': group_word, 'clock': clock, 'forgotten': forgotten,
           'component': component, 'look-view': look_view, 'components': components,
-          'component-health': component_health, 'component-action': component_action,
+          'component-health': component_health, 'component-action': component_action, 'paint-clear': paint_clear,
           'personal-view': personal_view, 'personal-style': personal_style,
           'word-set': word_set, 'word-rename': word_rename, 'history': history, 'rule': rule,
           'language': language,

@@ -28,9 +28,13 @@ def upsert(door,kind,name,**facts):
     return t
 
 
-def widget_source():
-    return '\n\n'.join(p.read_text(encoding='utf-8') for p in
-        [LAB/'widgets/common.js',HERE/'primitives.js',HERE/'themed.js',HERE/'theme.js',HERE/'quarantine.js',HERE/'isolation.js',HERE/'painter.js'])
+def widget_source(vocabulary=(), board_look=True):
+    """The painter's code for one widget. vocabulary: extra reviewed files loaded before the painter runs (the shell's
+    ShellKit); board_look=False leaves out the task board's stylesheet (theme.js), whose class names a bar does not want."""
+    files=[LAB/'widgets/common.js',HERE/'primitives.js',HERE/'themed.js',*([HERE/'theme.js'] if board_look else []),
+           HERE/'quarantine.js',HERE/'isolation.js',*vocabulary,HERE/'painter.js']
+    # a vocabulary entry is a file, or already its text (a str that is not an existing path)
+    return '\n\n'.join(p if isinstance(p,str) else Path(p).read_text(encoding='utf-8') for p in files)
 
 
 def install(door, board=True):

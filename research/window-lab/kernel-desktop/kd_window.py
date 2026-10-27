@@ -535,14 +535,22 @@ class PageApi:
         self._screen.minimize(self._wid)
         return True
 
-    # -- the desktop shell's pages (pages/shell/shell.js, Native.*): shape, reserved strip, DWM thumbnails, a live title
+    # -- the desktop shell's pages (pages/shell/shell.js Native.*, or a shell widget through window.native): shape,
+    # reserved strip, DWM thumbnails, a live title. Only a shell window answers; any other page asking gets nothing
+    # (26 Oct: before this, any page could clip its own window).
+    def _shell(self):
+        rec = self._screen.wins.get(self._wid) or {}
+        return rec.get("view") in SHELL_VIEWS
+
     def layout(self, spec, dpr=1.5):
-        return self._screen.shell_layout(self._wid, spec, dpr)
+        return self._screen.shell_layout(self._wid, spec, dpr) if self._shell() else False
 
     def thumbs(self, tiles, dpr=1.5):
-        return self._screen.shell_thumbs(self._wid, tiles, dpr)
+        return self._screen.shell_thumbs(self._wid, tiles, dpr) if self._shell() else 0
 
     def title(self, handle):
+        if not self._shell():
+            return ""
         import shell_native
         return shell_native.window_title(handle)
 
@@ -658,6 +666,11 @@ class WindowHost:
              "help": "window.surface: a widget's page in a normal window, listed by holds and ended by off."},
             {"word": "window.bar", "kind": "hold", "takes": "", "may": "anyone",
              "help": "window.bar: a widget's slot inside an existing desktop bar, listed by holds and ended by off."},
+            {"word": "window.native", "kind": "hold", "takes": "", "may": "stewards",
+             "help": "window.native: the shell's bars only (SHELL.md). A widget painted in a shell window may tell that window "
+                     "where it is solid (its click region) and what strip to reserve, lay DWM thumbnails over its own tiles, "
+                     "and read one live window title. Given by a steward's grant; holds lists it, off ends it. Refused in "
+                     "any window that is not a shell window."},
         ]
 
     def hello(self, msg):

@@ -202,8 +202,9 @@ def compile_view(k, actor, target, _trail=(), reader=None, view=None):
     styles = [a for a in visible.values() if a.get('kind') == 'part-style' and a.get('lens') in (lens['id'], lens.get('name'))
               and (not a.get('personal') or a.get('made_by') in (actor.person,actor.id) or a.get('for')==actor.person)]
     styles.sort(key=lambda a:bool(a.get('personal')))
-    reports = {a.get('path'):a for a in visible.values() if a.get('kind')=='paint-report'
-               and a.get('viewer')==actor.person and a.get('lens')==lens['id']}
+    # Paint health is this screen's, kept in the kernel process's memory and never in the world (painter/health.py).
+    from painter.health import reports_for
+    reports = reports_for(k, actor.person, lens['id'])
     counts, shown, settings_seen = Counter(), {}, []
     def expand(node, env, path, level=0):
         if level > 24:
@@ -322,7 +323,7 @@ def compile_view(k, actor, target, _trail=(), reader=None, view=None):
                 declared_parts=list(declared)
             except (ValueError,TypeError):error=f'{kind} parts must be a JSON object'
         health=dict(health=report.get('health','unobserved'),last_error=report.get('last_error',''),quarantined=bool(report.get('quarantined') or quarantined),
-                    painted=report.get('painted',[]),observed_at=report.get('observed_at'),failures=report.get('failures',0),disabled=report.get('disabled',False),action_epoch=report.get('action_epoch',0))
+                    observed_at=report.get('observed_at'),failures=report.get('failures',0),disabled=False,action_epoch=report.get('action_epoch',0))
         if error:health.update(health='stopped',last_error=error)
         settings_seen.append(dict(part=path, name=node['name'],component=kind, settings=settings, display=displays,labels=labels.get('ui',{}),facts=facts,health=health,
                                  parts=declared_parts,gestures=[g['event'] for g in node['gestures']]))
@@ -353,7 +354,10 @@ def compile_view(k, actor, target, _trail=(), reader=None, view=None):
     if style_errors:text+='; paint refusals: '+ '; '.join(e['error'] for e in style_errors)
     return dict(text=text, rows=[dict(kind='view-description', lens=lens['id'], tree=tree, counts=dict(counts), parts=settings_seen,
                                     components=used, styles=paint_styles,tokens=tokens,style_errors=style_errors,
-                                    readings=reading_sources, watches=watch_values, view=view)])
+                                    readings=reading_sources, watches=watch_values, view=view,
+                                    # Lens-wide painter handles: how often to reread as a safety net (500..60000 ms,
+                                    # default 1500) and whether right-clicking any part opens the ask menu.
+                                    options=dict(reconcile_ms=lens.get('reconcile_ms',''),right_click=lens.get('right_click','')))])
 
 
 def look_view(k, actor, st, entry, tx, group, saw=None):
@@ -363,7 +367,7 @@ def look_view(k, actor, st, entry, tx, group, saw=None):
         parts=[{key:value for key,value in p.items() if key!='facts'} for p in full['parts']]
         out['rows']=[dict(kind=full['kind'],lens=full['lens'],counts=full['counts'],parts=parts,style_errors=full['style_errors'],
                           readings=full.get('readings',[]),view=full.get('view',{}),
-                          observation='Last painter report, private to this viewer; unobserved is not proof of paint. plan=yes returns the full plan.')]
+                          observation='Paint health of this screen, private to this viewer and never recorded; unobserved is not proof of paint. plan=yes returns the full plan.')]
         out['text']+='\n'+ '\n'.join(p['name']+' ('+p['component']+'): '+p['health']['health']+(' · '+p['health']['last_error'] if p['health']['last_error'] else '') for p in parts if p['health']['health']!='unobserved')
     return out
 

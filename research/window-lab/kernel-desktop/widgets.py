@@ -33,7 +33,21 @@ class Widgets:
         i = self.instances.pop(token, None)
         if i:
             self.k.release(lease=i['lease'])
+            if i.get('native'):
+                self.k.release(lease=i['native'])
             i['p'].close()
+
+    def native_lease(self, p, mid):
+        """The shell's bars only: a widget that holds window.native (a steward's ordinary grant; holds lists it, off ends
+        it) may ask its own window for a click region, a reserved strip, DWM thumbnails and a live title. The page's
+        window must also be a shell window: PageApi refuses on any other (kd_window.py). -> lease or None."""
+        grants = ' '.join(self.k.state.get(g, 'words') or '' for g in self.k._grants_to(mid))
+        if 'window.native' not in grants.split():
+            return None
+        try:
+            return p.hold('window.native')
+        except Refused:
+            return None
 
     def theme(self, mid, viewer):
         """What a widget is told about the look it wears: the roles as the painter's tokens (paper, card, ink, muted, accent,
@@ -64,9 +78,10 @@ class Widgets:
                 p = Principal(self.k, mid, actor, token)
                 surface = self.k.state.get(mid, 'surface') or 'window'
                 lease = p.hold(SURFACES[surface])
-                self.instances[token] = dict(p=p, lease=lease, at=time.monotonic(), cursor=len(self.k.happenings),
+                native = self.native_lease(p, mid)
+                self.instances[token] = dict(p=p, lease=lease, native=native, at=time.monotonic(), cursor=len(self.k.happenings),
                                              words=set(), calls=[], hits=[], paint=None)
-                return dict(ok=True, instance=token, widget=mid, code=self.k.state.get(mid, 'code'),
+                return dict(ok=True, instance=token, widget=mid, code=self.k.state.get(mid, 'code'), native=bool(native),
                             name=self.k.state.get(mid, 'title') or self.k.name(mid), surface=surface, theme=self.theme(mid, actor.person),
                             component_lens=self.k.state.get(mid,'component_lens',''),receipts=self.k.state.get(mid,'receipts','line'))
             token = str(body.get('instance') or '')
@@ -81,10 +96,11 @@ class Widgets:
                 # opaque renderer hangs. Persist quarantine BEFORE replacing it.
                 from painter.arrangement import compile_view
                 plan=compile_view(self.k,p.actor,self.k.state.get(p.mid,'component_lens',''))['rows'][0]
-                path=str(body.get('path',''))
-                part=next((a for a in plan['parts'] if a['part']==path),None)
+                path=str(body.get('path',''))[:500]
+                from painter.health import part_of
+                part=part_of(plan,path)
                 if not part:raise Refused('stalled part is no longer in this view')
-                candidates=[a for a in plan['parts'] if a['component']==part['component']] if body.get('stage')=='module' else [part]
+                candidates=[a for a in plan['parts'] if a['component']==part['component']] if body.get('stage')=='module' else [dict(part,part=path)]
                 elapsed=body.get('elapsed_ms',2500)
                 if not isinstance(elapsed,(float,int)) or not 0<=elapsed<=1e8:raise Refused('invalid watchdog elapsed time')
                 reports=[dict(path=a['part'],health='stopped',last_error=f'Native parent watchdog: no response for {elapsed:g} ms',elapsed_ms=elapsed,painted=[]) for a in candidates]

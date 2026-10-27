@@ -41,15 +41,16 @@ def main():
         part=next(p for p in d.say('look-view taskboard-components')['rows'][0]['parts'] if p['component']=='card')
         path=part['part'];lens=d.say('look-view taskboard-components')['rows'][0]['lens']
         data=Q(json.dumps([dict(path=path,health='stopped',last_error='Private failure text',elapsed_ms=10)]))
+        records=len(k.log.records)
         for _ in range(2):assert principal.run('component-health '+lens+' data='+data)['ok']
-        check('Repeated failures persist quarantine and component health',d.say('help card')['rows'][0]['quarantined'] and d.say('help card')['rows'][0]['health']=='stopped')
-        check('Failure is a happening',k.happenings[-1]['word']=='component-health')
-        check('Private error happenings are not delivered to another person',not k.may_hear(member,k.happenings[-1]))
+        check('Repeated failures keep quarantine and component health on this screen',d.say('help card')['rows'][0]['quarantined'] and d.say('help card')['rows'][0]['health']=='stopped')
+        # 26 Oct: paint health is screen state, kept in the kernel process's memory (painter/health.py), never the log
+        check('Failure writes no record, no thing and no happening',len(k.log.records)==records and not k.things('paint-report') and k.happenings[-1]['word']!='component-health')
         check('Another viewer cannot read private failure text','Private failure text' not in str(peer.say('look-view taskboard-components')) and 'Private failure text' not in str(peer.say('rows paint-report')))
         out=peer.request('/do',dict(line='component-action '+lens+' path='+Q(path)+' action=clear'))
         check('Only a steward can clear quarantine',not out['ok'])
         assert principal.run('component-action '+lens+' path='+Q(path)+' action=clear')['ok']
-        check('Steward clear resets the quarantine fact',not d.say('help card')['rows'][0]['quarantined'])
+        check('Steward clear resets the quarantine (on this screen)',not d.say('help card')['rows'][0]['quarantined'])
         card=d.rows('component',name='card')[0];original=card['code']
         d.say('look '+card['id']);d.say('set '+card['id']+' code='+Q("export default {mount(){throw Error('new version')}}"))
         fresh=d.rows('component',name='card')[0]
@@ -58,8 +59,12 @@ def main():
         previous=principal.run('component-action '+lens+' path='+Q(path)+' action=previous',saw={card['id']:fresh['rev']})
         check('Previous restores only the changed code field',previous['ok'] and k.state.get(card['id'],'code')==original)
         off=principal.run('component-action '+lens+' path='+Q(path)+' action=off')
+        def disabled(tree):
+            if tree['path']==path:return tree['disabled']
+            return any(disabled(c) for c in tree['children'])
         plan=d.say('look-view taskboard-components plan=yes')['rows'][0]
-        check('Turn off is scoped to this part and viewer',off['ok'] and next(p for p in plan['parts'] if p['part']==path)['health']['disabled'] and not next(p for p in peer.say('look-view taskboard-components')['rows'][0]['parts'] if p['part']==path)['health']['disabled'])
+        # 26 Oct: off is the viewer's own private preference (<part>.enabled=no): every instance of that part, for them only
+        check("Turn off is this viewer's own preference for that part",off['ok'] and disabled(plan['tree']) and not disabled(peer.say('look-view taskboard-components plan=yes')['rows'][0]['tree']))
         d.say('make kind=component name=bad-metadata code="export default {}" settings="[]" parts="[]"')
         d.say('make kind=lens name=metadata-faults painter=components text='+Q('root : column\n  broken : bad-metadata\n  missing : absent-module\n  sibling : text "Still here"'))
         metadata=d.say('look-view metadata-faults')['rows'][0]['parts']

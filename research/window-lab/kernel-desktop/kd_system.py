@@ -65,7 +65,8 @@ def shape(r):
 
 
 FIXED = {"cpu": {"pct": 12.0}, "memory": {"pct": 41.0, "used_gb": 13.1, "total_gb": 32.0},
-         "network": {"down": 1200.0, "up": 300.0}, "volume": {"pct": 35, "muted": False}, "battery": None,
+         "network": {"down": 1200.0, "up": 300.0}, "volume": {"pct": 35, "muted": False},
+         "battery": {"pct": 84, "charging": True},           # hidden tests read a laptop's battery (the shell's battery chip)
          "focused": {"program": "notepad", "title": "notes.txt - Notepad"},
          "apps": [{"program": "chrome", "count": 3}, {"program": "code", "count": 1}]}
 

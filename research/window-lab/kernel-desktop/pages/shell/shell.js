@@ -47,6 +47,7 @@ const Shell = (() => {
       } catch (e) { return false; }
     },
     async init() {
+      if (this.link) return;                       // once per page (the component host and the fallback share it)
       this.link = h("link", { rel: "stylesheet", id: "theme" });
       doc.head.append(this.link);
       // ?theme=<same-origin url> (a proof's own compiled theme), ?look=<stand-in>, else the host's /desk/theme.css,
@@ -85,6 +86,7 @@ const Shell = (() => {
   const Wall = {
     el: null,
     init() {
+      if (this.el) return;
       this.el = h("div", { cls: "wall", "aria-hidden": "true" });
       doc.body.prepend(this.el);
       this.place();
@@ -894,10 +896,53 @@ const Shell = (() => {
     shape() { return { reserve: 0, shape: [{ x: 0, y: 0, w: innerWidth, h: innerHeight, r: 0 }] }; },
   };
 
+  // ------------------------------------------------------------------------------------------------ the component host
+  // SHELL.md, "The bars as components": when the world has an on widget for this bar (shell-top, shell-dock) that holds
+  // window.native, the page is only the wallpaper slice and the guarded painter frame (widget-host.js) in front of it.
+  // Anything else (no widget, off, refused, no grant, or the frame stopping) paints the hand-written bar below instead.
+  async function host(which) {
+    const view = which === "top" ? "shell-top" : which === "dock" ? "shell-dock" : "";
+    if (!view || q.get("fixture") || q.get("hand")) return Shell.start(which);   // the desktop layer, and the proof's own renders
+    let widget = q.get("widget");
+    if (!widget) {
+      const r = await KD.see("rows widget name=" + view);
+      const w = ((r && r.rows) || []).find((x) => x.on && x.component_lens && !x.forgotten);
+      widget = w && w.id;
+    }
+    if (!widget) return Shell.start(which);
+    doc.body.dataset.page = which;
+    doc.body.classList.add("shell-host");
+    // the frame is see-through only when it and this page agree on the colour scheme (else Chromium paints it opaque)
+    root.style.setProperty("color-scheme", "normal", "important");
+    if (q.get("hide")) doc.body.classList.add("hide");
+    await Theme.init();
+    Wall.init();
+    KD.stream((ev) => { if (ev.word === "theme.changed") Theme.reload(); });
+    doc.body.append(h("main", { id: "widget-surface", "aria-label": view === "shell-top" ? "Agora top bar" : "Agora dock" }));
+    let fell = false;
+    window.AGORA_SHELL = {
+      page: which, widget, painted: false,
+      fallback(text, painted) {
+        if (fell) return;
+        fell = true;
+        console.warn("shell: the hand-written bar instead of the components:", text);
+        window.__shellFallback = text;
+        const s = $("#widget-surface"); if (s) s.remove();
+        Shell.start(which);
+        // a bar that was painting and stopped (a restart, a new version of its code) tries the components again
+        if (painted) setTimeout(() => location.reload(), /changed|reopen/i.test(text || "") ? 3000 : 20000);
+      },
+    };
+    for (const src of ["../theme-live.js", "../widget-host.js"]) {
+      await new Promise((res) => { const s = h("script", { src }); s.onload = s.onerror = res; doc.body.append(s); });
+    }
+    window.__ready = true;
+  }
+
   // ------------------------------------------------------------------------------------------------ page start
   let page = null, reportT = 0;
   const Shell = {
-    q, h, glyph, Icon, Data, Theme, Pop, Menu, Native, Top, Dock, Desk, toast, fmt,
+    q, h, glyph, Icon, Data, Theme, Pop, Menu, Native, Top, Dock, Desk, toast, fmt, host,
     report() {                       // tell the host (and the proof) where this window is solid and what strip it needs
       if (!page) return;
       cancelAnimationFrame(reportT);
@@ -908,6 +953,7 @@ const Shell = (() => {
       });
     },
     async start(which) {
+      if (page) return;
       page = which === "top" ? Top : which === "dock" ? Dock : Desk;
       doc.body.dataset.page = which;
       if (q.get("hide")) doc.body.classList.add("hide");          // the proof hides the parts to compare the wallpaper slice alone

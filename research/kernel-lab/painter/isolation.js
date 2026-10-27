@@ -51,9 +51,9 @@ function paintedParts(owner){
   });
 }
 function observeComponent(owner,health,error='',elapsed=0){
-  // Only failures, and the recovery after one, reach the world (Alex, 26 Oct: "visual state should not live in the
-  // world"). Painted text and styles stay on this screen: every repaint used to become a record (Lines filled with
-  // "component-health" lines, one a second). paintedParts() is still here for a local reader.
+  // Only failures, and the recovery after one, are reported, and only to this screen's health table (painter/health.py:
+  // kernel memory, never the log). Painted text and styles are never sent (Alex, 26 Oct: "visual state should not live
+  // in the world"). paintedParts() is still here for a local reader.
   const bad=health==='stopped'||health==='slow';
   if(!bad&&!owner.reportedBad)return;
   owner.reportedBad=bad;
@@ -72,7 +72,7 @@ async function flushObservations(){
   for(const data of chunks)try{await agora.do('component-health '+currentPlan.lens+' data='+Q(JSON.stringify(data)))}catch(e){console.warn('Component report refused',String(e.message||e))}
 }
 function stoppedCard(owner,error,off=false){
-  const node=owner.node,card=part(node,'stopped','section',{class:'component-stopped',role:'status'});
+  const node=owner.node,card=part(node,'stopped','section',{class:'component-stopped',role:'status'});if(off)card.dataset.off='yes';
   card.append(el('strong',{},off?'This part is turned off':'This part stopped'),el('div',{},node.component.replace(/-/g,' ')),
     el('p',{},String(error?.message||error||'Try again when you are ready.').split('\n')[0].slice(0,300)));
   const controls=el('div',{class:'component-recovery'});

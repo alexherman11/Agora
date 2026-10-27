@@ -33,10 +33,91 @@ Progman/WorkerW and `WM_GETICON` on existing windows in `test_shell_icons.py` an
 
 ## Why not components
 
+> **Superseded by the next section (builder draft, 26 Oct 2026).** The bars are now painter components; the hand-written
+> page below stays as the fallback. Kept as the reasoning that led there.
+
 The bars are host pages under `pages/shell/`, not sandboxed painter components. A bar has to talk to its own native window
 (shape, reserved strip, DWM thumbnails, `AppBar.resize`), and the component frame has no native bridge. They are still small named
 parts with handles, and they read only `--ag-*`, so a theme restyles them like any component. What would change this:
 a component frame with a `native` capability (layout, thumbs), after which the parts can move without losing anything.
+
+## The bars as components (builder draft, Claude Code builder, 26 Oct 2026; for Claude and Alex)
+
+Alex: "are you giving the bars handles such that they will be malleable in the future?" We said only partly. "Yes rebuild them."
+Labels as above. Nothing here was installed into or run against the live desktop.
+
+**Shape.** The top bar and the dock are two world lenses, `shell-top` and `shell-dock` (`painter=components`), shown by two widgets of
+the same names. `top.html` / `dock.html` stay the window's page, but become a thin trusted host: the wallpaper slice behind, and
+the guarded painter frame in front (the same `widget-host.js` every painter window uses), plus one narrow bridge to the window.
+If the widget is missing, off, refused, or holds no native grant, the page paints the hand-written bar as before (`shell.js`),
+so a restart before the install changes nothing, and `off <shell-top widget>` is an off switch back to the old bar.
+The desktop layer is not a bar (it is the wallpaper) and stays hand-written.
+
+**Parts.** Each is a reviewed component thing with a card (`help shell-clock`), settings, named parts and gestures:
+
+| Lens part (default arrangement) | Component | Named parts (style targets) | Handles |
+|---|---|---|---|
+| `root` | `shell-bar` / `shell-dock` | `rail` / `pill` | holds the window's shape and strip; nothing else |
+| `left`, `middle`, `right` | `shell-island` | `body` | `side`, `label`; any parts go inside |
+| `launcher` | `shell-launcher` | `body`, `popover`, `search`, `app` | `apps` (Agora apps listed), gestures `lines`, `start` |
+| `spaces` | `shell-spaces` | `body`, `space` | shows only with 2+ spaces |
+| `focused` | `shell-focused-app` | `body`, `icon`, `name`, `menu` | `max` (width) |
+| `clock` | `shell-clock` | `body`, `time`, `date`, `popover` | `date yes|no`, `seconds yes|no`; gesture `notifications` |
+| `cpu`, `memory` | `shell-reading` | `body` | `key`, `label`, `show always|setting` |
+| `notifications` | `shell-notifications` | `body`, `badge`, `popover` | gesture `clear` |
+| `media` | `shell-media` | `body`, `art`, `title`, `popover` | gestures `play`, `next`, `prev` |
+| `tray` | `shell-tray` | `body`, `popover` | holds chips; the quick-settings popover |
+| `network`, `volume`, `battery` | `shell-chip` | `body`, `glyph`, `value` | `key`, `value yes|no`; gesture `press` (`window.settings which=…`) |
+| `jeff` | `shell-jeff` | `body`, `dot`, `name`, `popover` | gesture `open` (`window.open lines`) |
+| `power` | `shell-power` | `body` | gesture `off` (`off window`), two presses |
+| dock `launcher`, `overview` | `shell-dock-button` | `body` | `icon`, `label`, gesture `press` or `opens launcher` |
+| dock `item` (one per app, keyed) | `shell-dock-item` | `body`, `icon`, `mark`, `count`, `menu`, `preview`, `tile` | facts `state`, `app` on `body` for styles (`shell-dock-item.body[state=front]`) |
+
+So `make kind=part-style lens=shell-top target=shell-clock.time size=1.3em` makes the clock bigger; one more line under
+`tray` (`battery : shell-chip, key battery`) adds a chip; deleting a line removes a part; moving it to another island moves it;
+`personal-view shell-top clock.date=no` changes it just for one person. Right-clicking any part opens the painter's menu with the
+ask box (`ask <lens> text=… where="shell-top · root/middle/clock"`): a part with no bound thing asks about its lens.
+
+**Data stays out of the projection.** Live readings (`wm.windows`, `system.now`, `media.now`, notifications, presence, settings)
+are polled by one small hub in the shell widgets' own vocabulary (`shell_parts/shell-kit.js`: `ShellKit.source`), at the same
+rates as before (dock 1 s, bar 2.5 s and 4 s), and each part updates its own DOM. The painter's projection then changes only when
+the lens, a style, a preference or a component changes, so open popovers survive and nothing is rebuilt every second. The kit is
+painter vocabulary like `primitives.js`, included only in the two shell widgets' code; window actions (`wm.*` with the
+`window.activate` fallback) live there too, as before. Every callback a part registers runs as that part, so a throw stops one part.
+
+**The native capability (`window.native`).** Only what bars need, nothing general:
+
+- `agora.native('layout', {reserve, shape})`: the click region (rounded rects, CSS px) and the reserved strip; `('thumbs', tiles)`:
+  DWM thumbnails over the part's own rects; `('title', handle)`: one live window title (read, never written).
+- Two gates, both required. (1) The widget holds `window.native`, a hold word the window host offers (`may: stewards`), given by
+  an ordinary steward grant: `holds` lists it, `off` ends it. The broker (`widgets.py`) tells the frame `native: true` only then.
+  (2) The window is a shell view: `PageApi.layout/thumbs/title` now refuse on any other window (before this, any page could clip
+  its own window: a narrow hole closed).
+- The trusted host validates every call: at most 32 rects clamped to the window, reserve 0..400 CSS px, at most 8 tiles with
+  numeric handles. No other API crosses; the frame still has no session, network or DOM access to the host.
+- One more call rides the same gate, found while building (the frame has no network, so it cannot load an icon):
+  `('icon', ref, size)`, the host fetches the same owner-only `/desk/icon` (or an Agora app's svg) the hand-written bar shows
+  and hands the bytes back as a Blob, as it does for files. It reads an icon, never a window. (This is the "fourth call" the
+  paragraph below warns about; it is a read of a route the bars already use, so it stayed in the one grant.)
+
+**Paint health moves to the screen.** A painter's health is local: `component-health` keeps its observations in the kernel
+process's memory (per viewer, lens and part), never the log; a restart forgets them, which is what screen state should do.
+Quarantine after two failures and the watchdog's stall quarantine live there too. `component-action retry|clear` is local;
+`off` becomes the person's own preference (`<part>.enabled=no`, a private `view-preference`, undoable); `previous` is unchanged
+(it changes code or a setting, so it is recorded). "This part stopped" with Try again / Use the previous version / Turn it off
+keeps working. A new steward word `paint-clear` forgets every old `paint-report` thing in one act (one record, undo brings them
+back); `paint_clear.py` says it once against the live world. The log keeps its old records (it is append-only; compaction is one of
+Alex's open store decisions).
+
+**Smaller general words this needed** (rough spots at the end): `size` in the part-style vocabulary (text size);
+`api.child(name, settings, key)` so a slot repeated per app gets its own owner; a lens fact `reconcile_ms` (the painter's
+1.5 s safety reread, slower for bars); a lens fact `right_click=ask` (any part that does not handle right-click opens the ask menu).
+
+**What would change my mind.** If the painter frame costs visibly more than the hand-written bar (memory per window, or the
+1.5 s projection reread over a large world: it scans every visible thing), the bars should stay host pages and gain handles by
+reading their arrangement from the lens instead. If Alex wants the bar's data itself to be restyled per row (a chip per window),
+the hub should become `watch` readings in the projection with a diffing painter instead of whole repaints. If the native grant
+ever needs a fourth call, it should become a reviewed per-call grant (`window.native.layout` …) rather than grow.
 
 ## Components and their handles
 
@@ -49,6 +130,53 @@ World things the shell reads, none required (every one has a default):
 - Data read: `wm.windows`, `system.now`, `media.now`, `rows notification`, `rows presence`, `rows shell-settings`, `rows any bar=taskbar`, `rows lens`, `wm.title <key>` (live titles, tolerated if refused).
 - Acts sent: `wm.focus|minimise|restore|close|pin|unpin <key>`, `window.launch path=`, `window.open <lens>`, `window.start`, `media.play|next|prev`, `wm.mode off`, `off window`, `make kind=shell-settings ...`.
 - Every page also exposes `window.__shape` (rects and radii the host turns into a region), `window.__ready`, and `window.Shell` for the proof.
+
+### Built (26 Oct, builder): files, proof, rollout
+
+Files. New: `shell_parts/` (`shell-kit.js`, `shell-kit.css`, `components/*.js` (17 parts), `shell-top.lens`, `shell-dock.lens`,
+`cards.py`, `fake_wm.py` (tests only), `look_evidence.py`), `shell_install.py`, `paint_clear.py`, `test_shell_components.py`,
+`kernel-lab/tests/test_paint_health.py`. Changed: `pages/shell/{top,dock}.html` (`Shell.host`), `pages/shell/shell.js` (`host()`,
+idempotent `Theme`/`Wall`/`start`), `pages/shell/shell.css` (the host's frame), `pages/widget-host.js` (shell mode, the validated
+`native` bridge), `widgets.py` (`native` lease; keyed paths in the stall watchdog), `kd_window.py` (`window.native` hold;
+`PageApi` refuses outside shell windows), `kd_system.py` (headless reading has a battery), kernel-lab `painter/{health,
+arrangement,handles,install,isolation.js,painter.js,handle_contract}.py|js`, `kernel/words.py` (`paint-clear`, help).
+
+Proof (**ran**, hidden and headless; counts as printed):
+
+```
+test_shell_components.py   9 passed   (bars from world components; right-click clock -> ask -> one style line, time 15px -> 20.25px;
+                                        an agent adds a battery chip, 2 chips -> 3, 84%; theme.use night-metal repaints rail and pill;
+                                        dock: wm.focus, wm.minimise, wm.restore, preview asks thumbnails for hwnds 5001, 5002;
+                                        two throwing parts stop alone, 0 records from failures, Turn it off -> private preference;
+                                        no window.native -> the hand-written dock; PageApi refuses outside shell windows; install idempotent)
+look_evidence.py           top: 592 of 896000 pixels differ by more than 8 levels (the clock's minute); dock: 1 of 717600
+kernel-lab tests           112 passed, 30 subtests passed (with test_paint_health.py, 4)
+kernel-desktop tests       68 passed, 17 subtests passed (59 before + these 9)
+painter/proof.py           28 of 28 component checks passed;  painter/handle_contract.py  16 of 16 (updated for local health)
+shell_proof.py interact    17 of 17 (the hand-written fallback);  a11y as before
+```
+
+Screenshots (looked at): `evidence/shell/components-{top,dock}-{components,hand}.png`, `components-top-pop-{calendar,quick,launcher}.png`,
+`components-top-ask.png`, `components-dock-menu.png`.
+
+Not verified: anything on the real composed desktop (WebView2 on DWM glass): that the painter frame is see-through over the glass
+(headless Chromium agrees the frame is transparent when both colour schemes are `normal`; WebView2 was not run), the region and
+the AppBar from a frame's report, DWM thumbnails from `wm.windows` keys (the hwnd is the key's last field: read from
+`agora-wm/win32_host.py`, not run), memory per bar window, and the projection's cost over the live world's size (compile_view
+scans every visible thing; the bars reread it every 5 s and on every make/set/forget/undo).
+
+Rollout, for Claude (say first what will appear: the same bar and dock as now, briefly the hand-written ones while pages reload):
+
+1. Restart kdesk (kernel and window host) with this code: the kernel gains `paint-clear` and the local paint health; the window
+   host offers `window.native`. Until the install, the bars are exactly the hand-written ones.
+2. `python shell_install.py --live` (it refuses if step 1 has not happened). It makes 17 components (reviewed), the two lenses
+   and the two widgets with their grants. Nothing restarts; the bar pages pick the widgets up on their next load: `window.shell off`
+   then `window.shell on` (one act each), or restart the window host.
+3. `python paint_clear.py` (dry run: counts, and any part someone turned off), then `python paint_clear.py --live`: one
+   `paint-clear` act, one record; `undo r<n>` brings the reports back.
+4. Optional: `python ../../kernel-lab/painter/install.py --live` gives the board, gallery and Appearance the new painter
+   (ask about the lens, `size`, keyed slots, the theme-repaint fix). It changes those widgets' code, so their windows reopen.
+5. Off switch: `off <shell-top widget>` / `off <shell-dock widget>` (the hand-written bar on the next page load), or `window.shell off`.
 
 ## Theme contract
 
@@ -157,7 +285,7 @@ window's own icon (WM_GETICON / class icon): 16 of 16 windows
 saved evidence\shell\icons-sheet.png (28 icons on light and dark)
 ```
 
-## How the bars talk to `wm.*` and the theme
+## How the bars talk to `wm.*` and the theme (the hand-written fallback; the components speak the same words)
 
 - Windows: `wm.windows` first (rows with exe, title, state, focused, key); if it refuses (WM off), `window.desktop` + `window.list`, with native `window.activate handle=` and `do=close`.
   Bare exe paths in the WM's icon field are normalised to `exe:`; windows of the shell itself and Edge shell hosts are filtered with `window.list`.
@@ -238,3 +366,20 @@ Post these on the Rough spots note (f747); I did not write to the live world.
 5. `wm.title <key>`: live titles for a preview.
 6. A `system.volume <0..100>` write, a notification word, a presence word (see Not done).
 7. Theme compiler: `--ag-icon-style`, `--ag-island-opacity`, `--ag-island-outline`; the `--ag-border` colour/width collision; `--ag-wallpaper-dim` as a colour.
+
+Builder, 26 Oct (the bars as components):
+
+8. `kd_window.py` `window.native` hold and the `PageApi` gate; `widget-host.js` native bridge: a widget needs to speak to its
+   own window. Missing word: a reviewed per-window capability (`window.native`, now a hold; later perhaps per call).
+9. `widget-host.js` `icon` through the bridge: a sandboxed frame cannot load an image. Missing word: `icon <ref> [size]` as a
+   reading that returns bytes (also item 3 above).
+10. `painter/health.py`, `arrangement.py`, `isolation.js`: paint health was world state. Missing word: screen state as a kind of
+    its own (local, per viewer, forgotten on restart); for now the kernel process's memory. `paint-clear` for the old reports.
+11. `painter/handles.py` `size` and `via_actor`: there was no text-size handle, and every part-style an agent made was refused at
+    paint time (`via_actor` not in META). Missing word: none; a vocabulary gap and a bug.
+12. `painter.js` `api.child(name, settings, key)`, `api.ask`, `api.askBox`, lens facts `right_click=ask` and `reconcile_ms`,
+    the theme repaint that nulled the plan: missing words: a repeated slot, right-click-to-ask for any part, a reread rate.
+13. `kd_system.py` headless battery: the hidden world had no battery to show. Missing word: a fixture reading set by the test.
+14. Seen, not mine (ran): mid-session, another builder's uncommitted `kernel.py` change read a word's name in a thing position as
+    its dictionary entry, so `window.open help` lost its view and 5 desktop tests failed; a later full run passed 68 of 68.
+
