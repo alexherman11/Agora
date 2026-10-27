@@ -690,7 +690,7 @@ const Shell = (() => {
         if (e.key === "ArrowUp") { e.preventDefault(); this.hover(it, true); }
       });
       await this.refresh();
-      setInterval(() => this.refresh(), 1000);       // the window manager no longer announces screen churn to the world
+      setInterval(() => this.refresh(), 2500);       // 1 s saturated the kernel with wm.windows (26 Oct)
       addEventListener("resize", () => Shell.report());
     },
     async refresh() {

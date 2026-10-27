@@ -69,6 +69,8 @@ def forgotten(k, actor, st, entry, tx, group, saw=None):
     for t, a in k.state.things.items():
         if not a.get('forgotten') or not a.get('forget_reason'):
             continue
+        if a.get('kind') == 'paint-report':   # screen state cleared by paint-clear, not something a leader hid
+            continue
         if not k._sees(actor.person, a.get('sees', 'place'), t):
             continue
         parent = a.get('visibility_of')

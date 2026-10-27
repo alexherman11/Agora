@@ -158,8 +158,7 @@ def paint_clear(k,actor,st,entry,tx,group,saw=None):
     if not old:return dict(text='no paint reports left; paint health is kept on the screen now',rows=[])
     tx.parts[-1]['words']=f'paint-clear · {len(old)} old paint reports'
     for t in old:
-        tx.set(t,'forgotten',actor.person)
-        tx.set(t,'forget_reason','paint-clear: screen state does not live in the world')
+        tx.set(t,'forgotten',actor.person)   # no forget_reason: that is a moderator's note, and boards list those
     return dict(text=f'ok paint-clear [r?] · {len(old)} old paint reports out of every view, in one act; undo brings them back',rows=[])
 
 

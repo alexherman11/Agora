@@ -268,7 +268,10 @@ class Native:
 
     def restore_placement(self,ref,data):
         self.check(ref);p=Placement();p.length=C.sizeof(p)
-        p.flags=data['flags']|4;p.showCmd=data['show'];p.ptMinPosition=W.POINT(*data['min'])
+        # Put back where it was, never whether it was minimised: the window keeps the state it has now. (Live, 26 Oct:
+        # leases taken while windows were minimised by someone else re-minimised every window on a restart.)
+        show=7 if u.IsIconic(ref.hwnd) else 3 if u.IsZoomed(ref.hwnd) else 4
+        p.flags=data['flags']|4;p.showCmd=show;p.ptMinPosition=W.POINT(*data['min'])
         p.ptMaxPosition=W.POINT(*data['max']);p.rcNormalPosition=W.RECT(*data['normal'])
         if not u.SetWindowPlacement(ref.hwnd,C.byref(p)):raise OSError('SetWindowPlacement')
 

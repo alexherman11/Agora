@@ -78,7 +78,7 @@ export default {mount(api, s) {
     pill.setAttribute('aria-label', `Dock, ${items.filter((x) => x.wins.length).length} apps running${f ? ', ' + f.app + ' in front' : ''}`);
     K.report();
   }
-  K.watch(api, 'windows', 1000, (wins) => {
+  K.watch(api, 'windows', 2500, (wins) => {   // 2.5 s: at 1 s the kernel was saturated (26 Oct)
     state.wins = wins;
     const f = wins.find((w) => w.focused);          // clicking the dock activates the dock: remember who was in front before
     state.noFocus = !f; if (f) state.lastFront = f.key;
