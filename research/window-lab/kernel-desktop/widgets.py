@@ -36,15 +36,23 @@ class Widgets:
             i['p'].close()
 
     def theme(self, mid, viewer):
-        # Style source travels as data too, allowing richer painters to interpret
-        # their own style tokens without granting the widget arbitrary reads.
+        """What a widget is told about the look it wears: the roles as the painter's tokens (paper, card, ink, muted, accent,
+        the colour names, the shapes), the compiled theme.css, and the palette and roles for anything that mixes its own
+        colours. The theme is the viewer's own (place default, just for them, or being tried): theme/service.py.
+        A widget that sets pin_style=yes keeps the older behaviour: only the four tokens its named style note gives."""
+        from theme import service
+        p = service.payload(self.k, viewer, '/desk/')
         name = self.k.state.get(mid, 'style') or 'bars'
-        style = next((s for s in self.k.things('style') if self.k.state.get(s, 'name') == name), None)
-        a = self.k.shown(viewer, style) if style else None
-        theme = dict(paper='#FAF9F6', card='#FFFFFF', ink='#293542', muted='#85909B', accent='#638779',
-                    font='Segoe UI, system-ui, sans-serif', style=name, source=(a or {}).get('text', ''))
-        for key, value in re.findall(r'^token\s+(paper|card|ink|accent)\s*=\s*(#[0-9a-fA-F]{6})\b',theme['source'],re.M):
-            theme[key]=value
+        theme = dict(p['tokens'], font=p['font'], style=name, source='', css=p['css'], hash=p['hash'],
+                     variant=p['variant'], roles=p['roles'], palette=p['palette'], name=p['name'])
+        if self.k.state.get(mid, 'pin_style') == 'yes':
+            # Style source travels as data too, allowing richer painters to interpret their own style tokens
+            # without granting the widget arbitrary reads.
+            style = next((s for s in self.k.things('style') if self.k.state.get(s, 'name') == name), None)
+            a = self.k.shown(viewer, style) if style else None
+            theme['source'] = (a or {}).get('text', '')
+            for key, value in re.findall(r'^token\s+(paper|card|ink|accent)\s*=\s*(#[0-9a-fA-F]{6})\b', theme['source'], re.M):
+                theme[key] = value
         return theme
 
     def request(self, actor, action, body):

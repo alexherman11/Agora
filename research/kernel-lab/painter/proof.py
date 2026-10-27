@@ -42,7 +42,7 @@ def run():
         n=len(k.log.records);install(d);check('Idempotent component installation',len(k.log.records)==n)
         plan=d.say('look-view taskboard-components plan=yes')['rows'][0]
         check('Painter describes 25 cards and three lanes without executing component JS',plan['counts']['card']==25 and plan['counts']['lane']==3)
-        check('Five app components arrange the board',set(plan['counts'])=={'board','lane','card','flag','menu'})
+        check('Six app components arrange the board',set(plan['counts'])=={'board','lane','card','flag','menu','text-block'})
         check('Part reading carries facts, settings and gesture lines',all(n['facts'].get('id') for n in plan['parts'] if n['component']=='card') and 'task-move' in json.dumps(plan['tree']))
         check('Catalogue purposes and examples discoverable',len(d.say('components')['rows'])>=30 and 'root : calendar' in d.say('help calendar')['text'])
         p=Page(f.url,f.token,f.ids['taskboard-components']);pages.append(p)

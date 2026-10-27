@@ -1,12 +1,12 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>Agora bar</title>
+<html><head><meta charset="utf-8"><title>Agora bar</title><link rel="stylesheet" href="theme.css">
 <!-- A bar (a lens on a screen edge): lens.js itself, unchanged, in a frame. lens.html keeps a 2em status row under its
      painting, which would leave a 40px bar 10px to paint in; the frame is made taller than the window so that row falls
      outside it and the lens has the whole bar. Nothing scrolls: the lens says `scroll none`. (Claude, a13428, 24 Oct) -->
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #F4F5F3; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--ag-bar-bg, #F4F5F3); }
   body {display:flex} #lens {flex:1;min-width:0}
-  iframe { display: block; border: 0; width: 100%; height: calc(100% + 48px); background: #F4F5F3; }
+  iframe { display: block; border: 0; width: 100%; height: calc(100% + 48px); background: var(--ag-bar-bg, #F4F5F3); }
 </style></head>
 <body>
 <iframe id="lens" title="bar" scrolling="no"></iframe>
@@ -22,5 +22,5 @@ document.getElementById("lens").onload = (event) => {
   tips();
 };
 </script>
-<script src="widget-slots.js"></script>
+<script src="theme-live.js"></script><script src="widget-slots.js"></script>
 </body></html>

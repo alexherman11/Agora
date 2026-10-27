@@ -161,6 +161,15 @@ def make_handler(kernel, entry, secret):
             except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
                 return
 
+        def _theme(self, name, q, base):
+            """theme.css, theme.json, theme-native.json and the wallpaper: what the reader wears. Anyone may ask (a
+            sign-in page is themed too); a signed-in reader gets their own choice."""
+            from theme import service
+            actor, _ = self._actor()
+            code, body, ctype, extra = service.route(kernel, actor.person if actor else None, name, q, base,
+                                                     self.headers.get("If-None-Match"))
+            return self._raw(code, body, ctype, extra)
+
         def do_GET(self):
             from urllib.parse import parse_qs, urlparse
             u = urlparse(self.path)
@@ -193,6 +202,8 @@ def make_handler(kernel, entry, secret):
                     "Set-Cookie", f"agora_session={tok}; HttpOnly; SameSite=Lax; Path=/")])
             if u.path == "/api/version":
                 return self._send(200, painter.version_info())
+            if u.path.lstrip("/") in ("theme.css", "theme.json", "theme-native.json", "theme-wallpaper"):
+                return self._theme(u.path.lstrip("/"), q, "/")      # the theme this reader wears (theme/service.py)
             if u.path in ("/web", "/web/", "/web/host.js", "/web/host.css"):
                 page = {"/web": "index.html", "/web/": "index.html"}.get(u.path, u.path.rsplit("/", 1)[-1])
                 from .painter import LAB, TYPES

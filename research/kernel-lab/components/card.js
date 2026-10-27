@@ -7,7 +7,7 @@ export default {mount(api,s){
   }});
   const more=button('···',e=>{e.stopPropagation();const r=e.currentTarget.getBoundingClientRect();showMenu(r.right,r.bottom)});
   card.append(api.part('top','div',{class:'cardtop'},...api.children.filter(n=>n.component==='flag').map(api.render),more),api.part('title','div',{class:'cardtitle'},s.title||t.title));
-  if(s.note)card.append(api.part('note','div',{class:'noteexcerpt',style:{background:api.palette[s.note_colour]||'#f6f6f0'}},s.note.replace(/[*_#]/g,'').slice(0,130)));
+  if(s.note)card.append(api.part('note','div',{class:'noteexcerpt',style:{background:api.palette[s.note_colour]||'var(--ag-hover,#f6f6f0)'}},s.note.replace(/[*_#]/g,'').slice(0,130)));
   card.append(api.part('footer','div',{class:'cardfoot'},el('span',{},t.short_source?.startsWith('local')?'✧ Summarized':s.note?'▤ Note':'○ Ready when you are'),api.part('avatar','span',{class:'avatar',title:s.who||'Unassigned'},api.display('who')!==s.who?api.display('who'):(s.who||'A').slice(0,2).toUpperCase())));
   for(const child of api.children.filter(n=>!['flag','menu'].includes(n.component)))card.append(api.render(child));
   card.addEventListener('pointerdown',e=>api.beginDrag(e,card));
@@ -17,7 +17,7 @@ export default {mount(api,s){
     const drawer=el('section',{class:'drawer','aria-label':'Task details'});
     const shown=api.P.overlay('drawer',drawer,{label:'Task details',close:()=>{if(api.latest().facts.editing==='yes')currentFire('close',{}).catch(api.tell)}});
     const close=()=>shown.close();
-    const title=el('input',{value:t.title||'','aria-label':'Task title'}),full=el('textarea',{value:t.text||t.title||'','aria-label':'Full description'}),note=el('textarea',{value:t.note||'','aria-label':'Notes',style:{background:api.palette[t.note_colour]||'#fff'}});
+    const title=el('input',{value:t.title||'','aria-label':'Task title'}),full=el('textarea',{value:t.text||t.title||'','aria-label':'Full description'}),note=el('textarea',{value:t.note||'','aria-label':'Notes',style:{background:api.palette[t.note_colour]||'var(--card,#fff)'}});
     let edits=Promise.resolve();
     function currentFire(event,values){
       const result=edits.then(()=>{const n=api.latest();const g=n.gestures.find(g=>g.event===event);if(!g)throw Error('Missing '+event);return api.fireLatest(n,event,values)});

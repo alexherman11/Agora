@@ -19,7 +19,7 @@
     stopped=true; clearTimeout(pollTimer); frame?.remove(); frame=null;
     const receipt=document.querySelector('#receipt'); if(receipt) receipt.textContent=text;
     surface.dataset.stopped='true'; native.paint=null; native.hits=[];
-    const card=document.createElement('section');card.setAttribute('role','status');card.style.cssText='padding:16px;background:#FAF9F6;color:#35433D;border-radius:12px';
+    const card=document.createElement('section');card.setAttribute('role','status');card.style.cssText='padding:16px;background:var(--ag-surface,#FAF9F6);color:var(--ag-ink,#35433D);border-radius:var(--ag-radius-l,12px)';
     const label=document.createElement('strong');label.textContent='This part stopped';
     const detail=document.createElement('p');detail.textContent=text;
     const retry=document.createElement('button');retry.textContent='Try again';retry.onclick=()=>location.reload();card.append(label,detail,retry);surface.replaceChildren(card);
@@ -27,10 +27,16 @@
   const send = data => frame?.contentWindow.postMessage(data,'*');
   const bootstrap = `(() => {
     const pending=new Map(), listeners=new Map();let n=0, setup;
+    // The theme this window wears. The host sends a new one whenever it changes; CSS variables repaint everything at once.
+    function applyTheme(t){let s=document.getElementById('ag-theme');if(!s){s=document.createElement('style');s.id='ag-theme';document.head.append(s)}
+      if(s.textContent!==t.css)s.textContent=t.css;
+      for(const [k,v] of Object.entries(t.tokens||{}))document.documentElement.style.setProperty('--'+k,v);
+      window.dispatchEvent(new CustomEvent('ag-theme',{detail:t}))}
     const ready=new Promise(r=>setup=r);
     function call(op,data={}){return new Promise((resolve,reject)=>{const id=++n;pending.set(id,{resolve,reject});parent.postMessage({agora:1,id,op,...data},'*')})}
     addEventListener('message',e=>{if(e.source!==parent||e.data?.agora!==1)return;const m=e.data;
       if(m.init){setup(Object.freeze(m.init));return}
+      if(m.theme){applyTheme(m.theme);return}
       if(m.ping){parent.postMessage({agora:1,op:'widget-pong'},'*');return}
       if(m.event){for(const fn of listeners.get(m.event.word)||[])try{fn(m.event)}catch{};return}
       const p=pending.get(m.id);if(!p)return;pending.delete(m.id);m.error?p.reject(Error(m.error)):p.resolve(m.result);
@@ -188,10 +194,12 @@
     frame.setAttribute('allow',"camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'; fullscreen 'none'");
     // srcdoc has a unique opaque origin. Scripts run after the bridge bootstrap.
     const safe=s=>s.replace(/<\/script/gi,'<\\/script');
-    frame.srcdoc=`<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><style>html,body{margin:0;min-height:100%;font-family:${data.theme.font};color:${data.theme.ink}}*{box-sizing:border-box}</style><script>${safe(bootstrap)}<\/script><script type="module">${safe(data.code)}<\/script>`;
+    frame.srcdoc=`<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><style id="ag-theme">${String(data.theme.css||'').replace(/<\/style/gi,'<\\/style')}</style><style>html,body{margin:0;min-height:100%;font-family:${data.theme.font};color:${data.theme.ink}}*{box-sizing:border-box}</style><script>${safe(bootstrap)}<\/script><script type="module">${safe(data.code)}<\/script>`;
     frame.onload=()=>send({agora:1,init:{widget:data.widget,name:data.name,surface:data.surface,theme:data.theme}});
     surface.replaceChildren(frame);poll();
   }
+  // The page's theme changed (theme-live.js): the window inside wears it too, without a reload.
+  addEventListener('ag-theme',e=>{const t=e.detail;send({agora:1,theme:{css:t.css,tokens:t.tokens,font:t.font,roles:t.roles,palette:t.palette,variant:t.variant}})});
   // Read-only native rendering metadata, never an authority channel.
   Object.defineProperty(window,'widgetSurface',{value:native});
   addEventListener('pagehide',()=>{if(instance)navigator.sendBeacon('/desk/widget/close',JSON.stringify({instance}))});

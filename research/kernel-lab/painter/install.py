@@ -30,7 +30,7 @@ def upsert(door,kind,name,**facts):
 
 def widget_source():
     return '\n\n'.join(p.read_text(encoding='utf-8') for p in
-        [LAB/'widgets/common.js',HERE/'primitives.js',HERE/'theme.js',HERE/'quarantine.js',HERE/'isolation.js',HERE/'painter.js'])
+        [LAB/'widgets/common.js',HERE/'primitives.js',HERE/'themed.js',HERE/'theme.js',HERE/'quarantine.js',HERE/'isolation.js',HERE/'painter.js'])
 
 
 def install(door, board=True):

@@ -1,0 +1,25 @@
+{
+ "shell_window": 0,
+ "progman": 0,
+ "workerw": 0,
+ "defview_anywhere": false,
+ "attach_workerw_result": "not tried: there is no Progman on this desktop to send 0x052C to",
+ "layer_mode": "bottom",
+ "layer_exstyle_toolwindow": true,
+ "layer_exstyle_noactivate": true,
+ "layer_exstyle_appwindow": false,
+ "z_front_first_initial": [
+  "app-B",
+  "layer-A"
+ ],
+ "z_after_a_raise": [
+  "layer-A",
+  "app-B"
+ ],
+ "z_after_keep_loop": [
+  "app-B",
+  "layer-A"
+ ],
+ "layer_below_app_after_loop": true,
+ "layer_became_foreground": false
+}

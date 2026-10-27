@@ -67,6 +67,12 @@ def style_values(rule, tokens=None):
 
 
 def validate_write(k, actor, kind, values, tx=None):
+    if kind=='theme':
+        # a theme is data with a closed schema: refuse anything unsafe before it is written (theme/model.py)
+        from theme.model import ThemeError,check_text
+        try:check_text(values.get('text'))
+        except ThemeError as exc:raise Refused('theme not accepted: '+str(exc)[:400])
+        return
     if kind!='part-style':return
     def lens_id(name):
         return next((t for t in k.things('lens') if name in (t,k.state.get(t,'name'))),name)

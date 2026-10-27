@@ -54,6 +54,9 @@ VIEWS = {"lines": ("Lines", (1500, 760)), "thing": ("Thing", (1000, 820)),
          "taskbar": ("Agora taskbar", (0, 0))}
 BAR_H = 66                 # the Agora strip along the bottom, in pixels
 TOP_H = 60                 # a bar along the top (window.open <lens> edge=top)
+# The desktop shell (shell builder, 26 Oct 2026; pages/shell/, shell_native.py, SHELL.md): view -> (name, page, bar kind).
+SHELL_VIEWS = {"shell-top": ("Agora top bar", "top", "top"), "shell-dock": ("Agora dock", "dock", "bottom"),
+               "shell-desktop": ("Agora desktop", "desktop", "layer")}
 
 if sys.platform == "win32":
     # private handles: argtypes set on the shared ctypes.windll.user32 broke pywebview's own calls (ran 23 Oct)
@@ -81,6 +84,10 @@ if sys.platform == "win32":
     user32.GetWindow.restype = wt.HWND
     user32.GetWindow.argtypes = [wt.HWND, wt.UINT]
     dwmapi.DwmGetWindowAttribute.argtypes = [wt.HWND, wt.DWORD, ctypes.c_void_p, wt.DWORD]
+    # Title-free native identity, and the WM's geometry lease (agora-wm/WM.md).
+    user32.SetPropW.argtypes = [wt.HWND, wt.LPCWSTR, wt.HANDLE]
+    user32.GetPropW.argtypes = [wt.HWND, wt.LPCWSTR]
+    user32.GetPropW.restype = wt.HANDLE
 
 HWND_TOPMOST, HWND_NOTOPMOST = wt.HWND(-1), wt.HWND(-2)
 SWP_NOZORDER, SWP_NOACTIVATE, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE = 0x4, 0x10, 0x20, 0x2, 0x1
@@ -204,6 +211,12 @@ class AppBar:
         shell32.SHAppBarMessage(1, ctypes.byref(d))           # ABM_REMOVE: the strip comes back
         user32.DestroyWindow(self.hwnd)
 
+    def resize(self, height):
+        """The shell's pages say how much strip they need (their --ag-bar-height / --ag-dock-size): re-register it."""
+        if height > 0 and height != self.height and self.rect:
+            self.height = height
+            self._setpos()
+
     def remove(self):
         self.stop_ev.set()
 
@@ -283,7 +296,7 @@ class GuiScreen(Screen):
         x, y, w, h = box
         api = PageApi(self, wid)
         win = self.webview.create_window(title, url, js_api=api, x=int(x / s), y=int(y / s), width=max(200, int(w / s)),
-                                         height=max(30, int(h / s)), frameless=True, easy_drag=False, on_top=bool(bar), min_size=(120, 24),
+                                         height=max(30, int(h / s)), frameless=True, easy_drag=False, on_top=bool(bar) and bar != "layer", min_size=(120, 24),
                                          background_color="#F6F3EC", text_select=True, hidden=True)
         rec = {"w": win, "hwnd": None, "view": view, "bar": bar}
         with self.lock:
@@ -295,6 +308,7 @@ class GuiScreen(Screen):
             except Exception:
                 hwnd = user32.FindWindowW(None, title)
             rec["hwnd"] = hwnd
+            user32.SetPropW(hwnd, "Agora.Window." + wid, wt.HANDLE(1))
             if bar:
                 self._make_bar(wid, hwnd, bar)
             else:
@@ -323,6 +337,11 @@ class GuiScreen(Screen):
         win.events.closed += closed
 
     def _make_bar(self, wid, hwnd, edge):
+        view = (self.wins.get(wid) or {}).get("view")
+        if edge == "layer":                                   # the desktop layer: no strip, bottom-most (shell_native)
+            import shell_native
+            self.layer_mode = shell_native.make_layer(hwnd, monitor()[0])
+            return
         if edge == 'bottom':
             self.taskbar_lease.acquire()
         ex = user32.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)
@@ -334,9 +353,15 @@ class GuiScreen(Screen):
             user32.SetWindowPos(hwnd, HWND_TOPMOST, x, y, w, h, SWP_NOACTIVATE | SWP_FRAMECHANGED)
             if not self.bar_hidden.get(wid):
                 user32.ShowWindow(hwnd, SW_SHOWNOACTIVATE)
+        height = TOP_H if edge == "top" else BAR_H
+        if view in SHELL_VIEWS:                               # the shell's bars: a strip reserved, a window of their own
+            import shell_native
+            placed = shell_native.bar_placer(view, hwnd, lambda h: user32.ShowWindow(h, SW_SHOWNOACTIVATE), scale,
+                                             lambda: self.bar_hidden.get(wid))
+            height = shell_native.initial_reserve(view, scale())
         self.bar_hidden[wid] = False
         try:
-            self.bars[wid] = AppBar(TOP_H if edge == "top" else BAR_H, placed, edge)
+            self.bars[wid] = AppBar(height, placed, edge)
         except Exception:
             self.taskbar_lease.release()
             raise
@@ -419,6 +444,35 @@ class GuiScreen(Screen):
         if rec and rec["hwnd"]:
             user32.ShowWindow(rec["hwnd"], SW_MINIMIZE)
 
+    def shell_layout(self, wid, spec, dpr):
+        """A shell page's report: {reserve: css px of strip, shape: [rounded rects in css px]}. Solid only there."""
+        import shell_native
+        rec = self.wins.get(wid)
+        if not rec or not rec["hwnd"]:
+            return False
+        try:
+            spec = json.loads(spec) if isinstance(spec, str) else spec
+            dpr = float(dpr or scale())
+        except (TypeError, ValueError):
+            return False
+        ok = shell_native.set_shape(rec["hwnd"], spec.get("shape") or [], dpr)
+        bar = self.bars.get(wid)
+        if bar and spec.get("reserve"):
+            bar.resize(int(round(float(spec["reserve"]) * dpr)))
+        return ok
+
+    def shell_thumbs(self, wid, tiles, dpr):
+        import shell_native
+        rec = self.wins.get(wid)
+        if not rec or not rec["hwnd"]:
+            return 0
+        th = rec.setdefault("thumbs", shell_native.Thumbs())
+        try:
+            tiles = json.loads(tiles) if isinstance(tiles, str) else tiles
+        except ValueError:
+            return 0
+        return th.show(rec["hwnd"], tiles, float(dpr or scale())) if tiles else (th.clear() or 0)
+
     def others(self):
         """Other programs' windows as boxes, front to back: what the guy hops on. Titles are never read."""
         mine = {r["hwnd"] for r in self.wins.values() if r["hwnd"]}
@@ -476,6 +530,17 @@ class PageApi:
         self._screen.minimize(self._wid)
         return True
 
+    # -- the desktop shell's pages (pages/shell/shell.js, Native.*): shape, reserved strip, DWM thumbnails, a live title
+    def layout(self, spec, dpr=1.5):
+        return self._screen.shell_layout(self._wid, spec, dpr)
+
+    def thumbs(self, tiles, dpr=1.5):
+        return self._screen.shell_thumbs(self._wid, tiles, dpr)
+
+    def title(self, handle):
+        import shell_native
+        return shell_native.window_title(handle)
+
     def resize(self):
         """Follow the mouse from the window's corner until the button is let go (the page calls this on mousedown)."""
         rec = self._screen.wins.get(self._wid)
@@ -522,13 +587,17 @@ class WindowHost:
             {"word": "window.desktop", "kind": "see", "takes": "", "may": "anyone",
              "help": "window.desktop: running Windows task buttons, including minimized windows, with executable icons. Live only; no titles enter the log."},
             {"word": "window.activate", "kind": "do", "takes": "handle=<handle>", "may": "anyone",
-             "help": "window.activate handle=<handle>: bring a current Windows task button forward, or minimize it. External screen effect."},
+             "help": "window.activate handle=<handle> [do=close]: bring a current Windows task button forward, or minimize it; do=close asks the window to close (WM_CLOSE, never a kill). External screen effect."},
             {"word": "window.start", "kind": "do", "takes": "", "may": "anyone",
              "help": "window.start: open Windows Start (Ctrl+Esc)."},
             {"word": "window.settings", "kind": "do", "takes": "which=network|volume|battery|time", "may": "anyone",
              "help": "window.settings which=network|volume|battery|time: open the corresponding Windows settings."},
             {"word": "window.launch", "kind": "do", "takes": "path=<exe>", "may": "anyone",
              "help": "window.launch path=<absolute executable>: launch a pinned Windows program. A pin is a button with bar=taskbar, path=<exe> and does=window.launch."},
+            {"word": "window.shell", "kind": "do", "takes": "on|off", "may": "anyone",
+             "help": "window.shell on|off: the desktop shell (SHELL.md): a slim top bar, a centred dock and Agora's own desktop "
+                     "layer, in place of the old top bar and taskbar. on forgets the old bars' window things and makes the three "
+                     "shell windows; off forgets those and brings the taskbar back. One act, so undo takes it back."},
             {"word": "window.list", "kind": "see", "takes": "[all]", "may": "anyone",
              "help": "window.list [all]: the Agora windows open on this desktop now, front first. With all, other "
                      "programs' windows too, as boxes and program ids, never their titles."},
@@ -637,7 +706,7 @@ class WindowHost:
             import native_shell
             if word == 'window.activate':
                 mine = [r['hwnd'] for r in self.screen.wins.values() if r.get('hwnd')]
-                ok = native_shell.activate(kv.get('handle'), mine)
+                ok = native_shell.activate(kv.get('handle'), mine, kv.get('do') or '')
             elif word == 'window.start':
                 ok = native_shell.start_menu()
             elif word == 'window.settings':
@@ -648,6 +717,31 @@ class WindowHost:
                 if ok:
                     os.startfile(str(path))
             return {'external': True, 'text': f'{word}: done'} if ok else {'refused': 'that Windows target is not available now'}
+        if word == "window.shell":
+            mode = (words[0] if words else "").lower()
+            if mode not in ("on", "off"):
+                return {"refused": "window.shell on|off"}
+            rows = self.m.see("rows window", use=use).get("rows") or []
+            shell = [r for r in rows if r.get("shows") in SHELL_VIEWS]
+            old = [r for r in rows if r.get("shows") not in SHELL_VIEWS and (r.get("shows") == "taskbar" or r.get("edge"))]
+            wx, wy, ww, wh = self.screen.work()
+            (mx, my, mw, mh), _ = monitor()
+            if mode == "on":
+                if shell:
+                    return {"text": "the desktop shell is on already"}
+                lines = [f"forget {r['id']}" for r in old]
+                for view, (name, _page, bar) in SHELL_VIEWS.items():
+                    at, size = {"top": (f"{mx},{my}", f"{mw},{TOP_H}"), "bottom": (f"{mx},{my + mh - BAR_H}", f"{mw},{BAR_H}"),
+                                "layer": (f"{mx},{my}", f"{mw},{mh}")}[bar]
+                    lines.append(f"make kind=window shows={view} name={json.dumps(name)} at={at} size={size}"
+                                 + (f" edge={bar}" if bar in ("top", "bottom") else " layer=bottom"))
+                return {"lines": lines, "saw": {r["id"]: r["rev"] for r in old}}
+            if not shell:
+                return {"text": "the desktop shell is not on"}
+            lines = [f"forget {r['id']}" for r in shell]
+            lines.append(f'make kind=window shows=taskbar name="Agora taskbar" edge=bottom at={mx},{my + mh - BAR_H} size={mw},{BAR_H}')
+            self.made_bar = True
+            return {"lines": lines, "saw": {r["id"]: r["rev"] for r in shell}}
         if word == "window.open":
             if not words:
                 return {"refused": "window.open needs a view: " + ", ".join(v for v in VIEWS if v != "taskbar")}
@@ -785,7 +879,8 @@ class WindowHost:
         active = {w['id']:w['code'] for w in widgets.get('rows',[]) if w.get('on') and w.get('code') and not w.get('forgotten')}
         want = {wid:row for wid,row in want.items() if not row.get('widget') or row['widget'] in active}
         with self.lock:
-            if not any(row.get("shows") == "taskbar" for row in want.values()) and not getattr(self, "made_bar", False):
+            if (not any(row.get("shows") == "taskbar" or row.get("shows") in SHELL_VIEWS for row in want.values())
+                    and not getattr(self, "made_bar", False)):
                 self.made_bar = True
                 box = self.box_for("taskbar", {}, 0)
                 out = self.m.do(f'make kind=window shows=taskbar name="Agora taskbar" edge=bottom '
@@ -804,13 +899,16 @@ class WindowHost:
                 if wid not in self.screen.wins:
                     if row.get('widget'):self.widget_codes[wid]=active[row['widget']]
                     self._open(wid, row, box)
-                elif self.applied.get(wid) != box and not row.get("edge"):
+                elif self.applied.get(wid) != box and not row.get("edge") and not row.get("layer"):
                     self.screen.place(wid, box)
                     self.applied[wid] = box
             self.rows = want
 
     def _open(self, wid, row, box):
-        if row.get('widget'):
+        if row.get("shows") in SHELL_VIEWS:                   # the desktop shell: pages/shell/<page>.html
+            view = row["shows"]
+            path = f"/desk/shell/{SHELL_VIEWS[view][1]}.html?win={wid}"
+        elif row.get('widget'):
             view = 'widget'
             path = f"/desk/widget.html?win={wid}&widget={quote(str(row['widget']))}"
         elif row.get("lens") and row.get("edge"):
@@ -822,7 +920,7 @@ class WindowHost:
         else:
             view = row.get("shows") if row.get("shows") in VIEWS else "thing"
             path = f"/desk/{view}.html?win={wid}" + (f"&target={quote(str(row['target']))}" if row.get("target") else "")
-        title = f"{row.get('name') or VIEWS.get(view, ('Agora',))[0]} · Agora"
+        title = f"{row.get('name') or VIEWS.get(view, SHELL_VIEWS.get(view, ('Agora',)))[0]} · Agora"
         # Sign in on the control door, then redirect to this window's listener.
         # Host cookies also cover the loopback ports; pages keep native EventSource.
         path = f"/desk/window-origin?win={quote(wid)}&next={quote(path, safe='')}"
@@ -839,15 +937,19 @@ class WindowHost:
             out = self.m.do(f"forget {wid}", saw={wid: row2.get("rev", 0)})
             log(f"{wid} closed on the screen: {out.get('text')}")
         self.screen.open(wid, view, title, url, box, on_closed, on_shown,
-                         bar=row.get("edge") or ("bottom" if view == "taskbar" else None))
+                         bar=row.get("edge") or ("layer" if row.get("layer") else None) or ("bottom" if view == "taskbar" else None))
 
     def watch_drags(self):
         """Every half second: a window Alex moved or resized and then left alone is recorded where he left it."""
         while True:
             time.sleep(0.5)
             for wid, row in list(self.rows.items()):
-                if row.get("edge") or row.get("shows") == "taskbar":
+                if row.get("edge") or row.get("layer") or row.get("shows") == "taskbar":
                     continue
+                rec = self.screen.wins.get(wid) or {}
+                if rec.get("hwnd") and user32.GetPropW(rec["hwnd"], "Agora.WM.Lease"):
+                    self.settle.pop(wid, None)
+                    continue  # WM readings own geometry; never copy its placements into world facts.
                 box = self.screen.box(wid)
                 if not box or box == self.applied.get(wid):
                     self.settle.pop(wid, None)

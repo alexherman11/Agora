@@ -1,0 +1,47 @@
+[top] accessibility tree: 12 landmarks and controls, 0 controls without a name
+    toolbar   Agora top bar
+    group     Launcher and app
+    group     Date and time
+    group     Status
+    button    Agora launcher
+    button    Edge, focused app. Open its window menu
+    button    Calendar and notifications. Monday, October 26, 2026, 5:48 PM
+    button    Notifications, none unread
+    button    Media: Harbor Lights by The Seabright Players, playing
+    button    Quick settings. Network connected, volume 70%, battery 86%, charging
+    button    JEFF is here. Open JEFF
+    button    Turn the desktop off (press twice)
+[top] Tab -> {'tag': 'button', 'label': 'Agora launcher', 'role': ''}
+    (walk stopped at {'tag': 'button', 'label': 'Agora launcher', 'role': ''}; seen so far 8)
+[top] ArrowRight walks 8 controls: Agora launcher | Edge, focused app. Open its window menu | Calendar and notifications. Monday, October 26, 2026, 5:48 PM | Notifications, none unread | Media: Harbor Lights by The Seabright Players, playing | Quick settings. Network connected, volume 70%, battery 86%, charging | JEFF is here. Open JEFF | Turn the desktop off (press twice)
+[top] one more Tab leaves the toolbar (one tab stop): None
+[top] Enter on the launcher opens it; focus is in: {'tag': 'input', 'label': 'Open an app or say a line', 'role': ''}
+[top] typing 'li' filters the launcher to 1 app(s)
+[top] Escape closes it and focus returns to: {'tag': 'button', 'label': 'Agora launcher', 'role': ''}
+[top] Space opens the calendar: popover role=dialog, label=Calendar and notifications
+[dock] accessibility tree: 18 landmarks and controls, 0 controls without a name
+    toolbar   Dock, 10 apps running, Edge in front
+    button    Agora launcher
+    button    Lines, 1 window
+    button    Help, not running
+    button    Board, not running
+    button    Task board, 1 window
+    button    Appearance, not running
+    button    Feed, not running
+    button    Files, 2 windows
+    button    Edge, 3 windows, in front
+    button    WordPad, not running
+    button    Notepad, 1 window
+    button    Paint, 1 window, minimised
+    button    Task Manager, 1 window
+    button    Command Prompt, 1 window
+    button    PowerShell, 1 window
+    button    Control Panel, 1 window
+    button    Overview: all windows
+[dock] Tab -> {'tag': 'button', 'label': 'Agora launcher', 'role': ''}
+    (walk stopped at {'tag': 'button', 'label': 'Agora launcher', 'role': ''}; seen so far 17)
+[dock] ArrowRight walks 17 controls: Agora launcher | Lines, 1 window | Help, not running | Board, not running | Task board, 1 window | Appearance, not running | Feed, not running | Files, 2 windows | Edge, 3 windows, in front | WordPad, not running | Notepad, 1 window | Paint, 1 window, minimised | Task Manager, 1 window | Command Prompt, 1 window | PowerShell, 1 window | Control Panel, 1 window | Overview: all windows
+[dock] one more Tab leaves the toolbar (one tab stop): None
+[dock] the Menu key opens an item's menu: ['Open', 'Remove from dock']; focus in: {'tag': 'button', 'label': 'Open', 'role': 'menuitem'}
+[dock] ArrowDown inside the menu moves focus to: {'tag': 'button', 'label': 'Open', 'role': 'menuitem'}
+[dock] Escape closes the menu, focus returns to: {'tag': 'button', 'label': 'Board, not running', 'role': ''}

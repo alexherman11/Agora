@@ -1,0 +1,70 @@
+/* night-metal: near-black graphite, small radii, outlined islands */
+/* A stand-in theme for the shell builder, using exactly the variable names of agora-wm/CONTRACTS.md section 1
+   (palette, roles, type, shape, surface, motion), plus the few extras the shell reads (named at the end). The pages
+   load the host's real /theme.css first and fall back to a look from this folder only when that is absent. */
+:root {
+  --ag-base00: #0b0c0e;
+  --ag-base01: #14161a;
+  --ag-base02: #22262c;
+  --ag-base03: #5d6370;
+  --ag-base04: #8b919c;
+  --ag-base05: #d4d7dc;
+  --ag-base06: #e6e8eb;
+  --ag-base07: #f5f6f7;
+  --ag-base08: #d9667a;
+  --ag-base09: #d7a05a;
+  --ag-base0A: #cdb765;
+  --ag-base0B: #5fb98a;
+  --ag-base0C: #5aaec0;
+  --ag-base0D: #6aa6c9;
+  --ag-base0E: #a58fd1;
+  --ag-base0F: #9a7b62;
+  --ag-bg: #0b0c0e;
+  --ag-surface: #14161a;
+  --ag-raised: #1b1e23;
+  --ag-bar: #0f1114;
+  --ag-ink: #d4d7dc;
+  --ag-ink-muted: #8b919c;
+  --ag-accent: #6aa6c9;
+  --ag-accent-ink: #0b0c0e;
+  --ag-ok: #5fb98a;
+  --ag-warn: #d7a05a;
+  --ag-danger: #d9667a;
+  --ag-info: #5aaec0;
+  --ag-border: #2c3037;
+  --ag-focus: #6aa6c9;
+  --ag-select: #22262c;
+  --ag-scrim: rgba(11, 12, 14, .6);
+  --ag-font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --ag-font-mono: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
+  --ag-font-display: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --ag-text: 13.5px;
+  --ag-scale: 1.1;
+  --ag-radius-s: 5px;
+  --ag-radius-m: 8px;
+  --ag-radius-l: 12px;
+  --ag-radius-pill: 999px;
+  --ag-border-w: 1px;
+  --ag-gap-inner: 6px;
+  --ag-gap-outer: 8px;
+  --ag-bar-height: 32px;
+  --ag-dock-size: 58px;
+  --ag-bar-opacity: .18;
+  --ag-window-opacity: 1;
+  --ag-backdrop: blur(14px) saturate(1.15);
+  --ag-shadow: 0 12px 34px rgba(0, 0, 0, .55), 0 1px 3px rgba(0, 0, 0, .5);
+  --ag-dur-fast: 90ms;
+  --ag-dur-med: 160ms;
+  --ag-dur-slow: 300ms;
+  --ag-ease: cubic-bezier(.2, .8, .2, 1);
+  /* extras the shell reads (not in CONTRACTS section 1): */
+  --ag-island-opacity: .14;
+  --ag-icon-style: native;
+  --ag-icon-plate: #1b1e23;
+  --ag-motion-reduce: 0;
+  --ag-island-outline: 1;
+  --ag-wallpaper-size: cover;
+  --ag-wallpaper-pos: center;
+  --ag-wallpaper-dim: rgba(11, 12, 14, .15);
+  --ag-wallpaper: radial-gradient(700px 520px at 14% 24%, rgba(128, 118, 90, .5), transparent 62%), radial-gradient(900px 640px at 84% 78%, rgba(74, 92, 98, .6), transparent 64%), radial-gradient(1100px 380px at 60% 30%, rgba(160, 150, 120, .22), transparent 70%), linear-gradient(135deg, #1a1c1a 0%, #2c2f2b 40%, #1d2224 100%);
+}

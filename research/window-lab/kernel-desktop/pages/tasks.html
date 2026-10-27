@@ -1,6 +1,6 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Running windows</title><link rel="stylesheet" href="kd.css">
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Running windows</title><link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="kd.css">
 <style>.task{display:flex;align-items:center;gap:14px;text-align:left;width:100%;padding:14px;margin-bottom:8px}.task img{width:28px;height:28px}.task span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}</style></head>
-<body><main><h1>Running windows</h1><p class="meta">Choose a window to bring it forward.</p><input id="filter" placeholder="Find a window" aria-label="Find a window"><div id="tasks"></div></main><script src="kd.js"></script><script>
+<body><main><h1>Running windows</h1><p class="meta">Choose a window to bring it forward.</p><input id="filter" placeholder="Find a window" aria-label="Find a window"><div id="tasks"></div></main><script src="kd.js"></script><script src="theme-live.js"></script><script>
 KD.chrome("Running windows");let tasks=[];
 function draw(){const q=document.getElementById("filter").value.toLowerCase();document.getElementById("tasks").replaceChildren(...tasks.filter(t=>t.name.toLowerCase().includes(q)).map(t=>KD.el("button",{cls:"card act task",on:{click:()=>KD.doLine(t.line)}},KD.el("img",{src:t.icon||"icons/app-window.svg",alt:""}),KD.el("span",{},t.name))));}
 async function read(){const [a,b,p]=await Promise.all([KD.see("window.list"),KD.see("window.desktop"),KD.see("rows any bar=taskbar")]);

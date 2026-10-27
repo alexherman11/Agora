@@ -47,6 +47,7 @@ GUY_GRANTS = "guy.* window.list window.overlay rows look holds hear:window.opene
 SYSTEM_GRANTS = "system.* rows look"
 MEDIA_GRANTS = "media.* rows look"
 SUMMARIZE_GRANTS = "summarize.* model.preview rows make set"
+THEME_GRANTS = "theme.* make set forget rows look file-read clock hear:set hear:make hear:forget hear:undo"
 
 
 def module_specs(headless=False):
@@ -67,6 +68,9 @@ def module_specs(headless=False):
          "grants": SYSTEM_GRANTS, "for": "steward"},
         {"name": "media", "run": [py, str(HERE / "kd_media.py")] + tail, "publishes": "media.*",
          "grants": MEDIA_GRANTS, "for": "steward"},
+        {"name": "theme", "run": [py, str(HERE.parents[1] / "kernel-lab/theme/theme_module.py")],
+         "publishes": "theme.*", "grants": THEME_GRANTS, "only": "kind:theme,theme-settings,theme-choice",
+         "for": "steward"},
     ]
 
 
@@ -84,7 +88,9 @@ ABOUT = {"window": "the window host: it makes the Agora windows on this desktop 
          "system": "what this machine is doing (CPU, memory, network, volume, battery, the window in front), for the "
                    "bars' widgets and system.now",
          "media": "the media words (media.play, media.next, media.prev, media.now) through Windows' media session",
-         "summarize": "local task summaries with honest literal fallback; off summarize stops it"}
+         "summarize": "local task summaries with honest literal fallback; off summarize stops it",
+         "theme": "the themes: theme.use, theme.try, theme.import, theme.export; one look for every window, bar and widget "
+                  "(research/kernel-lab/theme/THEMES.md); off theme stops the words, the look stays"}
 
 
 def after_genesis(k, headless=False):
@@ -254,6 +260,19 @@ def make_desk_handler(kernel, entry):
                 except ValueError as e:
                     return self._send(404, {'error': str(e)})
                 return self._raw(302, b'', 'text/plain', [('Location', origin + nxt)])
+            if path.startswith("/desk/theme") and path[6:] in ("theme.css", "theme.json", "theme-native.json",
+                                                                 "theme-wallpaper"):
+                return self._theme(path[6:], {k: v[0] for k, v in parse_qs(urlsplit(self.path).query).items()},
+                                   "/desk/")
+            if path == "/desk/icon":
+                # colour icons with alpha for the shell (shell_icons.py): exe:, hwnd:, pkg:, aumid:, agora: references
+                actor, why = self._actor()
+                if actor is None or not kernel.is_steward(actor.person):
+                    return self._send(401, {"error": why or "only the desktop owner"})
+                import shell_icons
+                q = parse_qs(urlsplit(self.path).query)
+                code, ctype, data = shell_icons.serve(q.get("ref", [""])[0], q.get("size", ["128"])[0])
+                return self._raw(code, data, ctype, [("Cache-Control", "private, max-age=3600")])
             if path.startswith("/desk/"):
                 return self._file(path[6:])
             if path == '/lens.html':

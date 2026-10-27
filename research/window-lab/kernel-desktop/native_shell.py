@@ -112,18 +112,30 @@ def windows(exclude=()):
             return True
         path = program_path(hwnd)
         out.append(dict(handle=str(hwnd), name=title, program=Path(path).stem, path=path,
-                        icon=executable_icon(path), front=hwnd == foreground,
+                        ref=_ref(hwnd), icon=executable_icon(path), front=hwnd == foreground,
                         shown=not bool(u.IsIconic(W.HWND(hwnd)))))
         return True
     s._enum(each, 0)
     return sorted(out, key=lambda r: int(r['handle']))
 
 
-def activate(handle, exclude=()):
+def _ref(hwnd):
+    """The shell's icon reference for a window (shell_icons.py): pkg: for a packaged app, else exe:."""
+    try:
+        import shell_icons
+        return shell_icons.window_ref(hwnd)
+    except Exception:
+        return ''
+
+
+def activate(handle, exclude=(), do=''):
     row = next((r for r in windows(exclude) if r['handle'] == str(handle)), None)
     if not row:
         return False
     hwnd = int(handle)
+    if do == 'close':
+        # asks the window politely (WM_CLOSE), the same as its close button; never ends a process
+        return bool(u.PostMessageW(hwnd, 0x10, 0, 0))
     if row['front']:
         u.ShowWindow(hwnd, 6)
     else:

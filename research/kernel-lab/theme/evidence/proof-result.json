@@ -1,0 +1,340 @@
+{
+ "checks": 57,
+ "failed": [],
+ "live_desktop_touched": false,
+ "shots": [
+  "evidence\\delivery-dusk-board.png",
+  "evidence\\delivery-dusk-appearance.png",
+  "evidence\\delivery-dusk-probe.png",
+  "evidence\\delivery-undone-board.png",
+  "evidence\\delivery-undone-appearance.png",
+  "evidence\\delivery-undone-probe.png",
+  "evidence\\seabright-day-board.png",
+  "evidence\\seabright-day-appearance.png",
+  "evidence\\seabright-day-widget.png",
+  "evidence/seabright-day-taskbar.png",
+  "evidence/seabright-day-help.png",
+  "evidence\\sheet-seabright-day.png",
+  "evidence\\dusk-board.png",
+  "evidence\\dusk-appearance.png",
+  "evidence\\dusk-widget.png",
+  "evidence/dusk-taskbar.png",
+  "evidence/dusk-help.png",
+  "evidence\\sheet-dusk.png",
+  "evidence\\night-metal-board.png",
+  "evidence\\night-metal-appearance.png",
+  "evidence\\night-metal-widget.png",
+  "evidence/night-metal-taskbar.png",
+  "evidence/night-metal-help.png",
+  "evidence\\sheet-night-metal.png",
+  "evidence\\ink-landscape-board.png",
+  "evidence\\ink-landscape-appearance.png",
+  "evidence\\ink-landscape-widget.png",
+  "evidence/ink-landscape-taskbar.png",
+  "evidence/ink-landscape-help.png",
+  "evidence\\sheet-ink-landscape.png",
+  "evidence\\catppuccin-mocha-board.png",
+  "evidence\\catppuccin-mocha-appearance.png",
+  "evidence\\catppuccin-mocha-widget.png",
+  "evidence/catppuccin-mocha-taskbar.png",
+  "evidence/catppuccin-mocha-help.png",
+  "evidence\\sheet-catppuccin-mocha.png",
+  "evidence\\appearance-trial.png",
+  "evidence\\appearance-import.png",
+  "evidence\\appearance-editor.png",
+  "evidence\\appearance-share.png"
+ ],
+ "checks_detail": [
+  {
+   "check": "five starter themes exist, each passing the theme check",
+   "ok": true,
+   "detail": [
+    "catppuccin-mocha",
+    "dusk",
+    "ink-landscape",
+    "night-metal",
+    "seabright-day"
+   ]
+  },
+  {
+   "check": "theme.list shows all five as cards (none skipped by the check)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "Seabright Day is light and keeps the place's green accent",
+   "ok": true,
+   "detail": "#638779"
+  },
+  {
+   "check": "Ink Landscape carries its own SVG wallpaper",
+   "ok": true,
+   "detail": "25458 characters of data: address"
+  },
+  {
+   "check": "Catppuccin Mocha came through theme.import (base16)",
+   "ok": true,
+   "detail": "base16:catppuccin-mocha"
+  },
+  {
+   "check": "theme.import takes a base16 scheme",
+   "ok": true,
+   "detail": "ok make bd745 [r1003] \u00b7 a theme ~ by theme for Alex"
+  },
+  {
+   "check": "the import is a theme thing with its palette and licence",
+   "ok": true,
+   "detail": "MIT \u00b7 base16:nord"
+  },
+  {
+   "check": "theme.export format=base16 hands the sixteen colours back",
+   "ok": true,
+   "detail": "nord.yaml"
+  },
+  {
+   "check": "a theme made from Dusk with another accent",
+   "ok": true,
+   "detail": "accent #c4a8ff -> #8fe3b0"
+  },
+  {
+   "check": "the original Dusk is untouched",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "the text on the new accent still reads (accent-ink contrast)",
+   "ok": true,
+   "detail": "11.42:1"
+  },
+  {
+   "check": "someone else's theme cannot be edited; theme.make gives a copy",
+   "ok": true,
+   "detail": "refused: theme: you can edit themes you made; theme.make <theme> gives you a copy"
+  },
+  {
+   "check": "a place-wide theme reaches everyone",
+   "ok": true,
+   "detail": "Dusk Green \u00b7 place"
+  },
+  {
+   "check": "a neighbour cannot set the place's theme",
+   "ok": true,
+   "detail": "refused: theme: only a steward sets the place's theme; theme.use <theme> for=me changes it for you a"
+  },
+  {
+   "check": "just-for-me changes only that person's look",
+   "ok": true,
+   "detail": "Maya Nord (me); Alex Dusk Green; Neighbour 01 Dusk Green"
+  },
+  {
+   "check": "one person's choice is private to them",
+   "ok": true,
+   "detail": "Neighbour 01 sees 0 choices"
+  },
+  {
+   "check": "theme.try wears a theme on a 30 s trial",
+   "ok": true,
+   "detail": "until 2026-11-05T12:00:30+00:00"
+  },
+  {
+   "check": "a trial is only Maya's",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "the trial reverts by itself, writing nothing",
+   "ok": true,
+   "detail": "Nord (me) after 31 s"
+  },
+  {
+   "check": "theme.revert goes back at once",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "theme.keep makes the trial the person's own",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "follow the place again",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "restoring the place's theme",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "theme.export is one file with its wallpaper inside",
+   "ok": true,
+   "detail": "ink-landscape.agora-theme.json \u00b7 21336 bytes; dusk-green.agora-theme.json \u00b7 2239 bytes"
+  },
+  {
+   "check": "a file imports into a second scratch world",
+   "ok": true,
+   "detail": "ok make dk118 [r54] \u00b7 a theme\n~ by theme for Alex"
+  },
+  {
+   "check": "a file imports into a second scratch world",
+   "ok": true,
+   "detail": "ok make dk119 [r55] \u00b7 a theme\n~ by theme for Alex"
+  },
+  {
+   "check": "ink-landscape: same theme on the other side (digest)",
+   "ok": true,
+   "detail": "581aa9bcac60"
+  },
+  {
+   "check": "Dusk Green: same theme on the other side (digest)",
+   "ok": true,
+   "detail": "4d5ad44d91ca"
+  },
+  {
+   "check": "the place's own kit still builds with the theme module's words and themes in it (a help text that looked like a reference once broke it)",
+   "ok": true,
+   "detail": "ok kit dk120 [r56] \u00b7 50 definitions, no data"
+  },
+  {
+   "check": "the wallpaper came with it",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "a kit carries a theme, wallpaper and all",
+   "ok": true,
+   "detail": "20893 characters"
+  },
+  {
+   "check": "taking the kit in the other world makes the same theme",
+   "ok": true,
+   "detail": "581aa9bcac60"
+  },
+  {
+   "check": "theme text is opaque to the kit's reference scan (colours are not mistaken for things)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "a kit with a malicious theme is refused whole, writing nothing",
+   "ok": true,
+   "detail": "refused: a theme in this kit is not accepted: type.ui: 'url(https://evil.example/f.woff)' is not a plain font "
+  },
+  {
+   "check": "refused: a script in a font name",
+   "ok": true,
+   "detail": "refused: theme: the theme was not accepted: type.ui: 'Arial</style><script>alert(1)</script>' is not a plain font family name (names only: n"
+  },
+  {
+   "check": "refused: url( inside a value",
+   "ok": true,
+   "detail": "refused: theme: the theme was not accepted: type.mono: 'url(https://evil.example/x.woff)' is not a plain font family name (names only: no fi"
+  },
+  {
+   "check": "refused: a colour that is an address",
+   "ok": true,
+   "detail": "refused: theme: the theme was not accepted: roles.accent: 'url(javascript:alert(1))' is not a base slot, a #rrggbb colour"
+  },
+  {
+   "check": "refused: a key that is not part of a theme (raw css)",
+   "ok": true,
+   "detail": "refused: theme: the theme was not accepted: css: not part of the theme schema"
+  },
+  {
+   "check": "refused: an oversized svg wallpaper (320 KB; the limit is 128 KiB)",
+   "ok": true,
+   "detail": "refused: theme: the theme was not accepted: wallpaper.svg: the SVG is larger than 128 KiB"
+  },
+  {
+   "check": "refused: a script inside the svg",
+   "ok": true,
+   "detail": "refused: theme: the theme was not accepted: wallpaper.svg: an SVG wallpaper may not contain script"
+  },
+  {
+   "check": "refused: an svg that fetches an address",
+   "ok": true,
+   "detail": "refused: theme: the theme was not accepted: wallpaper.svg: href may only point at an id in the same drawing, from a use element"
+  },
+  {
+   "check": "refused: an oversized raster wallpaper (200 KB; the limit is 150 KB)",
+   "ok": true,
+   "detail": "refused: theme: the theme was not accepted: wallpaper.image: larger than 150 KB; make the picture smaller"
+  },
+  {
+   "check": "refused: a wallpaper that is a web address",
+   "ok": true,
+   "detail": "refused: theme: the theme was not accepted: wallpaper.image: an inline data:image/png, jpeg or webp;base64 image (no addresses)"
+  },
+  {
+   "check": "a theme written straight to the world, bypassing the module, is refused by the kernel hook",
+   "ok": true,
+   "detail": "refused: theme not accepted: type.ui: 'Arial</style><script>' is not a plain font family name (names only: no files, addresses, brackets, qu"
+  },
+  {
+   "check": "(control) a harmless word still answers",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "before: every surface wears Seabright Day",
+   "ok": true,
+   "detail": "#faf9f6"
+  },
+  {
+   "check": "ONE theme.use reached the board, the Appearance app, a legacy widget and two host chrome pages",
+   "ok": true,
+   "detail": "1 record(s); all show #1c1438"
+  },
+  {
+   "check": "the native sheet changed in the same act",
+   "ok": true,
+   "detail": "hash 5a2b0802bf \u00b7 gap 12 \u00b7 corner round"
+  },
+  {
+   "check": "the board's own tokens moved: --paper is dark, and a colour the board wrote for the light look (--board-colour-1) is worn in Dusk",
+   "ok": true,
+   "detail": "--paper #20173f; --board-colour-1 #85ad92 -> #9d9bec"
+  },
+  {
+   "check": "the legacy widget's text moved with it",
+   "ok": true,
+   "detail": "rgb(230, 222, 250)"
+  },
+  {
+   "check": "ONE undo put every surface and the native sheet back",
+   "ok": true,
+   "detail": "native hash cff2bee5de"
+  },
+  {
+   "check": "every starter rendered across the board, a painter component, a legacy widget and host chrome",
+   "ok": true,
+   "detail": "seabright-day, dusk, night-metal, ink-landscape, catppuccin-mocha"
+  },
+  {
+   "check": "Try in the app wears the theme on a trial, with Keep and Go back in sight",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "Go back reverts",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "pasting a base16 scheme into the app imports it",
+   "ok": true,
+   "detail": "Nord Paste"
+  },
+  {
+   "check": "editing a colour in the app saves it to the copy",
+   "ok": true,
+   "detail": "My Night Metal"
+  },
+  {
+   "check": "Share to the board posts with the preview picture and the theme file attached",
+   "ok": true,
+   "detail": "post bd812 with ['dusk-green-preview.png', 'dusk-green.agora-theme.json']"
+  }
+ ]
+}

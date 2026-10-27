@@ -1,6 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Lines · Agora</title>
-<link rel="stylesheet" href="kd.css">
+<link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="kd.css">
 <style>
   main { display: flex; flex-direction: column; gap: 10px; padding-bottom: 16px; }
   #log { flex: 1; overflow: auto; background: var(--card); border: 1px solid var(--faint); border-radius: 6px; padding: 10px 12px; }
@@ -20,7 +20,7 @@
   <div id="log"></div>
   <form id="f"><input id="line" autocomplete="off" spellcheck="false" placeholder="a line, e.g. window.open feed to=left"><button class="act">Say</button></form>
 </main>
-<script src="kd.js"></script>
+<script src="kd.js"></script><script src="theme-live.js"></script>
 <script>
 "use strict";
 const { el } = KD;

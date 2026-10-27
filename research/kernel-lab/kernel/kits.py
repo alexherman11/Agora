@@ -15,8 +15,12 @@ FIELDS = {
     "rule": set("name title on on_entry do do_bound off of_kind".split()),
     "kind": set("name title help fields".split()),
     "widget": set("name title code style help".split()),
+    "theme": set("name title text".split()),     # a theme is its JSON text (theme/model.py), wallpaper assets inline
 }
 REF = re.compile(r"(?<![\w])([a-z]{2,4}\d+)(?![\w])")
+# Fields that are the definition's own data, not words that name other things: never scanned for references, never
+# remapped (a theme's JSON says "base0D" and "#ff0000", which read like ids).
+OPAQUE = {"theme": {"text"}}
 
 
 def validate(bundle):
@@ -63,14 +67,23 @@ def validate(bundle):
                     bad()
                 if '.' in name and not (a['from'].startswith('module:') and name.startswith(a['from'][7:] + '.')):
                     raise Refused('dotted names belong to the implementing module')
-        elif a["kind"] in ("lens", "style", "kind") and not a.get("name"):
+        elif a["kind"] in ("lens", "style", "kind", "theme") and not a.get("name"):
             bad()
+        if a["kind"] == "theme":
+            # a stranger's theme is checked as strictly as one typed here: no scripts, no addresses, assets inline and small
+            from theme.model import ThemeError, check_text
+            try:
+                check_text(a.get("text"))
+            except ThemeError as exc:
+                raise Refused("a theme in this kit is not accepted: " + str(exc)[:300]) from None
     if any(not isinstance(t, str) or not REF.fullmatch(t) or t in seen or not isinstance(w, str)
            for t, w in kernel.items()):
         bad()
     known = seen | set(kernel)
     for d in defs:
-        for value in d["facts"].values():
+        for field, value in d["facts"].items():
+            if field in OPAQUE.get(d["facts"]["kind"], ()):
+                continue
             if any(t not in known for t in REF.findall(value)):
                 raise Refused("a definition refers to data outside the kit; replace that reference with an argument")
     return bundle
@@ -93,7 +106,7 @@ def kit(k, actor, st, entry, tx, group, saw=None):
         a = k.state.things[t]
         if k.shown(actor.person, t) is None:
             raise Refused("a definition is not visible to you; nothing was gathered")
-        text = " ".join(str(a.get(f, "")) for f in FIELDS[a["kind"]])
+        text = " ".join(str(a.get(f, "")) for f in FIELDS[a["kind"]] if f not in OPAQUE.get(a["kind"], ()))
         for e in k.entries():
             ea = k.entry(e)
             names = {ea.get("word", ""), ea.get("bound", "")} | set(ea.get("aliases", "").split())
@@ -114,7 +127,9 @@ def kit(k, actor, st, entry, tx, group, saw=None):
                 facts[field] = a[field + '_bound']
         definitions.append({'id': t, 'facts': facts})
     kernel = {e: k.state.get(e, "bound") for e in k.entries() if k.state.get(e, "from") == "kernel"}
-    used = set(REF.findall(json.dumps(definitions))) - chosen - {source}
+    used = set(REF.findall(json.dumps([{"id": d["id"], "facts": {f: v for f, v in d["facts"].items()
+                                                                   if f not in OPAQUE.get(d["facts"]["kind"], ())}}
+                                       for d in definitions]))) - chosen - {source}
     bundle = validate({"version": 1, "source": k.log.records[0]["digest"], "group": source,
                        "definitions": definitions, "kernel": {t: kernel[t] for t in used if t in kernel}})
     t = tx.mint()
@@ -152,7 +167,7 @@ def take(k, actor, st, entry, tx, group, saw=None):
                 if name in names or k.find_entry(name, group):
                     raise Refused(f"{name} already answers here; take into another group")
                 names.add(name)
-        elif a["kind"] in ("lens", "style", "kind") and a.get("name"):
+        elif a["kind"] in ("lens", "style", "kind", "theme") and a.get("name"):
             key = (a["kind"], a["name"])
             if key in named_definitions or any(k.state.get(t, "name") == a["name"] and group in k.groups_of(t)
                                                for t in k.things(a["kind"])):
@@ -163,7 +178,7 @@ def take(k, actor, st, entry, tx, group, saw=None):
     for d in bundle["definitions"]:
         t = mapping[d["id"]]
         for f, v in d["facts"].items():
-            tx.set(t, f, REF.sub(lambda m: mapping[m[0]], v))
+            tx.set(t, f, v if f in OPAQUE.get(d["facts"]["kind"], ()) else REF.sub(lambda m: mapping[m[0]], v))
         tx.set(t, "origin", {"world": bundle["source"], "thing": d["id"]})
         tx.set(t, "made_by", actor.id)
         tx.set(t, f"in:{group}", len(k.log.records) + 1)

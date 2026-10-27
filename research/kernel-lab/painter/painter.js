@@ -15,8 +15,26 @@ const interpolate=(text,env)=>String(text).replace(/\$([\w.-]+)/g,(matched,path,
   return quoted?String(value??'').replace(/\\/g,'\\\\').replace(/"/g,'\\"'):Q(value);
 });
 function closeMenu(){menu?.remove();menu=null;if(menuReturnFocus?.isConnected)menuReturnFocus.focus();menuReturnFocus=null}
+// 26 Oct (Alex): every menu ends with a box to ask, in your own words, for a change to what it is about.
+// The world's `ask` word decides where it goes (the kernel desk: a request relayed into the Conversation for Claude).
+function askBox(node){
+  const thing=Object.keys(node.saw||{})[0]||node.gestures?.map(g=>g.env&&Object.values(g.env).find(v=>v&&typeof v==='object'&&v.id)?.id).find(Boolean)||'-';
+  const box=document.createElement('input');box.type='text';box.placeholder='Ask for a change…';
+  box.setAttribute('aria-label','Ask for a change to this, in your own words');box.className='menu-ask';
+  box.style.cssText='display:block;box-sizing:border-box;width:100%;margin-top:6px;padding:7px 10px;font:inherit;font-size:12px;border:1px solid var(--ag-border,#e4e7e1);border-radius:8px;background:var(--ag-surface,#fff);color:inherit';
+  box.addEventListener('keydown',async e=>{
+    e.stopPropagation();
+    if(e.key==='Escape'){e.preventDefault();closeMenu();return}
+    if(e.key!=='Enter'||e.isComposing||!box.value.trim())return;
+    e.preventDefault();const words=box.value.trim();closeMenu();
+    try{await act('ask '+thing+' text='+Q(words)+' where='+Q(lensName+' · '+node.path),{});tell('Asked — it is in the Conversation')}
+    catch(err){tell('Not sent: '+(err?.message||err))}
+  });
+  return box;
+}
 function openMenu(node,x,y){
   if(!node)return;closeMenu();menuReturnFocus=document.activeElement;menu=render(node);menu.hidden=false;menu.classList.add('menu');
+  menu.append(askBox(node));
   document.body.append(menu);const r=menu.getBoundingClientRect();
   menu.style.left=Math.max(8,Math.min(x,innerWidth-r.width-10))+'px';
   menu.style.top=Math.max(8,Math.min(y,innerHeight-r.height-10))+'px';
@@ -117,8 +135,18 @@ function beginDrag(e,card,node){
   card.addEventListener('pointermove',move);card.addEventListener('pointerup',finish);card.addEventListener('pointercancel',finish);
 }
 const defaultTokens=P.tokens;
+// The viewer's theme gives the painter's tokens; a lens's own colours are worn through it (themed.js) unless it pins them.
+const NOT_TOKENS=new Set(['css','source','hash','variant','name','style']);
+const themeTokens=()=>Object.fromEntries(Object.entries(theme).filter(([k,v])=>typeof v==='string'&&!NOT_TOKENS.has(k)));
+function applyTokens(plan){
+  const worn=Themed.pinned(plan.tokens)?plan.tokens:Themed.tokens(plan.tokens);
+  const all={...P.tokens,...themeTokens(),...worn};
+  for(const [key,value] of Object.entries(all))if(typeof value==='string')document.documentElement.style.setProperty('--'+key,value);
+  if(!Themed.pinned(plan.tokens))Themed.rootVars(new Set(Object.keys(all)));
+}
 function applyStyles(plan){
   document.querySelector('#part-styles')?.remove();
+  const wear=Themed.pinned(plan.tokens)?(v=>v):(v=>Themed.lift(v));
   const tokens={...defaultTokens,...theme,...plan.tokens};
   const rules=[];
   for(const rule of plan.styles){
@@ -131,8 +159,8 @@ function applyStyles(plan){
     for(const [key,val] of Object.entries(rule.paint||{})){
       if(key==='lines')declarations.push(`display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:${val};overflow:hidden`);
       else if(key==='emphasis')declarations.push('font-weight:'+val);
-      else if(key==='glow')declarations.push(`box-shadow:0 0 18px ${val}`);
-      else declarations.push(({radius:'border-radius'}[key]||key)+':'+val);
+      else if(key==='glow')declarations.push(`box-shadow:0 0 18px ${wear(val)}`);
+      else declarations.push(({radius:'border-radius'}[key]||key)+':'+(key==='color'||key==='background'?wear(val):val));
     }
     rules.push(selector+'{'+declarations.map(d=>d.replace(/;|$/g,m=>m===';'?'!important;':'!important')).join(';')+'}');
   }
@@ -181,7 +209,7 @@ async function refreshOnce(){
   const passage=keepTextSelection();
   const next=render(plan.tree);mounted?.remove();document.body.append(next);mounted=next;
   mounted.dataset.view=JSON.stringify(plan.view||{});
-  for(const [key,value] of Object.entries({...P.tokens,...theme,...plan.tokens}))if(typeof value==='string')document.documentElement.style.setProperty('--'+key,value);
+  applyTokens(plan);
   document.documentElement.dataset.painter='components';
   if(focused){const n=[...document.querySelectorAll('[data-path]')].find(n=>n.dataset.path===focused&&n.dataset.part===focusedPart);if(n){if(value!==undefined)n.value=value;n.focus();if(typeof selection==='number'&&n.setSelectionRange)n.setSelectionRange(selection,selection)}}
   restoreTextSelection(passage);
@@ -202,6 +230,12 @@ async function refreshOnce(){
     try{await hearMotion(m.trigger.slice(10))}catch(e){observeComponent(owner,'healthy','Motion subscription refused: '+String(e.message||e))}
   }
 }
+// The theme changed (the host sends it; common.js has already updated `theme`): repaint the tokens and styles at once.
+addEventListener('ag-theme',()=>{
+  Object.assign(P.tokens,themeTokens());
+  // Components that took colours at mount (a card's tint) are mounted again; drafts live in api.draft and survive.
+  if(currentPlan){applyTokens(currentPlan);applyStyles(currentPlan);currentPlan=null;refresh().catch(tell)}
+});
 function playMotion(owner,token){
   const defaults={settle:{from:{opacity:.5,transform:'translateY(6px)'},to:{opacity:1,transform:'none'},duration:200},pulse:{from:{transform:'scale(.96)'},to:{transform:'scale(1)'},duration:180}};
   const motion=currentPlan.tokens?.['motion-'+token]||defaults[token];

@@ -1,0 +1,306 @@
+{
+ "A-pywebview-transparent": {
+  "raise_ok": true,
+  "print_window_ok": true,
+  "size": [
+   520,
+   160
+  ],
+  "paint": {
+   "corner": [
+    0,
+    0,
+    0
+   ],
+   "alpha_corner": 255,
+   "sample": [
+    [
+     0,
+     0,
+     0
+    ],
+    [
+     0,
+     0,
+     0
+    ],
+    [
+     0,
+     0,
+     0
+    ],
+    [
+     0,
+     0,
+     0
+    ]
+   ],
+   "blended_pixels_in_one_corner": 73
+  },
+  "layered": {
+   "ex_layered": false,
+   "attrs_ok": false,
+   "colorkey_bgr": "0x0",
+   "flags": 0
+  },
+  "screen_copy_corner": [
+   0,
+   0,
+   0
+  ],
+  "screen_copy_centre": [
+   0,
+   0,
+   0
+  ],
+  "hit_test_corner_is_this_window": true,
+  "hit_test_corner_is_backing": false,
+  "hit_test_centre_is_this_window": true,
+  "z_order_front_first": [
+   "WindowsForms10.Window.8.app.0.390be75_r17_ad1 (300, 300, 520, 160) <- test",
+   "UAC_InputIndicatorOverlayWnd (0, 0, 0, 0)",
+   "UAC Input Indicator (3792, 2112, 0, 0)",
+   "ShellSpikeBacking (300, 300, 520, 160) <- backing"
+  ],
+  "hit_centre_class": "Chrome_RenderWidgetHostHWND",
+  "visible": true,
+  "style_hex": "0x16010000",
+  "exstyle_hex": "0x50008",
+  "children": [
+   "WindowsForms10.Window.8.app.0.390be75_r17_ad1 vis=True (300, 300, 520, 160)",
+   "Chrome_WidgetWin_0 vis=True (300, 300, 520, 160)",
+   "Chrome_WidgetWin_1 vis=True (300, 300, 520, 160)",
+   "Chrome_RenderWidgetHostHWND vis=True (300, 300, 521, 161)",
+   "Intermediate D3D Window vis=True (300, 300, 520, 160)"
+  ]
+ },
+ "B-colorkey-black": {
+  "set_layered_ok": true,
+  "raise_ok": true,
+  "print_window_ok": true,
+  "size": [
+   520,
+   160
+  ],
+  "paint": {
+   "corner": [
+    1,
+    2,
+    3
+   ],
+   "alpha_corner": 255,
+   "sample": [
+    [
+     1,
+     2,
+     3
+    ],
+    [
+     1,
+     2,
+     3
+    ],
+    [
+     1,
+     2,
+     3
+    ],
+    [
+     1,
+     2,
+     3
+    ]
+   ],
+   "blended_pixels_in_one_corner": 73
+  },
+  "layered": {
+   "ex_layered": true,
+   "attrs_ok": true,
+   "colorkey_bgr": "0x30201",
+   "flags": 1
+  },
+  "screen_copy_corner": [
+   0,
+   0,
+   0
+  ],
+  "screen_copy_centre": [
+   0,
+   0,
+   0
+  ],
+  "hit_test_corner_is_this_window": false,
+  "hit_test_corner_is_backing": true,
+  "hit_test_centre_is_this_window": false,
+  "z_order_front_first": [
+   "UAC_InputIndicatorOverlayWnd (0, 0, 0, 0)",
+   "UAC Input Indicator (3792, 2112, 0, 0)",
+   "WindowsForms10.Window.8.app.0.390be75_r17_ad1 (300, 300, 520, 160) <- test",
+   "ShellSpikeBacking (300, 300, 520, 160) <- backing"
+  ],
+  "hit_centre_class": "ShellSpikeBacking",
+  "visible": true,
+  "style_hex": "0x16010000",
+  "exstyle_hex": "0xd0008",
+  "children": [
+   "WindowsForms10.Window.8.app.0.390be75_r17_ad1 vis=True (300, 300, 520, 160)",
+   "Chrome_WidgetWin_0 vis=True (300, 300, 520, 160)",
+   "Chrome_WidgetWin_1 vis=True (300, 300, 520, 160)",
+   "Chrome_RenderWidgetHostHWND vis=True (300, 300, 521, 161)",
+   "Intermediate D3D Window vis=True (300, 300, 520, 160)"
+  ]
+ },
+ "C-colorkey-edge-tone": {
+  "set_layered_ok": true,
+  "raise_ok": true,
+  "print_window_ok": true,
+  "size": [
+   520,
+   160
+  ],
+  "paint": {
+   "corner": [
+    205,
+    180,
+    254
+   ],
+   "alpha_corner": 255,
+   "sample": [
+    [
+     205,
+     180,
+     254
+    ],
+    [
+     205,
+     180,
+     254
+    ],
+    [
+     205,
+     180,
+     254
+    ],
+    [
+     205,
+     180,
+     254
+    ]
+   ],
+   "blended_pixels_in_one_corner": 62
+  },
+  "layered": {
+   "ex_layered": true,
+   "attrs_ok": true,
+   "colorkey_bgr": "0xfeb4cd",
+   "flags": 1
+  },
+  "screen_copy_corner": [
+   0,
+   0,
+   0
+  ],
+  "screen_copy_centre": [
+   0,
+   0,
+   0
+  ],
+  "hit_test_corner_is_this_window": false,
+  "hit_test_corner_is_backing": true,
+  "hit_test_centre_is_this_window": false,
+  "z_order_front_first": [
+   "UAC_InputIndicatorOverlayWnd (0, 0, 0, 0)",
+   "UAC Input Indicator (3792, 2112, 0, 0)",
+   "WindowsForms10.Window.8.app.0.390be75_r17_ad1 (300, 300, 520, 160) <- test",
+   "ShellSpikeBacking (300, 300, 520, 160) <- backing"
+  ],
+  "hit_centre_class": "ShellSpikeBacking",
+  "visible": true,
+  "style_hex": "0x16010000",
+  "exstyle_hex": "0xd0008",
+  "children": [
+   "WindowsForms10.Window.8.app.0.390be75_r17_ad1 vis=True (300, 300, 520, 160)",
+   "Chrome_WidgetWin_0 vis=True (300, 300, 520, 160)",
+   "Chrome_WidgetWin_1 vis=True (300, 300, 520, 160)",
+   "Chrome_RenderWidgetHostHWND vis=True (300, 300, 521, 161)",
+   "Intermediate D3D Window vis=True (300, 300, 520, 160)"
+  ]
+ },
+ "D-region": {
+  "region_ok": true,
+  "raise_ok": true,
+  "print_window_ok": true,
+  "size": [
+   520,
+   160
+  ],
+  "paint": {
+   "corner": [
+    255,
+    255,
+    255
+   ],
+   "alpha_corner": 255,
+   "sample": [
+    [
+     255,
+     255,
+     255
+    ],
+    [
+     255,
+     255,
+     255
+    ],
+    [
+     255,
+     255,
+     255
+    ],
+    [
+     255,
+     255,
+     255
+    ]
+   ],
+   "blended_pixels_in_one_corner": 781
+  },
+  "layered": {
+   "ex_layered": false,
+   "attrs_ok": false,
+   "colorkey_bgr": "0x0",
+   "flags": 0
+  },
+  "screen_copy_corner": [
+   0,
+   0,
+   0
+  ],
+  "screen_copy_centre": [
+   0,
+   0,
+   0
+  ],
+  "hit_test_corner_is_this_window": false,
+  "hit_test_corner_is_backing": true,
+  "hit_test_centre_is_this_window": true,
+  "z_order_front_first": [
+   "UAC_InputIndicatorOverlayWnd (0, 0, 0, 0)",
+   "UAC Input Indicator (3792, 2112, 0, 0)",
+   "WindowsForms10.Window.8.app.0.390be75_r17_ad1 (300, 300, 520, 160) <- test",
+   "ShellSpikeBacking (300, 300, 520, 160) <- backing"
+  ],
+  "hit_centre_class": "Chrome_RenderWidgetHostHWND",
+  "visible": true,
+  "style_hex": "0x16010000",
+  "exstyle_hex": "0x50008",
+  "children": [
+   "WindowsForms10.Window.8.app.0.390be75_r17_ad1 vis=True (300, 300, 520, 160)",
+   "Chrome_WidgetWin_0 vis=True (300, 300, 520, 160)",
+   "Chrome_WidgetWin_1 vis=True (300, 300, 520, 160)",
+   "Chrome_RenderWidgetHostHWND vis=True (300, 300, 521, 161)",
+   "Intermediate D3D Window vis=True (300, 300, 520, 160)"
+  ]
+ },
+ "screen_is_composed": null
+}
