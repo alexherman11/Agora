@@ -37,7 +37,9 @@ HELP={
 
 def offers():
     return [{'word':'wm.'+name,'kind':kind,'takes':takes,'help':'wm.'+name+': '+help,
-        'may':'anyone','undo':'yes' if name in ('mode','leave-alone','manage') else ('external' if kind=='do' else 'no')}
+        'may':'anyone','undo':'yes' if name in ('mode','leave-alone','manage') else ('external' if name=='close' else 'no')}
+    # Focus, minimise, restore, pin and arrange change only this screen: not records (Alex, 26 Oct: "visual state should
+    # not live in the world"; every dock click used to write one). close asks an app to close, so it stays recorded.
         for name,(kind,takes,help) in HELP.items()]
 
 
@@ -130,7 +132,7 @@ class WMModule:
             if (target in pins)==(word=='pin'):return {'text':f'already {word}ned'}
             pins=pins|{target} if word=='pin' else pins-{target}
             self._save_screen(pins=sorted(pins));self.latest=(settings,sorted(pins))
-            return {'external':True,'text':f'wm.{word}: {row["app"]}'}
+            return {'text':f'wm.{word}: {row["app"]}'}
         if word in ('leave-alone','manage'):
             app=' '.join(words) if words else target
             if not app:return {'refused':'give the app name from wm.windows'}
@@ -180,10 +182,10 @@ class WMModule:
                 except queue.Empty:break
                 try:
                     if op=='action':
-                        value=manager.action(*args);answer.put({'external':True,'text':f'wm.{args[0]}: '+('Windows refused focus' if value is False else 'requested')})
+                        value=manager.action(*args);answer.put({'external':args[0]=='close','text':f'wm.{args[0]}: '+('Windows refused focus' if value is False else 'requested')})
                     else:
                         manager.state=solve(manager.state,{'type':'arrange'}).state
-                        answer.put({'external':manager.mode=='live','text':'layout re-solved'})
+                        answer.put({'text':'layout re-solved'})
                 except Exception as exc:answer.put({'refused':str(exc)})
             if self.headless:work=Rect(0,0,3840,2160);rows=[];events=[]
             else:
