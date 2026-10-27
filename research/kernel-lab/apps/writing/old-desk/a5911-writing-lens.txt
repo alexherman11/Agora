@@ -1,0 +1,140 @@
+s5910 note "writing" · appears at a5911 · tags lens · style=review
+---
+# writing: the Writing room as an app (a5949, Alex 16 Oct: 'I kinda liked the old style, I just wanted good feature
+# parity and for it to be more polished'). design-review's page (a4039): the rail of documents on the left, the open
+# document in the middle drawn by doc-page (its words, its margin of comments, its Talk beside it). What is open is the
+# person's own writer note (role=writer, actor=$me): open= the document, back= the one before, find= the search words.
+# A new document is one Markdown text (a note, role=doc: a4865); a paragraph document (a surface) keeps its comments on
+# its paragraphs. In the home base this opens on the left of JEFF's chat (home-viewer); Pop out gives it a window.
+writing : column
+  share 1
+  role page
+  mine : column
+    share 1
+    of prop:role=writer,prop:actor=$me as w
+    each app
+  none : text "Writing needs a writer note of yours: a note in the Writing room with role=writer actor=<you>."
+    role meta
+    only when count(prop:role=writer,prop:actor=$me) = 0
+app : column
+  share 1
+  on link do read $w; do prop $w open=$value back="$w.open"
+  global : row
+    role toolbar
+    gap
+    brand : text "WRITING"
+      share 1
+      role railhead
+    back : text "← back"
+      role tool
+      only when ($w.back or "") != "" and ($w.back or "") != ($w.open or "")
+      on click do read $w; do prop $w open="$w.back" back="$w.open"
+    new : row
+      of prop:role=writing-notes as nb
+      each newbtn
+  workspace : row
+    share 1
+    gap
+    queue : column
+      scroll scroll
+      share 1
+      role rail
+      box : text "$w.find"
+        role find
+        hint "Find a document"
+        lines 1..1
+        commit enter only
+        on edit do read $w; do prop $w find="$value"
+      clear : text "clear the search"
+        role tool
+        only when ($w.find or "") != ""
+        on click do read $w; do prop $w find=""
+      found : column
+        only when ($w.find or "") != ""
+        let q = words-of($w.find)
+        hits : column
+          of ?$q,prop:role=doc as f
+          clamp 40
+          each hit
+        nothing : text "No document holds those words."
+          role meta
+          only when count(?$q,prop:role=doc) = 0
+      tree : column
+        only when ($w.find or "") = ""
+        designs : column
+          fold "Designs for me" open
+          role tree
+          waiting : column
+            of prop:role=doc,prop:design=waiting
+            each qrow
+          answered : column
+            fold "Answered"
+            of prop:role=doc,prop:design=answered
+            each qrow
+        notes : column
+          fold "Notes" open
+          role tree
+          docs : column
+            of kind:note,prop:role=doc,-prop:design,-prop:collection
+            each qrow
+        documentation : column
+          fold "Agora documentation"
+          role tree
+          sources : column
+            of in:f600,prop:source
+            each qrow
+          docs : column
+            of prop:role=doc,prop:collection=documentation
+            each qrow
+        personal : column
+          fold "Personal writing"
+          role tree
+          docs : column
+            of prop:role=doc,prop:collection=personal
+            each qrow
+          empty : text "No documents here yet"
+            role meta
+            only when count(prop:role=doc,prop:collection=personal) = 0
+        loose : column
+          fold "Paragraph documents"
+          role tree
+          docs : column
+            of kind:surface,prop:role=doc,-prop:design,-prop:collection
+            each qrow
+    desk : column
+      share 4
+      empty : column
+        only when ($w.open or "") = ""
+        hi : text "Nothing open"
+          role title
+        say : text "Choose a document on the left, or start one with New document. It is one Markdown text, drawn as you write: Ctrl+E shows the source, [[ links another document. Its Talk, beside it, is where comments go."
+          role meta
+      doc : column
+        share 1
+        only when ($w.open or "") != ""
+        one : column
+          share 1
+          of $w.open as d
+          each shown
+shown : column
+  share 1
+  lens doc-page
+newbtn : text "New document"
+  role button
+  on click do read $w; do create $nb kind=note title="Untitled" role=doc by=$me; do prop $w open=$new back="$w.open" find=""
+qrow : column
+  role qcard
+  role qcard.on when $item = ($w.open or "")
+  qt : text "$title"
+    role qtitle
+    clamp 2
+    on click do read $w; do prop $w open=$item back="$w.open" find=""
+hit : column
+  role qcard
+  on click do read $w; do prop $w open=$f back="$w.open" find=""
+  t : text "$title"
+    role qtitle
+    clamp 2
+  k : text "$kind"
+    role meta
+---

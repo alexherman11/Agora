@@ -1,0 +1,58 @@
+# Writing: the Writing center. Builder draft by Claude, 27 Oct 2026, closely modelled on the old desk's Writing app
+# (a5911 writing, a6079 doc-page) in the component style. A document is a thing that belongs to the person who made it:
+# kind=document, its Markdown in text=, its collection= (plans notes documentation personal). A plan also says
+# plan=waiting|answered, and verdict= once Alex makes his call. A comment is kind=comment about=<document> quote=<its words>.
+# What is open is this window's own view ($view.open, $view.back). Every press below says the line it runs.
+root : writing-shell, title "Writing"
+  on new do make kind=document title="Untitled" collection=notes text=""
+  rail : doc-rail, hint "Find a document"
+    watch reading:"rows document"
+    watch reading:"rows note"
+    plans : doc-shelf, label "Plans", open yes
+      on new do make kind=document title="Untitled plan" collection=plans plan=waiting text=""
+      waiting : doc-shelf, label "Waiting", open yes, nested yes, hot yes, empty "Nothing waits for you"
+        list : column, of tag:document, prop:plan=waiting as d, each rail-row
+      answered : doc-shelf, label "Answered", nested yes
+        list : column, of tag:document, prop:plan=answered as d, each rail-row
+    notes : doc-shelf, label "Notes", open yes
+      on new do make kind=document title="Untitled" collection=notes text=""
+      list : column, of tag:document, prop:collection=notes as d, each rail-row
+      kept : column, of tag:note as d, each rail-row
+    documentation : doc-shelf, label "Agora documentation"
+      on new do make kind=document title="Untitled" collection=documentation text=""
+      list : column, of tag:document, prop:collection=documentation as d, each rail-row
+    personal : doc-shelf, label "Personal writing", empty "No documents here yet"
+      on new do make kind=document title="Untitled" collection=personal text=""
+      list : column, of tag:document, prop:collection=personal as d, each rail-row
+    unsorted : doc-shelf, label "Files and unsorted", empty "Uploaded files and documents in no collection"
+      list : column, of tag:document, prop:collection= as d, each rail-row
+  home : doc-home
+    only when $view.open = ""
+    on new do make kind=document title="Untitled" collection=notes text=""
+    waiting : column, of tag:document, prop:plan=waiting as d, each home-card
+    recent : column, of tag:document as d, each home-line
+  open : column
+    only when $view.open != ""
+    doc : column, of tag:document, prop:id=$view.open as d, each page-view
+    note : column, of tag:note, prop:id=$view.open as d, each page-view
+rail-row : doc-row, look row
+home-card : doc-row, look card
+home-line : doc-row, look list
+page-view : doc-page
+  watch reading:"rows document"
+  watch reading:"rows note"
+  on edit do set $d.id text=$value
+  on retitle do set $d.id title=$value
+  on move do set $d.id collection=$value
+  on verdict do set $d.id plan=answered verdict=$value
+  on waiting do set $d.id plan=waiting verdict=
+  on comment do make kind=comment about=$d.id quote=$quote text=$value before=$before after=$after heading=$heading
+  on ask-jeff do say Conversation text=$value about=$d.id
+  on new do make kind=document title=$title collection=notes text=""
+  on forget do forget $d.id
+  comments : column, of tag:comment, prop:about=$d.id as c, each comment-view
+comment-view : doc-comment, doctext $d.text, doctitle $d.title
+  on reply do make kind=comment about=$d.id reply_to=$c.id text=$value
+  on resolve do set $c.id resolved=yes
+  on reopen do set $c.id resolved=
+  on ask-jeff do say Conversation text=$value about=$d.id

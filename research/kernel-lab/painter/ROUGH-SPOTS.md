@@ -140,3 +140,11 @@ web deployment. The frozen fresh-agent tweak trial remains the next review.
 The parser accepts English weekday/today/tomorrow plus local time or ISO local
 date/time. Responsive breakpoints remain CSS defaults, explicitly identified in
 the guide. All work is uncommitted for Claude; `lens.js` is untouched.
+
+## 27 October: the Writing center (builder draft by Claude)
+
+No source outside `apps/writing/` was edited. Frictions met while building it, each a missing world-level word
+(details in `apps/writing/README.md`): `say … quote=` (a Conversation line cannot carry a quoted passage; it is
+dropped), `window.open url=` for the person's own browser (a plan's design page can only be copied), an `icon=` the
+dock honours (it guesses from the lens name), the painter's `el` writing `null` attributes as `"null"`
+(`readonly="null"`), and `-prop:` exclusion in a lens query.

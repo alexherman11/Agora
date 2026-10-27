@@ -1,0 +1,24 @@
+sandbox: copied the live world to world-claude-writing
+PASS home: hello, the waiting plan as a card, Plans with Waiting and Answered (0.2s) · {'hello': 'Good afternoon, Alex.', 'sub': 'One plan is waiting for you. Everything else can wait.', 'cards': ['Shedding clutter'], 'shelves': ['›Plans
+PASS a plan opens: drawn Markdown with its tables, its call, Claude's draft, [[MOVING-IN]] resolved (0.9s) · {'plan': 'Waiting for you\nYour call\nStill open: C6 (the hot log rolls over) and C10 (embeddings; kinds that nest): Alex wants to
+PASS [[link]] opens Moving into the desktop: Answered, T1 still open, Back shown (0.3s) · {'plan': 'Answered\nYou answered this plan\nStill open: T1, the welcome text: not answered yet\nBuild it\nBuild it, with my comments\nNot yet, I have
+PASS "Linked from" lists Shedding clutter; Back returns to it (0.1s)
+PASS select words, right-click, Comment: a comment thing, its words marked, "under § The short version" (1.3s) · {'menu': '“Clutter is not old things.” | Comment | in the margin | Send to JEFF | Conversation | Edit this part', 'mark':
+PASS select words, right-click, Send to JEFF: a said line in the Conversation, quoted, about= the document (0.2s) · Which dial would you turn first?
+
+> Shedding has three dials
+
+— from [[dk934|Shedding clutter]]
+PASS Send to JEFF on the whole document; "Sent to JEFF · 2" under it (0.5s)
+PASS a plan's call: "Not yet, I have questions" answers it; "Back to waiting" undoes the state (0.6s)
+PASS New document: name it, press the page, write Markdown, [[ picks Shedding clutter, Esc keeps it, drawn (1.3s) · {'h2': 'Things to bring', 'tasks': 3, 'link': 'Shedding clutter', 'strong': 'folding table'}
+PASS a task box ticks the line in the text (0.2s)
+PASS Ctrl+E shows the source; writing there and Ctrl+E again keeps it and draws it (0.4s)
+PASS press a part, change the commented words, leave: saved, the comment says its words changed (0.8s) · changed: the words around it are still here, these words are not
+PASS Resolve folds the comment under "Show 1 resolved" (0.2s)
+PASS Find a document: "dial" finds Shedding clutter by its text; Esc brings the collections back (0.2s) · ['Shedding clutter']
+PASS the guide: [[Moving into the desktop]] by title, its keys table, its ticked list (0.8s) · {'link': 'dk933', 'table': 7, 'ticked': 3}
+PASS Home lists recently changed, newest first (0.3s) · ['Shedding clutter', 'Saturday market list', 'Moving into the desktop', 'Writing in Agora', 'seabright-ground.json']
+PASS the window wears the world's theme (the copy wears Alex's) (0.0s) · Dusk (place)
+PASS no script errors in the window (0.0s)
+18 of 18 steps pass
