@@ -14,6 +14,8 @@ The words answer at once and never wait on a model turn (the kernel gives a modu
     house.wake <person> [words]   wake one now, with your words                      (do, outside the world)
     house.stop <person>           end its process; the next call starts it again     (do, outside the world)
     house.activity <person>       what it said and did outside any chat              (see)
+What an agent is doing changing (idle to working, a new act) is announced as the happening house.doing about its
+house-agent thing, so a painted page (apps/work) rereads; it is never recorded.
 
 An agent acts through MCP (see, do, lines) with its own session, as itself. With speaks=text (the default), each text
 block of its turn is said into the chat that woke it, as it, the moment it arrives, and its tool calls become small
@@ -520,6 +522,8 @@ class House:
         if word == "house.activity" and a is not None:
             n = str((args.get("kv") or {}).get("limit", "10"))
             rows = a.recent_activity(min(int(n), 100) if n.isdigit() else 10)
+            for r in rows:
+                r["line"] = f"{r['at'][11:16]}  {r['what']:<5} {' '.join(str(r['text']).split())[:240]}"
             return {"text": (f"{a.name}'s activity outside any chat, latest last:\n" + "\n".join(
                 f"  {r['at'][11:16]} {r['what']}: {r['text'][:300]}" for r in rows)) if rows else
                 f"{a.name} has done nothing outside a chat yet", "rows": rows}
@@ -538,10 +542,18 @@ class House:
     def row(self, a):
         provider, model, effort = a.provider()
         fw = a.state.get("first_words_ms") or []
-        return {"name": a.name, "person": a.person, "doing": a.doing(), "provider": provider, "model": model,
-                "reasoning": effort, "turns": a.state.get("turns", 0), "last_turn": a.state.get("last_turn", ""),
-                "first_words_ms": fw[-1] if fw else None, "error": a.state.get("error", ""),
-                "acts": a.state.get("last_acts", []), "waiting": len(a.inbox)}
+        doing, acts = a.doing(), a.state.get("last_acts", [])
+        last = a.state.get("last_turn", "")
+        now = {"working": "; ".join(acts[-2:]) or "thinking", "error": a.state.get("error", ""),
+               "asleep": "asleep (want=asleep)"}.get(doing) or (f"last turn {last[11:16]}" if last else "not yet woken")
+        colour = {"working": "sage", "error": "rose", "idle": "sky"}.get(doing, "paper")     # the card's, in apps/work
+        return {"name": a.name, "person": a.person, "id": a.cfg.get("id", ""), "doing": doing, "now": now,
+                "colour": colour,
+                "role": a.cfg.get("role", "agent"), "chat": a.cfg.get("chat", ""), "task": a.cfg.get("task", ""),
+                "provider": provider, "model": model, "reasoning": effort, "turns": a.state.get("turns", 0),
+                "last_turn": last, "first_words_ms": fw[-1] if fw else None,
+                "first_words": f"{fw[-1] / 1000:.1f} s" if fw else "", "error": a.state.get("error", ""),
+                "acts": acts, "acts_text": "\n".join(acts), "waiting": len(a.inbox)}
 
     def status(self):
         return "; ".join(f"{a.name} {a.doing()}" for a in self.agents.values()) or "no agents"
@@ -551,8 +563,14 @@ class House:
         if not self.home:
             return
         live = {"at": time.time()}
+        said = getattr(self, "said_doing", {})
+        self.said_doing = said
         for a in self.agents.values():
             r = self.row(a)
+            if said.get(a.person) != (r["doing"], r["now"]) and a.cfg.get("id"):
+                # what it is doing changed: a happening (delivered, never recorded), so painted pages reread
+                said[a.person] = (r["doing"], r["now"])
+                self.m.happen("house.doing", a.cfg["id"], f"{a.name} {r['doing']}")
             live[f"house:{a.name.lower()}"] = {"value": r["doing"], "detail": "; ".join(r["acts"][-2:]),
                                                "doing": r["doing"]}
         tmp = self.home / "live.tmp"

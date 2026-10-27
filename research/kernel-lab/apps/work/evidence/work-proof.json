@@ -1,0 +1,41 @@
+{
+ "at": "2026-10-27 12:02",
+ "complete": true,
+ "checks": [
+  {
+   "check": "installed through the door (lens, widget, Alex's work-view, dock)",
+   "ok": true,
+   "detail": "{'lens': 'dk217', 'widget': 'dk218', 'view': 'dk228'}"
+  },
+  {
+   "check": "Work is in the dock's apps",
+   "ok": true,
+   "detail": "lines,help,board,taskboard,appearance,feed,work"
+  },
+  {
+   "check": "the page paints JEFF from house.who",
+   "ok": true,
+   "detail": "WorkAT WORKidleJEFFlast turn 12:02OpenNEEDS YOUBUILDSbuildingDock: battery reads wrongbuilder-aIN MOTIONLANDEDOpen someone on the left to see their work up close and talk to them."
+  },
+  {
+   "check": "a card with build= is under BUILDS, with its builder",
+   "ok": true,
+   "detail": "building \u00b7 Dock: battery reads wrong \u00b7 builder-a"
+  },
+  {
+   "check": "Open shows him up close: his chat and his record outside it",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "check": "the box says into his chat, as Alex, and he answers there",
+   "ok": true,
+   "detail": "JEFF: Heard you. | Alex: from the Work page | JEFF: Heard you."
+  },
+  {
+   "check": "the page hears house.doing (what an agent is doing, never recorded)",
+   "ok": true,
+   "detail": ""
+  }
+ ]
+}

@@ -1,0 +1,76 @@
+# Work: who is at work and what is moving, one page (Alex, 27 Oct: "a really good overview of all the work being
+# done, where i can click in and view more closely or chat with workers directly"). Brought forward from the old
+# desk's home-work and home-board panels (old-desk/): one line per person or card, a coloured word for its state.
+# Left: the people the house runs, then the cards: NEEDS YOU, BUILDS (a card with build=, which task.build will
+# write), IN MOTION, LANDED. Right: one person up close: what they are doing now, their lines and receipts in their
+# chat, their record outside any chat, and a box to talk to them. Colours are part-styles on the badges (install.py).
+# $SHOP is Shop talk's id, filled in by install.py; a person with no chat of their own is talked to there, by @name.
+root : column, of tag:work-view as view, each page
+page : split, columns "2fr 3fr"
+  left : scroll, padding 18px
+    list : column, gap 6px
+      title : text "Work", role heading
+      people-head : text "AT WORK", role sub
+      people : column, gap 4px, of reading:"house.who" as a, each person
+      needs-head : text "NEEDS YOU", role sub
+      needs : column, gap 4px, of tag:taskboard-task, prop:who=Alex as t, each needs-line
+      builds-head : text "BUILDS", role sub
+      builds : column, gap 4px, of tag:taskboard-task as t, each build-line
+      moving-head : text "IN MOTION", role sub
+      moving : column, gap 4px, of tag:taskboard-task, prop:lane=Now as t, each moving-line
+      landed-head : text "LANDED", role sub
+      landed : column, gap 4px, of tag:taskboard-task, prop:lane=Done as t, limit 8, each landed-line
+  right : scroll, padding 18px
+    pick : text "Open someone on the left to see their work up close and talk to them.", role sub
+      only when $view.agent = ""
+    up : column, of reading:"house.who" as sel, each close
+person : row, gap 10px
+  only when $a.name != ""
+  state : badge, label $a.doing
+  name : text "$a.name"
+  now : text "$a.now", role sub
+  open : button, label "Open"
+    on press do set $view.id agent=$a.person
+needs-line : row, gap 10px
+  only when $t.lane != "Done"
+  state : badge, label "yours"
+  what : text "$t.title"
+build-line : row, gap 10px
+  only when $t.build != ""
+  state : badge, label $t.build
+  what : text "$t.title"
+  who : text "$t.builder", role sub
+moving-line : row, gap 10px
+  state : badge, label "now"
+  what : text "$t.title"
+  who : text "$t.who", role sub
+landed-line : row, gap 10px
+  state : badge, label "done"
+  what : text "$t.title", role sub
+close : column, gap 10px
+  only when $sel.person = $view.agent
+  head : row, gap 10px
+    state : badge, label $sel.doing
+    name : text "$sel.name", role heading
+    shut : button, label "Close"
+      on press do set $view.id agent=""
+  model : text "$sel.now · $sel.model $sel.reasoning · $sel.turns turns · first words $sel.first_words", role sub
+  acting : code, value $sel.acts_text
+    only when $sel.doing = "working"
+  chat-head : text "IN THEIR CHAT", role sub
+    only when $sel.chat != ""
+  chat : column, gap 6px, of reading:"chat $sel.chat limit=15" as m, each said
+    only when $sel.chat != ""
+  talk : input, label "Talk to $sel.name", hint "Write to $sel.name…"
+    only when $sel.chat != ""
+    on change do say $sel.chat text="$value"
+  talk-shop : input, label "Talk to $sel.name in Shop talk", hint "Write to $sel.name…"
+    only when $sel.chat = ""
+    on change do say $SHOP text="@$sel.name $value"
+  out-head : text "OUTSIDE ANY CHAT", role sub
+  outside : column, of reading:"house.activity $sel.person limit=15" as e, each act
+said : column, gap 2px
+  line : text "$m.by: $m.text"
+  receipts : code, value $m.acts
+    only when $m.acts != ""
+act : code, value $e.line

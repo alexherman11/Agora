@@ -147,6 +147,7 @@ const Shell = (() => {
     lines: ["Lines", "window.open lines"], help: ["Help", "window.open help"], board: ["Board", "window.open board"],
     taskboard: ["Task board", "window.open taskboard-components"], appearance: ["Appearance", "window.open appearance"],
     feed: ["Feed", "window.open feed"], thing: ["Thing", "window.open thing"], tasks: ["Running windows", "window.open tasks"],
+    work: ["Work", "window.open work"],          // who is at work and what is moving (kernel-lab/apps/work, 27 Oct)
   };
   // Which Agora app a window or button belongs to, for its icon: the lens name itself, else a family by name
   // (seabright-board is a board, taskboard-components a task board). "thing" is the plain fallback.
