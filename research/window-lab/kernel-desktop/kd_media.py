@@ -36,8 +36,13 @@ class Media:
 
     def offer(self):
         return [
-            {"word": "media.play", "kind": "do", "takes": "", "may": "anyone",
-             "help": "media.play: play or pause what Windows' media session names (Spotify, a browser ...)."},
+            {"word": "media.play", "kind": "do", "takes": "[start=yes]", "may": "anyone",
+             "help": "media.play [start=yes]: play or pause (a toggle) what Windows' media session names (Spotify, a "
+                     "browser ...). With nothing named it presses nothing, unless start=yes."},
+            {"word": "media.pause", "kind": "do", "takes": "", "may": "anyone", "undo": "external",
+             "help": "media.pause: pause what is playing. Nothing playing: nothing is pressed, and it says so."},
+            {"word": "media.resume", "kind": "do", "takes": "", "may": "anyone", "undo": "external",
+             "help": "media.resume: play what is paused. Playing already, or nothing named: nothing is pressed."},
             {"word": "media.next", "kind": "do", "takes": "", "may": "anyone", "help": "media.next: the next song."},
             {"word": "media.prev", "kind": "do", "takes": "", "may": "anyone",
              "help": "media.prev: the song before, or this one from its start."},
@@ -84,6 +89,19 @@ class Media:
             return {"text": f"{n['title']} · {n['artist']} ({n['player']}, {'playing' if n['playing'] else 'paused'})",
                     "rows": [dict(n, kind="media")]}
         action = word.split(".", 1)[1]
+        # honest no-ops (P3, Alex 27 Oct): press only when it does what was asked; otherwise say nothing was pressed
+        n = self.now()
+        kv = (msg.get("args") or {}).get("kv") or {}
+        if action in ("pause", "resume"):
+            if not n:
+                return {"refused": "nothing is playing that Windows' media session names; nothing pressed"}
+            if (action == "pause") != bool(n["playing"]):
+                return {"refused": f"{n['title'] or n['player']} is {'paused' if action == 'pause' else 'playing'} "
+                                   f"already; nothing pressed"}
+            action = "play"
+        elif action == "play" and not n and kv.get("start") != "yes":
+            return {"refused": "nothing is playing that Windows' media session names, so play would press the play "
+                               "key blind; nothing pressed (media.play start=yes presses it anyway)"}
         if HEADLESS:
             return {"external": True, "text": f"media.{action} (headless: nothing pressed)"}
         import media

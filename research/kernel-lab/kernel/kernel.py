@@ -487,6 +487,83 @@ class Kernel:
     def entry(self, e):
         return dict(self.state.things.get(e, {}), id=e)
 
+    NOT_NAMED = ("topic", "word", "grant", "taskboard-event", "paint-report")
+
+    def named(self, actor, name, hint=None):
+        """Visible things whose name, title or label is `name` (any case), the hinted kind first (P1, Alex 27 Oct:
+        names work where ids go). -> [(id, kind)]: one is the thing; more is a question to ask back."""
+        want, hits = str(name).strip().strip("\"'").casefold(), []
+        if not want:
+            return []
+        for t, a in list(self.state.things.items()):
+            if a.get("kind") in self.NOT_NAMED or a.get("forgotten"):
+                continue
+            if want in {str(a.get(f, "")).casefold() for f in ("name", "title", "label")} \
+                    and self.shown(actor.person, t) is not None:
+                hits.append((t, a.get("kind")))
+        hinted = [h for h in hits if hint and (h[1] == hint or h[1].endswith("-" + hint))]
+        if hint and hits and not hinted:
+            raise Refused(f"no {hint} you can see is called {name.strip()} (called that: "
+                          + ", ".join(f"{t}, a {kd}" for t, kd in hits[:4]) + ")")
+        return hinted or hits
+
+    @staticmethod
+    def usage_kind(entry):
+        """The kind a word's usage names first (window.move <window> …: window), if any."""
+        first = (str(entry.get("help") or "").splitlines() or [""])[0]
+        m = L.re.search(r"<([a-z][a-z0-9-]*)", first)
+        return m.group(1) if m and m.group(1) not in ("id", "thing", "words", "text", "word") else None
+
+    def resolve_name(self, actor, st, entry):
+        """A name where a word takes a thing: the whole of its free words first ("buy milk"), then the first word.
+        Sets st.target and returns True; refuses when two things share the name; False when nothing is called it."""
+        hint = self.usage_kind(entry)
+        tries = [(st.words, "")] + ([(st.words.split()[0], st.words.split(None, 1)[1])] if " " in st.words else [])
+        for name, rest in tries:
+            hits = self.named(actor, name, hint)
+            if len(hits) == 1:
+                st.target, st.words = hits[0][0], rest.strip()
+                return True
+            if hits:
+                raise Refused(f"{len(hits)} things are called {name.strip()}: "
+                              + ", ".join(f"{t} (a {kd})" for t, kd in hits[:5]) + f". Say {st.word} with one of those ids")
+        return False
+
+    def plain_verb(self, actor, st, group):
+        """A plain verb nothing else answers to (close, open, move, done): the family word it means for its thing
+        (P2, Alex 27 Oct: no declarations; work it out from the names, ask only when two fit). -> entry id or None."""
+        word = st.word
+        cands = []
+        for e in self.entries():
+            w = str(self.state.get(e, "word") or "")
+            if "." in w and w.rsplit(".", 1)[1] == word and self.shown(actor.person, e) is not None:
+                cands.append(e)
+        if not cands:
+            return None
+        kind = None
+        if st.target and L.ID.match(st.target):
+            kind = self.state.get(st.target, "kind")
+        elif st.words:
+            for name in [st.words] + ([st.words.split()[0]] if " " in st.words else []):
+                hits = self.named(actor, name)
+                if len({kd for _, kd in hits}) == 1:
+                    kind = hits[0][1]
+                    break
+
+        def fits(e):
+            ns = str(self.state.get(e, "word")).rsplit(".", 1)[0]
+            usage = (str(self.state.get(e, "help") or "").splitlines() or [""])[0]
+            return ns == kind or ns in str(kind).split("-") or f"<{kind}" in usage or f"<{kind}" in str(
+                self.state.get(e, "takes") or "")
+        fit = [e for e in cands if fits(e)] if kind else cands
+        if len(fit) == 1:
+            return fit[0]
+        said = ", ".join(self.state.get(e, "word") for e in (fit or cands))
+        if kind:
+            raise Refused(f"{word} could mean {said} for a {kind}; say which" if fit else
+                          f"nothing called {word} acts on a {kind}; {word} means {said} for other things")
+        raise Refused(f"{word} could mean {said}; say which, or name the thing (help {word})")
+
     def needs_a_thing(self, actor, st, entry, text):
         """The refusal for a word given a name (or nothing) where it takes a thing's id: say which id, as a line."""
         usage = (entry.get('help', '').splitlines() or [''])[0]
@@ -799,7 +876,12 @@ class Kernel:
             return gone
 
     def undone(self):
-        return {r["undoes"] for r in self.log.records if r.get("undoes")}
+        out = set()
+        for r in self.log.records:
+            if r.get("undoes"):
+                out.add(r["undoes"])
+                out.update(r.get("undoes_too") or ())        # rule acts that went back with the act that caused them
+        return out
 
     # ------------------------------------------------------------------ the act loop
     def run(self, actor, line, press=None, saw=None, mode="do"):
@@ -866,6 +948,8 @@ class Kernel:
                 eid = next((e for e in self.things('word') if self.state.get(e, 'from') == 'kernel'
                             and self.state.get(e, 'bound') == st.word), None)
             if eid is None:
+                eid = self.plain_verb(actor, st, group)            # close Help: window.close, from Help's kind
+            if eid is None:
                 from .helping import suggest
                 raise Refused(f"nothing answers to '{st.word}' here; " + suggest(self, actor, st.word, group))
             entry = self.entry(eid)
@@ -876,15 +960,22 @@ class Kernel:
                 st.words = (st.target + " " + st.words).strip()       # a word that takes no thing: an id is words
                 st.target = None
             first_takes = (str(entry.get("takes") or "").split() or [""])[0]
-            if takes and first_takes in ("<id>", "[<id>]") and not st.target and st.words:
+            names_a_thing = (takes and first_takes in ("<id>", "[<id>]")) or (
+                entry.get("from") == "verb" and self.usage_kind(entry))     # task.done <task>: a verb about a thing
+            if names_a_thing and not st.target and st.words:
                 # a word's name where a thing is expected names its dictionary entry: word-set window.open help=…
                 first = st.words.split()[0]
-                try:
-                    named = self.find_entry(first, group) if not L.ID.match(first) else None
-                except Refused:
-                    named = None
-                if named and self.shown(actor.person, named) is not None:
-                    st.target, st.words = named, st.words[len(first):].strip()
+                plain = not L.ID.match(first) and not L.RECORD.match(first)
+                # a word whose usage names a kind (window.close <window>) looks for a thing so called first
+                if not (plain and self.usage_kind(entry) and self.resolve_name(actor, st, entry)):
+                    try:
+                        named = self.find_entry(first, group) if plain else None
+                    except Refused:
+                        named = None
+                    if named and self.shown(actor.person, named) is not None:
+                        st.target, st.words = named, st.words[len(first):].strip()
+                    elif plain:
+                        self.resolve_name(actor, st, entry)        # set Lines at=…: Lines is dk74
             if st.target and L.ID.match(st.target):
                 if self.shown(actor.person, st.target) is None:
                     raise self.no_such(st.target)                     # the same words as for a thing that isn't there
@@ -960,6 +1051,7 @@ class Kernel:
         by = actor.module if actor.kind == "module" else actor.id
         return self._commit(tx, by=by, words=words, entry=entry["id"], press=press, undoes=undoes,
                             rule=getattr(self._local, "rule", None),         # a rule ran it (never on a sealed act)
+                            caused_by=getattr(self._local, "cause", None),   # the act whose happening fired that rule
                             external=tx.extra.get("external"),
                             **{"for": actor.person if by != actor.person else None,
                                "via": "module" if actor.kind == "module" else ("agent" if actor.kind == "agent" else None),
@@ -1247,10 +1339,14 @@ class Kernel:
             by = "" if h.get("by") == "sealed" else str(h.get("for") or h.get("by") or "")
             line = str(r.get('do_bound') or r.get("do") or "").replace("$target", h.get("target") or "").replace("$by", by)
             self._local.rule, self._local.rule_depth = rid, depth + 1
+            first = h.get("record")
+            if first and first <= len(self.log.records):
+                first = self.log.records[first - 1].get("caused_by") or first          # a chain keeps its first act
+            self._local.cause = first
             try:
                 out = self.run(actor, line)
             finally:
-                self._local.rule, self._local.rule_depth = None, 0
+                self._local.rule, self._local.rule_depth, self._local.cause = None, 0, None
             self.rules_fired = (self.rules_fired + [(rid, h.get("n"), out["text"].split("\n")[0])])[-50:]
 
     # ------------------------------------------------------------------ module words
@@ -1445,6 +1541,16 @@ class Kernel:
             tx.set(eid, a, v)
         rec = self._commit(tx, by=mid, words=f"offer {word}: {', '.join(changed)} refreshed", via="offer")
         return f"bound {word} to {eid}; refreshed {', '.join(changed)} [r{rec['seq']}]"
+
+    def namespace_owner(self, word):
+        """The module whose namespace a dotted word is in (window.* is the window module's), or None: a family no module
+        publishes (task.*, word.*) is free for the world's own words (P4, Alex 27 Oct: one dotted spelling)."""
+        if "." not in word:
+            return None
+        for m in self.things("module"):
+            if self._matches(self.state.get(m, "publishes") or "", word):
+                return self.state.get(m, "name")
+        return None
 
     def dropped(self, e):
         """True when a module word's module runs and no longer offers it (known only since the module's last start)."""

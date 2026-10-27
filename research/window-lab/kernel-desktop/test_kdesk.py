@@ -348,7 +348,11 @@ class DesktopTest(unittest.TestCase):
         self.assertTrue(out["ok"], out["text"])
         self.assertIn("cpu: 12%", out["text"])
         self.assertIn("nothing is playing", d.say("media.now")["text"])
-        out = d.say("media.play")
+        out = d.say("media.play")                                          # 27 Oct (P3): an honest no-op
+        self.assertFalse(out["ok"], out["text"])
+        self.assertIn("nothing pressed", out["text"])
+        self.assertIn("nothing pressed", d.say("media.pause")["text"])
+        out = d.say("media.play start=yes")
         self.assertTrue(out["ok"], out["text"])
         self.assertIn("undo cannot take it back", out["text"])            # it touched the outside world
 

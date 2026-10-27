@@ -8,7 +8,7 @@ root : appearance
   on try do theme.try $theme
   on keep do theme.keep
   on revert do theme.revert
-  on use do theme.use $theme
+  on use do theme.use $theme for=place
   on useme do theme.use $theme for=me
   on follow do theme.use place for=me
   on make do theme.make $theme name=$name

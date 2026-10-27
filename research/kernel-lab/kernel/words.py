@@ -61,8 +61,9 @@ KERNEL_ENTRIES = [
     _k('word-rename', 'do', '<id> to=<name>', 'stewards', 'yes',
        help='word-rename <entry> to=<name>: a steward changes a name, keeping stored lines bound to its id. '
             'Look first. Dotted names belong to the implementing module.'),
-    _k('history', 'see', '<id>', 'anyone', 'no',
-       help='history <thing>: its record trail, oldest first: record, at (UTC), by, word and changed facts. '
+    _k('history', 'see', '[<id>]', 'anyone', 'no',
+       help='history [<thing>]: a thing\'s record trail, oldest first: record, at (UTC), by, word and changed facts; '
+            'alone, your own latest acts (recent shows everyone\'s). '
             'Only facts you may see are returned; sealed acts never identify their author. '
             'A lens repeats these same rows with of history:$task.id as event.'),
     _k('rule', 'do', 'on=<word> [kind=<kind>] do=<line> [name=<text>]', 'members', 'yes',
@@ -159,6 +160,19 @@ KERNEL_ENTRIES = [
     _k("vote", "do", "<id> <option>", "members", "yes", sealed="yes", once="per person per target", fence="adds",
        help="vote <poll> <option>: one vote each, sealed: the counts are shown, not who voted how.\n"
             "undo takes your vote back, so you can vote again."),
+    _k("who", "see", "", "anyone", "no",
+       help="who: the people here (and who leads), the agents and whom they act for, and the modules, on or off."),
+    _k("recent", "see", "[by=<name|me>] [kind=<kind>] [since=r<n>] [limit=<n>]", "anyone", "no",
+       help="recent [by=<name|me>] [kind=<kind>] [since=r<n>] [limit=<n>]: the latest acts you can see, newest first: "
+            "record, time, who, which word, on what. Never facts, never a sealed act's author."),
+    _k("kinds", "see", "", "anyone", "no",
+       help="kinds: every kind of thing you can see, with how many. rows <kind> lists one kind; help <kind> says what "
+            "acts on it."),
+    _k("on", "do", "<module>", "stewards", "yes",
+       help="on <module>: turn a module back on, with the grants its off took back. undo turns it off again."),
+    _k("press", "see", "<id>", "anyone", "no",
+       help="press <button>: run its does= line as you, exactly as a click would (press Feed, press dk41). What the "
+            "line does is its own act, with its own receipt and undo."),
     _k("role", "do", "<id> leader|member|none in=<group>", "leaders", "yes",
        help="role <person> leader|member|none in=<group>: who leads a group and who belongs to it. Leaders appoint."),
 ]
@@ -387,7 +401,8 @@ def undo(k, actor, st, entry, tx, group, saw=None):
             raise Refused(f"no act r{seq} in this world's log")
         rec = k.log.records[seq - 1]
     else:
-        rec = next((r for r in reversed(k.log.records) if r.get("entry") and not r.get("undoes")
+        # your latest act: not an undo, not what a rule did on its own (that goes back with the act that caused it)
+        rec = next((r for r in reversed(k.log.records) if r.get("entry") and not r.get("undoes") and not r.get("rule")
                     and r["seq"] not in undone and _own(k, actor, r)), None)
         if rec is None:
             raise Refused("you have nothing to undo")
@@ -405,27 +420,61 @@ def undo(k, actor, st, entry, tx, group, saw=None):
     if not _may_undo(k, actor, rec):
         raise Refused(f"r{seq} is {_whose(k, rec)}; you may undo your own acts, leaders the acts in their groups, "
                       f"stewards any")
-    facts = [f for part in rec["parts"] for f in part["facts"]]
-    for target in {f[0] for f in facts}:
-        k.reaches(actor, 'undo', k.state.get(target, 'kind'), target=target,
-                  fields=[f[1] for f in facts if f[0] == target])
-    made = {f[0] for f in facts if f[1] == "kind" and f[2] == "0"}
-    for f in facts:
-        t, a = f[0], f[1]
-        v = f[3] if len(f) > 3 else None
-        now = k.state.things.get(t, {}).get(a)
-        if (now is None) != (v is None) or (now is not None and k.state.last_seq(t, a) != seq):
-            raise Refused(f"r{seq} cannot be undone: {t} {a.split(':')[0]} changed since (r{k.state.last_seq(t, a)})")
-    for t in made:
-        later = [s for (tt, _), hist in k.state.history.items() if tt == t for s, _ in hist if s > seq]
-        if later:
-            raise Refused(f"r{seq} cannot be undone: {t} has changed since (r{max(later)}); undo that first")
-    for f in reversed(facts):
-        tx.set(f[0], f[1], k.state.before(f[0], f[1], seq))
+    # the whole action (P3, Alex 27 Oct): what rules did because of it goes back with it, when that can go back
+    caused = [r for r in k.log.records if r.get("caused_by") == seq and r["seq"] not in undone and not r.get("undoes")]
+    left = [r for r in caused if r.get("external") or not _may_undo(k, actor, r)
+            or k.state.get(r.get("entry"), "undo") in ("no", "external")]
+    group_recs = sorted([r for r in caused if r not in left] + [rec], key=lambda r: -r["seq"])   # newest first
+    seqs = {r["seq"] for r in group_recs}
+    cur = {}                                  # (thing, aspect) -> (value, seq that set it), as the undo walks back
+
+    def now(t, a):
+        if (t, a) not in cur:
+            cur[(t, a)] = (k.state.things.get(t, {}).get(a), k.state.last_seq(t, a))
+        return cur[(t, a)]
+
+    def prev_seq(t, a, s):
+        return max([x for x, _ in k.state.history.get((t, a), []) if x < s] + [0])
+
+    writes = []
+    for r in group_recs:
+        facts = [f for part in r["parts"] for f in part["facts"]]
+        for target in {f[0] for f in facts}:
+            k.reaches(actor, 'undo', k.state.get(target, 'kind'), target=target,
+                      fields=[f[1] for f in facts if f[0] == target])
+        for f in reversed(facts):
+            t, a = f[0], f[1]
+            v = f[3] if len(f) > 3 else None
+            value, last = now(t, a)
+            if (value is None) != (v is None) or (value is not None and last != r["seq"]):
+                raise Refused(f"r{seq} cannot be undone: {k.name(t)} {a.split(':')[0]} changed since (r{last})")
+            back = k.state.before(t, a, r["seq"])
+            cur[(t, a)] = (None if back is GONE else back, prev_seq(t, a, r["seq"]))
+            writes.append((t, a, back))
+        for t in {f[0] for f in facts if f[1] == "kind" and f[2] == "0"}:
+            later = [s for (tt, _), hist in k.state.history.items() if tt == t for s, _ in hist
+                     if s > r["seq"] and s not in seqs]
+            if later:
+                raise Refused(f"r{seq} cannot be undone: {k.name(t)} has changed since (r{max(later)}); undo that first")
+    for t, a, back in writes:
+        tx.set(t, a, back)
     tx.extra["undoes"] = seq
+    if len(group_recs) > 1:
+        tx.extra["undoes_too"] = sorted(seqs - {seq})
     if rec.get("by") == "sealed":
         tx.extra["sealed_as"] = rec.get("seal")
-    return {"text": f"ok undo r{seq} [r?] · put back {len(facts)} fact{'' if len(facts) == 1 else 's'}"}
+    word = k.state.get(rec.get("entry"), "word") or "it"
+    things = [t for p in rec["parts"] for t in [p.get("target")] if t] or \
+             list(dict.fromkeys(f[0] for p in rec["parts"] for f in p["facts"]))
+    what = ", ".join(str(k.state.get(t, "title") or k.state.get(t, "name") or k.state.get(t, "label") or t)
+                     for t in things[:2])
+    said = f"undid r{seq}: {word}" + (f" {what}" if what else "")
+    if len(group_recs) > 1:
+        n = len(group_recs) - 1
+        said += f", and what {n} rule act{'' if n == 1 else 's'} did because of it"
+    if left:
+        said += f" (r{', r'.join(str(r['seq']) for r in left)} by rules cannot go back)"
+    return {"text": f"{said} [r?]"}
 
 
 def off(k, actor, st, entry, tx, group, saw=None):
@@ -554,7 +603,31 @@ def make(k, actor, st, entry, tx, group, saw=None):
         raise Refused(f"{k.name(group)} is not open, so what is made in it is seen by its members, not the place")
     elif not public:
         tx.set(t, "sees", f"group:{group}")
-    return {"text": f"ok make {t} [r?] · a{'n' if kind[0] in 'aeiou' else ''} {kind}" + (f" in {k.name(group)}" if group != k.place else "")}
+    return {"text": f"ok make {t} [r?] · a{'n' if kind[0] in 'aeiou' else ''} {kind}" + (f" in {k.name(group)}" if group != k.place else "")
+                    + _make_notes(k, actor, kind, kv)}
+
+
+def _make_notes(k, actor, kind, kv):
+    """What make does not recognise, said, never refused (P7, Alex 27 Oct): a kind nothing here shows or uses yet, and
+    a setting the kind's other things never say, or say otherwise (bar=dock where buttons say bar=taskbar)."""
+    others = [a for t, a in list(k.state.things.items()) if a.get("kind") == kind and not a.get("forgotten")
+              and k.shown(actor.person, t) is not None]
+    if not others:
+        mentioned = any(kind in str(a.get(f, "")) for a in k.state.things.values()
+                        if a.get("kind") in ("lens", "rule", "topic", "word") for f in ("text", "on", "of_kind", "do",
+                                                                                        "words", "help", "takes"))
+        return "" if mentioned else (f"\n~ {kind} is new here: no lens, rule or word mentions it yet, so it shows only "
+                                     f"in look and rows (kinds lists the kinds there are)")
+    notes = []
+    for key, v in kv.items():
+        if key in ("title", "name", "text", "label", "about") or v == "":
+            continue
+        said = {str(a.get(key)) for a in others if a.get(key) not in (None, "")}
+        if not said:
+            notes.append(f"no other {kind} has {key}=")
+        elif str(v) not in said and len(said) <= 4:
+            notes.append(f"no other {kind} has {key}={v} (they say {' or '.join(sorted(said))})")
+    return ("\n~ " + "; ".join(notes[:3]) + ": still made, as you said") if notes else ""
 
 
 def set_(k, actor, st, entry, tx, group, saw=None):
@@ -566,6 +639,8 @@ def set_(k, actor, st, entry, tx, group, saw=None):
         raise Refused(f"{t} is a {k.state.get(t, 'kind')}; set changes only things made with make")
     if not st.kv:
         raise Refused("set needs k=v: set <thing> label=Feed")
+    if all(str(k.state.get(t, a) if k.state.get(t, a) is not None else '') == str(v) for a, v in st.kv.items()):
+        return {"text": f"{k.name(t)} already says {', '.join(f'{a}={v}' for a, v in st.kv.items())}; nothing changed"}
     _writable(k, st.kv)
     _conditions(k, st.kv, group)
     from painter.handles import validate_write
@@ -719,7 +794,7 @@ def rows(k, actor, st, entry, tx, group, saw=None):
     return {"text": f"{len(rows)} {plural}" + ("\n" + text if rows else ""), "rows": rows}
 
 
-VERB_NAME = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
+VERB_NAME = re.compile(r"^[a-z][a-z0-9-]{0,31}(\.[a-z][a-z0-9-]{0,31})?$")      # word or family.word
 
 
 def verb(k, actor, st, entry, tx, group, saw=None):
@@ -727,8 +802,9 @@ def verb(k, actor, st, entry, tx, group, saw=None):
     kv = dict(st.kv)
     w = (st.words.split() or [""])[0].lower()
     if not VERB_NAME.match(w):
-        raise Refused("verb needs a plain word: verb <word> steps=\"<lines>\" help=\"…\" (dotted words belong to "
-                      "modules)")
+        raise Refused("verb needs a word: verb <word> steps=\"<lines>\" help=\"…\" (a family word is family.word)")
+    if k.namespace_owner(w):
+        raise Refused(f"{w.split('.')[0]}.* belongs to the {k.namespace_owner(w)} module; choose another family")
     if k.find_entry(w, group):
         raise Refused(f"{w} already answers here; choose another word, so no word is hidden behind it")
     steps, help_ = str(kv.get("steps") or ""), str(kv.get("help") or "").strip()
@@ -804,6 +880,9 @@ def rule(k, actor, st, entry, tx, group, saw=None):
 
 
 def history(k, actor, st, entry, tx, group, saw=None):
+    if not st.target:
+        from .readings import own_history
+        return own_history(k, actor)
     rows = k.trail(actor.person, st.target)
     k.mark(actor, st.target, k.shown(actor.person, st.target))
     return {'text': '\n'.join(f"{r['record']} · {r['at']} · {r['by']} · {r['word']} · {r['changes']}" for r in rows),
@@ -815,6 +894,8 @@ from .kits import kit, take, rename, module, grant
 from .inpage import widget
 from .blobs import upload, attach, file_result, file_read
 from .world_words import dictionary_copy, group_word, clock, forgotten
+from .readings import who, recent, kinds, on, press
+from .store import GONE
 from painter.arrangement import component, look_view, components, component_card
 from painter.health import component_health, component_action, personal_view, personal_style, paint_clear
 
@@ -829,4 +910,5 @@ KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant":
           **{w: panes if w == "panes" else arrange for w in PANE_HELP},
           "counts": counts, "test": test, "look": look, "help": help_, "post": post, "like": like, "pin": pin, "undo": undo, "off": off,
           "status": status, "make": make, "set": set_, "forget": forget, "holds": holds, "claim": claim,
-          "vote": vote, "role": role, "rows": rows, "find": rows, "verb": verb}
+          "vote": vote, "role": role, "rows": rows, "find": rows, "verb": verb,
+          "who": who, "recent": recent, "kinds": kinds, "on": on, "press": press}

@@ -115,11 +115,15 @@ def test_saved_lines_keep_ids_after_alias_reuse_and_replay(world):
 def test_dotted_names_stay_with_the_implementing_module(world):
     k, a, _ = world
     verb = say(k, a, 'verb finish steps="post Done" help="Finish"')['made'][0]
-    for line in (f'word-rename {verb} to=task.done', f'rename {verb} word=task.done',
-                 f'word-set {verb} aliases=task.done', f'word-set {verb} label.es=task.hecho'):
+    # 27 Oct (P4): a family no module publishes is the world's, so a verb may be task.done ...
+    say(k, a, 'look ' + verb)
+    say(k, a, f'word-rename {verb} to=task.done')
+    module = say(k, a, 'module media run=' + quoted('["unused"]') + ' grants=""')['made'][0]
+    # ... but a module's namespace stays the module's
+    for line in (f'word-rename {verb} to=media.done', f'rename {verb} word=media.done',
+                 f'word-set {verb} aliases=media.done', f'word-set {verb} label.es=media.hecho'):
         say(k, a, 'look ' + verb)
         say(k, a, line, False)
-    module = say(k, a, 'module media run=' + quoted('["unused"]') + ' grants=""')['made'][0]
     k.on_offer(module, [{'word': 'media.play', 'kind': 'do', 'takes': '', 'help': 'Play', 'undo': 'external'}])
     eid = k.find_entry('media.play')
     assert k.state.get(eid, 'undo') == 'external'

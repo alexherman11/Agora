@@ -18,9 +18,12 @@ def check_names(k, t, values):
         if not n or re.search(r'[\s;=$]', n):
             raise Refused('a dictionary name is one word, without spaces, ;, = or $')
         if '.' in n and not (module and n.startswith(namespace)):
-            # Kernel administration words are the only built-in dotted names.
-            if not (a.get('from') == 'kernel' and n == a.get('bound')):
-                raise Refused('dotted names belong to the implementing module')
+            # a module's namespace is the module's; a family no module publishes (task.*, word.*) is the world's
+            if module:
+                raise Refused(f'a {namespace[:-1]} word keeps its {namespace}* name, so a reader can tell where it comes from')
+            owner = k.namespace_owner(n)
+            if owner:
+                raise Refused(f'{n.split(".")[0]}.* belongs to the {owner} module; dotted names there are its own')
         other = k.find_entry(n, a.get('lives'))
         if other and other != t:
             raise Refused(f'{n} already answers here')
@@ -51,6 +54,9 @@ def word_set(k, actor, st, entry, tx, group, saw=None):
         raise Refused('status says live, old or hidden')
     if 'aliases' in values:
         values['aliases'] = values['aliases'].casefold()
+    if all(str(k.state.get(t, f) or '') == str(v or '') for f, v in values.items()):
+        # an honest no-op (P3, 27 Oct): nothing would change, so nothing is recorded, and it says so
+        return {'text': f"{k.state.get(t, 'word')} already says that; nothing changed"}
     check_names(k, t, {f: v for f, v in values.items() if v})
     k.fence(actor, t, list(values), saw)
     if 'aliases' in values or any(f.startswith('label.') for f in values):
@@ -65,7 +71,7 @@ def word_set(k, actor, st, entry, tx, group, saw=None):
         was = f' (was {str(before)[:60]})' if before and f != 'help' else ''
         said.append(f'{f} now {str(v)[:120]}{was}' if v else f'{f} taken away')
     # echo what changed, so a fix can be read back without another line (friction study, 26 Oct)
-    return {'text': f"ok word-set {k.state.get(t, 'word')} [r?] · " + ' · '.join(said)}
+    return {'text': f"ok {entry.get('word', 'word.set')} {k.state.get(t, 'word')} [r?] · " + ' · '.join(said)}
 
 
 def word_rename(k, actor, st, entry, tx, group, saw=None):

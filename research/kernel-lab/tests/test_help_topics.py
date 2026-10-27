@@ -97,7 +97,9 @@ def test_help_check_finds_help_that_misleads(world):
 def test_look_by_name_says_which_id_and_help_words_reaches_its_topic(world):
     k, a, b = world
     t = say(k, b, 'make kind=note name=Groceries')['made'][0]
-    assert f'Groceries is {t}' in say(k, b, 'look Groceries', ok=False)['text']
+    assert say(k, b, 'look Groceries')['text'].startswith(f'Groceries ({t})')   # 27 Oct (P1): names work
+    say(k, b, 'make kind=note name=Groceries')
+    assert '2 things are called Groceries' in say(k, b, 'look Groceries', ok=False)['text']
     assert 'all ' in say(k, b, 'help words')['text']                 # no topic called words: the full list
     say(k, a, 'make kind=topic name=words text="Making your own words." words="verb"')
     assert say(k, b, 'help words')['text'].startswith('words: Making your own words.')

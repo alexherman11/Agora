@@ -33,6 +33,7 @@ def main():
     ap.add_argument("--file", default=str(HERE / "topics.lines"))
     ap.add_argument("--dry", action="store_true")
     ap.add_argument("--always", action="store_true", help="say every line (help fixes), looking first at what it edits")
+    ap.add_argument("--refresh", action="store_true", help="rewrite a page nobody but its maker has changed since")
     a = ap.parse_args()
     sessions = json.loads((Path(a.world) / "keep" / "sessions.json").read_text(encoding="utf-8"))
     token = next(t for t, v in sessions.items() if v.get("signer") == a.who)
@@ -47,13 +48,30 @@ def main():
             if a.dry:
                 print(f"would say {line[:90]}")
                 continue
-            say(a.port, token, "see", ("help " if word == "word-set" else "look ") + target)   # the look an edit needs
+            say(a.port, token, "see", ("help " if word in ("word-set", "word.set") else "look ") + target)   # the look an edit needs
             out = say(a.port, token, "do", line)
             print(("ok     " if out.get("ok") else "REFUSED ") + out.get("text", "").splitlines()[0][:160])
             continue
-        name = dict(t.split("=", 1) for t in shlex.split(line) if "=" in t).get("name", "")
+        fields = dict(t.split("=", 1) for t in shlex.split(line) if "=" in t)
+        name = fields.get("name", "")
         if name.casefold() in names:
-            print(f"kept   {name} (already in the world)")
+            row = next(r for r in have.get("rows", []) if str(r.get("name", "")).casefold() == name.casefold())
+            if not a.refresh:
+                print(f"kept   {name} (already in the world)")
+                continue
+            trail = say(a.port, token, "see", f"history {row['id']}").get("rows", [])
+            others = {r.get("by") for r in trail} - {trail[0].get("by")} if trail else set()
+            if others:
+                print(f"kept   {name}: changed by {', '.join(sorted(others))} since; their words stay")
+                continue
+            new = {f: v for f, v in fields.items() if f in ("title", "aliases", "words", "text", "order")
+                   and str(row.get(f, "")) != v}
+            if not new:
+                print(f"same   {name}")
+                continue
+            sets = " ".join(f"{f}={json.dumps(v, ensure_ascii=False)}" for f, v in new.items())
+            out = say(a.port, token, "do", f"set {row['id']} {sets}")
+            print(("fresh  " if out.get("ok") else "REFUSED ") + f"{name}: {out.get('text', '').splitlines()[0][:120]}")
             continue
         if a.dry:
             print(f"would make {name}")

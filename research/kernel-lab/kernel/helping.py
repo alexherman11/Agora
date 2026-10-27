@@ -20,7 +20,7 @@ START = ("Lines: type a line, the world answers. A line is a word, then what it 
          "  post \"hello there\"            quote text that has spaces\n"
          "Every act gets a receipt [r812]; undo takes back your latest act (undo r812 takes back that one).")
 USEFUL = ("look", "help", "rows", "window.list", "window.open", "make", "set", "forget", "undo", "history", "post",
-          "theme.use", "task-add", "verb", "rule")
+          "theme.use", "task.add", "verb", "rule", "who", "recent")
 
 
 # ---------------------------------------------------------------------------------------------------- small pieces
@@ -86,6 +86,11 @@ def _visible_entries(k, actor, group):
 def _line(k, actor, a, group, width=18):
     _, desc = _split_help(a["word"], a.get("help", ""))
     mark = "" if k.may(actor, a, None, group) else f"  ({a.get('may')} only)"
+    frm = str(a.get("from") or "")
+    if frm.startswith("module:"):
+        mid = k.module_named(frm[7:])
+        if mid and not k.state.get(mid, "on"):
+            mark += f"  ({frm[7:]} is off)"
     return f"  {a['word']:<{width}} {desc}{mark}"
 
 
@@ -113,6 +118,15 @@ def _can_edit_thing(k, actor, t):
 def _can_edit_entry(k, actor, a):
     scope = a.get("lives")
     return k.is_steward(actor.person) or bool(scope and k.is_leader(actor.person, scope))
+
+
+def _ws(k):
+    """What the word-set entry is called here now (word.set since 27 Oct; a world may rename it)."""
+    try:
+        e = k.find_entry("word-set")
+    except Exception:
+        e = None
+    return k.state.get(e, "word") if e else "word-set"
 
 
 def _ask_hint(k, t):
@@ -223,7 +237,7 @@ def _entry_page(k, actor, e):
             facts.append("unbound: this community must grant and run the module")
     text = a.get("help", "") + "\n" + " · ".join(facts)
     if _can_edit_entry(k, actor, a):
-        text += f"\nfix this help: word-set {a['word']} help=\"…\""
+        text += f"\nfix this help: {_ws(k)} {a['word']} help=\"…\""
     elif _ask_hint(k, e):
         text += "\n" + _ask_hint(k, e)
     return {"text": text, "rows": [dict(a)]}
@@ -288,8 +302,8 @@ def check_page(k, actor, group, pool):
     gone = sorted(_dropped(k))
     if gone:
         lines.append("no longer offered by their running module (left out of help): " + ", ".join(gone)
-                     + f". Retire one: word-set {gone[0]} status=hidden")
-    lines.append("fix one: help <word>, then word-set <word> help=\"<word> <what it takes>: what it does.\"")
+                     + f". Retire one: {_ws(k)} {gone[0]} status=hidden")
+    lines.append(f"fix one: help <word>, then {_ws(k)} <word> help=\"<word> <what it takes>: what it does.\"")
     return {"text": "\n".join(lines), "rows": [{"word": w, "problems": said} for w, said in problems]}
 
 
@@ -354,6 +368,12 @@ def answer(k, actor, words, group):
     hit = topic_named(k, actor, w)
     if hit:
         return _topic_page(k, actor, group, hit[0], hit[1], pool)
+    family = [a for name, a in sorted(pool.items()) if "." in name and name.rsplit(".", 1)[1] == w]
+    if family:
+        lines = [f"{w} <thing>: a plain word. It runs the family's own {w} for the kind of thing you name, "
+                 f"and asks when two could fit:"] + _listing(k, actor, family, group)
+        lines.append(f"e.g. {w} <name or id> · help <word> says more")
+        return {"text": "\n".join(lines), "rows": [{"word": x["word"], "kind": x.get("word_kind")} for x in family]}
     for v in _variants(w):
         m = k.module_named(v)
         if m and k.state.get(m, "kind") == "module":

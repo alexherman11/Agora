@@ -80,7 +80,27 @@ The coordinator found two things once it was live: `help windows` listed `wm.cha
 
 Ran: `research/kernel-lab/tests` `114 passed, 30 subtests passed`; `test_kdesk.py` `22 passed`.
 
-## What needs Alex: the language
+## Alex's answers (27 Oct) and what was built
+
+Read from the design page's store (**read**, `decisions`, seven documents). Yes: P1 names, P4 spelling, P5 readings, P7 make and press. Changed:
+- **P2**, Alex: *"it shouldn't need to redeclare close = window.close. I think it should be intuitive enough to code just assuming the actions are usable, and if they conflict somehow it can be clarified."* Built with no declarations: a plain verb nothing else answers to (`close`, `open`, `done`) finds the dotted words ending in it (`window.close`, `task.done`), keeps those whose family or usage fits the kind of the thing named, runs the one that fits, and asks when two do (`close could mean window.close, pane.close, wm.close; say which`). `help close` lists them.
+- **P3**, Alex: *"i like honest no ops, but i think undo should undo the whole action ... i want to keep it clean"*, unsure whether receipts should list what rules did. Built: a record a rule makes carries `caused_by` (the first act of the chain); `undo` takes back the act and every rule act it caused, in one record (`undoes_too`), and says so in one line (`undid r1436: task.done buy milk, and what 1 rule act did because of it`); plain `undo` never picks a rule's act. Receipts are not lengthened. Honest no-ops: `set` and `word.set` with nothing to change say so and record nothing; `media.pause`/`media.resume` (new) and `media.play` with nothing named press nothing and say so (`start=yes` presses anyway). `wm.arrange` in shadow mode is the window-manager session's to fix (passed on).
+- **P6**, Alex: *"for=me should be optional ... every time the theme is changed it should be for me. I dont care to much about agent's history of changing my settings"*. Built: `theme.use <name>` is yours; `for=place` (stewards) changes the place's; `theme.use place` follows the place again. The Appearance lens's "use" button says `for=place`. Agent naming was dropped.
+
+Built:
+- **P1**: a word that takes a thing (its first argument `<id>`, or a verb whose usage names a kind) takes its name, title or label: the whole of its free words first (`done "buy milk"`), then the first word. The kind its usage names wins (`window.close Help` means the window); a name only other kinds have says so (`no window you can see is called Feed (called that: dk39, a lens, …)`); two of a name ask back with their ids. Topics, words, grants and board events are never what a name means.
+- **P4**: a dotted name is the world's unless a module publishes that family (`window.*` is the window module's; `task.*` is free). A module's own words keep its namespace. Renamed in the world by [install_renames.py](install_renames.py): `task.*` (14), `word.set`, `word.rename`, `word.copy`, `component.action`, `component.health`, `file.read`, `file.result`, `personal.view`, `personal.style`; each old name stays an alias (and still answers through the entry's bound name), help texts naming old words are rewritten.
+- **P5** ([readings.py](../kernel/readings.py)): `who`; `recent [by=<name|me>] [kind=] [since=r<n>] [limit=]` (who, which word, on which visible thing; never facts, never a sealed act's author, nothing that touched only hidden things); `history` alone is your own latest acts; `kinds`; `on <module>` (its off's grants come back).
+- **P7**: `make` adds a note, never a refusal, for a kind nothing mentions yet and for settings the kind's other things never use or say otherwise (`no other button has bar=dock (they say taskbar)`); `press <button>` runs its `does=` as the presser.
+- Also: a module's words list `(window is off)` in help when their module is off.
+
+One script puts all of it in a running world, in order, every step an undoable line: [install_lines_plainly.py](install_lines_plainly.py) (renames, then topics refreshed where only the installer touched them, then help fixes, then the Appearance lens). **Ran** on a fresh copy of the live world: 95 changes, no refusals; a second run changed nothing and said so.
+
+Tests (**ran**): [test_lines_plainly.py](../tests/test_lines_plainly.py) 7 tests (P4 families; P1 names, two of a name, wrong kind; P2 plain verbs; P5; P7; P3 undo with a rule's post). `research/kernel-lab/tests` `120 passed, 30 subtests passed` before the last test was added; `test_kdesk.py` `22 passed` (its media.play expectation changed to the honest no-op). Not run: `kernel-lab/theme/proof.py` (a browser proof; its steward calls now say `for=place`).
+
+Known limits: a button or verb line that says a name resolves it when it runs, not when saved, so renaming the thing breaks that line (ids still bind). After undoing an act, undoing the act before it can still refuse "changed since" (an older kernel limit). `move Feed left` (a bare spot) is not read as `to=left`.
+
+## What needed Alex: the language
 
 Seven proposals, each with today/proposed lines, how it works, and what would change my mind: [lines-plainly.html](lines-plainly.html). In one line each: names work where ids go (P1); a few plain verbs that ask the thing's kind what they mean (P2); receipts in the user's words, rule side effects named, honest no-ops (P3); one spelling for families, old names kept as aliases (P4); `who`, `recent`, `kinds`, `on <module>` (P5); agents named everywhere, "me" says whose (P6); `make` warns about unknown kinds, `press <button>` from Lines (P7).
 

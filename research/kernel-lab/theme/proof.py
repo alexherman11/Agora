@@ -216,11 +216,11 @@ class Proof:
 
     def scopes(self):
         d, maya, sam = self.d, self.maya, self.sam
-        d.say("theme.use " + self.green)
+        d.say("theme.use " + self.green + " for=place")
         a, m, s = self.wears("Alex"), self.wears("Maya"), self.wears("Neighbour 01")
         self.check("a place-wide theme reaches everyone", a["name"] == m["name"] == s["name"] == "Dusk Green"
                    and m["source"] == "place", f"{a['name']} · {m['source']}")
-        bad, text = self.refused(maya, "theme.use ink-landscape")
+        bad, text = self.refused(maya, "theme.use ink-landscape for=place")
         self.check("a neighbour cannot set the place's theme", bad, text[:100])
         out = maya.say("theme.use nord for=me")
         a, m, s = self.wears("Alex"), self.wears("Maya"), self.wears("Neighbour 01")
@@ -249,7 +249,7 @@ class Proof:
                    and self.wears("Maya")["source"] == "me")
         maya.say("theme.use place for=me")
         self.check("follow the place again", self.wears("Maya")["name"] == "Dusk Green" and self.wears("Maya")["source"] == "place")
-        d.say("theme.use seabright-day")
+        d.say("theme.use seabright-day for=place")
         self.check("restoring the place's theme", self.wears("Alex")["name"] == "Seabright Day")
 
     def sharing(self):
@@ -425,7 +425,7 @@ class Proof:
         target = "dusk"
         want = self.surface_of(target)
         records = len(self.k.log.records)
-        used = d.say("theme.use " + target)
+        used = d.say("theme.use " + target + " for=place")
         acts = len(self.k.log.records) - records
         record = used["records"][0]
         for c in (bar, frame):
@@ -472,7 +472,7 @@ class Proof:
         order = [slug for slug, _ in S.ORDER]
         for slug in order:
             want = self.surface_of(slug)
-            self.d.say("theme.use " + slug)
+            self.d.say("theme.use " + slug + " for=place")
             for c in (bar, frame):
                 c.js("window.AgoraTheme&&AgoraTheme.refresh();0")
             self.wait(lambda: board.js('getComputedStyle(document.documentElement).getPropertyValue("--ag-surface").trim().toLowerCase()') == want
@@ -486,7 +486,7 @@ class Proof:
             self.shot_chrome(frame, OUT / f"{slug}-help.png")
             self.shots += [f"evidence/{slug}-taskbar.png", f"evidence/{slug}-help.png"]
             self.contact_sheet(slug)
-        self.d.say("theme.use seabright-day")
+        self.d.say("theme.use seabright-day for=place")
         self.check("every starter rendered across the board, a painter component, a legacy widget and host chrome",
                    True, ", ".join(order))
 
@@ -560,7 +560,7 @@ class Proof:
                    f"post {post['id']} with {[f.get('name') for f in files]}")
         self.shot_page(ap, "appearance-share.png")
         # clean up the app's test acts: nothing else
-        d.say("theme.use seabright-day")
+        d.say("theme.use seabright-day for=place")
 
     def run(self):
         steps = [self.starters, self.words, self.scopes, self.sharing, self.kits, self.malicious, self.delivery,

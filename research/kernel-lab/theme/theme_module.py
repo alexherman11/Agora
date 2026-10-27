@@ -3,7 +3,7 @@
     theme.list [mine=yes]                  see   the themes you may see, with what each looks like and which one you wear
     theme.get <theme>                      see   one theme in full, and its derived values
     theme.current                          see   which theme you wear, and why (place | me | trial)
-    theme.use <theme> [for=me]             do    the place's theme (stewards), or just yours with for=me; `place` follows the place
+    theme.use <theme> [for=place]          do    yours (27 Oct: yours by default); for=place: the place's (stewards); `place` follows the place
     theme.try <theme> [seconds=30]         do    wear it for a while; it goes back by itself unless you keep it
     theme.keep / theme.revert              do    keep what you are trying / go back now
     theme.import [yaml=|json=|text=] [name=] [in=<group>]
@@ -48,9 +48,10 @@ OFFER = [
      "help": "theme.get <theme>: one theme in full, with the derived values (roles, the extra palette slots, accent-ink, contrast)."},
     {"word": "theme.current", "kind": "see", "takes": "", "may": "anyone",
      "help": "theme.current: the theme you wear, and why: the place's, your own choice, or one you are trying."},
-    {"word": "theme.use", "kind": "do", "takes": "<theme> [for=me]", "may": "anyone",
-     "help": "theme.use <theme> [for=me]: wear a theme. Alone it is the place's theme (stewards); for=me is just yours "
-             "and wins for you. `theme.use place for=me` follows the place again. undo puts it back."},
+    {"word": "theme.use", "kind": "do", "takes": "<theme> [for=place]", "may": "anyone",
+     "help": "theme.use <theme> [for=place]: wear a theme, just you (agents change it for the person they act for). "
+             "for=place changes the place's theme for everyone (stewards). theme.use place follows the place again. "
+             "undo puts it back."},
     {"word": "theme.try", "kind": "do", "takes": "<theme> [seconds=30]", "may": "anyone",
      "help": "theme.try <theme> [seconds=30]: wear a theme for a while, just yourself. It goes back by itself unless "
              "you say theme.keep."},
@@ -337,7 +338,7 @@ class Theme:
 
     def w_use(self, use, me, caller, arg, kv):
         w = self.things(use)
-        personal = kv.get("for") == "me"
+        personal = kv.get("for") not in ("place", "everyone")      # yours unless you say the place's (P6, 27 Oct)
         if arg.lower() in ("place", "default") and personal:
             ref, theme_id = None, "place"
         else:
@@ -352,7 +353,7 @@ class Theme:
             return {"lines": [f"make kind=theme-choice theme={theme_id} sees=me"], "saw": {},
                     "text": f"you now wear {arg or theme_id} (just for you)", "announce": "me"}
         if not self.steward(me):
-            raise Refuse("only a steward sets the place's theme; theme.use <theme> for=me changes it for you alone")
+            raise Refuse("only a steward sets the place's theme; theme.use <theme> changes it for you alone")
         owned = [s for s in w["settings"] if self.owner_made(s)]
         if owned:
             s = owned[-1]
