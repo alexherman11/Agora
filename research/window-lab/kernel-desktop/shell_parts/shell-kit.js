@@ -178,17 +178,17 @@ const ShellKit = (() => {
     },
     // actions: wm.* when the manager answers, the native shell otherwise
     focus(w) {
-      if (w.agora) return this.act(`window.focus ${w.key}`);
+      if (w.agora) return this.act(`window.focus ${w.agora}`);
       if (this.wmOK) return this.act(w.state === 'minimised' ? `wm.restore ${w.key}` : `wm.focus ${w.key}`);
       return this.act(`window.activate handle=${w.key}`);
     },
     minimise(w) {
-      if (w.agora) return this.act(`window.focus ${w.key}`);          // focus on the front window tucks it away
+      if (w.agora) return this.act(`window.focus ${w.agora}`);          // focus on the front window tucks it away
       if (this.wmOK) return this.act(`wm.minimise ${w.key}`);
       return this.act(`window.activate handle=${w.key}`);              // activate on the front window minimises it
     },
     close(w) {
-      if (w.agora) return this.act(`window.close ${w.key}`);
+      if (w.agora) return this.act(`window.close ${w.agora}`);
       if (this.wmOK) return this.act(`wm.close ${w.key}`);
       return this.act(`window.activate handle=${w.key} do=close`);
     },

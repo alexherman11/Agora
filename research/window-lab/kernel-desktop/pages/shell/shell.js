@@ -256,17 +256,17 @@ const Shell = (() => {
     },
     // actions: wm.* when the manager answers, the native shell otherwise
     async focus(w) {
-      if (w.agora) return this.act(`window.focus ${w.key}`);
+      if (w.agora) return this.act(`window.focus ${w.agora}`);
       if (this.wmOK) return this.act(w.state === "minimised" ? `wm.restore ${w.key}` : `wm.focus ${w.key}`);
       return this.act(`window.activate handle=${w.key}`);
     },
     async minimise(w) {
-      if (w.agora) return this.act(`window.focus ${w.key}`);          // focus on the front window tucks it away
+      if (w.agora) return this.act(`window.focus ${w.agora}`);          // focus on the front window tucks it away
       if (this.wmOK) return this.act(`wm.minimise ${w.key}`);
       return this.act(`window.activate handle=${w.key}`);              // activate on the front window minimises it
     },
     async close(w) {
-      if (w.agora) return this.act(`window.close ${w.key}`);
+      if (w.agora) return this.act(`window.close ${w.agora}`);
       if (this.wmOK) return this.act(`wm.close ${w.key}`);
       return this.act(`window.activate handle=${w.key} do=close`);
     },
@@ -726,8 +726,8 @@ const Shell = (() => {
       // a running Agora window shares the slot of whatever opens it (a launcher, or a button that says window.open)
       const slotted = new Set();
       for (const p of pinned) {
-        const lens = p.launcher || opensLens(p.line);
-        const k = lens ? [...g.keys()].find((x) => x.startsWith("agora:") && !slotted.has(x) && g.get(x).wins.some((w) => w.shows === lens || (p.launcher && appOf(w.shows) === p.launcher))) : p.id;
+        const lens = opensLens(p.line);
+        const k = lens ? [...g.keys()].find((x) => x.startsWith("agora:") && !slotted.has(x) && g.get(x).wins.some((w) => w.shows === lens)) : p.id;
         const run = k && g.get(k);
         if (run && !slotted.has(k)) { Object.assign(p, { wins: run.wins }); slotted.add(k); }
       }

@@ -36,8 +36,8 @@ export default {mount(api, s) {
     // a running Agora window shares the slot of whatever opens it (a launcher, or a button that says window.open)
     const slotted = new Set();
     for (const p of pinned) {
-      const lens = p.launcher || K.opensLens(p.line);
-      const k = lens ? [...g.keys()].find((x) => x.startsWith('agora:') && !slotted.has(x) && g.get(x).wins.some((w) => w.shows === lens || (p.launcher && K.appOf(w.shows) === p.launcher))) : p.id;
+      const lens = K.opensLens(p.line);
+      const k = lens ? [...g.keys()].find((x) => x.startsWith('agora:') && !slotted.has(x) && g.get(x).wins.some((w) => w.shows === lens)) : p.id;
       const run = k && g.get(k);
       if (run && !slotted.has(k)) { p.wins = run.wins; slotted.add(k); }
     }
