@@ -138,11 +138,18 @@ class Builders:
 
     def update(self, state, **facts):
         door = self.session(state['requester'])
-        task = door.look(state['task'])
-        if task.get('build_run') != state['run']:
-            raise RuntimeError('claim changed; the previous builder cannot update this task')
-        return door.call('/do', 'set ' + state['task'] + ' ' + ' '.join(k+'='+q(v) for k,v in facts.items()),
-                         saw={state['task']: int(task['rev'])})
+        for attempt in range(4):
+            task = door.look(state['task'])
+            if task.get('build_run') != state['run']:
+                raise RuntimeError('claim changed; the previous builder cannot update this task')
+            try:
+                return door.call('/do', 'set ' + state['task'] + ' ' + ' '.join(k+'='+q(v) for k,v in facts.items()),
+                                 saw={state['task']: int(task['rev'])})
+            except RuntimeError as exc:
+                # 28 Oct: JEFF, as lead, set the card between this read and write; the run blocked before its
+                # worktree. The claim is re-read each time, so another writer's facts are never overwritten blind.
+                if 'stale' not in str(exc) or attempt == 3:
+                    raise
 
     def phase(self, state, phase, detail, **facts):
         state.update(phase=phase, detail=detail, updated=stamp())
@@ -213,6 +220,11 @@ class Builders:
         claim = door.call('/do', 'set '+state['task']+' builder='+q(state['name'])+' build=asked build_run='+q(state['run']),
                           saw={state['task']: int(task['rev'])})
         state['claim_records'] = claim.get('records', [])
+        self.prepare(state, door)
+
+    def prepare(self, state, door):
+        """After the claim: the worktree, the builder's chat, the first turn."""
+        task = door.look(state['task'])
         self.phase(state, 'preparing', 'claim recorded; preparing isolated worktree')
         base = self.git(self.repo, 'rev-parse', 'main')
         tree = self.repo / '.worktrees' / state['run']
@@ -316,6 +328,8 @@ class Builders:
             state['phase']='preparing';self.save(state)
             def launch(s):
                 self.assert_owned(s)
+                if s.get('claim_records') and not s.get('tree'):     # blocked after the claim, before any worktree
+                    return self.prepare(s, self.session(s['requester']))
                 if (not s.get('tree') or self.git(s['tree'],'rev-parse','HEAD')!=s['base']
                         or self.git(s['tree'],'status','--porcelain','--untracked-files=no')):
                     raise RuntimeError('startup tree has changes; reconcile before retry')

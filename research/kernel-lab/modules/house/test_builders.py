@@ -271,6 +271,32 @@ def test_landing_refuses_a_conflict_and_moves_nothing(manager):
     assert (repo/'shared.py').read_bytes()==b'one\ntwo\nthree, theirs\n' and (repo/'only.py').read_bytes()==b'old\n'
 
 
+def test_a_stale_card_write_is_reread_and_written_again(manager):
+    s=state(manager)
+    class Busy(WorldDoor):
+        def call(self,route,line,**kw):
+            if line.startswith('set ') and not getattr(self,'raced',False):
+                self.raced=True;self.task['rev']+=1;self.task['next_action']='the lead wrote this'
+                raise RuntimeError('refused: stale: dk1 changed since it was read; nothing was done')
+            return super().call(route,line,**kw)
+    busy=Busy();busy.task['build_run']=s['run'];manager.session=lambda _:busy
+    manager.update(s,build_phase='preparing')
+    assert busy.task['build_phase']=='preparing' and busy.task['next_action']=='the lead wrote this'
+
+
+def test_retry_after_the_claim_and_before_a_worktree_prepares_it(manager):
+    s=state(manager,'blocked');s.update(claim_records=['r1']);s.pop('tree',None);manager.save(s)
+    manager.session=lambda _:manager.fixture_door
+    prepared=[]
+    manager.prepare=lambda st,door:prepared.append(st['run'])
+    out=manager.retry(msg('dk1'))
+    assert out.get('external'),out
+    import time
+    deadline=time.monotonic()+5
+    while not prepared and time.monotonic()<deadline:time.sleep(.02)
+    assert prepared==[s['run']]
+
+
 def test_unknown_door_outcome_is_not_retried(manager):
     s=state(manager)
     class Lost(WorldDoor):
