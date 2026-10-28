@@ -41,6 +41,11 @@ live.install(KP.Facade)            # widgets carry live readings when painted (l
 PAGES = HERE / "pages"
 DEFAULT_WORLD = HERE / "state" / "world"
 BASE_PY = Path(getattr(sys, "_base_executable", sys.executable))
+# summarize needs the venv's packages. A House builder worktree has no .venv of its own (27 Oct: every desktop test
+# failed in setup there), so fall back to the venv this kdesk is running in.
+VENV_PY = HERE.parents[2] / ".venv/Scripts/python.exe"
+if not VENV_PY.is_file():
+    VENV_PY = Path(sys.prefix) / "Scripts/python.exe"
 STEWARD_ACCOUNT = "desktop:alex"
 
 WINDOW_GRANTS = "window.* make set forget rows look who hear:make hear:set hear:forget hear:undo hear:off"
@@ -59,7 +64,7 @@ def module_specs(headless=False):
     py = str(BASE_PY)            # the real interpreter, so the pid the kernel holds is the module's own (gotchas note)
     tail = ["--headless"] if headless else []
     return [
-        {"name": "summarize", "run": [str(HERE.parents[2] / '.venv/Scripts/python.exe'),
+        {"name": "summarize", "run": [str(VENV_PY),
          str(HERE.parents[1] / 'kernel-lab/modules/summarize/summarize.py')],
          "publishes": "summarize.*", "grants": SUMMARIZE_GRANTS,
          "only": "kind:taskboard-task", "for": "steward"},
