@@ -388,20 +388,7 @@ const ShellKit = (() => {
       const sig = JSON.stringify(s);
       if (sig === lastSent) return;
       lastSent = sig;
-      agora.native('layout', s).then(reply => {
-        const rail = doc.querySelector('.rail');
-        if (!rail || !reply || typeof reply !== 'object') return;
-        const slot = reply.readout || {};
-        const width = Math.max(0, Math.min(520, +slot.width || 0));
-        const height = Math.max(0, Math.min(52, +slot.height || 0));
-        const value = `${width}px`, tall = `${height}px`;
-        if (rail.style.getPropertyValue('--readout-width') !== value ||
-            rail.style.getPropertyValue('--readout-height') !== tall) {
-          rail.style.setProperty('--readout-width', value);
-          rail.style.setProperty('--readout-height', tall);
-          report();
-        }
-      }).catch(() => { lastSent = ''; });
+      agora.native('layout', s).catch(() => { lastSent = ''; });
     });
   }
   const thumbs = (tiles) => agora.native('thumbs', tiles).catch(() => 0);

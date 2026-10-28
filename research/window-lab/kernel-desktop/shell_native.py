@@ -140,9 +140,6 @@ def bar_placer(view, hwnd, show, scale_fn, hidden_fn):
                 gdi32.DeleteObject(strip)
         if not hidden_fn():
             show(hwnd)
-        if view == "shell-top":
-            import performance_overlay
-            performance_overlay.accommodate(hwnd)
     return placed
 
 
