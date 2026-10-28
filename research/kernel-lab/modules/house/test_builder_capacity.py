@@ -1,5 +1,5 @@
 """Bounded pool policy, no live world or model."""
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from types import SimpleNamespace
 import pytest
 from test_builders import manager, msg, state
@@ -32,15 +32,16 @@ def test_ambiguous_or_unavailable_settings_refuse(manager):
 
 def test_three_requests_start_and_fourth_waits(manager):
     configure(manager,3)
-    with patch('builders.threading.Thread.start') as launch:
+    with patch('builders.threading', SimpleNamespace(Thread=Mock())) as threads:
         for target in ('dk1','dk2','dk3'):
             assert manager.start(msg(target))['rows'][0]['doing']=='asked'
         assert 'refused' in manager.start(msg('dk4'))
-        assert launch.call_count==3
+        assert threads.Thread.call_count==3
+        assert threads.Thread.return_value.start.call_count==3
 
 def test_decrease_does_not_stop_existing_workers(manager):
     configure(manager,3)
-    with patch('builders.threading.Thread.start'):
+    with patch('builders.threading', SimpleNamespace(Thread=Mock())):
         for target in ('dk1','dk2','dk3'):manager.start(msg(target))
     children={key:SimpleNamespace(stop=lambda:pytest.fail('active child stopped')) for key in manager.states}
     manager.children.update(children)
@@ -55,8 +56,8 @@ def test_review_and_publication_share_admission_capacity(manager,phase,word):
     configure(manager,1)
     target=state(manager,phase)
     manager.states['dk2']=dict(task='dk2',phase='working')
-    with patch('builders.threading.Thread.start') as launch:
+    with patch('builders.threading', SimpleNamespace(Thread=Mock())) as threads:
         result=getattr(manager,word)(msg())
         assert 'capacity is occupied' in result['refused']
         assert target['phase']==phase
-        launch.assert_not_called()
+        threads.Thread.assert_not_called()

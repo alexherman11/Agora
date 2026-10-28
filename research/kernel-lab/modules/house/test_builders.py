@@ -262,6 +262,21 @@ def landing_repo_again(manager):
     return s,base,cand
 
 
+def test_a_review_that_conflicts_with_main_leaves_a_clean_tree_and_may_run_again(manager):
+    s,base,cand=landing_repo(manager,b'one\ntwo\nthree\n')
+    repo=manager.repo;tree=Path(s['tree'])
+    (repo/'shared.py').write_bytes(b'one\ntwo\nthree, main moved\n')
+    manager.git(repo,'commit','-qam','main moved')
+    (tree/'BUILD-RESULT.md').write_text('fixture')
+    s.update(phase='reviewing',base=base)
+    with pytest.raises(RuntimeError,match='conflicts with this worker in shared.py'):
+        manager.review(s)
+    assert manager.git(tree,'status','--porcelain','--untracked-files=no')==''
+    assert s['review_base']==manager.git(repo,'rev-parse','HEAD')
+    s.update(phase='blocked')
+    assert manager.request_review(msg('dk1')).get('external')
+
+
 def test_landing_refuses_a_conflict_and_moves_nothing(manager):
     s,base,cand=landing_repo(manager,b'one\ntwo\nthree, theirs\n')
     with pytest.raises(RuntimeError,match='conflict'):
