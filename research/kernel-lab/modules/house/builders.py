@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import queue
 import subprocess
+import tempfile
 import threading
 import time
 import urllib.request
@@ -110,12 +111,28 @@ class Builders:
             raise RuntimeError('requester has no unambiguous existing builder agent session; no credential was created')
         return Door(self.h.builder_url, tokens[0])
 
+    git_lock = threading.Lock()
+
     def git(self, cwd, *args):
-        result = subprocess.run(['git', '-C', str(cwd), *args], capture_output=True, text=True,
-                                encoding='utf-8', errors='replace', timeout=120, creationflags=T.NO_WINDOW)
-        if result.returncode:
-            raise RuntimeError((result.stderr or result.stdout)[-2000:])
-        return result.stdout.strip()
+        """27 Oct: twice a git call finished its work but held the House past its timeout (a background repack, then
+        two parallel reviews' `git add` stuck ~25 min). So: no auto gc/maintenance; one git at a time; stdin is empty,
+        never the House's own kernel pipe; output goes to files, so no leftover child can hold a pipe open; and a
+        timeout kills git's whole process tree."""
+        cmd = ['git', '-c', 'gc.auto=0', '-c', 'maintenance.auto=false', '-C', str(cwd), *args]
+        with self.git_lock, tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+            proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=out, stderr=err, creationflags=T.NO_WINDOW)
+            try:
+                code = proc.wait(timeout=120)
+            except subprocess.TimeoutExpired:
+                subprocess.run(['taskkill', '/T', '/F', '/PID', str(proc.pid)], capture_output=True,
+                               stdin=subprocess.DEVNULL, timeout=30, creationflags=T.NO_WINDOW)
+                raise
+            out.seek(0), err.seek(0)
+            stdout = out.read().decode('utf-8', 'replace')
+            stderr = err.read().decode('utf-8', 'replace')
+        if code:
+            raise RuntimeError((stderr or stdout)[-2000:])
+        return stdout.strip()
 
     def update(self, state, **facts):
         door = self.session(state['requester'])
@@ -352,12 +369,15 @@ never change credentials, security settings or provider, use paid fallback, or s
 Preserve existing user work and apps. No visible test windows, OBS operations, global window-manager changes,
 forced process stops, deletions, publishing or pushes. Use hidden fixtures. Stop an exact denied action and report it;
 do not route around a denial. No task.done or merging to main: owner review remains required.
-Use the pinned {T.PY}. Implement the existing requested task, test affected behavior, commit only owned source.
+Use the pinned {T.PY}. Implement the existing requested task and test affected behavior.
+Your sandbox cannot write .git (index.lock is denied): never stage or commit, and don't work around it. Leave your source
+changes in this worktree; at review the House commits everything you left to your branch, except BUILD-RESULT.md and
+top-level dot-folders. So keep scratch, temp fixtures and logs out of the tree or under a top-level dot-folder.
 For writing import: first inspect sources/permissions, preserve originals/authorship/current writing, use idempotent
 provenance and prepare a reviewable importer/manifest; do not import private or ambiguous content without review.
 Do not read sessions/*.pickle directly or grep exported transcripts. Never expose secrets.
 Before each irreversible effect check the current task for correction, pause, cancellation and owner changes.
-Leave BUILD-RESULT.md at worktree root (untracked): exact changes, commands/results, limitations, source commit,
+Leave BUILD-RESULT.md at worktree root (untracked): exact changes and the files you changed, commands/results, limitations,
 activation requirements and blockers. A model ending is received, not reviewed or verified. End with a useful result.
 <transcript_evidence>
 User, October 27, message Sentinel_cd8f7f9ae8c4819196c8b9c06fd41908: "awesome, can i get you to get  some codex workers get codex workers working in the world and have them start pickup up tasks and completing them?"
@@ -384,15 +404,29 @@ Assistant, October 27: "Found the blocker: the new world is running, but its Hou
             threading.Thread(target=self.guarded, args=(state, self.review), daemon=True).start()
         return {'text': 'independent checks requested; source is not landed', 'external': True}
 
+    def commit_worker(self, state, tree):
+        """The worker's sandbox cannot write .git (index.lock is denied), as on the old desk (workshop CODEX_LIMITS,
+        1 Oct). So the House commits what it left, to the worker's own branch only, before the independent checks.
+        Left out: BUILD-RESULT.md (its self-proof, kept untracked) and dot-folders at the top (scratch, temp fixtures)."""
+        self.git(tree, 'add', '-A', '--', '.', ':(exclude)BUILD-RESULT.md', ':(exclude,glob).*', ':(exclude,glob).*/**')
+        files = self.git(tree, 'diff', '--cached', '--name-only').splitlines()
+        if not files:
+            return
+        self.git(tree, 'commit', '-q', '-m', state['name'] + '\n\nCommitted by the House for builder run ' + state['run']
+                 + ' (the worker sandbox cannot write .git).')
+        state['house_commit'] = dict(commit=self.git(tree, 'rev-parse', 'HEAD'), files=files)
+        self.event(state, 'committed', f"House committed {len(files)} file(s) the worker left: " + ', '.join(files[:12]))
+
     def review(self, state):
         self.assert_owned(state)
         tree = Path(state['tree'])
-        # Never erase or stash worker edits. Its source must be committed.
-        if self.git(tree, 'status', '--porcelain', '--untracked-files=no'):
-            raise RuntimeError('worker has uncommitted tracked changes; source review held')
         report = tree/'BUILD-RESULT.md'
         if not report.is_file():
             raise RuntimeError('worker self-proof BUILD-RESULT.md is missing')
+        # Never erase or stash worker edits: commit them to its branch, then check that exact commit.
+        self.commit_worker(state, tree)
+        if self.git(tree, 'status', '--porcelain', '--untracked-files=no'):
+            raise RuntimeError('worker has uncommitted tracked changes; source review held')
         state['self_proof_sha256'] = hashlib.sha256(report.read_bytes()).hexdigest()
         base = self.git(self.repo, 'rev-parse', 'main')
         if base != state['base']:

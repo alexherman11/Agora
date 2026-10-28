@@ -1,16 +1,18 @@
 root : map-shell, title "Seabright"
   map : geo-map, map Seabright
     watch reading:"map.layers Seabright"
-    on add do make kind=spot map=Seabright name=$name lat=$lat lon=$lon osm=$osm
-    on add-event do make kind=event title=$title start=$start lat=$lat lon=$lon
+    on put do map.add $place kind=$kind $fields
     on move do set $thing lat=$lat lon=$lon
   search : map-search, map Seabright
   inspect : map-inspector, map Seabright
     watch reading:"map.layers Seabright"
+    on put do map.add $place kind=$kind $fields
+    on adopt do map.adopt $place lat=$lat lon=$lon name=$name
+    on open-page do window.open $page $thing
+    on say do post $text about=$thing
     on edit do set $thing $fields
     on forget do forget $thing
     on replan do map.route $route
-    on add do make kind=spot map=Seabright name=$name lat=$lat lon=$lon osm=$osm
   plan : map-route, map Seabright
     only when $view.tool = route
     on route do map.route name=$name stops=$stops mode=$mode map=Seabright
@@ -18,6 +20,8 @@ root : map-shell, title "Seabright"
     watch reading:"map.layers Seabright"
     on hide do map.hide $layer map=Seabright
     on unhide do map.unhide $layer map=Seabright
+    on style do map.style $style map=Seabright
     on edit-layer do set $layer $fields
     on forget-layer do forget $layer
-    on make do make kind=map-layer map=Seabright name=$name shows=$shows color=$color look=$look
+    on make do make kind=map-layer map=$map name=$name shows=$shows color=$color look=$look
+    on make-mine do make kind=map-layer map=$map name=$name shows=$shows color=$color look=$look sees=me only=me

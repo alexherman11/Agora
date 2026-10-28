@@ -1,22 +1,28 @@
-"""An evening with the map, as people would use it, in a hidden world and a hidden browser. Writes evidence/proof.md
-and pictures. Each step says what a person does, does it through the window (real pointer and key events) or through
-lines, and checks what the world and the window show afterwards.
+"""An evening with the map, as people would use it, in a hidden world and a hidden browser. Each step says what a
+person does, does it through the window (real pointer and key events) or through lines, and checks what the world and
+the window show afterwards. Prints PASS/FAIL per step and writes evidence/proof-output.txt and pictures.
 
     python proof.py
+Tiles come from the network the first time and from a cache after (AGORA_MAP_CACHE, default: the temp folder).
 """
 import json
+import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 
+os.environ.setdefault('AGORA_MAP_CACHE', str(Path(tempfile.gettempdir()) / 'agora-map-cache'))
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE)]
-from look import open_map  # noqa: E402
+from look import MapPage  # noqa: E402
 from scratch import Scratch  # noqa: E402
 
 OUT = HERE / 'evidence'
 OUT.mkdir(exist_ok=True)
 log = []
+CARMEL = dict(ref='overture:67b0aac8-26f6-4c71-a01a-1990cf5c4a21', lat=36.965295, lon=-121.998016, name='715 Carmel Street')
+CITY_HALL = dict(ref='overture:c49959f8-e2ca-4a60-854a-60835580c345', lat=36.974399, lon=-122.029475, name='Santa Cruz City Hall')
 
 
 def metres(lat1, lon1, lat2, lon2):
@@ -27,8 +33,8 @@ def metres(lat1, lon1, lat2, lon2):
 
 
 def note(step, ok, detail=''):
-    log.append((step, ok, detail))
-    print(('PASS ' if ok else 'FAIL ') + step + (' · ' + detail if detail else ''), flush=True)
+    log.append((step, bool(ok), detail))
+    print(('PASS ' if ok else 'FAIL ') + step + (' · ' + str(detail) if detail else ''), flush=True)
 
 
 class Driver:
@@ -69,7 +75,7 @@ class Driver:
         c.call('Input.dispatchMouseEvent', type='mouseReleased', button='left', clickCount=1, **pt)
 
     def click_text(self, selector, text):
-        i = self.js(f'[...document.querySelectorAll({json.dumps(selector)})].findIndex(n=>n.textContent.trim()==={json.dumps(text)})')
+        i = self.js(f'[...document.querySelectorAll({json.dumps(selector)})].findIndex(n=>n.textContent.trim().startsWith({json.dumps(text)}))')
         if i is None or i < 0:
             raise AssertionError(f'no {selector} saying {text}')
         self.js(f'[...document.querySelectorAll({json.dumps(selector)})].forEach((n,i)=>n.toggleAttribute("data-hit",i==={i}))')
@@ -92,242 +98,274 @@ class Driver:
     def until(self, expr, seconds=15):
         try:
             self.p.until(expr, seconds)
+            return True
         except AssertionError:
-            print('TOASTS', self.js('[...document.querySelectorAll(".toast")].map(t=>t.textContent)'))
-            print('VIEW', self.js('document.querySelector("[data-view]")?.dataset.view'))
-            raise
+            print('   (waited for', expr[:120], ')', self.js('[...document.querySelectorAll(".toast")].map(t=>t.textContent).slice(-3)'))
+            return False
 
     def engine(self, expr):
         """Read the engine through the surface element (the engine sits in the part's draft; the page has no global)."""
         return self.js('(()=>{const c=document.querySelector(".gm-canvas");const E=c&&c.__engine;return E?(' + expr + '):null})()')
 
-    def center(self, lat, lon, dist=None):
-        """Put the camera over a place (as a person would by dragging), and wait for the frame."""
-        self.engine(f'(()=>{{const [x,y]=E.toXY({lat},{lon});E.anim=null;E.cam.x=x;E.cam.y=y;'
-                    + (f'E.cam.dist={dist};' if dist else '') + 'E.clampCam();E.ask();return 1})()')
+    def tiles_in(self, seconds=45):
+        """Wait until every tile the camera wants is drawn."""
+        return self.until('(()=>{const E=document.querySelector(".gm-canvas")?.__engine;return E&&E.drawList.length>0&&!E.pending})()', seconds)
+
+    def look_at(self, lat, lon, dist=300, pitch=50, bearing=0):
+        self.engine(f'(()=>{{const [x,y]=E.toXY({lat},{lon});E.anim=null;E.inertia=null;Object.assign(E.cam,{{x,y,dist:{dist}*E.scaleAt(y),pitch:{pitch},bearing:{bearing}}});E.clampCam();E.ask();return 1}})()')
+        self.settle(250)
+        self.tiles_in()
         self.settle(300)
 
-    def off_centre(self, lat, lon):
-        """How far (px) a place is from the middle of the map's open part (beside the panels)."""
-        return self.engine(f'(()=>{{const [x,y]=E.toXY({lat},{lon});E.matrices();const p=E.project(x,y,0);'
-                           'const side=E.root.closest(".gm-shell")?.querySelector(".gm-side");const m=E.root.getBoundingClientRect();'
-                           'const inset=side?side.getBoundingClientRect().right-m.left:0;'
-                           'return Math.hypot(p[0]-(inset+(E.w-inset)/2),p[1]-E.h/2)})()')
-
     def screen_of(self, lat, lon):
-        return self.engine(f'(()=>{{const [x,y]=E.toXY({lat},{lon});E.matrices();const p=E.project(x,y,0);'
-                           f'const r=E.root.getBoundingClientRect();return p?{{x:p[0]+r.left,y:p[1]+r.top}}:null}})()')
+        return self.engine(f'(()=>{{const [x,y]=E.toXY({lat},{lon});E.matrices();const p=E.project(x,y,0);return p?{{x:p[0],y:p[1]}}:null}})()')
+
+    def text(self, selector):
+        return self.js(f'document.querySelector({json.dumps(selector)})?.innerText||""')
+
+
+def world_rows(s, line):
+    return s.say(line).get('rows', [])
+
+
+def open_page(s, widget_name, target, width=900, height=900):
+    w = world_rows(s, 'rows widget name=' + widget_name)
+    page = MapPage(s.url, s.token('alex'), w[0]['id'] + '&target=' + target, width, height)
+    page.until('!!document.querySelector(".pp")', 40)
+    page.until('!!document.querySelector(".pp-head h1")', 30)
+    return page, Driver(page)
+
+
+def script_errors(page):
+    return [e for e in page.errors if e.get('method') == 'Runtime.exceptionThrown']
 
 
 def main():
     s = Scratch()
     t_all = time.time()
+    errors = []
     try:
         # Before anyone opens the window, a neighbour adds things the ordinary way, in lines.
+        s.say('make kind=kind name=event fields="start end location place seats type"')
+        s.say('make kind=kind name=note fields="text at type"')
         tide = s.say('make kind=spot map=Seabright name="Tide pools" lat=36.9630 lon=-122.0040 text="Low tide only"')['made'][0]
-        s.say('make kind=kind name=event fields="start end location place seats"')
-        ev1 = s.say('make kind=event title="Beach cleanup" start=2026-10-31T09:00 place=' + tide)['made'][0]
-        ev2 = s.say('make kind=event title="Council night" start=2026-10-30T18:30 location="Museum of Natural History"')['made'][0]
-        note('events find their place: one by place=, one by its written location', True, f'{ev1} {ev2}')
-        page = open_map(s)
-        d = Driver(page)
-        ok = d.engine('!!E.buffers&&!!E.gl')
-        note('the window opens and draws Seabright', ok)
-        pins = d.js('[...document.querySelectorAll(".gm-pin")].map(p=>p.getAttribute("aria-label"))')
-        note('three placed things show as pins (spot, event at the spot, event by location)', len(pins) == 3, json.dumps(pins))
-        approx = d.js('document.querySelectorAll(".gm-pin.gm-approx").length')
-        note('the event placed only by its written location is drawn as approximate', approx == 1, f'{approx} approximate')
-        page.shot(str(OUT / 'proof-01-open.png'))
-        loads = d.engine('E.loadCount||1')
+        council = s.say('make kind=event title="Beach cleanup" start=2026-10-31T09:00 location="Seabright Beach"')['made'][0]
+        note('a spot by lat/lon and an event by its written location, made in lines', tide and council)
 
-        # 2. Press the Beach cleanup pin: the inspector shows its facts, where it is, and what is near.
-        d.center(36.9630, -122.0040, 650)
-        d.click('.gm-pin[aria-label^="Beach cleanup"]')
-        d.until('document.querySelector(".gm-title")?.textContent.includes("Beach cleanup")', 10)
-        d.until('document.querySelector(".gm-where")?.textContent.length>3&&!document.querySelector(".gm-where").textContent.startsWith("…")', 10)
-        where = d.js('document.querySelector(".gm-where").textContent')
-        facts = d.js('[...document.querySelectorAll(".gm-facts dt")].map(n=>n.textContent)')
-        note('pressing a pin shows its facts and where it is', 'start' in facts, where + ' · ' + ', '.join(facts))
-        same = d.engine('E.loadCount||1') == loads and d.engine('!!E.buffers')
-        note('selecting repaints the window without reloading the map', same)
-        page.shot(str(OUT / 'proof-02-pressed-pin.png'))
-
-        # 3. Search for "java", choose the first answer: the camera flies there.
-        d.click('.gm-search input')
-        d.type('java')
-        d.until('document.querySelectorAll(".gm-results button").length>0', 10)
-        d.key('Enter', 'Enter', 13)
-        d.until('document.querySelector(".gm-title")?.textContent.includes("Java Junction")', 10)
-        d.settle(1300)
-        off = d.off_centre(36.9674789, -122.0081128)
-        note('search finds Java Junction and flies there (to the middle of the map beside the panels)', off < 40, f'{off:.0f} px from the middle')
-        page.shot(str(OUT / 'proof-03-search.png'))
-
-        # 4. Add a spot: choose the tool, press the map, name it, press Enter.
-        d.click_text('.gm-tools button', 'Add a spot')
-        d.until('document.querySelector(".gm-root")?.dataset.tool==="add"', 5)
-        pt = d.screen_of(36.96705, -122.00835)
-        d.click_at(pt['x'], pt['y'])
-        d.until('!!document.querySelector(".gm-draft input")', 5)
-        d.click('.gm-draft input')
-        d.type('Bench with a view')
-        d.key('Enter', 'Enter', 13)
-        d.until('[...document.querySelectorAll(".gm-pin")].some(p=>p.getAttribute("aria-label").startsWith("Bench with a view"))', 10)
-        bench = [r for r in s.say('rows spot')['rows'] if r.get('name') == 'Bench with a view'][0]
-        dist = metres(bench['lat'], bench['lon'], 36.96705, -122.00835)
-        note('adding a spot in the window makes a spot thing where it was pressed', dist < 6, f'{bench["id"]} {dist:.1f} m from the press')
-        page.shot(str(OUT / 'proof-04-added.png'))
-
-        # 4b. Add an event the same way: the tool, a press, "An event", a name and "Sat 10am"
-        d.click_text('.gm-tools button', 'Add a spot')
-        d.until('document.querySelector(".gm-root")?.dataset.tool==="add"', 5)
-        pt = d.screen_of(36.96620, -122.00790)
-        d.click_at(pt['x'], pt['y'])
-        d.until('!!document.querySelector(".gm-draft input")', 5)
-        d.click('.gm-draft [data-kind=event]')
-        d.click('.gm-draft input[aria-label="Name"]')
-        d.type('Porch music')
-        d.click('.gm-draft input[aria-label="When"]')
-        d.type('Sat 10am')
-        d.click_text('.gm-draft button', 'Add event')
-        d.until('[...document.querySelectorAll(".gm-pin")].some(p=>p.getAttribute("aria-label").startsWith("Porch music"))', 10)
-        ev = [r for r in s.say('rows event')['rows'] if r.get('title') == 'Porch music'][0]
-        note('an event added on the map is an event thing with a time and a place', bool(ev.get('start')) and bool(ev.get('lat')),
-             f"start {ev.get('start')}, {metres(ev['lat'], ev['lon'], 36.96620, -122.00790):.1f} m from the press")
-
-        # 5. Drag the new pin across the street; the world moves it. Undo puts it back.
-        a = d.screen_of(float(bench['lat']), float(bench['lon']))
-        b = d.screen_of(36.96690, -122.00800)
-        d.drag(a['x'], a['y'] - 14, b['x'], b['y'] - 14)
-        d.settle(900)
-        moved = s.say('look ' + bench['id'])['rows'][0]
-        m = metres(moved['lat'], moved['lon'], 36.96690, -122.00800)
-        note('dragging a pin moves the thing in the world', m < 8, f'{m:.1f} m from where it was dropped')
-        s.say('undo')
-        back = s.say('look ' + bench['id'])['rows'][0]
-        note('undo takes the move back', back['lat'] == bench['lat'], f"{back['lat']},{back['lon']}")
-
-        # 6. Plan a route: the tool, then the Tide pools pin, two presses on the map; the planner gives length and time.
-        d.click_text('.gm-tools button', 'Plan a route')
-        d.until('!!document.querySelector("[aria-label=\'Route planner\']")', 8)
-        d.engine('(E.flyTo({dist:1300},10),1)')
-        d.settle(400)
-        d.click('.gm-pin[aria-label^="Tide pools"]')
-        for lat, lon in [(36.96455, -122.00785), (36.96745, -122.00745)]:
-            p2 = d.screen_of(lat, lon)
-            d.click_at(p2['x'], p2['y'])
-            d.settle(350)
-        d.until('document.querySelectorAll(".gm-stops li").length===3', 8)
-        d.until('!!document.querySelector(".gm-big")', 12)
-        numbers = d.js('document.querySelector(".gm-big").textContent')
-        note('the planner shows the street path length and time for three stops', 'min' in numbers, numbers)
-        page.shot(str(OUT / 'proof-05-planning.png'))
-        d.click('[aria-label="Route name"]')
-        d.type('Flyers: tide pools to Murray')
-        d.click_text('.gm-btn', 'Save route')
-        d.until('!document.querySelector("[aria-label=\'Route planner\']")', 10)
-        routes = [r for r in s.say('rows route')['rows'] if r.get('name') == 'Flyers: tide pools to Murray']
-        note('saving makes a route thing that keeps its street path', bool(routes) and len(routes[0].get('path', '').split()) > 5,
-             (routes[0].get('metres', '?') + ' m, ' + routes[0].get('minutes', '?') + ' min, via ' + routes[0].get('streets', '')) if routes else 'none')
-        d.settle(600)
-        page.shot(str(OUT / 'proof-06-route-saved.png'))
-        # 6b. Press the route's flag: its length and time; then ride along it
-        d.until('!!document.querySelector(".gm-pin[aria-label^=\'Flyers: tide pools\']")', 10)
-        rid = routes[0]['id']
-        d.center(float(routes[0]['stop_points'].split()[0].split(',')[0]), float(routes[0]['stop_points'].split()[0].split(',')[1]), 700)
-        d.click('.gm-pin[aria-label^="Flyers: tide pools"]')
-        d.until('document.querySelector(".gm-where .gm-big")?.textContent.includes("948 m")', 10)
-        note('pressing a route\'s flag shows its length and time', True, d.js('document.querySelector(".gm-where").textContent'))
-        start_cam = d.engine('({x:E.cam.x,y:E.cam.y})')
-        d.click_text('.gm-btn', 'Fly along it')
-        d.settle(4000)
-        mid = d.engine('({x:E.cam.x,y:E.cam.y,pitch:E.cam.pitch,dist:E.cam.dist,flying:!!E.anim})')
-        moved = ((mid['x'] - start_cam['x']) ** 2 + (mid['y'] - start_cam['y']) ** 2) ** .5
-        note('"Fly along it" rides the camera down the street path', mid['flying'] and moved > 60 and mid['pitch'] > 50,
-             f"{moved:.0f} m along after 4 s, pitch {mid['pitch']:.0f}")
-        page.shot(str(OUT / 'proof-06b-flying.png'))
-        d.engine('(E.anim=null,1)')
-
-        # 7. Hide the Events layer for yourself. The world keeps the layer; only your view changes.
-        d.click('[aria-label="Show Events"]')
-        d.until('![...document.querySelectorAll(".gm-pin")].some(p=>p.getAttribute("aria-label").includes("Council night"))', 10)
-        head = s.say('map.layers Seabright')['rows'][0]
-        events = [r for r in s.say('rows map-layer')['rows'] if r.get('name') == 'Events'][0]
-        note('hiding a layer is your own view preference; the layer itself is unchanged',
-             events['id'] in head.get('hidden', '') and 'on' not in events, 'hidden: ' + head.get('hidden', ''))
-        d.click('[aria-label="Show Events"]')
-        d.until('[...document.querySelectorAll(".gm-pin")].some(p=>p.getAttribute("aria-label").includes("Council night"))', 10)
-        note('showing it again brings its pins back', True)
-
-        # 8. A line turns the window: map.show
-        s.say('map.show "Tide pools"')
-        d.settle(1800)
-        off = d.off_centre(36.9630, -122.0040)
-        note('map.show, said as a line, turns the open window to the thing', off < 40, f'{off:.0f} px from the middle')
-
-        # 9. A layer made in a line appears in the window at once
-        s.say('make kind=map-layer map=Seabright name=Council shows="rows event title=\\"Council night\\"" color=#3f78b5 order=4')
-        d.until('[...document.querySelectorAll(".gm-layer label")].some(l=>l.textContent==="Council")', 12)
-        note('a layer made in a line shows in the layers panel without reopening', True)
-        # 9b. Change that layer in the window: its colour, through the layer's own editor
-        d.click('[aria-label="Change Council"]')
-        d.until('!!document.querySelector("[aria-label=\'Layer name\']")', 8)
-        d.click('.gm-form .gm-chips [aria-label="#4f9a4a"]')
-        d.click_text('.gm-form button', 'Save')
-        d.settle(800)
-        council = [r for r in s.say('rows map-layer')['rows'] if r.get('name') == 'Council'][0]
-        note('changing a layer in the window sets its facts in the world', council.get('color') == '#4f9a4a', 'color ' + str(council.get('color')))
-
-        # 10. Restyle event pins with one part-style line
-        s.say('make kind=part-style lens=seabright-map target=geo-map.pin[kind=event] size=22px')
-        d.until('getComputedStyle(document.querySelector(".gm-pin[data-fact-kind=event]")).fontSize==="22px"', 12)
-        note('a part-style line restyles every event pin', True, 'font-size 22px')
-        page.shot(str(OUT / 'proof-07-styled.png'))
-
-        # 11. Press a building: the ground tells what it knows; "Add as a spot" adopts it
-        s.say('map.show 36.96452,-122.00958')
-        d.settle(1500)
-        bp = d.screen_of(36.9645203, -122.0095822)
-        d.click_at(bp['x'], bp['y'])
-        d.until('document.querySelector(".gm-card h3")?.textContent==="From the ground"&&document.querySelector(".gm-title")?.textContent.includes("Museum")', 10)
-        title = d.js('document.querySelector(".gm-title").childNodes[0].textContent')
-        note('pressing a building shows what the ground knows about it', 'Museum' in title, title)
-        page.shot(str(OUT / 'proof-08-building.png'))
-        d.click_text('.gm-btn', 'Add as a spot')
-        d.until('[...document.querySelectorAll(".gm-pin")].some(p=>p.getAttribute("aria-label").includes("Museum"))', 10)
-        adopted = [r for r in s.say('rows spot')['rows'] if 'Museum' in r.get('name', '')]
-        note('a building becomes a spot that remembers its OpenStreetMap feature',
-             bool(adopted) and adopted[0].get('osm', '').startswith('way/'), adopted[0].get('osm', '') if adopted else 'none')
-
-        # 12. Keys move the camera
-        d.click('.gm-canvas')
-        before = d.engine('E.cam.dist')
-        d.key('+', 'Equal', 187)
-        d.settle(450)
-        note('the + key zooms in', d.engine('E.cam.dist') < before, f'{before:.0f} -> {d.engine("E.cam.dist"):.0f} m')
-
-        # 13. Flat plan, and a phone-sized window
-        d.click('[aria-label="Tilt or flatten the map"]')
         t0 = time.time()
-        try:
-            d.p.until('document.querySelector(".gm-canvas").__engine.cam.pitch<1', 8)
-        except AssertionError:
-            pass
-        flat = d.engine('E.cam.pitch') < 1
-        print('FLAT after', round(time.time() - t0, 2), 's; frame', d.engine('(()=>{const t=performance.now();E.draw();return Math.round(performance.now()-t)})()'), 'ms (software GPU)')
-        note('the 2D button flattens the map', flat, '' if flat else d.engine('JSON.stringify(E.flights)'))
-        page.shot(str(OUT / 'proof-09-flat.png'))
-        page.c.call('Emulation.setDeviceMetricsOverride', width=420, height=860, deviceScaleFactor=1, mobile=False)
-        d.settle(900)
-        page.shot(str(OUT / 'proof-10-phone.png'))
-        note('the engine kept one load through the whole evening', d.engine('E.loadCount||1') == 1, f"loads {d.engine('E.loadCount||1')}")
-        errs = [e for e in page.errors if e.get('method') == 'Runtime.exceptionThrown']
-        note('no script errors', not errs, json.dumps(errs)[:400])
+        page = MapPage(s.url, s.token('alex'), s.ids['widget'], 1500, 940)
+        d = Driver(page)
+        page.until('!!document.querySelector(".gm-root")', 40)
+        drawn = d.tiles_in(60)
+        bld = d.engine('E.drawList.reduce((n,t)=>n+(t.bufs?.buildings.n||0),0)')
+        note('the window opens on Seabright and draws its live tiles, buildings included', drawn and bld > 10000,
+             f'{d.engine("E.drawList.length")} tiles, {bld} building vertices, {time.time() - t0:.1f} s')
+        pins = d.js('[...document.querySelectorAll(".gm-pin")].map(p=>p.getAttribute("aria-label"))')
+        approx = d.js('document.querySelectorAll(".gm-pin.gm-approx").length')
+        note('the spot and the event show as pins; the one placed by words is drawn as approximate', len(pins) == 2 and approx == 1, json.dumps(pins))
+        opaque = d.engine('E.gl.getContextAttributes().alpha===false')
+        note('the world is opaque (no see-through drawing surface) and flat (no curve)', opaque and d.engine('typeof E.curve==="undefined"'))
+        page.shot(str(OUT / 'proof-01-open.png'))
+
+        # A house: press it, see that nothing happens there yet, plan a party at it, say something.
+        d.look_at(CARMEL['lat'], CARMEL['lon'], dist=260, pitch=45)
+        pt = d.screen_of(CARMEL['lat'], CARMEL['lon'])
+        d.click_at(pt['x'], pt['y'])
+        ok = d.until('document.querySelector("[data-part=inspector]")?.innerText.includes("715 Carmel Street")', 15)
+        card = d.text('[data-part=inspector]')
+        note('pressing a house shows its card: its address, and that nobody has put anything there', ok and 'Nobody has put anything here yet' in card,
+             card.replace('\n', ' | ')[:160])
+        page.shot(str(OUT / 'proof-02-house.png'))
+        d.click_text('[data-part=inspector] button', '+ Event here')
+        d.until('!!document.querySelector(".gm-draft input[aria-label=Title]")', 5)
+        d.settle(150)
+        d.type('Halloween party')
+        d.click('.gm-draft input[aria-label=When]')
+        d.type('Sat 7pm')
+        d.settle(150)
+        page.shot(str(OUT / 'proof-03-adding.png'))
+        d.click('.gm-draft button[type=submit]')
+        ok = d.until('document.querySelector("[data-part=inspector]")?.innerText.includes("Halloween party")', 20)
+        st = world_rows(s, 'rows structure')
+        ev = [r for r in world_rows(s, 'rows event') if r.get('title') == 'Halloween party']
+        note('the house becomes a world thing the moment a party is put at it; the party points at it',
+             ok and len(st) == 1 and st[0].get('ref') == CARMEL['ref'] and ev and ev[0].get('at') == st[0]['id'],
+             f"{st[0].get('name') if st else '-'} · party at={ev[0].get('at') if ev else '-'} start={ev[0].get('start') if ev else '-'}")
+        house = st[0]['id'] if st else ''
+        d.until('!!document.querySelector("[data-part=inspector] input[aria-label=\'Say something\']")', 10)
+        d.click('[data-part=inspector] input[aria-label="Say something"]')
+        d.type('Is it costumes only?')
+        d.key('Enter', vk=13)
+        ok = d.until('document.querySelector("[data-part=inspector]")?.innerText.includes("costumes only")', 20)
+        posts = world_rows(s, 'rows post about=' + house)
+        note('saying something in the card makes a post about the house', ok and len(posts) == 1, posts[0].get('text') if posts else '')
+        win = s.say('rows window')
+        d.click_text('[data-part=inspector] button', 'Open its page')
+        d.settle(1200)
+        wins = [r for r in world_rows(s, 'rows window') if r.get('shows') == 'place-page']
+        note('Open its page opens a window on the house (window.open place-page <house>)', wins and wins[0].get('target') == house,
+             json.dumps([(r.get('name'), r.get('target')) for r in wins]))
+        page.shot(str(OUT / 'proof-04-card.png'))
+
+        # The house's page: its own window, a live 3D picture of it, the party, the talk; leave a note there.
+        pg, pd = open_page(s, 'place-page', house)
+        pd.until('document.querySelector(".pp")?.innerText.includes("Halloween party")', 20)
+        text = pd.text('.pp')
+        note('the page shows the house, the party coming up and the talk', all(x in text for x in ('715 Carmel Street', 'Halloween party', 'costumes only')),
+             text.replace('\n', ' | ')[:200])
+        pd.click_text('.pp-section button', '+ Leave a note')
+        pd.until('!!document.querySelector(".pp-section textarea")', 5)
+        pd.click('.pp-section textarea')
+        pd.type('Bring a lantern; the porch light is out')
+        pd.click_text('.pp-section button[type=submit]', 'Leave a note')
+        ok = pd.until('document.querySelector(".pp")?.innerText.includes("Bring a lantern")', 20)
+        notes = [r for r in world_rows(s, 'rows note') if r.get('at') == house]
+        note('a note left on the page is a world thing at the house, and the page shows it', ok and len(notes) == 1)
+        pd.until('(()=>{const E=document.querySelector(".gm-canvas")?.__engine;return E&&E.drawList.length>0&&!E.pending})()', 30)
+        pd.settle(600)
+        pg.shot(str(OUT / 'proof-05-page.png'))
+        errors += script_errors(pg)
+        pg.close()
+
+        # The city hall opens in the town-hall page: meetings and debates.
+        out = s.say(f"map.adopt {CITY_HALL['ref']} lat={CITY_HALL['lat']} lon={CITY_HALL['lon']}")
+        hall = out.get('made', [''])[0]
+        placed = s.say('map.place ' + hall)
+        page_name = (placed.get('rows') or [{}])[0].get('page')
+        note('City Hall, adopted in a line, chooses the town-hall page by its kind (a page widget says places=)', page_name == 'town-hall-page',
+             placed.get('text'))
+        pg, pd = open_page(s, page_name, hall)
+        pd.click_text('.pp-section button', '+ Add a meeting')
+        pd.until('!!document.querySelector(".pp-section input[aria-label=title]")', 5)
+        pd.click('.pp-section input[aria-label=title]')
+        pd.type('Council: the Murray Street bridge')
+        pd.click('.pp-section input[aria-label=start]')
+        pd.type('Thu 6pm')
+        pd.click_text('.pp-section button[type=submit]', 'Add a meeting')
+        ok = pd.until('document.querySelector(".pp")?.innerText.includes("Murray Street bridge")', 20)
+        meet = [r for r in world_rows(s, 'rows event') if r.get('at') == hall]
+        note('the town-hall page lists meetings; a meeting added there is an event at the hall with type=meeting',
+             ok and meet and meet[0].get('type') == 'meeting', pd.text('.pp-head').replace('\n', ' | ')[:120])
+        pd.click('.pp-section input[aria-label="Say something"]')
+        pd.type('Please keep the bike lane')
+        pd.key('Enter', vk=13)
+        ok = pd.until('document.querySelector(".pp")?.innerText.includes("keep the bike lane")', 20)
+        note('a debate post on the town-hall page is a post about the hall', ok and len(world_rows(s, 'rows post about=' + hall)) == 1)
+        pd.settle(800)
+        pg.shot(str(OUT / 'proof-06-town-hall.png'))
+        errors += script_errors(pg)
+        pg.close()
+
+        # Layers: add one from the gallery, and one only for yourself.
+        d.click_text('[data-part=layers] button', '+ Add a layer')
+        d.until('!!document.querySelector(".gm-gallery")', 5)
+        d.click_text('.gm-gallery button', 'Notes')
+        d.until('document.querySelector("[data-part=layers]")?.innerText.includes("It finds")', 10)
+        page.shot(str(OUT / 'proof-07-add-layer.png'))
+        d.click_text('[data-part=layers] button[type=submit]', 'Make the layer')
+        ok = d.until('[...document.querySelectorAll(".gm-layer label")].some(l=>l.textContent.startsWith("Notes"))', 20)
+        lay = [r for r in world_rows(s, 'rows map-layer') if r.get('name') == 'Notes']
+        note('+ Add a layer → Notes makes a shared layer that shows the note', ok and lay and lay[0].get('shows') == 'rows note',
+             d.js('[...document.querySelectorAll(".gm-layer")].map(l=>l.innerText.replace(/\\n/g," ")).slice(0,6)'))
+        d.click_text('[data-part=layers] button', '+ Add a layer')
+        d.until('!!document.querySelector(".gm-gallery")', 5)
+        d.click_text('.gm-gallery button', 'Tagged')
+        d.until('!!document.querySelector("[data-part=layers] input[aria-label=tag]")', 5)
+        d.click('[data-part=layers] input[aria-label=tag]')
+        d.type('dogs')
+        d.click_text('[data-part=layers] .gm-seg button', 'Only me')
+        d.click_text('[data-part=layers] button[type=submit]', 'Make the layer')
+        d.until('[...document.querySelectorAll(".gm-layer label")].some(l=>l.textContent.includes("dogs"))', 20)
+        mine = [r for r in world_rows(s, 'rows map-layer') if 'dogs' in str(r.get('shows'))]
+        # this hidden desk has one person (Alex; claude is his agent), so a second person's view is not tried here; and
+        # the kernel keeps sees= out of readings, so the layer also says only=me for the window to label it
+        badge = d.js('[...document.querySelectorAll(".gm-layer")].some(l=>l.innerText.includes("dogs")&&!!l.querySelector(".gm-mine"))')
+        note('a layer made "Only me" is made with sees=me, and the panel labels it "only you"', mine and mine[0].get('only') == 'me' and badge,
+             f"only={mine[0].get('only') if mine else '-'}")
+
+        # How it looks, and the ground's own layers, for you
+        d.click_text('.gm-styles button', 'Dusk')
+        ok = d.until('document.querySelector(".gm-canvas")?.__engine?.style==="dusk"', 25)
+        prefs = [r for r in world_rows(s, 'rows view-preference') if r.get('map.style')]
+        note('choosing Dusk changes your map and is kept as your own view preference', ok and prefs and prefs[-1]['map.style'] == 'dusk')
+        d.look_at(36.9665, -122.0015, dist=700, pitch=55, bearing=-20)
+        page.shot(str(OUT / 'proof-08-dusk.png'))
+        d.click('#gm-g-buildings')
+        ok = d.until('document.querySelector(".gm-canvas")?.__engine?.hidden.has("ground:buildings")', 25)
+        note('unticking Buildings hides them for you only', ok)
+        d.click('#gm-g-buildings')
+        d.until('!document.querySelector(".gm-canvas")?.__engine?.hidden.has("ground:buildings")', 25)
+
+        # Search beyond the neighbourhood
+        d.click('.gm-search input')
+        d.type('Capitola Village')
+        d.until('!!document.querySelector(".gm-results button")', 15)
+        d.key('Enter', vk=13)
+        d.settle(3000)
+        here = d.engine('E.toLL(E.cam.x,E.cam.y)')
+        dist = metres(here[0], here[1], 36.97268, -121.95214)
+        note('searching Capitola Village flies there', dist < 2500, f'{dist:.0f} m from it')
+
+        # A walk: the route tool, two presses, the planner, save
+        d.look_at(36.96526, -122.00443, dist=1300, pitch=0)      # both stops in the open middle, clear of the panels
+        d.click_text('.gm-tools button', 'Route')
+        d.settle(400)
+        for lat, lon in ((36.96702, -122.00785), (36.96350, -122.00100)):
+            p = d.screen_of(lat, lon)
+            d.click_at(p['x'], p['y'])
+            d.settle(500)
+        ok = d.until('/\\d+(\\.\\d+)? (m|km) · \\d+ min/.test(document.querySelector("[data-part=route]")?.innerText||"")', 25)
+        note('two presses with the route tool give a street path with its length and minutes', ok, d.text('[data-part=route] .gm-big'))
+        d.click_text('[data-part=route] button', 'Save route')
+        ok = d.until('!document.querySelector("[data-part=route]")', 20)
+        routes = world_rows(s, 'rows route')
+        note('Save makes a route thing that keeps its path', ok and routes and routes[0].get('path'), f"{routes[0].get('metres')} m" if routes else '')
+
+        # California, then home
+        d.click('.gm-nav button[aria-label="See all of California"]')
+        d.settle(3000)
+        d.tiles_in(90)
+        z = d.engine('Math.max(...E.drawList.map(t=>t.z))')
+        span = d.engine('E.cam.dist')
+        note('the globe button shows all of California, drawn from low-zoom tiles', span > 1e6 and z <= 8, f'camera {span / 1000:.0f} km up, tiles z≤{z}')
+        page.shot(str(OUT / 'proof-09-california.png'))
+        d.click('.gm-nav button[aria-label="Back to Seabright"]')
+        d.settle(2600)
+        here = d.engine('E.toLL(E.cam.x,E.cam.y)')
+        note('the home button comes back to Seabright', metres(here[0], here[1], 36.9672, -122.0088) < 500)
+        d.tiles_in(60)
+
+        # A line, said elsewhere, shows up in the open window; a pin dragged moves its thing
+        s.say('map.add "Seabright & Murray" kind=spot name="Corner bench"')
+        ok = d.until('[...document.querySelectorAll(".gm-pin")].some(p=>p.getAttribute("aria-label").startsWith("Corner bench"))', 25)
+        note('a spot added in a line (map.add "Seabright & Murray" …) appears in the open window', ok)
+        d.look_at(36.9630, -122.0040, dist=300, pitch=0)
+        p = d.screen_of(36.9630, -122.0040)
+        d.drag(p['x'], p['y'] - 20, p['x'] + 90, p['y'] - 20 + 60)
+        d.settle(1200)
+        t = world_rows(s, 'look ' + tide)[0]
+        moved = metres(t['lat'], t['lon'], 36.9630, -122.0040)
+        note('dragging the Tide pools pin moves the spot in the world', moved > 10, f'{moved:.0f} m')
+
+        # How fast a frame is here (software GPU; a real one is faster)
+        d.look_at(36.9665, -122.0015, dist=600, pitch=55, bearing=-20)
+        ms = d.js('(async()=>{const E=document.querySelector(".gm-canvas").__engine;const t=[];for(let i=0;i<20;i++){E.cam.bearing+=1;E.draw();t.push(E.frameMs)}t.sort((a,b)=>a-b);return t[10]})()')
+        note('a frame over Seabright in 3D takes this long on a software GPU (median of 20)', ms is not None, f'{ms:.1f} ms')
+        errors += script_errors(page)
+        stopped = d.js('document.querySelectorAll("[data-health=stopped],.part-stopped").length')
+        note('no script errors and no stopped parts in any window', not errors and not stopped,
+             json.dumps([e.get('params', {}).get('exceptionDetails', {}).get('text') for e in errors])[:400])
+        page.shot(str(OUT / 'proof-10-end.png'))
         page.close()
     finally:
         s.close()
-        print('total', round(time.time() - t_all, 1), 's')
+    passed = sum(1 for _, ok, _ in log if ok)
+    lines = [f"{'PASS' if ok else 'FAIL'} {step}" + (f' · {detail}' if detail else '') for step, ok, detail in log]
+    summary = f'{passed} of {len(log)} steps pass · {time.time() - t_all:.0f} s'
+    (OUT / 'proof-output.txt').write_text('\n'.join(lines + ['', summary]) + '\n', encoding='utf-8')
+    print(summary)
+    return passed == len(log)
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(0 if main() else 1)

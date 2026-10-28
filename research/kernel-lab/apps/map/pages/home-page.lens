@@ -1,0 +1,12 @@
+root : place-page, accent "#c2477c"
+  head : place-head, badge "Home"
+    watch reading:"map.place $view.target"
+    on show do map.show $thing
+    on edit do set $thing $fields
+  parties : place-list, title "Parties and get-togethers", kind event, fields "title start", add "Throw something", empty "No parties planned. Yet."
+    watch reading:"map.place $view.target"
+    on add do make kind=event at=$thing $fields
+  guestbook : place-talk, title "Guestbook", prompt "Say hi to the neighbours", empty "Nobody has signed the guestbook yet."
+    watch reading:"map.place $view.target"
+    on say do post $text about=$thing
+    on like do like $post
