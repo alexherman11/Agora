@@ -111,7 +111,10 @@ class Builders:
         return Door(self.h.builder_url, tokens[0])
 
     def git(self, cwd, *args):
-        result = subprocess.run(['git', '-C', str(cwd), *args], capture_output=True, text=True,
+        # No automatic gc/maintenance: a background repack of this ~900 MB repo inherited our pipes and held a
+        # finished commit past the timeout (27 Oct, dk1022 marked uncertain though its commit had succeeded).
+        result = subprocess.run(['git', '-c', 'gc.auto=0', '-c', 'maintenance.auto=false', '-C', str(cwd), *args],
+                                capture_output=True, text=True,
                                 encoding='utf-8', errors='replace', timeout=120, creationflags=T.NO_WINDOW)
         if result.returncode:
             raise RuntimeError((result.stderr or result.stdout)[-2000:])
