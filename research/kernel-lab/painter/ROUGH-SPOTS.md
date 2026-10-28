@@ -148,3 +148,15 @@ No source outside `apps/writing/` was edited. Frictions met while building it, e
 dropped), `window.open url=` for the person's own browser (a plan's design page can only be copied), an `icon=` the
 dock honours (it guesses from the lens name), the painter's `el` writing `null` attributes as `"null"`
 (`readonly="null"`), and `-prop:` exclusion in a lens query.
+
+## 27 October: the map, second pass (builder draft by Claude)
+
+One small source edit, in three files, for one missing world-level word: **a window opened on a thing**.
+`window.open <lens> <thing>` already recorded `target=` on the window thing, but a component lens never saw it, so a
+page for one place (a building's page) had no way to know which place. Now `kd_window.py` adds `&target=` to a
+widget window's address, `pages/widget-host.js` hands it to the frame as `init.target` (only an id-shaped value), and
+`painter.js` starts the view with it, so the lens reads `$view.target` in its readings (`watch reading:"map.place
+$view.target"`). The painter suite (8) and the widget/window suites (10) pass after the edit. Not tried: a real
+native window opening with a target (the hidden desk keeps windows in memory only).
+Other frictions met (details in `apps/map/README.md`): `sees=` is not readable, so a private layer also says
+`only=me` for its label; a reading that is refused stops a whole page from painting.

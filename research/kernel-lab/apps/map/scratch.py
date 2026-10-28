@@ -30,7 +30,8 @@ class Scratch:
 
     def say(self, line, who='alex'):
         route = '/see' if line.split()[0] in ('rows', 'look', 'help', 'map.find', 'map.where', 'map.near', 'map.path',
-                                               'map.layers', 'look-view') else '/do'
+                                               'map.layers', 'map.place', 'map.tile', 'map.cache', 'look-view',
+                                               'window.list') else '/do'
         return taskboard.Door(self.url, self.token(who)).request(route, {'line': line})
 
     def close(self):

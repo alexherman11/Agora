@@ -8,7 +8,7 @@ import urllib.error
 import urllib.request
 
 SEE = {'rows', 'look', 'help', 'kinds', 'recent', 'who', 'look-view', 'components', 'map.find', 'map.where',
-       'map.near', 'map.path', 'map.layers'}
+       'map.near', 'map.path', 'map.layers', 'map.place', 'map.tile', 'map.cache'}
 
 
 def say(door_file, line, who='token'):

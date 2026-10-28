@@ -1,0 +1,15 @@
+root : place-page, accent "#3f6fa6"
+  head : place-head, badge "Town hall"
+    watch reading:"map.place $view.target"
+    on show do map.show $thing
+    on edit do set $thing $fields
+  meetings : place-list, title "Meetings", kind event, type meeting, fields "title start", add "Add a meeting", empty "No meetings on the calendar."
+    watch reading:"map.place $view.target"
+    on add do make kind=event at=$thing $fields
+  agenda : place-list, title "On the agenda", kind note, type agenda, fields "text", add "Add an item", empty "Nothing on the agenda yet."
+    watch reading:"map.place $view.target"
+    on add do make kind=note at=$thing $fields
+  debates : place-talk, title "Debates", prompt "What should the council hear?", empty "No debates yet. Start one."
+    watch reading:"map.place $view.target"
+    on say do post $text about=$thing
+    on like do like $post

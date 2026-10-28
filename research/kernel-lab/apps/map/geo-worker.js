@@ -1,8 +1,10 @@
 // The map's geometry builder. Runs in a Worker (made from this text as a blob), so the window never waits on it.
-// In: {ground: <agora-ground/1 text>, palette}. Out: typed arrays for the GL passes, plus what picking and labels need.
-// Coordinates out are metres east/north of the ground's origin (the ground stores decimetres).
+// In: {id, chunk: <agora-tile/1 text>, palette, flags}. Out: typed arrays for one tile's GL passes, plus what picking
+// and names need. Positions out are metres east/north of the tile's north-west corner, in Web Mercator metres; heights
+// are true metres times the Mercator scale there, so buildings keep their shape at every latitude.
 function geoWorkerMain(){
 'use strict';
+// ---- earcut (after Mapbox's earcut, ISC licence; reduced: no z-order hashing) ---------------------------------
 // ---- earcut (after Mapbox's earcut, ISC licence; reduced: no z-order hashing) ---------------------------------
 function Node(i,x,y){this.i=i;this.x=x;this.y=y;this.prev=null;this.next=null;this.steiner=false}
 function insertNode(i,x,y,last){const p=new Node(i,x,y);if(!last){p.prev=p;p.next=p}else{p.next=last.next;p.prev=last;last.next.prev=p;last.next=p}return p}
@@ -34,150 +36,159 @@ function earcut(d,holes){const outerLen=holes&&holes.length?holes[0]*2:d.length;
 class Buf{constructor(stride,cap=4096){this.s=stride;this.a=new Float32Array(cap*stride);this.n=0}
   push(...v){if((this.n+1)*this.s>this.a.length){const b=new Float32Array(this.a.length*2);b.set(this.a);this.a=b}this.a.set(v,this.n*this.s);this.n++}
   out(){return this.a.slice(0,this.n*this.s)}}
-const hex=(h,a=1)=>{h=h.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');const n=parseInt(h,16);return [(n>>16&255)/255,(n>>8&255)/255,(n&255)/255,a]};
+const hex=(h,a=1)=>{h=String(h||'#888').replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');const n=parseInt(h,16)||0;return [(n>>16&255)/255,(n>>8&255)/255,(n&255)/255,a]};
 function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0)/4294967295}
-const M=v=>v/10;           // decimetres -> metres
+const WORLD=2*Math.PI*6378137;
 
-// Split long triangle edges so a curved ground bends smoothly (the tiny-earth view moves vertices, not pixels).
-function addTri(buf,a,b,c,z,col,pick,maxEdge){
-  const d2=(p,q)=>(p[0]-q[0])**2+(p[1]-q[1])**2,L=maxEdge*maxEdge;
-  if(d2(a,b)>L||d2(b,c)>L||d2(c,a)>L){
-    const ab=[(a[0]+b[0])/2,(a[1]+b[1])/2],bc=[(b[0]+c[0])/2,(b[1]+c[1])/2],ca=[(c[0]+a[0])/2,(c[1]+a[1])/2];
-    addTri(buf,a,ab,ca,z,col,pick,maxEdge);addTri(buf,ab,b,bc,z,col,pick,maxEdge);addTri(buf,ca,bc,c,z,col,pick,maxEdge);addTri(buf,ab,bc,ca,z,col,pick,maxEdge);return}
-  for(const p of [a,b,c])buf.push(p[0],p[1],z,col[0],col[1],col[2],col[3],pick);
-}
-function polygon(buf,rings,z,col,pick,maxEdge=70){
+function polygon(buf,rings,u,z,col,pick){
   const flat=[],holes=[];
-  rings.forEach((r,i)=>{if(r.length<6)return;if(i>0)holes.push(flat.length/2);for(let k=0;k<r.length;k++)flat.push(M(r[k]))});
+  rings.forEach((r,i)=>{if(r.length<6)return;if(i>0)holes.push(flat.length/2);for(let k=0;k<r.length;k+=2){flat.push(r[k]*u,-r[k+1]*u)}});
   if(flat.length<6)return 0;
   const t=earcut(flat,holes);
-  for(let i=0;i<t.length;i+=3){const P=j=>[flat[t[i+j]*2],flat[t[i+j]*2+1]];addTri(buf,P(0),P(1),P(2),z,col,pick,maxEdge)}
+  for(let i=0;i<t.length;i++){const k=t[i];buf.push(flat[k*2],flat[k*2+1],z,col[0],col[1],col[2],col[3],pick)}
   return t.length/3;
 }
-// A line as a ribbon with mitred joins (clamped), resampled every `step` metres so it bends with the ground.
-function ribbon(buf,pts,width,z,col,pick,step=35){
-  const P=[];for(let i=0;i<pts.length;i+=2){const x=M(pts[i]),y=M(pts[i+1]);if(P.length){const [px,py]=P[P.length-1];const d=Math.hypot(x-px,y-py);if(d<0.05)continue;const n=Math.floor(d/step);for(let k=1;k<=n;k++)P.push([px+(x-px)*k/(n+1),py+(y-py)*k/(n+1)])}P.push([x,y])}
+// A line for the line program: each vertex is the centre point plus an offset direction (already mitred); the vertex
+// shader widens it to max(half width in metres, a minimum in pixels), so a road stays a road at every zoom.
+// Stride 11: x y nx ny halfW minPx z r g b pick.
+function line(buf,pts,u,hw,minPx,z,col,pick,E){
+  const P=[];for(let i=0;i<pts.length;i+=2){const x=pts[i]*u,y=-pts[i+1]*u;if(P.length){const [px,py]=P[P.length-1];if(Math.hypot(x-px,y-py)<u*0.5)continue}P.push([x,y,pts[i],pts[i+1]])}
   if(P.length<2)return;
-  const h=width/2,L=[],R=[];
+  const N=[],M=[];
   for(let i=0;i<P.length;i++){
     const a=P[Math.max(0,i-1)],b=P[i],c=P[Math.min(P.length-1,i+1)];
     let d1=[b[0]-a[0],b[1]-a[1]],d2=[c[0]-b[0],c[1]-b[1]];
     const n1=Math.hypot(...d1)||1,n2=Math.hypot(...d2)||1;d1=[d1[0]/n1,d1[1]/n1];d2=[d2[0]/n2,d2[1]/n2];
     if(i===0)d1=d2;if(i===P.length-1)d2=d1;
-    let tx=d1[0]+d2[0],ty=d1[1]+d2[1];const tl=Math.hypot(tx,ty)||1;tx/=tl;ty/=tl;
-    const nx=-ty,ny=tx;const dot=nx*(-d1[1])+ny*d1[0];const m=Math.min(h/Math.max(dot,.35),h*2.6);
-    L.push([b[0]+nx*m,b[1]+ny*m]);R.push([b[0]-nx*m,b[1]-ny*m]);
+    let tx=d1[0]+d2[0],ty=d1[1]+d2[1];const tl=Math.hypot(tx,ty);
+    if(tl<1e-3){tx=d1[0];ty=d1[1]}else{tx/=tl;ty/=tl}
+    const nx=-ty,ny=tx;const dot=nx*(-d1[1])+ny*d1[0];const m=Math.min(1/Math.max(dot,.4),2.5);
+    N.push([nx*m,ny*m]);
   }
+  const V=(p,n)=>buf.push(p[0],p[1],n[0],n[1],hw,minPx,z,col[0],col[1],col[2],pick);
   for(let i=0;i<P.length-1;i++){
-    const v=[L[i],R[i],L[i+1],R[i],R[i+1],L[i+1]];
-    for(const p of v)buf.push(p[0],p[1],z,col[0],col[1],col[2],col[3],pick);
+    const a=P[i],b=P[i+1],na=N[i],nb=N[i+1],ma=[-na[0],-na[1]],mb=[-nb[0],-nb[1]];
+    V(a,na);V(a,ma);V(b,nb);V(a,ma);V(b,mb);V(b,nb);
   }
-  // round the two ends a little, so lone paths do not stop square
+  // round ends, except where the line was cut at the tile's edge (the next tile carries on)
+  const edge=p=>p[2]<=0||p[3]<=0||p[2]>=E||p[3]>=E;
   for(const [end,dir] of [[0,1],[P.length-1,-1]]){
-    const b=P[end],o=P[end+dir];const ang=Math.atan2(b[1]-o[1],b[0]-o[0]);
+    const b=P[end];if(edge(b))continue;const o=P[end+dir];const ang=Math.atan2(b[1]-o[1],b[0]-o[0]);
     for(let s=0;s<4;s++){const a0=ang-Math.PI/2+s*Math.PI/4,a1=a0+Math.PI/4;
-      buf.push(b[0],b[1],z,...col,pick);buf.push(b[0]+Math.cos(a0)*h,b[1]+Math.sin(a0)*h,z,...col,pick);buf.push(b[0]+Math.cos(a1)*h,b[1]+Math.sin(a1)*h,z,...col,pick)}
+      V(b,[0,0]);V(b,[Math.cos(a0),Math.sin(a0)]);V(b,[Math.cos(a1),Math.sin(a1)])}
   }
 }
 
-const ROAD_W={major:13,street:8.5,service:4.6,walk:5,path:2.2,cycle:2.8,steps:2.4};
-const ROAD_ORDER=['path','steps','cycle','service','walk','street','major'];
+// How each line class is drawn: half width in metres, minimum half width in pixels, casing, order
+const LINES={
+  motorway:{w:9,px:1.7,case:true,z:9},major:{w:6.5,px:1.25,case:true,z:8},street:{w:4.2,px:0.8,case:true,z:7},
+  service:{w:2.4,px:0.55,case:true,z:6},walk:{w:1.3,px:0.5,z:5},path:{w:0.9,px:0.55,z:4},cycle:{w:1.2,px:0.6,z:4},
+  steps:{w:1.1,px:0.6,z:4},rail:{w:1.5,px:0.8,z:3},runway:{w:22,px:1.4,z:2},taxiway:{w:7,px:0.7,z:2},
+  river:{w:9,px:1.1,z:1},stream:{w:2.2,px:0.6,z:1},ferry:{w:1,px:0.6,z:1}};
+const CLASS_BUILDING={residential:'home',house:'home',detached:'home',semidetached_house:'home',apartments:'home',terrace:'home',bungalow:'home',
+  commercial:'shop',retail:'shop',office:'shop',supermarket:'shop',hotel:'shop',kiosk:'shop',
+  industrial:'work',warehouse:'work',factory:'work',manufacture:'work',service:'work',garage:'shed',garages:'shed',shed:'shed',carport:'shed',
+  civic:'civic',government:'civic',townhall:'civic',public:'civic',school:'civic',university:'civic',college:'civic',kindergarten:'civic',library:'civic',
+  hospital:'civic',fire_station:'civic',police:'civic',church:'faith',chapel:'faith',cathedral:'faith',religious:'faith',mosque:'faith',temple:'faith',synagogue:'faith'};
 
-function build(ground,pal){
-  const g=JSON.parse(ground);
-  if(g.format!=='agora-ground/1')throw Error('not an agora-ground/1 file');
-  const areas=new Buf(8,1<<15),roads=new Buf(8,1<<15),shadows=new Buf(8,1<<13),bld=new Buf(11,1<<16),edges=new Buf(4,1<<15);
-  const picks=[null];     // index -> what was pressed
-  // 1. areas, in the ground's own order (sea first), each class a little above the last
-  // 0. the land itself: a slab a little past the ground's box, with earth sides, like a diorama piece
-  {const [bx0,by0,bx1,by1]=g.bounds.map(M);const pad=120,X0=bx0-pad,Y0=by0-pad,X1=bx1+pad,Y1=by1+pad;
-    const soil=hex(pal.soil||'#c8ae86'),deep=hex(pal.soilDeep||'#9c8262');
-    const edge=(ax,ay,bx,by)=>{const n=Math.max(1,Math.ceil(Math.hypot(bx-ax,by-ay)/40));for(let i=0;i<n;i++){
-      const x0=ax+(bx-ax)*i/n,y0=ay+(by-ay)*i/n,x1=ax+(bx-ax)*(i+1)/n,y1=ay+(by-ay)*(i+1)/n;
-      for(const [x,y,z,c] of [[x0,y0,0,soil],[x1,y1,0,soil],[x1,y1,-36,deep],[x0,y0,0,soil],[x1,y1,-36,deep],[x0,y0,-36,deep]])areas.push(x,y,z,c[0],c[1],c[2],1,0)}};
-    edge(X0,Y0,X1,Y0);edge(X1,Y0,X1,Y1);edge(X1,Y1,X0,Y1);edge(X0,Y1,X0,Y0);
-    polygon(areas,[[X0*10,Y0*10,X1*10,Y0*10,X1*10,Y1*10,X0*10,Y1*10]],-0.01,hex(pal.land),0,150);}
-  const AREA_Z={sea:0,residential:.02,commercial:.02,industrial:.02,school:.03,green:.05,park:.06,wood:.07,wetland:.07,beach:.08,pitch:.09,play:.09,parking:.1,marina:.11,water:.12,pool:.13};
-  for(const a of g.areas){
-    const col=hex(pal.area[a.k]||'#e9e3d6');
-    const pick=a.k==='sea'||a.k==='residential'||a.k==='commercial'||a.k==='industrial'?0:picks.push({type:'area',id:a.id,name:a.n||'',what:a.k})-1;
-    polygon(areas,a.r,AREA_Z[a.k]||.04,col,pick,a.k==='sea'?150:110);
+function build(chunkText,pal,flags){
+  const c=JSON.parse(chunkText);
+  if(c.f!=='agora-tile/1')throw Error('not an agora-tile/1 chunk');
+  const z=c.z,n=2**z,E=c.e||4096,size=WORLD/n,u=size/E;
+  const ox=c.x/n*WORLD-WORLD/2,oy=WORLD/2-c.y/n*WORLD;
+  const latC=Math.atan(Math.sinh(Math.PI*(1-2*(c.y+0.5)/n)));const k=1/Math.cos(latC);
+  const areas=new Buf(8,1<<12),lines=new Buf(11,1<<13),casings=new Buf(11,1<<12),shadows=new Buf(8,1<<11),bld=new Buf(11,1<<12),edges=new Buf(4,1<<12);
+  const picks=[null];
+  // 1. areas, in the chunk's order (lowest first), each class drawn over the last
+  const AREA_PICK={park:1,wood:1,beach:1,water:1,sea:0,pitch:1,play:1,school:1,hospital:1,cemetery:1,airport:1,wetland:1,green:1};
+  for(const a of c.a){
+    const col=hex(pal.area[a[0]]||pal.land);
+    const pick=AREA_PICK[a[0]]&&(z>=11||a[2])?picks.push({type:'area',what:a[0],name:a[2]||''})-1:0;
+    polygon(areas,a[1],u,0,col,pick);
   }
-  // pitches get a chalk line, parks a darker rim: drawn as thin ribbons along the outer ring
-  for(const a of g.areas)if(a.k==='pitch'||a.k==='park'||a.k==='play'){const r=a.r[0];ribbon(areas,r,a.k==='pitch'?.6:1.1,.15,hex(a.k==='pitch'?pal.chalk:pal.rim,a.k==='pitch'?.85:.55),0,60)}
-  // 2. streams and the river's line
-  for(const s of g.streams)ribbon(areas,s.p,s.c==='river'?6:2.2,.14,hex(pal.area.water),0);
-  // 3. building shadows: the footprint pushed away from the sun, soft and low
-  const sun=[-0.52,-0.42];   // the light comes from the south-west; shadows fall north-east
-  for(const b of g.buildings){
-    const k=Math.min(b.h,14)*0.55;const ring=b.r[0];const sh=[];
-    for(let i=0;i<ring.length;i+=2)sh.push(ring[i]-sun[0]*k*10,ring[i+1]-sun[1]*k*10);
-    polygon(shadows,[ring],.16,[0,0,0,1],0,1e9);polygon(shadows,[sh],.16,[0,0,0,1],0,1e9);
-    for(let i=0;i<ring.length-2;i+=2){       // the sides the shadow sweeps between footprint and its cast copy
-      const a=[M(ring[i]),M(ring[i+1])],b=[M(ring[i+2]),M(ring[i+3])],c=[M(sh[i+2]),M(sh[i+3])],d=[M(sh[i]),M(sh[i+1])];
-      for(const p of [a,b,c,a,c,d])shadows.push(p[0],p[1],.16,0,0,0,1,0);
-    }
+  // 2. lines: casings under fills, by class
+  const named={};for(const s of c.s)if(!named[s[0]])named[s[0]]=s[1];
+  const order=c.l.map((_,i)=>i).sort((a,b)=>(LINES[c.l[a][0]]?.z||0)-(LINES[c.l[b][0]]?.z||0));
+  for(const i of order){
+    const [cls,pts,fl]=c.l[i];const L=LINES[cls];if(!L)continue;
+    if(fl.includes('t')&&cls!=='rail')continue;           // tunnels are not drawn on top of the ground
+    const fill=hex(cls==='river'||cls==='stream'?pal.area.water:cls==='ferry'?pal.ferry:(pal.road[cls]||pal.road.street));
+    const pick=['motorway','major','street','service','walk','path','cycle','steps'].includes(cls)?picks.push({type:'street',what:cls,name:''})-1:0;
+    if(L.case){const cc=hex(fl.includes('b')?pal.bridge:(pal.casing[cls]||pal.casing.street));line(casings,pts,u,L.w+1.1,L.px+0.75,L.z,cc,pick,E)}
+    line(lines,pts,u,L.w,L.px,L.z+0.5,fill,pick,E);
+    if(cls==='rail'){line(lines,pts,u,0.45,0.35,L.z+0.6,hex(pal.railTie),0,E)}
   }
-  // 4. roads: casings, then fills, by class (small under big)
-  const labels=[],roadPick=new Map();
-  for(const r of g.roads)if(r.n)roadPick.set(r.id,picks.push({type:'street',id:r.id,name:r.n,what:r.c})-1);
-  for(const cls of ROAD_ORDER)for(const r of g.roads)if(r.c===cls&&cls!=='path'&&cls!=='steps'&&cls!=='cycle'){
-    const w=ROAD_W[cls]*(r.x?0.8:1);
-    ribbon(roads,r.p,w+2.2,.2+ROAD_ORDER.indexOf(cls)*.01,hex(pal.casing[cls]||pal.casing.street),roadPick.get(r.id)||0);
-  }
-  for(const cls of ROAD_ORDER)for(const r of g.roads)if(r.c===cls){
-    const w=ROAD_W[cls]*(r.x?0.8:1);
-    ribbon(roads,r.p,w,.3+ROAD_ORDER.indexOf(cls)*.01,hex(pal.road[cls]),roadPick.get(r.id)||0);
-  }
-  for(const r of g.rail){ribbon(roads,r.p,3.2,.42,hex(pal.rail),0);ribbon(roads,r.p,1.1,.43,hex(pal.railTie),0,12)}
-  // street names: one candidate every ~260 m of each named street, on its longest straight runs
-  const byName={};for(const r of g.roads)if(r.n&&r.c!=='path'&&r.c!=='cycle'&&r.c!=='steps')(byName[r.n]=byName[r.n]||[]).push(r);
-  for(const [name,rs] of Object.entries(byName)){
-    const segs=[];for(const r of rs){const p=r.p;for(let i=0;i<p.length-2;i+=2){const ax=M(p[i]),ay=M(p[i+1]),bx=M(p[i+2]),by=M(p[i+3]);segs.push({x:(ax+bx)/2,y:(ay+by)/2,len:Math.hypot(bx-ax,by-ay),ang:Math.atan2(by-ay,bx-ax),cls:r.c})}}
-    segs.sort((a,b)=>b.len-a.len);const kept=[];
-    for(const s of segs){if(s.len<22)break;if(kept.every(k=>Math.hypot(k.x-s.x,k.y-s.y)>260))kept.push(s);if(kept.length>6)break}
-    for(const s of kept)labels.push({type:'street',text:name,x:s.x,y:s.y,ang:s.ang,rank:s.cls==='major'?1:s.cls==='street'?2:3});
-  }
-  // 5. buildings: walls and roofs, lit in the shader; outlines as lines
-  const meta=[];
-  for(const b of g.buildings){
-    const pick=picks.push({type:'building',id:b.id,name:b.n||'',address:b.a||'',h:b.h,hs:b.hs,what:b.k})-1;
-    meta.push(pick);
-    const t=hash(b.id),base=hex(pal.buildings[Math.floor(t*pal.buildings.length)]);
-    const jitter=0.94+0.1*hash(b.id+'j');const col=[base[0]*jitter,base[1]*jitter,base[2]*jitter];
-    const roof=hex(pal.roof[Math.floor(hash(b.id+'r')*pal.roof.length)]);
-    const h=b.h;
-    // walls
-    for(const ring of b.r){
-      const n=ring.length/2;if(n<3)continue;
-      let sa=0;for(let i=0;i<n;i++){const j=(i+1)%n;sa+=ring[i*2]*ring[j*2+1]-ring[j*2]*ring[i*2+1]}
-      const ccw=sa>0;
-      for(let i=0;i<n;i++){
-        const j=(i+1)%n;let ax=M(ring[i*2]),ay=M(ring[i*2+1]),bx=M(ring[j*2]),by=M(ring[j*2+1]);
-        if(ax===bx&&ay===by)continue;
-        let nx=by-ay,ny=-(bx-ax);const nl=Math.hypot(nx,ny);nx/=nl;ny/=nl;if(!ccw){nx=-nx;ny=-ny}
-        const v=[[ax,ay,0],[bx,by,0],[bx,by,h],[ax,ay,0],[bx,by,h],[ax,ay,h]];
-        for(const p of v)bld.push(p[0],p[1],p[2],nx,ny,0,col[0],col[1],col[2],pick,p[2]>0?1:0);
+  // 3. buildings: walls and roofs, lit in the shader; shadows below; outlines as lines
+  const sun=[-0.52,-0.42];const idOf=new Map();const shadowsOn=z>=14&&!flags?.noShadows;
+  for(const b of c.b){
+    const [id,h0,mh0,cls,rings,name,extra]=b;
+    let pick=idOf.get(id);
+    if(!pick){pick=picks.push({type:'building',id,ref:id.startsWith('osm-')?'':'overture:'+id,name:name||'',h:h0,what:cls,
+      number:extra.number||'',osm:extra.osm||'',src:extra.src||'',floors:extra.num_floors||'',roof:extra.roof_shape||''})-1;idOf.set(id,pick)}
+    const h=Math.max(1.5,h0)*k,mh=(mh0||0)*k;
+    const group=CLASS_BUILDING[cls]||CLASS_BUILDING[extra.subtype]||'plain';
+    const set=pal.buildings[group]||pal.buildings.plain;
+    let base=extra.facade_color&&/^#?[0-9a-f]{6}$/i.test(extra.facade_color)?hex(extra.facade_color):hex(set[Math.floor(hash(id)*set.length)]);
+    const jitter=0.95+0.08*hash(id+'j');const col=[base[0]*jitter,base[1]*jitter,base[2]*jitter];
+    const rs=pal.roofs[group]||pal.roofs.plain;
+    const roof=extra.roof_color&&/^#?[0-9a-f]{6}$/i.test(extra.roof_color)?hex(extra.roof_color):hex(rs[Math.floor(hash(id+'r')*rs.length)]);
+    const onEdge=(ax,ay,bx,by)=>(ax<=0&&bx<=0)||(ay<=0&&by<=0)||(ax>=E&&bx>=E)||(ay>=E&&by>=E);
+    for(const ring of rings){
+      const m=ring.length/2;if(m<3)continue;
+      let sa=0;for(let i=0;i<m;i++){const j=(i+1)%m;sa+=ring[i*2]*ring[j*2+1]-ring[j*2]*ring[i*2+1]}
+      const cw=sa>0;    // y down in tile units: positive area is clockwise on the ground
+      for(let i=0;i<m;i++){
+        const j=(i+1)%m;const rax=ring[i*2],ray=ring[i*2+1],rbx=ring[j*2],rby=ring[j*2+1];
+        if(rax===rbx&&ray===rby)continue;
+        if(onEdge(rax,ray,rbx,rby))continue;               // a cut along the tile edge is not a wall
+        const ax=rax*u,ay=-ray*u,bx=rbx*u,by=-rby*u;
+        let nx=by-ay,ny=-(bx-ax);const nl=Math.hypot(nx,ny)||1;nx/=nl;ny/=nl;if(cw){nx=-nx;ny=-ny}
+        const v=[[ax,ay,mh],[bx,by,mh],[bx,by,h],[ax,ay,mh],[bx,by,h],[ax,ay,h]];
+        for(const p of v)bld.push(p[0],p[1],p[2],nx,ny,0,col[0],col[1],col[2],pick,p[2]>mh?1:0);
         edges.push(ax,ay,h,0);edges.push(bx,by,h,0);
-        edges.push(ax,ay,0,1);edges.push(ax,ay,h,1);
+        edges.push(ax,ay,mh,1);edges.push(ax,ay,h,1);
       }
     }
-    // roof
-    const flat=[],holes=[];b.r.forEach((r,i)=>{if(i>0)holes.push(flat.length/2);for(const v of r)flat.push(M(v))});
+    const flat=[],holes=[];rings.forEach((r,i)=>{if(i>0)holes.push(flat.length/2);for(let q=0;q<r.length;q+=2)flat.push(r[q]*u,-r[q+1]*u)});
     const tri=earcut(flat,holes);
-    for(let i=0;i<tri.length;i++){const k=tri[i];bld.push(flat[k*2],flat[k*2+1],h,0,0,1,roof[0],roof[1],roof[2],pick,2)}
+    for(let i=0;i<tri.length;i++){const q=tri[i];bld.push(flat[q*2],flat[q*2+1],h,0,0,1,roof[0],roof[1],roof[2],pick,2)}
+    if(shadowsOn&&mh0<=0.5){
+      const ring=rings[0];const kk=Math.min(h0,16)*0.55*k;const fp=[],sh=[];
+      for(let i=0;i<ring.length;i+=2){fp.push(ring[i]*u,-ring[i+1]*u);sh.push(ring[i]*u-sun[0]*kk,-ring[i+1]*u-sun[1]*kk)}
+      const put=(pts)=>{const t=earcut(pts);for(let i=0;i<t.length;i++)shadows.push(pts[t[i]*2],pts[t[i]*2+1],0,0,0,0,1,0)};
+      put(fp);put(sh);
+      for(let i=0;i<fp.length;i+=2){const j=(i+2)%fp.length;const a=[fp[i],fp[i+1]],b=[fp[j],fp[j+1]],cc=[sh[j],sh[j+1]],d=[sh[i],sh[i+1]];
+        for(const p of [a,b,cc,a,cc,d])shadows.push(p[0],p[1],0,0,0,0,1,0)}
+    }
   }
-  // 6. named places and small things for the overlay
-  const places=g.pois.map(p=>({type:'place',text:p.n,x:M(p.x),y:M(p.y),what:p.c,id:p.id,address:p.a||''}));
-  const props=(g.props||[]).map(p=>({type:'prop',what:p.k,x:M(p.x),y:M(p.y),id:p.id,text:p.n||''}));
-  const [x0,y0,x1,y1]=g.bounds.map(M);
-  return {areas:areas.out(),roads:roads.out(),shadows:shadows.out(),buildings:bld.out(),edges:edges.out(),
-    picks,labels,places,props,bounds:[x0,y0,x1,y1],frame:g.frame,name:g.name,attribution:g.attribution,
-    counts:{buildings:g.buildings.length,roads:g.roads.length,areas:g.areas.length,places:g.pois.length}};
+  // 4. names: streets along their longest pieces, then points
+  const labels=[];
+  if(z>=13){
+    const byName={};for(const [name,cls,pts] of c.s)(byName[name]=byName[name]||{cls,runs:[]}).runs.push(pts);
+    for(const [name,{cls,runs}] of Object.entries(byName)){
+      const segs=[];for(const p of runs)for(let i=0;i<p.length-2;i+=2){const ax=p[i]*u,ay=-p[i+1]*u,bx=p[i+2]*u,by=-p[i+3]*u;segs.push({x:(ax+bx)/2,y:(ay+by)/2,len:Math.hypot(bx-ax,by-ay),ang:Math.atan2(by-ay,bx-ax)})}
+      segs.sort((a,b)=>b.len-a.len);const kept=[];
+      for(const s of segs){if(s.len<25)break;if(kept.every(q=>Math.hypot(q.x-s.x,q.y-s.y)>330))kept.push(s);if(kept.length>3)break}
+      const rank=cls==='motorway'||cls==='major'?1:cls==='street'?2:3;
+      for(const s of kept)labels.push({type:'street',text:name,x:s.x,y:s.y,ang:s.ang,rank,cls});
+    }
+  }
+  const PLACE_RANK={country:0,state:1,city:2,town:3,village:4,suburb:5,quarter:6,neighbourhood:6,hamlet:7,island:5,isolated_dwelling:9,locality:8};
+  const places=[];
+  for(const [name,cls,sub,rank,px,py] of c.p){
+    const x=px*u,y=-py*u;
+    if(cls==='place')places.push({type:'place',kind:'town',text:name,what:sub,x,y,pri:(PLACE_RANK[sub]??8)+(rank||0)*0.05,town:true});
+    else if(cls==='peak'||cls==='water'||cls==='airport')places.push({type:'place',kind:cls,text:name,what:cls==='water'?'water':sub||cls,x,y,pri:9+(rank||0)*0.05});
+    else places.push({type:'place',kind:'poi',text:name,what:sub||cls,cls,x,y,pri:12+(rank||5)*0.1});
+  }
+  return {key:c.z+'/'+c.x+'/'+c.y,z,origin:[ox,oy],size,
+    areas:areas.out(),casings:casings.out(),lines:lines.out(),shadows:shadows.out(),buildings:bld.out(),edges:edges.out(),
+    picks,labels,places,counts:{buildings:c.b.length,lines:c.l.length,areas:c.a.length,places:c.p.length}};
 }
 self.onmessage=e=>{
-  try{const t0=Date.now();const out=build(e.data.ground,e.data.palette);out.ms=Date.now()-t0;
-    self.postMessage(out,[out.areas.buffer,out.roads.buffer,out.shadows.buffer,out.buildings.buffer,out.edges.buffer])}
-  catch(err){self.postMessage({error:String(err&&err.message||err)})}
+  const {id,chunk,palette,flags}=e.data;
+  try{const t0=Date.now();const out=build(chunk,palette,flags);out.ms=Date.now()-t0;out.id=id;
+    self.postMessage(out,[out.areas.buffer,out.casings.buffer,out.lines.buffer,out.shadows.buffer,out.buildings.buffer,out.edges.buffer])}
+  catch(err){self.postMessage({id,error:String(err&&err.message||err)})}
 };
 }
