@@ -397,8 +397,13 @@ Assistant, October 27: "Found the blocker: the new world is running, but its Hou
         if not state or state['requester'] != msg.get('caller', {}).get('person'):
             return {'refused': 'only the requester may review this build'}
         with self.lock:
-            if state['phase'] != 'received' or state['task'] in self.children or state.get('pending'):
-                return {'refused': 'review requires a received result, not an active or uncertain worker'}
+            # Review again: after main moved past a reviewed result, or after a review whose checks failed (the run
+            # stays blocked with its review receipts). Never an active, uncertain or pre-review failure.
+            again = state['phase'] == 'reviewed' or (state['phase'] == 'blocked' and state.get('review_base'))
+            if (state['phase'] != 'received' and not again) or state['task'] in self.children or state.get('pending'):
+                return {'refused': 'review requires a received, reviewed or review-failed result, not an active or uncertain worker'}
+            if again:
+                self.event(state, 'review-again', 'independent checks requested again on the current main')
             state['phase'] = 'reviewing'
             self.save(state)
             threading.Thread(target=self.guarded, args=(state, self.review), daemon=True).start()

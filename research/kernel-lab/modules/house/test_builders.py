@@ -341,3 +341,15 @@ def test_house_commits_what_a_sandboxed_worker_left(tmp_path):
     assert 'BUILD-RESULT.md' in left and '.regression-tmp' in left
     b.commit_worker(s,tree)                                                      # nothing new: no empty commit
     assert b.git(tree,'rev-parse','HEAD')==s['house_commit']['commit']
+
+
+@pytest.mark.parametrize('phase,base,ok',[('reviewed','a',True),('blocked','a',True),('blocked',None,False),
+                                          ('uncertain','a',False),('working',None,False)])
+def test_review_again_only_after_a_review(manager,phase,base,ok):
+    """A reviewed result whose main moved, or one whose review checks failed, may be reviewed again by its
+    requester; a worker failure before review, an uncertain or an active run may not."""
+    s=state(manager,phase)
+    if base:s['review_base']=base
+    manager.review=lambda st:None
+    out=manager.request_review(msg())
+    assert ('refused' not in out)==ok,out
