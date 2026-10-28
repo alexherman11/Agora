@@ -132,3 +132,25 @@ def test_worker_and_resident_share_a_fail_closed_subscription_guard():
     client.account_read.assert_called_once_with({"refreshToken": False})
     client.turn_start.assert_not_called()
     client.account_login_start.assert_not_called()
+
+
+def test_kernel_resident_uses_supported_discovery_with_no_native_tools(tmp_path):
+    from codex_resident import build_config
+    opts=build_config(tmp_path,'fixture.exe',tmp_path,door=True).config_overrides
+    assert 'features.code_mode=true' in opts and 'features.code_mode_host=true' in opts
+    for name in ('shell_tool','unified_exec','apply_patch_freeform','view_image','web_search','computer_use','multi_agent'):
+        assert f'features.{name}=false' in opts
+    default=build_config(tmp_path,'fixture.exe',tmp_path).config_overrides
+    assert 'features.code_mode=false' in default
+
+
+def test_kernel_resident_exposes_only_existing_three_door_tools(tmp_path):
+    import json
+    from codex_resident import kernel_door_server
+    path=tmp_path/'mcp.json'
+    path.write_text(json.dumps({'mcpServers':{'agora':{'command':'fixture','args':[]}}}))
+    server=kernel_door_server(path)
+    assert server['enabled_tools']==['see','do','lines']
+    assert set(server['tools'])=={'see','do','lines'}
+    path.write_text(json.dumps({'mcpServers':{'agora':{},'unapproved':{}}}))
+    with pytest.raises(ValueError,match='only the Agora'):kernel_door_server(path)

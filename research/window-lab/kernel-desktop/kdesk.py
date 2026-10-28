@@ -273,6 +273,35 @@ class LocalEntry:
         os.replace(tmp, self.path)
         self.sessions = sessions
 
+    def check_manager_sessions(self, account):
+        """Validate Rowan's exact pair without exposing or replacing a token."""
+        expected = [
+            {"account": account, "method": "desktop", "signer": "rowan"},
+            {"account": account, "method": "desktop", "signer": "rowan-builder", "agent": "rowan-builder"},
+        ]
+        matches = [v for v in self.sessions.values()
+                   if v.get("account") == account or v.get("signer") in ("rowan", "rowan-builder")]
+        if matches and (len(matches) != 2 or any(matches.count(v) != 1 for v in expected)):
+            raise ValueError("Rowan session pair conflicts with an existing identity")
+        return bool(matches)
+
+    def add_manager_sessions(self, account):
+        """Startup-only approved pair, atomically persisted; prior sessions stay intact."""
+        if self.check_manager_sessions(account):
+            return
+        if self.path.exists() and json.loads(self.path.read_text(encoding="utf-8")) != self.sessions:
+            raise ValueError("local sessions changed during manager provisioning")
+        sessions = dict(self.sessions)
+        for signer, agent in (("rowan", None), ("rowan-builder", "rowan-builder")):
+            sessions[secrets.token_urlsafe(24)] = {
+                "account": account, "method": "desktop", "signer": signer,
+                **({"agent": agent} if agent else {}),
+            }
+        tmp = self.path.with_suffix(".manager.tmp")
+        tmp.write_text(json.dumps(sessions, indent=1), encoding="utf-8")
+        os.replace(tmp, self.path)
+        self.sessions = sessions
+
     def token(self, signer):
         return next(t for t, v in self.sessions.items() if v.get("signer") == signer)
 
@@ -415,7 +444,7 @@ def make_desk_handler(kernel, entry):
     return Handler
 
 
-def start(world=DEFAULT_WORLD, port=8810, modules=True, headless=False, resident_manifest=None):
+def start(world=DEFAULT_WORLD, port=8810, modules=True, headless=False, resident_manifest=None, manager_manifest=None):
     """-> (kernel, server, host, entry). Serves on a thread; the caller decides how long it lives."""
     world = Path(world)
     k = Kernel(world, None if (world / "log" / "0001.jsonl").exists() else genesis(headless))
@@ -425,6 +454,9 @@ def start(world=DEFAULT_WORLD, port=8810, modules=True, headless=False, resident
     if resident_manifest is not None:
         from agents.move_resident import install, load_manifest
         install(k, entry, load_manifest(resident_manifest))
+    if manager_manifest is not None:
+        from agents.new_manager import install as install_manager, load_manifest as load_manager_manifest
+        install_manager(k, entry, load_manager_manifest(manager_manifest))
     k.dev_sessions = lambda: entry.sessions             # the door's /dev/signin knows these sessions
     handler = make_desk_handler(k, entry)
     srv = DesktopServer(("127.0.0.1", port), handler)
@@ -448,12 +480,13 @@ def main():
     ap.add_argument("--port", type=int, default=8810)
     ap.add_argument("--no-modules", action="store_true")
     ap.add_argument("--resident-manifest", help="owner-reviewed Sable or Pike manifest; provision asleep before House starts")
+    ap.add_argument("--manager-manifest", help="approved fresh Rowan manifest; provision asleep before House starts")
     ap.add_argument("--log", help="write what it says here (it runs under pythonw, with no console)")
     a = ap.parse_args()
     if a.log:
         Path(a.log).parent.mkdir(parents=True, exist_ok=True)
         sys.stdout = sys.stderr = open(a.log, "a", encoding="utf-8", buffering=1)
-    k, srv, host, entry = start(a.world, a.port, modules=not a.no_modules, resident_manifest=a.resident_manifest)
+    k, srv, host, entry = start(a.world, a.port, modules=not a.no_modules, resident_manifest=a.resident_manifest, manager_manifest=a.manager_manifest)
     (k.keep_dir / "kdesk.pid").write_text(str(os.getpid()))
     print(f"kdesk: {k.name(k.place)} on http://127.0.0.1:{a.port} · {len(k.log.records)} records · modules "
           f"{', '.join(k.state.get(m, 'name') for m in k.things('module') if k.state.get(m, 'on'))}", flush=True)

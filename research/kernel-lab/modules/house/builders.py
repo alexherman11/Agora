@@ -19,6 +19,7 @@ import urllib.error
 import uuid
 
 import transport as T
+import manager as M
 
 ACTIVE = {'asked', 'preparing', 'working', 'reviewing', 'landing'}
 HELD = {'yes', 'true', '1', 'paused', 'held', 'blocked', 'cancelled', 'canceled'}
@@ -65,7 +66,24 @@ class Door:
 
 
 class Builders:
-    capacity = 2
+    @property
+    def capacity(self):
+        """World-configured shared pool, bounded by the existing four-worker cap.
+
+        Lowering the value never interrupts work already admitted. Invalid or
+        ambiguous configuration closes admission until the owner corrects it.
+        """
+        reading = self.h.m.see('rows house-settings')
+        if reading.get('ok') is False:
+            raise RuntimeError('builder capacity unavailable; no new worker admitted')
+        settings = [r for r in reading.get('rows', []) if r.get('kind') == 'house-settings']
+        if len(settings) > 1:
+            raise RuntimeError('ambiguous house settings; no new worker admitted')
+        raw = settings[0].get('builder_capacity', 2) if settings else 2
+        value = str(raw).strip()
+        if value not in ('1', '2', '3', '4'):
+            raise RuntimeError('builder_capacity must be 1 to 4; no new worker admitted')
+        return int(value)
 
     def __init__(self, house, repo=T.REPO):
         self.h = house
@@ -137,12 +155,15 @@ class Builders:
         return stdout.strip()
 
     def update(self, state, **facts):
+        M.check_state(self, state)
         door = self.session(state['requester'])
         for attempt in range(4):
             task = door.look(state['task'])
             if task.get('build_run') != state['run']:
                 raise RuntimeError('claim changed; the previous builder cannot update this task')
             try:
+                if state.get('manager'):
+                    return M.write_task(self, state, task, facts)
                 return door.call('/do', 'set ' + state['task'] + ' ' + ' '.join(k+'='+q(v) for k,v in facts.items()),
                                  saw={state['task']: int(task['rev'])})
             except RuntimeError as exc:
@@ -165,7 +186,9 @@ class Builders:
         caller = msg.get('caller') or {}
         # Read as this caller narrowed by the House's existing read grant.
         rows = self.h.m.see('look ' + target, use=msg.get('use')).get('rows') or []
-        if not rows or rows[0].get('kind') not in ('taskboard-task', 'task'):
+        # which things a build reaches is the word's shape (needs=kind=taskboard-task|task, kernel kinds.py), checked
+        # before the house is asked, so a steward can widen it in the world without editing this file
+        if not rows:
             return {'refused': 'choose a visible task card'}
         task = rows[0]
         # A card may have a new run once its last one landed or was released (e.g. landed then reverted).
@@ -174,6 +197,8 @@ class Builders:
         claimed = task.get('builder') or task.get('build_run')
         if held(task) or (claimed and not (again and task.get('build_run') in (prev['run'], None, ''))):
             return {'refused': 'task is held, finished, or already has a builder; reconcile it before a new build'}
+        if msg.get('_managed') and task.get('who') != caller.get('name'):
+            return {'refused': 'approved manager no longer owns this task'}
         if task.get('who') and task.get('who') not in (caller.get('name'), 'JEFF'):
             return {'refused': 'task has another owner; ask that owner to release it first'}
         self.session(caller['person'])  # validate before recording or spawning anything
@@ -181,12 +206,15 @@ class Builders:
             if target in self.states and not again:
                 return {'text': 'existing request: ' + self.states[target]['phase'], 'rows': [self.row(self.states[target])]}
             if sum(s['phase'] in ACTIVE or s['task'] in self.children for s in self.states.values()) >= self.capacity:
-                return {'refused': 'both builder slots are occupied; no request was queued'}
+                return {'refused': 'builder capacity is occupied; no request was queued'}
             run = 'kernel-' + target + '-' + uuid.uuid4().hex[:10]
             state = dict(task=target, run=run, name='Codex — '+str(task.get('title') or 'Builder')[:60], requester=caller['person'],
                          title=task.get('title') or target, phase='asked', detail='claim pending',
                          model='gpt-6.1-sol', reasoning='medium', created=stamp(), activity=[],
                          task_owner=task.get('who',''), pending=[], basis={k:task.get(k,'') for k in ('title','text','acceptance','who')})
+            if msg.get('_managed'):
+                state['manager'] = caller['person']
+                M.check_state(self, state)
             if again:
                 state['previous_run'] = prev['run']
                 prev['superseded_by'] = run
@@ -210,15 +238,21 @@ class Builders:
             except Exception:
                 # The local receipt remains authoritative if ownership/door changed.
                 pass
+        finally:
+            M.notify(self, state)
 
     def build(self, state):
+        M.check_state(self, state)
         door = self.session(state['requester'])
         task = door.look(state['task'])
         if (held(task) or task.get('build_run') not in (state.get('previous_run'), None, '')
                 or (task.get('builder') and not state.get('previous_run')) or task.get('who','') != state['task_owner']):
             raise RuntimeError('task changed before claim; nothing launched')
-        claim = door.call('/do', 'set '+state['task']+' builder='+q(state['name'])+' build=asked build_run='+q(state['run']),
-                          saw={state['task']: int(task['rev'])})
+        if state.get('manager'):
+            claim = M.write_task(self, state, task, dict(builder=state['name'],build='asked',build_run=state['run']))
+        else:
+            claim = door.call('/do', 'set '+state['task']+' builder='+q(state['name'])+' build=asked build_run='+q(state['run']),
+                              saw={state['task']: int(task['rev'])})
         state['claim_records'] = claim.get('records', [])
         self.prepare(state, door)
 
@@ -324,7 +358,7 @@ class Builders:
             if state['phase']!='blocked' or state.get('session') or state['task'] in self.children:
                 return {'refused':'retry only applies to a terminal startup failure before any Codex thread'}
             if sum(s['phase'] in ACTIVE or s['task'] in self.children for s in self.states.values())>=self.capacity:
-                return {'refused':'both slots occupied'}
+                return {'refused':'builder capacity is occupied'}
             state['phase']='preparing';self.save(state)
             def launch(s):
                 self.assert_owned(s)
@@ -355,7 +389,7 @@ class Builders:
                 return {'refused':'ten follow-ups already pending; no more were queued'}
             if state['phase']=='received' and state['task'] not in self.children and sum(
                     s['phase'] in ACTIVE or s['task'] in self.children for s in self.states.values()) >= self.capacity:
-                return {'refused':'both slots occupied; follow-up did not start or queue another builder'}
+                return {'refused':'builder capacity is occupied; follow-up did not start or queue another builder'}
             # Explicit owner correction replaces the task basis, never its authority.
             state['basis']={k:task.get(k,'') for k in ('title','text','acceptance','who')}
             state['pending'].append(words[:8000])
@@ -383,13 +417,13 @@ class Builders:
                 if out.get('refused'):self.event(state,'held',out['refused'])
 
     def prompt(self, state, task):
-        return f'''You are {state['name']}, a Codex builder for Alex inside the kernel desktop.
+        return f'''You are {state['name']}, a Codex builder for the requesting person inside Alex's kernel desktop.
 Current task: {state['title']} ({state['task']}). Read its current card and charter via Agora see.
 Task text: {task.get('text', '')}
 Acceptance: {task.get('acceptance', '')}
 You own only this task in this House-created worktree. Read AGENTS.md and the approved direction at
 C:/Projects/Agora4/research/kernel-lab/agents/MOVING-IN.md (canonical source, not yet tracked in older worker bases).
-The current world is kernel8810, not Frontier. Use Agora see/do/lines with the existing agent-for-Alex session;
+The current world is kernel8810, not Frontier. Use Agora see/do/lines with the existing requester-bound agent session;
 never change credentials, security settings or provider, use paid fallback, or start another worker.
 Preserve existing user work and apps. No visible test windows, OBS operations, global window-manager changes,
 forced process stops, deletions, publishing or pushes. Use hidden fixtures. Stop an exact denied action and report it;
@@ -411,6 +445,7 @@ Assistant, October 27: "Found the blocker: the new world is running, but its Hou
 '''
 
     def assert_owned(self, state):
+        M.check_state(self, state)
         task = self.session(state['requester']).look(state['task'])
         if task.get('build_run') != state['run'] or held(task):
             raise RuntimeError('task claim changed or is held; stop this operation')
@@ -427,6 +462,8 @@ Assistant, October 27: "Found the blocker: the new world is running, but its Hou
             again = state['phase'] == 'reviewed' or (state['phase'] == 'blocked' and state.get('review_base'))
             if (state['phase'] != 'received' and not again) or state['task'] in self.children or state.get('pending'):
                 return {'refused': 'review requires a received, reviewed or review-failed result, not an active or uncertain worker'}
+            if sum(s['phase'] in ACTIVE or s['task'] in self.children for s in self.states.values()) >= self.capacity:
+                return {'refused': 'builder capacity is occupied; review did not start'}
             if again:
                 self.event(state, 'review-again', 'independent checks requested again on the current main')
             state['phase'] = 'reviewing'
@@ -490,6 +527,8 @@ Assistant, October 27: "Found the blocker: the new world is running, but its Hou
                 return {'refused': 'independent review has not passed'}
             if any(s['phase'] == 'landing' for s in self.states.values()):
                 return {'refused': 'another source publication is running'}
+            if sum(s['phase'] in ACTIVE or s['task'] in self.children for s in self.states.values()) >= self.capacity:
+                return {'refused': 'builder capacity is occupied; publication did not start'}
             state['phase'] = 'landing'
             self.save(state)
             threading.Thread(target=self.guarded, args=(state, self.publish), daemon=True).start()
