@@ -1,11 +1,11 @@
 PASS a spot by lat/lon and an event by its written location, made in lines
-PASS the window opens on Seabright and draws its live tiles, buildings included · 4 tiles, 594204 building vertices, 4.7 s
+PASS the window opens on Seabright and draws its live tiles, buildings included · 4 tiles, 594204 building vertices, 6.8 s
 PASS the spot and the event show as pins; the one placed by words is drawn as approximate · ["Tide pools \u00b7 Spots", "Beach cleanup \u00b7 Events \u00b7 approximate place"]
 PASS the world is opaque (no see-through drawing surface) and flat (no curve)
 PASS pressing a house shows its card: its address, and that nobody has put anything there · A BUILDING | × |  | 715 Carmel Street |  | commercial | about 8 m tall | on Carmel Street | + Event here | + Note | Give it a page |  | Nobody has put anything 
-PASS the house becomes a world thing the moment a party is put at it; the party points at it · 715 Carmel Street · party at=dk205 start=2026-11-01T02:00:00.000Z
+PASS the house becomes a world thing the moment a party is put at it; the party points at it · 715 Carmel Street · party at=dk212 start=2026-11-01T02:00:00.000Z
 PASS saying something in the card makes a post about the house · Is it costumes only?
-PASS Open its page opens a window on the house (window.open place-page <house>) · [["Place", "dk205"]]
+PASS Open its page opens a window on the house (window.open place-page <house>) · [["Place", "dk212"]]
 PASS the page shows the house, the party coming up and the talk · 715 Carmel Street | commercial · on Carmel Street · about 8 m tall | Show on the map | Rename | Coming up | + Plan something here | Sat 7:00 PM | Halloween party | Alex · just now | Notes | + Leave a 
 PASS a note left on the page is a world thing at the house, and the page shows it
 PASS City Hall, adopted in a line, chooses the town-hall page by its kind (a page widget says places=) · Santa Cruz City Hall · a world thing · page town-hall-page
@@ -22,7 +22,7 @@ PASS the globe button shows all of California, drawn from low-zoom tiles · came
 PASS the home button comes back to Seabright
 PASS a spot added in a line (map.add "Seabright & Murray" …) appears in the open window
 PASS dragging the Tide pools pin moves the spot in the world · 26 m
-PASS a frame over Seabright in 3D takes this long on a software GPU (median of 20) · 0.9 ms
+PASS a frame over Seabright in 3D takes this long on a software GPU (median of 20) · 1.0 ms
 PASS no script errors and no stopped parts in any window · []
 
-26 of 26 steps pass · 76 s
+26 of 26 steps pass · 88 s

@@ -227,8 +227,21 @@ function mountShell(api){
   return root;
 }
 
+// A paused (quarantined) part runs in a worker with no screen to draw on, and Try again keeps the pause (only a
+// steward lifts it). So the paused map says so and offers its own button: the lens's `on resume` line
+// (component-action … action=clear) starts it again for a steward, and says plainly why not for anyone else.
+function mapPaused(api){
+  const box=api.part('surface','div',{role:'status',style:{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'10px',
+    height:'100%',minHeight:'240px',padding:'24px',background:'#eef3f6',color:'#2c3a44',textAlign:'center',fontSize:'14px'}});
+  const said=api.el('p',{style:{margin:'0',color:'#5b6b76'}},'The map paused itself after it stopped twice on this screen. It draws with the graphics card, so it cannot run while paused.');
+  const go=api.el('button',{type:'button',style:{padding:'8px 14px',borderRadius:'8px',border:'1px solid #2f7f8f',background:'#2f7f8f',color:'#fff',fontSize:'14px'},
+    on:{click:()=>{said.textContent='Starting the map again…';api.fire('resume',{}).catch?.(e=>{said.textContent=String(e?.message||e)})}}},'Start the map again');
+  box.append(api.el('strong',{},'The map is paused'),said,go);return box;
+}
+
 // ---- geo-map ---------------------------------------------------------------------------------------------------------
 function mountGeoMap(api,settings){
+  if(!api.draft)return mapPaused(api);
   const d=api.draft;if(!d.engine)d.engine=new GeoEngine(String(geoWorkerMain));const E=d.engine;
   E.canvas.__engine=E;      // for measuring in tests (the page is sandboxed; nothing outside it can reach this)
   const view=mapView(api);const map=settings.map||'';

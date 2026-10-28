@@ -53,7 +53,7 @@ COMPONENTS = {
     'geo-map': ('A flat 3D map of the live ground (OpenStreetMap, Overture buildings), anywhere on Earth, with the '
                 'placed things of every layer as pins and routes. Drag to move, scroll to zoom, right-drag to turn; '
                 'Add puts a spot, an event, a note or any kind at a building or a point; Route plans a walk.',
-                'surface pin', '', 'put move',
+                'surface pin', '', 'put move resume',
                 dict(map=T(), hide=T(), focus=T(), style=T(), labels=T(default='{}'))),
     'map-layers': ('Layers of a map: show or hide each for yourself, + Add a layer from a gallery of readings (shared or '
                    'only yours), the ground\'s own layers, and how the map looks.',

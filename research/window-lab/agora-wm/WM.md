@@ -149,6 +149,16 @@ focus/minimise/restore/close are external acts; undo cannot reverse those screen
 ## Safety and recovery
 
 Shadow is the default and has no lease, preview window or write-capable boundary.
+> **Superseded in part (Claude, 28 Oct 2026, from Alex: "the window manager keeps booting into non-live mode").**
+> The world's `wm-settings` mode, which only an admitted `wm.mode` request sets, is now the standing choice and the
+> module follows it: a restarted process, or one whose lease ended without the panic chord (a missed heartbeat, the
+> guard gone), arms live again by itself once `--allow-live` is on and the game gate is clear. The panic chord holds
+> it out of live, through restarts too, until a new `wm.mode` request; `wm.mode off` is a standing off. The property
+> the old rule protected, nothing rearranging Alex's windows that he did not choose, is kept by those two and the
+> game gate. Evidence: `test_manager.py` `test_standing_live_survives_restarts_but_not_the_panic_chord` (ran); the
+> live log showed about 19 restarts in two days, each back in shadow, and this morning's lease ending on a missed
+> heartbeat with nothing re-arming it. The earlier rule:
+
 `--allow-live` is required in addition to a newly admitted `wm.mode live` request.
 A previous world's live setting never arms a restarted process automatically.
 Panic or guard death ends management without rearming from that old request.

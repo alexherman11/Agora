@@ -1,6 +1,10 @@
 """wm module: SHAPE §17 JSON-lines protocol. No live installation at import/run.
-Run by a kernel from the supplied genesis snippet. Starts in shadow even if an
-old world says live. Only a newly admitted wm.mode live request can arm it.
+Run by a kernel from the supplied genesis snippet. The world's wm-settings mode (set only by an admitted wm.mode
+request) is the person's standing choice, and the module follows it: after a restart or a lost lease it arms live
+again by itself once the game gate is clear (28 Oct, Alex: "the window manager keeps booting into non-live mode").
+The panic chord holds it out of live until a new wm.mode request; wm.mode off is a standing off.
+Earlier rule, superseded: "Starts in shadow even if an old world says live. Only a newly admitted wm.mode live
+request can arm it."
 """
 import argparse
 from copy import deepcopy
@@ -56,7 +60,7 @@ class WMModule:
         self.headless=headless;self.allow_live=allow_live;self.theme_native=theme_native
         self.owner=None;self.manager=None;self.lock=threading.RLock();self.stop=threading.Event()
         self.stewards=set()     # people who lead this place (Alex, 27 Oct: JEFF a steward too); refreshed by intent_loop
-        self.requests=queue.Queue();self.latest=None;self.last_mode_request=None;self.intent_seen=False
+        self.requests=queue.Queue();self.latest=None;self.last_mode_request=None;self.intent_seen=False;self.held=False
         # Window pins and adopted windows are screen state (Alex, 26 Oct: "visual state should not live in the world"):
         # kept in <home>/screen.json, never as world things. The world keeps preferences only (wm-settings).
         self.screen={'pins':[],'adopted':[]};self.screen_path=None
@@ -157,6 +161,11 @@ class WMModule:
             return {'lines':[f'set {sid} never={quote(json.dumps(never))}'],'saw':saw}
         return {'refused':'unknown wm word'}
 
+    def lease_reason(self):
+        """Why the last live lease ended ('panic', 'heartbeat expired', 'manager ended', 'off'), from its file."""
+        try:return json.loads((self.home/'lease.json').read_text(encoding='utf-8')).get('reason')
+        except (OSError,ValueError,AttributeError,TypeError):return None
+
     def _save_screen(self,**changes):
         self.screen.update(changes)
         if self.screen_path:
@@ -172,11 +181,14 @@ class WMModule:
                     # Pins are window keys from screen.json (26 Oct); older world wm-pin rows are not read any more.
                     manager.configure(settings,[r for r in pins if isinstance(r,str)])
                     manager.adopted=set(self.screen['adopted'])
-                    request=settings.get('mode_request')
+                    request=settings.get('mode_request');want=settings.get('mode','shadow')
                     if not self.intent_seen:
-                        manager.switch('off' if settings.get('mode')=='off' else 'shadow');self.intent_seen=True
-                    elif request!=self.last_mode_request:manager.switch(settings.get('mode','shadow'))
+                        self.held=self.lease_reason()=='panic';self.intent_seen=True   # the panic chord outlives a restart
+                    elif request!=self.last_mode_request:self.held=False             # a new request lifts the hold
                     self.last_mode_request=request
+                    target='off' if want=='off' else 'live' if want=='live' and not self.held else 'shadow'
+                    # a refused live (game gate active) is tried again with the next second's settings
+                    if manager.mode!=target:manager.switch(target)
                     self.say('settings',None)
                 except Exception as exc:
                     # A refused live request (game gate active) is retried each second until it can apply; say so once.
@@ -184,8 +196,10 @@ class WMModule:
             if manager.lease:
                 try:manager.lease.heartbeat()
                 except Exception:
-                    # Panic/guard death never rearms from the old world request.
-                    manager.switch('off')
+                    # The lease ended. The panic chord holds live off until a new wm.mode request; any other end (a
+                    # missed heartbeat, the guard gone) re-arms from the standing choice next second.
+                    manager.switch('off');self.held=self.lease_reason()=='panic'
+                    self.say('lease','wm lease ended: '+str(self.lease_reason()))
             while True:
                 try:op,args,answer=self.requests.get_nowait()
                 except queue.Empty:break

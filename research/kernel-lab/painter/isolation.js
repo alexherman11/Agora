@@ -9,9 +9,17 @@ function scoped(owner,fn){
   try{const out=fn();if(out?.then)return out.catch(e=>componentFailed(owner,e));return out}
   catch(e){componentFailed(owner,e)}finally{
     const elapsed=performance.now()-started;
-    if(timed&&elapsed>32&&!owner.failed){owner.failures++;observeComponent(owner,'slow','Callback exceeded 32 ms',elapsed)}
+    if(timed&&elapsed>32&&!owner.failed)slowed(owner,'Callback exceeded 32 ms',elapsed);
     endPhase(owner);activeOwner=previous;
   }
+}
+// One slow moment (a GPU compiling shaders, a big window resizing, a pause) is not a slow part. A part counts toward
+// quarantine only when it is slow again within 10 s; before, every slow callback counted for the life of the window,
+// so a map animating for an hour on a 4K screen was always quarantined in the end (28 Oct).
+function slowed(owner,message,elapsed){
+  const now=performance.now(),again=owner.slowAt&&now-owner.slowAt<10000;owner.slowAt=now;
+  if(!again)return;
+  owner.failures++;observeComponent(owner,'slow',message,elapsed);
 }
 function beginPhase(owner,stage){if(!owner)return;if(!owner.phaseDepth++)agora.componentPhase?.({path:owner.node.path,component:owner.node.component,stage})}
 function endPhase(owner){if(owner&&!--owner.phaseDepth)agora.componentPhase?.({path:owner.node.path,end:true})}
@@ -41,7 +49,9 @@ EventTarget.prototype.removeEventListener=function(event,fn,options){
 function ownerFor(node){
   let owner=componentOwners.get(node.path);
   if(!owner){owner={node,dispose:[],failures:0,element:null,lastGood:null,failed:false,epoch:0,phaseDepth:0};componentOwners.set(node.path,owner)}
-  owner.node=node;owner.epoch=node.health?.action_epoch||0;return owner;
+  // Try again, clear or off (each a new action epoch) starts the part's count afresh on this page too.
+  const epoch=node.health?.action_epoch||0;if(epoch!==owner.epoch){owner.failures=0;owner.slowAt=0}
+  owner.node=node;owner.epoch=epoch;return owner;
 }
 function paintedParts(owner){
   const root=owner.element;if(!root)return [];
@@ -130,7 +140,7 @@ function renderBoundary(node){
     owner.element=n;
     const elapsed=Math.max(0,performance.now()-started-owner.childrenTime);owner.elapsed=elapsed;
     owner.lastGood=n.cloneNode(true);
-    if(!primitive&&elapsed>32){n.dataset.slow='true';n.title='This part took '+elapsed.toFixed(1)+' ms (budget 32 ms)';observeComponent(owner,'slow','Mount/update exceeded 32 ms',elapsed);owner.failures++}
+    if(!primitive&&elapsed>32){n.dataset.slow='true';n.title='This part took '+elapsed.toFixed(1)+' ms (budget 32 ms)';slowed(owner,'Mount/update exceeded 32 ms',elapsed)}
     return n;
   }catch(e){return componentFailed(owner,e)}finally{if(!primitive)endPhase(owner);activeOwner=previous;if(previous)previous.childrenTime=(previous.childrenTime||0)+performance.now()-started}
 }
