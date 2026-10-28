@@ -44,6 +44,7 @@ sys.path.insert(0, str(HERE.parents[2] / "window-lab" / "kernel-desktop"))
 sys.path.insert(0, str(HERE.parents[2] / "text-desk-lab" / "notation"))
 from modproto import Module, log            # noqa: E402
 import transport as T                        # noqa: E402
+import manager as BM                         # noqa: E402
 
 try:
     from quota_policy import quota_error     # noqa: E402  the old desk's own rule: what counts as a used-up plan
@@ -398,6 +399,8 @@ class House:
                     a.state["error"] = f"could not start: {exc}"
                     a.save()
         self.ready.set()
+        for state in self.builders.states.values():
+            BM.notify(self.builders, state)
         self.task_changes()
         threading.Thread(target=self.ticker, daemon=True, name="house-live").start()
 
@@ -558,6 +561,8 @@ class House:
         word, args = msg.get("word"), msg.get("args") or {}
         if not self.ready.wait(5):
             return {"refused": "the house is still starting; try again in a moment"}
+        if word == "house.manage":
+            return BM.dispatch(self.builders, msg)
         if word == "house.build":
             return self.builders.start(msg)
         if word == "house.retry":
@@ -704,12 +709,14 @@ class House:
 
 
 OFFER = [
+    {"word": "house.manage", "kind": "do", "needs": "kind=taskboard-task|task", "takes": "<id> [action=<word>] [<words>]", "undo": "external", "may": "members",
+     "help": "house.manage <task> action=build|tell|retry|report|review|land|note [words]: only the explicitly approved resident person, for its three locally approved tasks. Builders and other people are refused before effects."},
     {"word": "house.retry", "kind": "do", "takes": "<id>", "undo": "external", "may": "stewards",
      "help": "house.retry <task>: retry a proven terminal startup failure before any model thread. Preserves its existing claim and worktree; refuses uncertain or changed work."},
     {"word": "house.tell", "kind": "do", "takes": "<id> <words>", "undo": "external", "may": "stewards",
      "help": "house.tell <task> <words>: retain a follow-up for your active or received builder, continuing the same Codex thread. Held, uncertain, reviewed and landed work does not restart."},
     {"word": "house.build", "kind": "do", "takes": "<id>", "undo": "external", "may": "stewards",
-     "help": "house.build <task>: claim a ready task and start an authenticated Codex builder asynchronously, two at most. Uses your existing agent session; never creates credentials. Result receipt is not task completion."},
+     "help": "house.build <task>: claim a ready task and start an authenticated Codex builder asynchronously, within the shared configured capacity (default two, maximum four). Uses your existing agent session; never creates credentials. Result receipt is not task completion."},
     {"word": "house.review", "kind": "do", "takes": "<id>", "undo": "external", "may": "stewards",
      "help": "house.review <task>: independently check a received committed result against current main, including hidden desktop checks. Does not land or close it."},
     {"word": "house.land", "kind": "do", "takes": "<id>", "undo": "external", "may": "stewards",
