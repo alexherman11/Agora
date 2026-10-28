@@ -447,7 +447,7 @@ def main():
     ap.add_argument("--world", default=str(DEFAULT_WORLD))
     ap.add_argument("--port", type=int, default=8810)
     ap.add_argument("--no-modules", action="store_true")
-    ap.add_argument("--resident-manifest", help="owner-reviewed Sable manifest; provision asleep before House starts")
+    ap.add_argument("--resident-manifest", help="owner-reviewed Sable or Pike manifest; provision asleep before House starts")
     ap.add_argument("--log", help="write what it says here (it runs under pythonw, with no console)")
     a = ap.parse_args()
     if a.log:
