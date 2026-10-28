@@ -51,3 +51,12 @@ All edits are inside `agora-wm/`. `kd_window.py`, the shell, the painter and the
 ## 27 October 2026 — adaptive visibility
 
 See [adaptive WM handoff](ADAPTIVE-20261027.md). Missing world words: preserve-visible placement and causal displacement restoration. Source changes confined to engine.py / manager.py and focused tests/proof. No live activation.
+
+## 28 October 2026 — live comes back by itself (Claude)
+
+Alex: "the window manager keeps booting into non-live mode (bruh)". Every restart of the wm module (about 19 in two
+days: kdesk restarts, module restarts by other sessions) came back in shadow, and a lease lost to a missed heartbeat
+went off and stayed off, because only a *new* `wm.mode live` request could arm it. Source edit in `wm_module.py`: the
+world's mode is the standing choice; restarts and non-panic lease ends re-arm from it once the gate is clear; the panic
+chord holds it out until a new request. Missing world-level word: **a standing intent versus a one-time request**: a
+setting a module should keep honouring across its own restarts, kept apart from a request that happened once.

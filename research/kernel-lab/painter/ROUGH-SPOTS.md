@@ -160,3 +160,20 @@ $view.target"`). The painter suite (8) and the widget/window suites (10) pass af
 native window opening with a target (the hidden desk keeps windows in memory only).
 Other frictions met (details in `apps/map/README.md`): `sees=` is not readable, so a private layer also says
 `only=me` for its label; a reading that is refused stops a whole page from painting.
+
+## 28 October: a long-lived surface was always quarantined in the end (builder draft by Claude)
+
+Alex saw the Seabright map "blue only": its `geo-map` part was quarantined on his screen (the 4K desktop), and in
+quarantine it runs in a worker with no `api.draft` and no WebGL, so it stopped with "Cannot read properties of
+undefined (reading 'engine')" and its blank last-good canvas showed the sky colour. Every slow callback (over 32 ms)
+counted toward quarantine for the whole life of the window, so an animated map on a big screen (a resize, a shader
+compile, a pause) was always quarantined given enough time; and Try again (retry) kept the page's own count, so the
+part came back quarantined until the window was reopened. Source edit in `isolation.js`: one slow moment does not
+count; slowness counts when it comes again within 10 s; a new action epoch (retry, clear, off) starts the page's count
+afresh. Unchanged by design (ARRANGEMENT.md): retry keeps the kernel's quarantine and only a steward clears it, so the
+paused map now offers its own "Start the map again", a lens line `on resume do component-action … action=clear`.
+**ran**: a hidden map with injected 45 ms frames: one is not reported, two within 10 s report `slow`, a repaint after
+that shows the paused map, and its button brings it back healthy; the 26-step map proof passes. Not ran: Alex's own
+GPU, so the first failure on his screen is still not known (the health table keeps only the latest error). Missing
+world-level words: **a part's frame budget** (a GPU surface's frames are not a list's callbacks), and **the first
+error, not only the latest**, in a part's health.

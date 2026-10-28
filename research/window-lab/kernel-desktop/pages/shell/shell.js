@@ -250,7 +250,9 @@ const Shell = (() => {
       return p ? { state: p.state || "here", note: p.note || "" } : { state: doc.body.classList.contains("away") ? "away" : "here", note: "" };
     },
     async title(key) {
+      if (this.noTitleWord) return null;           // the manager has no wm.title: ask once, not on every hover
       const r = await this.see("wm.title " + key);
+      if (r && (r.ok === false || r.refused) && /nothing answers/.test(r.text || r.refused || "")) this.noTitleWord = true;
       const t = r && r.ok !== false && r.rows && r.rows[0];
       return t || null;
     },

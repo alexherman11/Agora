@@ -225,5 +225,34 @@ class Quiet(unittest.TestCase):
                 gates.clear();wm.latest=(settings,['k1']);wm.manager.gate_cache=(None,-1);wm.tick()
                 self.assertEqual(wm.manager.mode,'live');self.assertEqual(said.call_count,2)   # one 'clear' line
 
+    def test_standing_live_survives_restarts_but_not_the_panic_chord(self):
+        """28 Oct, Alex: 'the window manager keeps booting into non-live mode'. The world's mode is the standing choice."""
+        with tempfile.TemporaryDirectory() as folder:
+            home=Path(folder);leases=[]
+            def lease(_):
+                leases.append(Mock());return leases[-1]
+            def module():
+                wm=WMModule(headless=True);wm.home=home
+                wm.manager=Manager(Mock(),folder,allow_live=True,gate_fn=lambda:[],lease_factory=lease);return wm
+            def tick(wm,settings):
+                wm.latest=(settings,[]);wm.manager.gate_cache=(None,-1)
+                with patch('wm_module.log'):wm.tick()
+            live={**DEFAULTS,'mode':'live','mode_request':'r1'}
+            wm=module();tick(wm,live)
+            self.assertEqual(wm.manager.mode,'live','a restarted module arms from the standing choice')
+            # the lease ends without the panic chord (a missed heartbeat): live again next second
+            (home/'lease.json').write_text(json.dumps({'released':True,'reason':'heartbeat expired'}))
+            leases[-1].heartbeat.side_effect=RuntimeError('guard gone');tick(wm,live)
+            tick(wm,live);self.assertEqual(wm.manager.mode,'live')
+            # the panic chord holds live off, through a restart too, until a new request
+            (home/'lease.json').write_text(json.dumps({'released':True,'reason':'panic'}))
+            leases[-1].heartbeat.side_effect=RuntimeError('panic');tick(wm,live)
+            tick(wm,live);self.assertEqual(wm.manager.mode,'shadow')
+            wm=module();tick(wm,live);self.assertEqual(wm.manager.mode,'shadow','panic outlives a restart')
+            tick(wm,{**live,'mode_request':'r2'});self.assertEqual(wm.manager.mode,'live','a new wm.mode live lifts it')
+            # wm.mode off is a standing off
+            tick(wm,{**live,'mode':'off','mode_request':'r3'});wm2=module();tick(wm2,{**live,'mode':'off','mode_request':'r3'})
+            self.assertEqual((wm.manager.mode,wm2.manager.mode),('off','off'))
+
 
 if __name__=='__main__':unittest.main()

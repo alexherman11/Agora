@@ -67,6 +67,18 @@ def local_page(url):
         return False
 
 
+def page_answers(url, timeout=0.5):
+    """Does the door serving this local page take a connection? (A window on a door that has gone paints white.)"""
+    import socket
+    from urllib.parse import urlsplit
+    u = urlsplit(str(url))
+    try:
+        with socket.create_connection((u.hostname, u.port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
 BAR_H = 66                 # the Agora strip along the bottom, in pixels
 TOP_H = 60                 # a bar along the top (window.open <lens> edge=top)
 # The desktop shell (shell builder, 26 Oct 2026; pages/shell/, shell_native.py, SHELL.md): view -> (name, page, bar kind).
@@ -667,6 +679,7 @@ class WindowHost:
         self.screen = MemScreen() if HEADLESS else GuiScreen(self)
         self.rows = {}                 # wid -> the window thing as last read
         self.applied = {}              # wid -> the box last put on the screen (or recorded from a drag)
+        self.dead_pages = set()        # page windows whose door does not answer: said once, opened when it answers
         self.settle = {}               # wid -> (box, polls seen) while a drag settles
         self.widget_codes = {}
         self.opened = 0
@@ -1089,6 +1102,21 @@ class WindowHost:
                 log(f"window {wid}: url is not a page on this machine; not opened")
                 return
             url = row["url"]
+            if not page_answers(url):
+                # 28 Oct: the old desk on 8794 was archived, and a JEFF window still showing it opened blank white.
+                # Not opened; said once (in refusals); it opens by itself once its door answers again.
+                if wid not in self.dead_pages:
+                    self.dead_pages.add(wid)
+                    from urllib.parse import urlsplit
+                    why = (f"{row.get('name') or wid} shows a page at {urlsplit(url).netloc}, which is not answering, "
+                           f"so it was not opened; window.close {wid} forgets it")
+                    log(f"window {wid}: {why}")
+                    try:
+                        self.m.do(f"failed why={json.dumps(why)} where=window")
+                    except Exception as exc:        # noqa: BLE001  refusals is a courtesy; the window stays shut
+                        log(f"window {wid}: could not say failed: {exc!r}")
+                return
+            self.dead_pages.discard(wid)
         self.applied[wid] = box
         self.geo.put(wid, box)
 

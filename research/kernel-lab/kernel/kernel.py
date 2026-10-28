@@ -1428,6 +1428,10 @@ class Kernel:
                     continue
             by = "" if h.get("by") == "sealed" else str(h.get("for") or h.get("by") or "")
             line = str(r.get('do_bound') or r.get("do") or "").replace("$target", h.get("target") or "").replace("$by", by)
+            resting = self._rule_rests(line)
+            if resting:
+                self.rules_fired = (self.rules_fired + [(rid, h.get("n"), f"resting: {resting} is off")])[-50:]
+                continue
             self._local.rule, self._local.rule_depth = rid, depth + 1
             first = h.get("record")
             if first and first <= len(self.log.records):
@@ -1438,6 +1442,24 @@ class Kernel:
             finally:
                 self._local.rule, self._local.rule_depth, self._local.cause = None, 0, None
             self.rules_fired = (self.rules_fired + [(rid, h.get("n"), out["text"].split("\n")[0])])[-50:]
+
+    def _rule_rests(self, line):
+        """A rule whose line is a word of a module that is off rests with that module (`off guy` is the switch for
+        the guy and for what asks him), so it is not run, and not a refusal each time its happening comes round
+        (28 Oct: three guy rules were refused every few minutes while the guy was off). -> the module's name, or None."""
+        word = (line.split() or [""])[0]
+        with self.lock:
+            try:
+                eid = self.find_entry(word)
+            except Refused:
+                return None
+            if eid is None:
+                return None
+            src, name = self.source(self.entry(eid))
+            if src != "module":
+                return None
+            mid = self.module_named(name)
+            return name if mid and not self.state.get(mid, "on") else None
 
     # ------------------------------------------------------------------ module words
     def module_word(self, actor, st, entry, group, text, press, saw=None):
