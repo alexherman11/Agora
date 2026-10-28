@@ -154,11 +154,13 @@ class Agent:
         mcp = T.mcp_config(URL, self.token_file(), self.dir / "mcp.json")
         session = self.state.get("session") if self.state.get("session_provider") == provider else None
         if provider == "claude":
-            hook = T.compact_hook(URL, self.token_file(), self.cfg.get("charter")) if self.cfg.get("charter") else {}
+            hook = T.compact_hook(URL, self.token_file(), self.cfg.get("charter"), self.cfg.get("id"))
             cmd = T.claude_cmd(T.find_claude(), model, effort, charter, mcp, hook, session)
             env = T.clean_env(self.house.compact_at(), FAKE)
         elif provider == "codex":
-            cmd = T.codex_cmd(model, effort, self.dir / "charter.txt", mcp, session)
+            cmd = T.codex_cmd(model, effort, self.dir / "charter.txt", mcp, session,
+                              context={"url": URL, "token_file": str(self.token_file()),
+                                       "charter": self.cfg.get("charter"), "agent": self.cfg.get("id")})
             env = dict(os.environ)
         else:
             raise RuntimeError(f"{self.name}: unknown provider {provider}")
@@ -208,6 +210,9 @@ class Agent:
         parts = []
         if self.state.pop("welcome_due", None):
             parts.append(self.house.welcome(self))
+        context = self.house.next_steps(self)
+        if context:
+            parts.append(context)
         parts.append(f"~ it is {it_is()}")
         parts += [i["text"] for i in items]
         text = "\n\n".join(parts)
@@ -215,6 +220,9 @@ class Agent:
                      "receipts": [], "line": None, "woken_by": items[-1]["text"].splitlines()[0][:160]}
         if self.child.send(text):
             self.busy = True
+            if context:
+                self.state["next_steps_context"] = context
+            self.state.pop("next_steps_queued", None)
             self.state["last_sent"] = text[-4000:]
             self.log("sent", text)
         else:
@@ -242,6 +250,10 @@ class Agent:
                 self.state["welcome_due"] = "the conversation was compacted"
                 self.state["compactions"] = self.state.get("compactions", 0) + 1
                 self.save()
+                # Claude's read-only hook reinjects within this turn. The shared
+                # continuation also covers transports without a SessionStart hook.
+                if self.cfg.get("next_steps") == "on":
+                    self.wake("~ the conversation was compacted; reconcile your current next steps.")
         elif e == "text":
             self._spoke(ev["text"])
         elif e == "tool":
@@ -384,6 +396,7 @@ class House:
                     a.state["error"] = f"could not start: {exc}"
                     a.save()
         self.ready.set()
+        self.task_changes()
         threading.Thread(target=self.ticker, daemon=True, name="house-live").start()
 
     def load(self):
@@ -439,6 +452,26 @@ class House:
                "Your words in a turn are your own thinking; say <chat> <words> is how anyone hears you. ")
             + "rows chat lists the chats; chat <chat> reads one.")
         return own + (f"\n\n# Your soul ({cfg['soul']}, yours to keep)\n\n{soul}" if soul else "")
+
+    def next_steps(self, a):
+        if a.cfg.get("next_steps") != "on":
+            return ""
+        out = a.door.post("/see", f"rows nextsteps:{a.person}")
+        if not out.get("ok"):
+            return "Next steps unavailable; read rows nextsteps:" + a.person + " before continuing task work."
+        return out.get("text", "")
+
+    def task_changes(self):
+        """Event-driven reread, through each resident's own visibility fence."""
+        for a in self.agents.values():
+            if a.cfg.get("next_steps") != "on" or not getattr(a, "door", None):
+                continue
+            with a.lock:
+                context = self.next_steps(a)
+                fresh = a.state.get("welcome_due") and not a.busy
+                if context and (fresh or context != a.state.get("next_steps_context")) and context != a.state.get("next_steps_queued"):
+                    a.state["next_steps_queued"] = context
+                    a.wake("~ your task projection changed; reconcile current next actions.")
 
     # ---- catching up
     def catch_up(self, a):
@@ -502,14 +535,17 @@ class House:
                                 except Exception as exc:  # noqa: BLE001
                                     a.state["error"] = f"could not start: {exc}"
                                     a.save()
+                self.task_changes()
                 self.publish()
                 return
+        if word not in ("house.doing", "say") and (target or word == "undo"):
+            self.task_changes()
         if target and (word in ("make", "set") or word.startswith("task.")) and "who=" in str(msg.get("text", "")):
             rows = self.m.see(f"look {target}").get("rows") or [{}]
             r = rows[0]
             if r.get("kind") in TASK_KINDS:
                 for a in self.agents.values():
-                    if str(r.get("who", "")).casefold() == a.name.casefold():
+                    if a.cfg.get("next_steps") != "on" and str(r.get("who", "")).casefold() == a.name.casefold():
                         a.wake(f"~ {msg.get('by') or 'someone'} gave you a task: {r.get('title') or target} ({target}); "
                                f"look {target}", record=msg.get("record"))
 

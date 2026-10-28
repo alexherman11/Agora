@@ -182,16 +182,20 @@ def claude_cmd(claude, model, effort, system_prompt, mcp, hook, session=None):
     return cmd
 
 
-def codex_cmd(model, effort, charter_file, mcp, session=None):
+def codex_cmd(model, effort, charter_file, mcp, session=None, context=None):
     """codex_resident.py with the door adapter as its one MCP server (--mcp-config <file>). Unproven with a live model."""
     cmd = [str(PY), str(CODEX), "--model", model, "--reasoning", effort or "medium",
            "--charter-file", str(charter_file), "--mcp-config", mcp]
     if session:
         cmd += ["--resume", session]
+    if context:
+        cmd += ["--kernel-context", json.dumps(context)]
     return cmd
 
 
-def compact_hook(url, token_file, charter):
+def compact_hook(url, token_file, charter, agent=None):
     """Claude's SessionStart hook after a compaction: read the charter again through the door (charter_hook.py)."""
     command = f'"{PY}" "{HERE / "charter_hook.py"}" --url {url} --token-file "{token_file}" --charter {charter}'
+    if agent:
+        command += f" --agent {agent}"
     return {"hooks": {"SessionStart": [{"matcher": "compact", "hooks": [{"type": "command", "command": command}]}]}}

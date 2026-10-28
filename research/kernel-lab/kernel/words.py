@@ -21,6 +21,14 @@ def _k(word, kind, takes, may, undo, help, **more):
 from hosts.web.layout import HELP as PANE_HELP, panes, arrange
 
 KERNEL_ENTRIES = [
+    *[_k("task." + action, "do", "<id> " + takes, "members", "yes", help=help_,
+         bound="task-" + action, aliases="task-" + action)
+      for action, takes, help_ in [
+          ("next", 'next_action=<text> acceptance=<text>', "task.next <task>: retain the next action and acceptance."),
+          ("revise", 'goal=<text> acceptance=<text> request_ref=<ref> next_action=<text>', "task.revise <task>: reconcile intent with the current request."),
+          ("review", 'basis=<token> next_action=<text>', "task.review <task>: designated reviewer acknowledges the current result; clears review_at."),
+          ("verify", 'basis=<token> evidence=<id>', "task.verify <task>: designated reviewer attests acceptance against current visible evidence."),
+          ("followup", 'review_at=<ISO-datetime>', "task.followup <task>: retain an explicit review deadline with timezone; never starts a timer.")]],
     _k('upload', 'do', 'name=<name> [in=<group>]', 'members', 'yes', once='at most 40 per day per person',
        help='upload: send bytes through POST /upload or agora.upload(file). Private file until attach. Size/type/hash are kernel facts; undo removes the file, retaining unreachable bytes.'),
     _k('attach', 'do', '<id> to=<id>', 'members', 'yes',
@@ -790,6 +798,11 @@ def rows(k, actor, st, entry, tx, group, saw=None):
     whoever reads them can act on what it read; in their `order` when they have one, then as made."""
     kv = dict(st.kv)
     kind = kv.pop("kind", None) or (st.words.split() or ["any"])[0].lower()
+    if kind.startswith("nextsteps:"):
+        from .next_steps import rows as next_rows, packet
+        ref = kind.split(":", 1)[1]
+        items = next_rows(k, actor, ref)
+        return {"text": packet(items, ref), "rows": items}
     kv.pop("in", None)
     rows = []
     for t in (list(k.state.things) if kind == "any" else k.things(kind)):
@@ -922,10 +935,12 @@ from .world_words import dictionary_copy, group_word, clock, forgotten
 from .readings import who, recent, kinds, on, press
 from .chat import say, chat as chat_word, closed_sees
 from .store import GONE
+from .next_steps import change as task_change
 from painter.arrangement import component, look_view, components, component_card
 from painter.health import component_health, component_action, personal_view, personal_style, paint_clear
 
 KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant": grant, "widget": widget, "describe": describe,
+          **{"task-" + action: task_change for action in ("next", "revise", "review", "verify", "followup")},
           'upload': upload, 'attach': attach, 'file-result': file_result, 'file-read': file_read,
           'dictionary-copy': dictionary_copy, 'group': group_word, 'clock': clock, 'forgotten': forgotten,
           'component': component, 'look-view': look_view, 'components': components,

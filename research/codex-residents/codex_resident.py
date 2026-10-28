@@ -209,6 +209,23 @@ def event_data(event):
 
 def refresh_charter(client, thread_id, args, emit):
     """A raw developer item is model-visible history, not a synthetic user turn."""
+    if getattr(args, "kernel_context", None):
+        # The new kernel uses the resident's existing door. Do not read an old
+        # world or create a session to refresh its charter and next task rows.
+        hook_dir = Path(__file__).resolve().parents[1] / "kernel-lab" / "modules" / "house"
+        if str(hook_dir) not in sys.path:
+            sys.path.insert(0, str(hook_dir))
+        from charter_hook import context
+        try:
+            text = context(**json.loads(args.kernel_context))
+            client.request("thread/inject_items", {"threadId": thread_id, "items": [
+                {"type": "message", "role": "developer",
+                 "content": [{"type": "input_text", "text": text}]}]},
+                response_model=ThreadInjectItemsResponse)
+            emit({"type": "kernel_context", "ok": True})
+        except Exception as exc:
+            emit({"type": "kernel_context", "ok": False, "error": type(exc).__name__})
+        return
     if not getattr(args, "world", None):
         return
     notation = Path(__file__).resolve().parents[1] / "text-desk-lab" / "notation"
@@ -454,6 +471,7 @@ def main():
     parser.add_argument("--target")
     parser.add_argument("--actor")
     parser.add_argument("--mcp-config", help="a file naming the door adapter as the one MCP server (the kernel's house)")
+    parser.add_argument("--kernel-context", help="House's read-only compaction context, using its existing door")
     args = parser.parse_args()
     try:
         return serve(args)
