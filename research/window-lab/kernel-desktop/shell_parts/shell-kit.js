@@ -168,9 +168,12 @@ const ShellKit = (() => {
       return p ? { state: p.state || 'here', note: p.note || '' } : { state: 'here', note: '' };
     },
     // A live title, asked now and never kept: the manager's word if it has one, else the window's own (window.native).
+    // The manager has no wm.title today (it never hands out titles), so once the kernel says nothing answers to it,
+    // the bar stops asking: each hover was one more line in refusals (28 Oct).
     async title(w) {
-      const r = await this.see('wm.title ' + w.key);
-      const t = !refused(r) && r.rows && r.rows[0];
+      const r = this.noTitleWord ? null : await this.see('wm.title ' + w.key);
+      if (r && refused(r) && /nothing answers/.test(r.text || r.refused || '')) this.noTitleWord = true;
+      const t = r && !refused(r) && r.rows && r.rows[0];
       if (t) return t;
       const hwnd = this.hwnd(w);
       if (hwnd) { try { const title = await agora.native('title', hwnd); if (title) return { title, hwnd }; } catch (e) { /* no grant */ } }

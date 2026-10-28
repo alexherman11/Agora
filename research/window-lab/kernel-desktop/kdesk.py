@@ -48,12 +48,12 @@ if not VENV_PY.is_file():
     VENV_PY = Path(sys.prefix) / "Scripts/python.exe"
 STEWARD_ACCOUNT = "desktop:alex"
 
-WINDOW_GRANTS = "window.* make set forget rows look who hear:make hear:set hear:forget hear:undo hear:off"
+WINDOW_GRANTS = "window.* make set forget rows look who failed hear:make hear:set hear:forget hear:undo hear:off"
 GUY_GRANTS = "guy.* window.list window.overlay rows look holds hear:window.opened"
 SYSTEM_GRANTS = "system.* rows look"
 MEDIA_GRANTS = "media.* rows look"
 SUMMARIZE_GRANTS = "summarize.* model.preview rows make set"
-HOUSE_GRANTS = "house.* rows look chat hear:say hear:make hear:set hear:undo hear:task.*"
+HOUSE_GRANTS = "house.* rows look chat turn around nearby hear:say hear:make hear:set hear:undo hear:task.*"
 JEFF_ACCOUNT = "desktop:jeff"
 THEME_GRANTS = "theme.* make set forget rows look file-read clock hear:set hear:make hear:forget hear:undo"
 
@@ -131,8 +131,25 @@ def after_genesis(k, headless=False):
                         todo.append((g,'words',words+' holds'))
             if ABOUT.get(name) and not k.state.get(m, "about"):
                 todo.append((m, "about", ABOUT[name]))
+        widen = []
+        for m in k.things("module"):
+            spec = next((s for s in module_specs(headless) if s["name"] == k.state.get(m, "name")), None)
+            if spec is None or not k.state.get(m, "on"):
+                continue                 # `off <module>` takes its grants back; a start never hands them out again
+            words, granted = spec["grants"].split(), set()
+            for g in k._grants_to(m):
+                granted |= set(str(k.state.get(g, "words") or "").split())
+            # the words this source asked for when kdesk last started; a word in it that the world no longer grants
+            # was taken back on purpose and stays back. Before 28 Oct nothing was kept, so a word granted nowhere
+            # counts as new once.
+            seen = set(str(k.state.get(m, "asks") or "").split()) or (granted & set(words))
+            more = [w for w in words if w not in seen and w not in granted]
+            if more:
+                widen.append((m, " ".join(more), spec.get("only")))
+            if str(k.state.get(m, "asks") or "") != spec["grants"]:
+                todo.append((m, "asks", spec["grants"]))
         if not todo and not new:
-            return
+            return _widen(k, steward, widen)
         tx = Tx(k)
         tx.part("install", None, "install")
         for t, a, v in todo:
@@ -149,6 +166,17 @@ def after_genesis(k, headless=False):
             if spec.get('only'):
                 tx.set(g, 'only', spec['only'])
         k._commit(tx, by="kernel", words="install: what each module is, whose, and the window grant's narrowing")
+    _widen(k, steward, widen)
+
+
+def _widen(k, steward, widen):
+    """Source now asks for words the world never granted a module (28 Oct: the House's `turn`, the window host's
+    `who`): each is one more `grant`, said as the steward, as it would be said by hand; undo takes it back, and the
+    module's `asks` keeps it from coming back on the next start."""
+    actor = k.actor_of(steward) if widen and steward else None
+    for m, words, only in widen if actor else ():
+        out = k.run(actor, f'grant {m} words="{words}"' + (f" only={only}" if only else ""))
+        print(f"kdesk: {k.state.get(m, 'name')} now needs {words}: {out['text'].splitlines()[0]}", flush=True)
 
 
 def moving_in(k):

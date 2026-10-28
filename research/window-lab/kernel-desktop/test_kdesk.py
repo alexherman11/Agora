@@ -148,9 +148,16 @@ class DesktopTest(unittest.TestCase):
         self.assertEqual(back["box"][0], 24)
 
     def test_a_page_from_another_door_on_this_machine_opens_in_its_own_window(self):
-        # 27 Oct: the top bar's JEFF button opens JEFF's conversation, a lens of the frontier desk on 8794
+        # 27 Oct: the top bar's JEFF button opened JEFF's conversation, a lens of the frontier desk on 8794. That desk
+        # was archived on 27 Oct, and a window on a door that does not answer stays shut (28 Oct), so another door
+        # that answers stands in for it here.
+        import http.server
+        other = http.server.ThreadingHTTPServer(("127.0.0.1", 0), http.server.SimpleHTTPRequestHandler)
+        threading.Thread(target=other.serve_forever, daemon=True).start()
+        self.addCleanup(other.server_close)
+        self.addCleanup(other.shutdown)
         d = self.d
-        page = "http://127.0.0.1:8794/lens.html?session=frontier&as=alex&lens=jeff-chat&inspect=0"
+        page = f"http://127.0.0.1:{other.server_address[1]}/lens.html?session=frontier&as=alex&lens=jeff-chat&inspect=0"
         out = d.say(f'window.open url="{page}" name=JEFF')
         self.assertTrue(out["ok"], out["text"])
         w = d.wait(lambda: d.window("page"))
