@@ -77,6 +77,8 @@ class Kernel:
         self.state = self.log.replay()
         self.keep_dir = self.dir / "keep"
         self.keep_dir.mkdir(parents=True, exist_ok=True)
+        from .refusals import Refusals
+        self.refusals = Refusals(self)                 # refused lines and errors, beside the world (refusals.py)
         self.accounts = self._keep_read("accounts.json", {})
         seal = self.keep_dir / "seal.key"
         if not seal.exists():
@@ -922,7 +924,25 @@ class Kernel:
     # ------------------------------------------------------------------ the act loop
     def run(self, actor, line, press=None, saw=None, mode="do"):
         """A whole line: its steps in order, each its own record; stops at the first refusal, naming what did not run.
-        -> {ok, text, rows, records, made}"""
+        -> {ok, text, rows, records, made}. A refusal or a broken word is kept in `refusals` (refusals.py), once, by
+        the outermost run on this thread: a press whose button's line refuses inside is one refusal."""
+        depth = getattr(self._local, "runs", 0)
+        self._local.runs = depth + 1
+        try:
+            out = self._run(actor, line, press, saw, mode)
+        except Exception as exc:                         # noqa: BLE001  kept, then raised as before
+            if depth == 0:
+                self.refusals.error(exc, line, actor=actor, via="press" if press else "line")
+            raise
+        finally:
+            self._local.runs = depth
+        if depth == 0 and not out.get("ok"):
+            text = out.get("text", "")
+            self.refusals.keep(text[text.find("refused:"):] if "refused:" in text else text, line, actor=actor,
+                               via="press" if press else "line", mode=mode if mode != "do" else None)
+        return out
+
+    def _run(self, actor, line, press=None, saw=None, mode="do"):
         if press:
             with self.lock:
                 for r in self.log.records:
@@ -934,6 +954,7 @@ class Kernel:
         handles = {}
         for i, s in enumerate(steps):
             s = self.fill_handles(s, handles)
+            pressed = None
             try:
                 s, pressed = self.pressed_line(actor, s)       # press <button>: its does= runs here, as a typed line
                 r = self.step(actor, s, press=press if len(steps) == 1 else None, saw=saw, mode=mode)
@@ -941,7 +962,8 @@ class Kernel:
                     r = dict(r, text=f"pressed {pressed}: {r.get('text', '')}")
                 self.keep_handle(s, r.get("made"), handles)
             except Refused as exc:
-                texts.append(f"refused: {exc}")
+                # a pressed button's refusal names the line it ran, so a receipt or `refusals` says which line failed
+                texts.append(f"refused: pressing {pressed} ran {s}: {exc}" if pressed else f"refused: {exc}")
                 if steps[i + 1:]:
                     texts.append(f"not run: {' | '.join(steps[i + 1:])}")
                 out["ok"] = False

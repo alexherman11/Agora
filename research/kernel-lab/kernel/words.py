@@ -180,6 +180,15 @@ KERNEL_ENTRIES = [
     _k("recent", "see", "[by=<name|me>] [kind=<kind>] [since=r<n>] [limit=<n>]", "anyone", "no",
        help="recent [by=<name|me>] [kind=<kind>] [since=r<n>] [limit=<n>]: the latest acts you can see, newest first: "
             "record, time, who, which word, on what. Never facts, never a sealed act's author."),
+    _k("refusals", "see", "[by=<name|me>] [limit=<n>] [errors] [all]", "anyone", "no",
+       help="refusals [by=<name|me>] [limit=<n>] [errors] [all]: the latest refused lines and errors, newest first: "
+            "when, who (and whom a module or widget acted for), the line, and why. From any button, word, module, "
+            "rule or agent; a module that died and a page's failure (failed) land here too. The same refusal again "
+            "is counted (×N), not repeated. A steward sees everyone's; anyone else their own. errors leaves out "
+            "plain refusals. Kept beside the world, never in it: a refusal writes nothing."),
+    _k("failed", "do", "why=<text> [line=<text>] [where=<page>]", "anyone", "no",
+       help="failed why=\"…\" [line=\"…\"] [where=dock]: say that something failed outside any line (a frame "
+            "stopped, a native call threw, a bar fell back), so it lands in refusals. Writes nothing in the world."),
     _k("kinds", "see", "", "anyone", "no",
        help="kinds: every kind of thing you can see, with how many. rows <kind> lists one kind; help <kind> says what "
             "acts on it."),
@@ -933,6 +942,7 @@ from .inpage import widget
 from .blobs import upload, attach, file_result, file_read
 from .world_words import dictionary_copy, group_word, clock, forgotten
 from .readings import who, recent, kinds, on, press
+from .refusals import refusals, failed
 from .chat import say, chat as chat_word, closed_sees
 from .store import GONE
 from .next_steps import change as task_change
@@ -952,4 +962,5 @@ KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant":
           "counts": counts, "test": test, "look": look, "help": help_, "post": post, "like": like, "pin": pin, "undo": undo, "off": off,
           "status": status, "make": make, "set": set_, "forget": forget, "holds": holds, "claim": claim,
           "vote": vote, "role": role, "rows": rows, "find": rows, "verb": verb,
-          "who": who, "recent": recent, "kinds": kinds, "on": on, "press": press, "say": say, "chat": chat_word}
+          "who": who, "recent": recent, "kinds": kinds, "on": on, "press": press, "say": say, "chat": chat_word,
+          "refusals": refusals, "failed": failed}

@@ -279,7 +279,10 @@ const Shell = (() => {
       if (window.__fx && window.__fx.native) return window.__fx.native(name, ...args);
       const a = this.api();
       if (!a || !a[name]) return null;
-      try { return await a[name](...args); } catch (e) { return null; }
+      try { return await a[name](...args); } catch (e) {
+        try { KD.failed(`the window's native ${name} threw: ${(e && e.message) || e}`); } catch (_) { /* no door */ }
+        return null;
+      }
     },
     dpr: () => window.devicePixelRatio || 1,
     // what strip to reserve (CSS px) and where this window is solid (a list of {x,y,w,h,r} in CSS px)

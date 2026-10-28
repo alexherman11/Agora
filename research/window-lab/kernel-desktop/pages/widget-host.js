@@ -20,6 +20,10 @@
   let nextCall=0;
   async function callTurn(){const now=performance.now(),at=Math.max(now,nextCall);nextCall=at+40;if(at>now)await new Promise(resolve=>setTimeout(resolve,at-now))}
   const native = {paint:null, hits:[]};
+  // A failure here, outside any line, is said to the kernel so it lands in `refusals` (kd.js KD.failed, card dk939).
+  // A line the kernel refused is kept there already, so those errors are marked kept and not said again.
+  let partName='';
+  const failed=(why,line)=>{try{window.KD&&KD.failed&&KD.failed(why,line,shell?shell.page+'-bar':(partName||q.get('widget')||'widget'))}catch{}};
   const post = async (action, data={}) => {
     const r = await fetch('/desk/widget/'+action,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({...data,instance})});
@@ -27,6 +31,7 @@
     return r.json();
   };
   const stop = text => {
+    failed('stopped: '+text);
     // A shell bar never shows a whole-window card (its window is mostly see-through and clipped): the page paints the
     // hand-written bar instead, and the shell page tries the components again later.
     if(shell?.fallback){stopped=true;clearTimeout(pollTimer);frame?.remove();frame=null;shell.fallback(text,!!shell.painted);return}
@@ -101,7 +106,7 @@
         if(!['do','see','hear','theme','describe','upload','project','file','download','download-reading'].includes(op))throw Error('Unknown bridge call');
         if(componentView)await callTurn();
         result=await call({op:['file','download'].includes(op)?'file-check':op==='download-reading'?'see':op,line:e.data.line,saw:e.data.saw,word:e.data.word,text:e.data.text,name:e.data.name,data:e.data.data,group:e.data.group,view:e.data.view,target:e.data.target,variant:e.data.variant});
-        if(!result.ok)throw Error(result.text||'Refused');
+        if(!result.ok){const kept=Error(result.text||'Refused');kept.kept=true;throw kept}
         if(op==='hear')heardWords.add(String(e.data.word||''));
         if(op==='file'||op==='download'){
           if(!/^\/files\/[a-zA-Z]+\d+\?variant=(content|thumbnail)$/.test(result.path))throw Error('Invalid file route');
@@ -124,7 +129,7 @@
         }
       }
       send({agora:1,id,result});
-    }catch(err){send({agora:1,id,error:String(err.message||err)})}finally{busy--;waiting.shift()?.()}
+    }catch(err){if(!err?.kept)failed(String(err?.message||err),op==='do'||op==='see'?String(e.data.line||''):op);send({agora:1,id,error:String(err.message||err)})}finally{busy--;waiting.shift()?.()}
   });
   // ---- window.native: what a shell bar may ask its own window, validated here, in the trusted page. Nothing else
   // crosses: no session, no DOM, no other host function. kd_window's PageApi also refuses outside a shell window.
@@ -230,7 +235,7 @@
     const now=performance.now();
     while(restarts.length&&now-restarts[0]>120000)restarts.shift();
     if(restarts.length>=3){stop(why+' It stopped three times in two minutes.');return}
-    restarts.push(now);recovering=true;
+    restarts.push(now);recovering=true;failed('started again: '+why);
     try{
       clearTimeout(pollTimer);phases.clear();frame?.remove();frame=null;
       if(instance){const old=instance;instance=null;fetch('/desk/widget/close',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({instance:old})}).catch(()=>{})}
@@ -266,7 +271,7 @@
       surface.dataset.recoveries=String((+surface.dataset.recoveries||0)+1);
     }catch(e){
       frame=null;old?.remove();surface.replaceChildren(card);
-      detail.textContent=part.component+' · '+String(e.message||e).split('\n')[0];
+      detail.textContent=part.component+' · '+String(e.message||e).split('\n')[0];failed('a stalled '+part.component+' could not recover: '+String(e.message||e).split('\n')[0]);
       const retry=document.createElement('button');retry.textContent='Try again';retry.onclick=()=>location.reload();card.append(retry);
     }finally{recovering=false}
   }
@@ -319,7 +324,7 @@
   async function start(){
     forgive();
     const data=await post('open',{widget:(shell&&shell.widget)||q.get('widget')});if(!data.ok)throw Error(data.text);
-    instance=data.instance;code=data.code;
+    instance=data.instance;code=data.code;partName=String(data.name||'');
     componentView=!!data.component_lens;
     nativeGranted=!!data.native;
     if(shell&&!nativeGranted)throw Error('The '+(data.name||'bar')+' widget holds no window.native grant');

@@ -98,6 +98,9 @@ class ModuleProcess:
                 self.handle(msg)
             except Exception as exc:                # noqa: BLE001  one bad message never stops the reader
                 self.err = (self.err + [f"{msg.get('t')} failed in the kernel: {exc!r}"])[-20:]
+                self.host.kernel.refusals.keep(f"its {msg.get('t')} message failed in the kernel: {exc!r}",
+                                               str(msg.get("line") or msg.get("word") or ""), by=self.mid,
+                                               via="module", kind="error")
         self.stdout_closed.set()
         for p in list(self.pending.values()):
             p["event"].set()                       # the process ended: every open call is answered by its absence
@@ -125,6 +128,7 @@ class ModuleProcess:
             said = k.announce(self.mid, str(msg.get("word") or ""), msg.get("target"), msg.get("text") or "")
             if said != "ok":
                 self.send({"t": "refused", "about": "happen", "word": msg.get("word"), "why": said})
+                k.refusals.keep(said, f"happen {msg.get('word') or ''}", by=self.mid, via="module")
         elif t == "hold":
             lease, why = k.hold(self.mid, str(msg.get("word") or ""))
             self.send({"t": "held", "use": msg.get("use"), "word": msg.get("word"),
@@ -204,6 +208,8 @@ class Host:
                     p = self.procs.pop(mid)
                     if mid in want:                    # on, but its process ended by itself: it died
                         self.died[mid] = (time.time(), (p.err[-1] if p.err else ""))
+                        k.refusals.keep(f"{k.name(mid)} stopped by itself: {'; '.join(p.err[-3:]) or 'it gave no reason'}"
+                                        f"; started again in {self.REST_S:g} s", "", by=mid, via="module", kind="died")
                     k.release(mid=mid)                 # whatever it held ends with it
                     threading.Thread(target=p.stop, daemon=True).start()
             for mid, run in want.items():

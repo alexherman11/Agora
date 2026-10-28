@@ -272,6 +272,7 @@ class Facade:
             out = self.k.run(actor, line, press=body.get("gesture"), saw=saw)
         except Refused as exc:
             out = {'ok': False, 'text': 'refused: ' + str(exc)}
+            self.k.refusals.keep(exc, line, actor=actor, via="press")     # a drop refused before its line ran
         return {"text": out["text"], "error": None if out["ok"] else out["text"], "line": line,
                 "events_total": len(self.k.log.records), "as": self.k.name(actor.id),
                 "created": out.get("made", []), "code": "kernel"}

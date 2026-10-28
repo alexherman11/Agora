@@ -66,6 +66,21 @@ const KD = (() => {
     return out;
   }
 
+  // Something failed here, outside any line (a frame stopped, a native call threw): say it, so it lands in `refusals`
+  // with who and why (card dk939). A refused line needs no report: the kernel keeps those itself. The same failure is
+  // said at most once in ten seconds, and a page says at most 60, so a broken loop cannot flood the log.
+  const told = new Map();
+  function failed(why, line, where) {
+    why = String(why || "").replace(/\s+/g, " ").trim().slice(0, 600);
+    if (!why || told.size >= 60) return;
+    const key = why + "|" + (line || ""), now = Date.now();
+    if (now - (told.get(key) || 0) < 10000) return;
+    told.set(key, now);
+    const quo = (s) => '"' + String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\s+/g, " ").slice(0, 400) + '"';
+    where = String(where || location.pathname.split("/").pop() || "page").replace(/[^\w.:-]/g, "-").slice(0, 60);
+    post("/do", { line: `failed why=${quo(why)}` + (line ? ` line=${quo(line)}` : "") + ` where=${where}` });
+  }
+
   // a window's own strip: its name (drag to move), tuck away, close. Closing is a line, so undo opens it again.
   function chrome(name) {
     document.title = `${name} · Agora`;
@@ -88,5 +103,5 @@ const KD = (() => {
     return `${Math.floor(sec / 86400)} d ago`;
   }
 
-  return { see, act, doLine, stream, el, chrome, receipt, win, target, ago, q };
+  return { see, act, doLine, failed, stream, el, chrome, receipt, win, target, ago, q };
 })();

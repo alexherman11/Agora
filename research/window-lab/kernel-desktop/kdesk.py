@@ -298,6 +298,7 @@ def make_desk_handler(kernel, entry):
                 body_size = int(self.headers.get('Content-Length') or 0)
                 if body_size > max(100000, 4 * ((cap(kernel) + 2) // 3) + 16384):
                     return self._send(413, {'ok': False, 'text': 'bridge message too large'})
+                body = {}
                 try:
                     body = self._body() or {}
                     if body_size > 100000 and body.get('op') != 'upload':
@@ -305,6 +306,11 @@ def make_desk_handler(kernel, entry):
                     out = widgets.request(actor, path.rsplit('/', 1)[-1], body)
                 except (KD.Refused, ValueError, KeyError, TypeError) as e:
                     out = {'ok': False, 'text': 'refused: ' + str(e)}
+                    # refused by the widget broker before any line ran (a lens line's own refusal is kept by the kernel)
+                    if not getattr(e, 'agora_kept', False):
+                        kernel.refusals.keep(e, str(body.get('line') or ''), actor=actor, via='widget',
+                                             where=f"widget {path.rsplit('/', 1)[-1]}",
+                                             kind='refused' if isinstance(e, KD.Refused) else 'error')
                 return self._send(200, out)
             return super().do_POST()
 
