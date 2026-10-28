@@ -205,6 +205,44 @@ def test_publish_preserves_overlapping_uncommitted_source(manager):
     assert not any(a[0]=='merge' for a in called)
 
 
+def landing_repo(manager, edit):
+    """main with a three-line file, a reviewed candidate that changes line three, and someone's uncommitted edit."""
+    b=manager;repo=b.repo;repo.mkdir(exist_ok=True)
+    b.git(repo,'init','-b','main');b.git(repo,'config','user.name','Fixture');b.git(repo,'config','user.email','fixture@invalid')
+    b.git(repo,'config','core.autocrlf','false')         # as in the canonical checkout
+    (repo/'shared.py').write_bytes(b'one\ntwo\nthree\n');(repo/'only.py').write_bytes(b'old\n')
+    b.git(repo,'add','.');b.git(repo,'commit','-qm','base');base=b.git(repo,'rev-parse','HEAD')
+    tree=repo.parent/'tree';b.git(repo,'worktree','add','-q','-b','worker/fx',str(tree))
+    (tree/'shared.py').write_bytes(b'one\ntwo\nthree, landed\n');(tree/'only.py').write_bytes(b'new\n');(tree/'added.py').write_bytes(b'added\n')
+    b.git(tree,'add','.');b.git(tree,'commit','-qm','candidate');cand=b.git(tree,'rev-parse','HEAD')
+    (repo/'shared.py').write_bytes(edit)
+    s=state(manager,'reviewed');s.update(review_base=base,candidate=cand,tree=str(tree))
+    manager.session=lambda _:manager.fixture_door
+    return s,base,cand
+
+
+def test_landing_keeps_someone_elses_uncommitted_edits_on_top(manager):
+    s,base,cand=landing_repo(manager,b'one, being reworked\ntwo\nthree\n')
+    manager.publish(s)
+    repo=manager.repo
+    assert s['phase']=='landed' and manager.git(repo,'rev-parse','HEAD')==cand
+    assert (repo/'shared.py').read_bytes()==b'one, being reworked\ntwo\nthree, landed\n'
+    assert (repo/'only.py').read_bytes()==b'new\n' and (repo/'added.py').read_bytes()==b'added\n'
+    assert manager.git(repo,'diff','--name-only','HEAD')=='shared.py'          # still theirs, still uncommitted
+    assert '+one, being reworked' in manager.git(repo,'diff','HEAD')
+    assert manager.git(repo,'diff','--cached','--name-only')==''
+    assert (manager.home/s['run']/'carried/shared.py').read_bytes()==b'one, being reworked\ntwo\nthree\n'
+
+
+def test_landing_refuses_a_conflict_and_moves_nothing(manager):
+    s,base,cand=landing_repo(manager,b'one\ntwo\nthree, theirs\n')
+    with pytest.raises(RuntimeError,match='conflict'):
+        manager.publish(s)
+    repo=manager.repo
+    assert manager.git(repo,'rev-parse','HEAD')==base
+    assert (repo/'shared.py').read_bytes()==b'one\ntwo\nthree, theirs\n' and (repo/'only.py').read_bytes()==b'old\n'
+
+
 def test_unknown_door_outcome_is_not_retried(manager):
     s=state(manager)
     class Lost(WorldDoor):
@@ -341,3 +379,30 @@ def test_house_commits_what_a_sandboxed_worker_left(tmp_path):
     assert 'BUILD-RESULT.md' in left and '.regression-tmp' in left
     b.commit_worker(s,tree)                                                      # nothing new: no empty commit
     assert b.git(tree,'rev-parse','HEAD')==s['house_commit']['commit']
+
+
+@pytest.mark.parametrize('phase,base,ok',[('reviewed','a',True),('blocked','a',True),('blocked',None,False),
+                                          ('uncertain','a',False),('working',None,False)])
+def test_review_again_only_after_a_review(manager,phase,base,ok):
+    """A reviewed result whose main moved, or one whose review checks failed, may be reviewed again by its
+    requester; a worker failure before review, an uncertain or an active run may not."""
+    s=state(manager,phase)
+    if base:s['review_base']=base
+    manager.review=lambda st:None
+    out=manager.request_review(msg())
+    assert ('refused' not in out)==ok,out
+
+
+def test_a_landed_or_released_card_may_have_a_new_run(manager,monkeypatch):
+    """Landed then reverted (dk1025, 27 Oct): the requester can start a second run; the first is kept, marked
+    superseded, and never reloaded over the new one. An active run still refuses."""
+    started=[]
+    monkeypatch.setattr(B.threading,'Thread',lambda target,args,daemon:SimpleNamespace(start=lambda:started.append(args[0])))
+    s=state(manager,'working')
+    assert 'refused' in manager.start(msg()) or 'existing request' in manager.start(msg()).get('text','')
+    s['phase']='landed'
+    out=manager.start(msg())
+    assert out.get('external'),out
+    new=manager.states['dk1']
+    assert new['run']!=s['run'] and new['previous_run']==s['run'] and s['superseded_by']==new['run']
+    assert started==[new]

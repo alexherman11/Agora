@@ -77,6 +77,8 @@ class Builders:
         self.stopping = False
         for path in self.home.glob('*/state.json'):
             state = json.loads(path.read_text(encoding='utf-8'))
+            if state.get('superseded_by'):        # an earlier run of a card that has had a new one
+                continue
             if state['phase'] in ACTIVE:
                 state.update(phase='recovery-needed', detail='House restarted during an operation; inspect retained process, branch and receipts before resuming')
             rows=house.m.see('look '+state['task']).get('rows') or []
@@ -159,13 +161,17 @@ class Builders:
         if not rows or rows[0].get('kind') not in ('taskboard-task', 'task'):
             return {'refused': 'choose a visible task card'}
         task = rows[0]
-        if held(task) or task.get('builder') or task.get('build_run'):
+        # A card may have a new run once its last one landed or was released (e.g. landed then reverted).
+        prev = self.states.get(target)
+        again = bool(prev) and prev['phase'] in ('landed', 'released') and target not in self.children
+        claimed = task.get('builder') or task.get('build_run')
+        if held(task) or (claimed and not (again and task.get('build_run') in (prev['run'], None, ''))):
             return {'refused': 'task is held, finished, or already has a builder; reconcile it before a new build'}
         if task.get('who') and task.get('who') not in (caller.get('name'), 'JEFF'):
             return {'refused': 'task has another owner; ask that owner to release it first'}
         self.session(caller['person'])  # validate before recording or spawning anything
         with self.lock:
-            if target in self.states:
+            if target in self.states and not again:
                 return {'text': 'existing request: ' + self.states[target]['phase'], 'rows': [self.row(self.states[target])]}
             if sum(s['phase'] in ACTIVE or s['task'] in self.children for s in self.states.values()) >= self.capacity:
                 return {'refused': 'both builder slots are occupied; no request was queued'}
@@ -174,6 +180,10 @@ class Builders:
                          title=task.get('title') or target, phase='asked', detail='claim pending',
                          model='gpt-6.1-sol', reasoning='medium', created=stamp(), activity=[],
                          task_owner=task.get('who',''), pending=[], basis={k:task.get(k,'') for k in ('title','text','acceptance','who')})
+            if again:
+                state['previous_run'] = prev['run']
+                prev['superseded_by'] = run
+                self.save(prev)
             self.states[target] = state
             self.save(state)
             threading.Thread(target=self.guarded, args=(state, self.build), daemon=True).start()
@@ -197,7 +207,8 @@ class Builders:
     def build(self, state):
         door = self.session(state['requester'])
         task = door.look(state['task'])
-        if held(task) or task.get('builder') or task.get('build_run') or task.get('who','') != state['task_owner']:
+        if (held(task) or task.get('build_run') not in (state.get('previous_run'), None, '')
+                or (task.get('builder') and not state.get('previous_run')) or task.get('who','') != state['task_owner']):
             raise RuntimeError('task changed before claim; nothing launched')
         claim = door.call('/do', 'set '+state['task']+' builder='+q(state['name'])+' build=asked build_run='+q(state['run']),
                           saw={state['task']: int(task['rev'])})
@@ -397,8 +408,13 @@ Assistant, October 27: "Found the blocker: the new world is running, but its Hou
         if not state or state['requester'] != msg.get('caller', {}).get('person'):
             return {'refused': 'only the requester may review this build'}
         with self.lock:
-            if state['phase'] != 'received' or state['task'] in self.children or state.get('pending'):
-                return {'refused': 'review requires a received result, not an active or uncertain worker'}
+            # Review again: after main moved past a reviewed result, or after a review whose checks failed (the run
+            # stays blocked with its review receipts). Never an active, uncertain or pre-review failure.
+            again = state['phase'] == 'reviewed' or (state['phase'] == 'blocked' and state.get('review_base'))
+            if (state['phase'] != 'received' and not again) or state['task'] in self.children or state.get('pending'):
+                return {'refused': 'review requires a received, reviewed or review-failed result, not an active or uncertain worker'}
+            if again:
+                self.event(state, 'review-again', 'independent checks requested again on the current main')
             state['phase'] = 'reviewing'
             self.save(state)
             threading.Thread(target=self.guarded, args=(state, self.review), daemon=True).start()
@@ -475,12 +491,74 @@ Assistant, October 27: "Found the blocker: the new world is running, but its Hou
             raise RuntimeError('candidate changed after review')
         changed = self.git(state['tree'], 'diff', '--name-only', state['review_base'], state['candidate']).splitlines()
         dirty = self.git(self.repo, 'diff', 'HEAD', '--name-only').splitlines()
-        if set(changed) & set(dirty):
-            raise RuntimeError('canonical uncommitted edits overlap candidate; preserve both and reconcile')
-        self.git(self.repo, 'merge', '--ff-only', state['candidate'])
+        overlap = sorted(set(changed) & set(dirty))
+        if not overlap:
+            self.git(self.repo, 'merge', '--ff-only', state['candidate'])
+        else:
+            self.carry_over(state, changed, overlap)
         state['landed_commit'] = self.git(self.repo, 'rev-parse', 'HEAD')
         self.phase(state, 'landed', 'source landed; activation and owner outcome verification remain',
                    landed_commit=state['landed_commit'], outcome='unverified')
+
+    def carry_over(self, state, changed, overlap):
+        """Land while someone else's uncommitted edits sit in files the candidate also changes (Alex, 28 Oct: land
+        just the builder's code while another session reworks its own). Each such file gets a three-way merge
+        (main, the edited file, the candidate); any conflict refuses before anything moves. Then main moves to the
+        candidate and the edited files keep their edits on top, still uncommitted. Copies go to the run folder."""
+        base, cand = state['review_base'], state['candidate']
+        folder = self.home/state['run']/'carried'
+        merged = {}
+        for f in overlap:
+            path = self.repo/f
+            if not path.is_file() or not self.git(self.repo, 'ls-tree', '--name-only', cand, '--', f):
+                raise RuntimeError(f'canonical uncommitted edits overlap candidate on {f} (added or deleted); reconcile by hand')
+            mine = path.read_bytes()
+            text = self.merge_file(mine, self.show(base, f), self.show(cand, f))
+            if text is None:
+                raise RuntimeError(f'canonical uncommitted edits conflict with candidate in {f}; preserve both and reconcile')
+            (folder/f).parent.mkdir(parents=True, exist_ok=True)
+            (folder/f).write_bytes(mine)
+            merged[f] = (mine, text)
+        self.git(self.repo, 'update-ref', '-m', 'House landing '+state['run'], 'refs/heads/main', cand, base)
+        self.git(self.repo, 'reset', '-q', cand, '--', *changed)
+        clean = [f for f in changed if f not in merged]
+        for f in clean:
+            if self.git(self.repo, 'ls-tree', '--name-only', cand, '--', f):
+                self.git(self.repo, 'checkout', '-q', '--', f)
+            elif (self.repo/f).exists():
+                (self.repo/f).unlink()
+        late = []
+        for f, (mine, text) in merged.items():
+            path = self.repo/f
+            now = path.read_bytes()
+            if now != mine:          # edited again while landing: merge the newest edits instead
+                text = self.merge_file(now, self.show(base, f), self.show(cand, f))
+                if text is None:
+                    late.append(f)
+                    continue
+            path.write_bytes(text)
+        self.event(state, 'carried', 'kept uncommitted edits on top of the landed code in ' + ', '.join(overlap)
+                   + (f'; NOT merged (edited during landing, conflicts): {", ".join(late)}' if late else '')
+                   + f'; copies in {folder}')
+        if late:
+            raise RuntimeError('landed, but uncommitted edits in ' + ', '.join(late) + ' conflict with it; see ' + str(folder))
+
+    def show(self, rev, f):
+        with self.git_lock:
+            return subprocess.run(['git', '-C', str(self.repo), 'cat-file', '--filters', f'{rev}:{f}'], capture_output=True, check=True,
+                                  stdin=subprocess.DEVNULL, timeout=60, creationflags=T.NO_WINDOW).stdout
+
+    def merge_file(self, mine, base, theirs):
+        """git merge-file on three byte strings; the merged bytes, or None on any conflict."""
+        with tempfile.TemporaryDirectory() as d:
+            paths = []
+            for name, data in (('mine', mine), ('base', base), ('theirs', theirs)):
+                p = Path(d)/name
+                p.write_bytes(data)
+                paths.append(str(p))
+            proc = subprocess.run(['git', 'merge-file', *paths], capture_output=True, stdin=subprocess.DEVNULL,
+                                  timeout=60, creationflags=T.NO_WINDOW)
+            return Path(paths[0]).read_bytes() if proc.returncode == 0 else None
 
     def row(self, state):
         phase = state['phase']
