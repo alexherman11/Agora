@@ -496,8 +496,19 @@ Assistant, October 27: "Found the blocker: the new world is running, but its Hou
             raise RuntimeError('worker has uncommitted tracked changes; source review held')
         state['self_proof_sha256'] = hashlib.sha256(report.read_bytes()).hexdigest()
         base = self.git(self.repo, 'rev-parse', 'main')
+        # Recorded before the merge, so a review that stops here may be asked for again (28 Oct: Pike's review hit a
+        # kdesk.py conflict with the Rowan work and could not be reviewed again).
+        state['review_base'] = base
+        self.save(state)
         if base != state['base']:
-            self.git(tree, 'merge', '--no-edit', base)
+            try:
+                self.git(tree, 'merge', '--no-edit', base)
+            except RuntimeError:
+                # Never leave conflict markers for the next review's commit to pick up.
+                conflicted = self.git(tree, 'diff', '--name-only', '--diff-filter=U').split()
+                self.git(tree, 'merge', '--abort')
+                raise RuntimeError('main conflicts with this worker in ' + ', '.join(conflicted or ['some files'])
+                                   + '; merge main into the worker branch by hand, then review again') from None
         candidate = self.git(tree, 'rev-parse', 'HEAD')
         state.update(review_base=base, candidate=candidate, checks=[])
         self.phase(state, 'reviewing', 'independent kernel and hidden desktop checks on '+candidate[:12])
