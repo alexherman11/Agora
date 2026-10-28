@@ -426,6 +426,7 @@ class RecoveryTest(unittest.TestCase):
         import subprocess
         import taskbar_guard as guard
         self.C, self.W, self.guard = C, W, guard
+        (HERE / 'state').mkdir(exist_ok=True)        # ignored by git, so absent in a fresh House worktree
         self.tmp = tempfile.TemporaryDirectory(prefix='taskbar-probe-', dir=HERE / 'state')
         self.lease = Path(self.tmp.name) / 'lease.json'
         self.u = C.WinDLL('user32')
