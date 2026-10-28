@@ -353,3 +353,18 @@ def test_review_again_only_after_a_review(manager,phase,base,ok):
     manager.review=lambda st:None
     out=manager.request_review(msg())
     assert ('refused' not in out)==ok,out
+
+
+def test_a_landed_or_released_card_may_have_a_new_run(manager,monkeypatch):
+    """Landed then reverted (dk1025, 27 Oct): the requester can start a second run; the first is kept, marked
+    superseded, and never reloaded over the new one. An active run still refuses."""
+    started=[]
+    monkeypatch.setattr(B.threading,'Thread',lambda target,args,daemon:SimpleNamespace(start=lambda:started.append(args[0])))
+    s=state(manager,'working')
+    assert 'refused' in manager.start(msg()) or 'existing request' in manager.start(msg()).get('text','')
+    s['phase']='landed'
+    out=manager.start(msg())
+    assert out.get('external'),out
+    new=manager.states['dk1']
+    assert new['run']!=s['run'] and new['previous_run']==s['run'] and s['superseded_by']==new['run']
+    assert started==[new]

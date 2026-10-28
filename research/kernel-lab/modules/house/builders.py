@@ -77,6 +77,8 @@ class Builders:
         self.stopping = False
         for path in self.home.glob('*/state.json'):
             state = json.loads(path.read_text(encoding='utf-8'))
+            if state.get('superseded_by'):        # an earlier run of a card that has had a new one
+                continue
             if state['phase'] in ACTIVE:
                 state.update(phase='recovery-needed', detail='House restarted during an operation; inspect retained process, branch and receipts before resuming')
             rows=house.m.see('look '+state['task']).get('rows') or []
@@ -159,13 +161,17 @@ class Builders:
         if not rows or rows[0].get('kind') not in ('taskboard-task', 'task'):
             return {'refused': 'choose a visible task card'}
         task = rows[0]
-        if held(task) or task.get('builder') or task.get('build_run'):
+        # A card may have a new run once its last one landed or was released (e.g. landed then reverted).
+        prev = self.states.get(target)
+        again = bool(prev) and prev['phase'] in ('landed', 'released') and target not in self.children
+        claimed = task.get('builder') or task.get('build_run')
+        if held(task) or (claimed and not (again and task.get('build_run') in (prev['run'], None, ''))):
             return {'refused': 'task is held, finished, or already has a builder; reconcile it before a new build'}
         if task.get('who') and task.get('who') not in (caller.get('name'), 'JEFF'):
             return {'refused': 'task has another owner; ask that owner to release it first'}
         self.session(caller['person'])  # validate before recording or spawning anything
         with self.lock:
-            if target in self.states:
+            if target in self.states and not again:
                 return {'text': 'existing request: ' + self.states[target]['phase'], 'rows': [self.row(self.states[target])]}
             if sum(s['phase'] in ACTIVE or s['task'] in self.children for s in self.states.values()) >= self.capacity:
                 return {'refused': 'both builder slots are occupied; no request was queued'}
@@ -174,6 +180,10 @@ class Builders:
                          title=task.get('title') or target, phase='asked', detail='claim pending',
                          model='gpt-6.1-sol', reasoning='medium', created=stamp(), activity=[],
                          task_owner=task.get('who',''), pending=[], basis={k:task.get(k,'') for k in ('title','text','acceptance','who')})
+            if again:
+                state['previous_run'] = prev['run']
+                prev['superseded_by'] = run
+                self.save(prev)
             self.states[target] = state
             self.save(state)
             threading.Thread(target=self.guarded, args=(state, self.build), daemon=True).start()
@@ -197,7 +207,8 @@ class Builders:
     def build(self, state):
         door = self.session(state['requester'])
         task = door.look(state['task'])
-        if held(task) or task.get('builder') or task.get('build_run') or task.get('who','') != state['task_owner']:
+        if (held(task) or task.get('build_run') not in (state.get('previous_run'), None, '')
+                or (task.get('builder') and not state.get('previous_run')) or task.get('who','') != state['task_owner']):
             raise RuntimeError('task changed before claim; nothing launched')
         claim = door.call('/do', 'set '+state['task']+' builder='+q(state['name'])+' build=asked build_run='+q(state['run']),
                           saw={state['task']: int(task['rev'])})
