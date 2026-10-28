@@ -305,6 +305,8 @@ class GuiScreen(Screen):
 
     def start(self, then):
         import widget_guard
+        import window_profiles
+        window_profiles.install()
         widget_guard.install()
         # pywebview needs a window before start: a hidden one that holds the loop and shows nothing
         self.anchor = self.webview.create_window("Agora window host", html="<html></html>", hidden=True,
