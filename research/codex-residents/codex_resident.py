@@ -84,7 +84,7 @@ def deny(method, params):
     return {"decision": "decline"}
 
 
-def runtime_config(directory, binary=None, model=MODEL):
+def runtime_config(directory, binary=None, model=MODEL, *, door=False):
     from runtime_pin import catalog_matches, ensure_runtime
 
     lock = ensure_runtime()
@@ -97,7 +97,7 @@ def runtime_config(directory, binary=None, model=MODEL):
     catalog = Path(__file__).with_name("model-catalog.json")
     if not catalog_matches(catalog, lock["catalog_sha256"]):
         raise RuntimeError("Pinned resident catalog changed")
-    return build_config(directory, binary, PROFILE, model=model)
+    return build_config(directory, binary, PROFILE, model=model, door=door)
 
 
 def model_catalog(model):
@@ -133,7 +133,7 @@ def require_subscription(client):
     return "chatgpt"
 
 
-def build_config(directory, binary, profile, model=MODEL):
+def build_config(directory, binary, profile, model=MODEL, *, door=False):
     """Configuration only; candidate probes use their own empty profile."""
     if importlib.metadata.version("openai-codex") != SDK_VERSION:
         raise RuntimeError(
@@ -141,7 +141,11 @@ def build_config(directory, binary, profile, model=MODEL):
         )
     if any((Path(profile) / name).exists() for name in ("AGENTS.md", "AGENTS.override.md")):
         raise RuntimeError("Resident profile contains global instructions; keep its prompt empty")
-    overrides = [f"features.{name}=false" for name in DISABLED] + [
+    # Same pinned discovery wrapper already verified by codex_worker. Only the
+    # explicit kernel door opts in; shell, files, web and other built-ins stay off.
+    enabled = {"code_mode", "code_mode_host"} if door else set()
+    overrides = [f"features.{name}=false" for name in DISABLED if name not in enabled]
+    overrides += [f"features.{name}=true" for name in sorted(enabled)] + [
         'web_search="disabled"',
         "tools.update_plan.enabled=false",
         "tools.experimental_request_user_input.enabled=false",
@@ -177,6 +181,16 @@ def build_config(directory, binary, profile, model=MODEL):
         client_name="agora_desk_resident",
         client_title="Agora Desk resident",
     )
+
+
+def kernel_door_server(path):
+    """Only the existing native person's three authorized world tools."""
+    servers = json.loads(Path(path).read_text(encoding="utf-8"))["mcpServers"]
+    if set(servers) != {"agora"}:
+        raise ValueError("resident MCP configuration must contain only the Agora door")
+    names = ["see", "do", "lines"]
+    return {**servers["agora"], "enabled": True, "enabled_tools": names,
+            "tools": {name: {"approval_mode": "approve"} for name in names}}
 
 
 def thread_parameters(client, directory, model, *, config=None, ephemeral=False):
@@ -371,7 +385,7 @@ def serve(args):
     # A house closes stdin to stop a resident. Interrupt an in-flight model turn,
     # including when EOF arrives while the main thread waits for runtime events.
     threading.Thread(target=read_input, daemon=True).start()
-    with CodexClient(runtime_config(directory, model=args.model), approval_handler=deny) as client:
+    with CodexClient(runtime_config(directory, model=args.model, door=bool(getattr(args, "mcp_config", None))), approval_handler=deny) as client:
         client.initialize()
         require_subscription(client)
         available = {m.model: m for m in client.model_list(True).data}
@@ -385,8 +399,7 @@ def serve(args):
         if getattr(args, "mcp_config", None):
             # The kernel's house (kernel-lab/modules/house): the door adapter as this resident's one MCP server,
             # with its own session. Every other configured server stays disabled. Unproven with a live model.
-            server = json.loads(Path(args.mcp_config).read_text(encoding="utf-8"))["mcpServers"]["agora"]
-            parameters["config"]["mcp_servers"]["agora"] = server
+            parameters["config"]["mcp_servers"]["agora"] = kernel_door_server(args.mcp_config)
         if getattr(args, "charter_file", None):
             parameters["developerInstructions"] = Path(args.charter_file).read_text(
                 encoding="utf-8")
