@@ -320,3 +320,24 @@ def test_codex_public_text_is_not_duplicated_by_final_aggregate():
     got=[]
     while not child.events.empty():got.append(child.events.get())
     assert [e['text'] for e in got if e['e']=='text']==['Progress']
+
+
+def test_house_commits_what_a_sandboxed_worker_left(tmp_path):
+    """The worker sandbox cannot write .git (index.lock denied), so review commits its tree to the worker's own
+    branch: new and changed source go in; BUILD-RESULT.md and top-level dot-folders (temp fixtures) stay out."""
+    h=SimpleNamespace(home=tmp_path/'home',m=SimpleNamespace(happen=lambda *a:None))
+    repo=tmp_path/'repo';repo.mkdir();b=B.Builders(h,repo)
+    b.git(repo,'init','-b','main');b.git(repo,'config','user.name','Fixture');b.git(repo,'config','user.email','fixture@invalid')
+    (repo/'value.txt').write_text('before');b.git(repo,'add','.');b.git(repo,'commit','-m','base')
+    tree=tmp_path/'tree';b.git(repo,'worktree','add','-b','worker/x',str(tree),'main')
+    (tree/'value.txt').write_text('after');(tree/'pkg').mkdir();(tree/'pkg'/'new.py').write_text('x=1\n')
+    (tree/'BUILD-RESULT.md').write_text('proof');(tree/'.regression-tmp').mkdir();(tree/'.regression-tmp'/'log').write_text('t')
+    s=dict(task='t1',run='kernel-t1-x',name='Codex — fixture',activity=[])
+    b.commit_worker(s,tree)
+    assert sorted(s['house_commit']['files'])==['pkg/new.py','value.txt']
+    assert b.git(tree,'status','--porcelain','--untracked-files=no')==''
+    assert b.git(repo,'rev-parse','main')!=s['house_commit']['commit']          # its own branch, never main
+    left=b.git(tree,'status','--porcelain')
+    assert 'BUILD-RESULT.md' in left and '.regression-tmp' in left
+    b.commit_worker(s,tree)                                                      # nothing new: no empty commit
+    assert b.git(tree,'rev-parse','HEAD')==s['house_commit']['commit']
