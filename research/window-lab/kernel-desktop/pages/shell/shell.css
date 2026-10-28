@@ -63,13 +63,13 @@ button { appearance: none; border: 0; background: transparent; padding: 0; margi
   -webkit-mask: var(--src) center / contain no-repeat; mask: var(--src) center / contain no-repeat; pointer-events: none; }
 
 /* ---- the top bar */
-body[data-page="top"] .rail { position: absolute; z-index: 2; left: 0; right: 0; top: 0; height: var(--bh); display: flex; align-items: center; justify-content: space-between;
-  padding: 0 var(--go); background: var(--rail); -webkit-backdrop-filter: var(--bd); backdrop-filter: var(--bd);
+body[data-page="top"] .rail { position: absolute; z-index: 2; left: 0; right: 0; top: 0; height: max(var(--bh), var(--readout-height, 0px)); display: flex; align-items: center; justify-content: space-between;
+  padding: 0 calc(var(--go) + var(--readout-width, 0px)) 0 var(--go); background: var(--rail); -webkit-backdrop-filter: var(--bd); backdrop-filter: var(--bd);
   border-bottom: var(--bw) solid color-mix(in srgb, var(--ag-border) 45%, transparent); }
 .isle { display: flex; align-items: center; gap: 2px; height: var(--ih); padding: 0 3px; border-radius: var(--rp); background: var(--island);
   -webkit-backdrop-filter: var(--bd); backdrop-filter: var(--bd); border: var(--bw) solid transparent; }
 [data-outline="yes"] .isle { border-color: var(--hair); }
-.isle.mid { position: absolute; left: 50%; transform: translateX(-50%); }
+.isle.mid { position: absolute; left: calc(50% - var(--readout-width, 0px) / 2); transform: translateX(-50%); }
 .btn { position: relative; display: inline-flex; align-items: center; gap: 7px; height: calc(var(--ih) - 6px); padding: 0 11px; border-radius: min(var(--rp), var(--rm));
   transition: background var(--fast) var(--ease), color var(--fast) var(--ease); white-space: nowrap; }
 .btn:hover { background: var(--hover); }

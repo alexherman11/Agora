@@ -283,7 +283,23 @@ const Shell = (() => {
     },
     dpr: () => window.devicePixelRatio || 1,
     // what strip to reserve (CSS px) and where this window is solid (a list of {x,y,w,h,r} in CSS px)
-    layout(spec) { window.__layout = spec; return this.call("layout", JSON.stringify(spec), this.dpr()); },
+    async layout(spec) {
+      window.__layout = spec;
+      const reply = await this.call("layout", JSON.stringify(spec), this.dpr());
+      const rail = doc.querySelector('.rail');
+      if (rail && reply && typeof reply === 'object') {
+        const slot = reply.readout || {};
+        const width = `${Math.max(0, Math.min(520, +slot.width || 0))}px`;
+        const height = `${Math.max(0, Math.min(52, +slot.height || 0))}px`;
+        if (rail.style.getPropertyValue('--readout-width') !== width ||
+            rail.style.getPropertyValue('--readout-height') !== height) {
+          rail.style.setProperty('--readout-width', width);
+          rail.style.setProperty('--readout-height', height);
+          Shell.report();
+        }
+      }
+      return reply;
+    },
   };
 
   // ------------------------------------------------------------------------------------------------ popovers

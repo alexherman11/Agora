@@ -434,6 +434,9 @@ class GuiScreen(Screen):
                 else:
                     user32.ShowWindow(hwnd, SW_SHOWNOACTIVATE)
                     user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE)
+                    if (self.wins.get(wid) or {}).get("view") == "shell-top":
+                        import performance_overlay
+                        performance_overlay.accommodate(hwnd)
             time.sleep(0.5)
 
     def close(self, wid):
@@ -510,6 +513,9 @@ class GuiScreen(Screen):
         bar = self.bars.get(wid)
         if bar and spec.get("reserve"):
             bar.resize(int(round(float(spec["reserve"]) * dpr)))
+        if rec.get("view") == "shell-top":
+            import performance_overlay
+            return dict(ok=ok, readout=performance_overlay.accommodate(rec["hwnd"]))
         return ok
 
     def shell_thumbs(self, wid, tiles, dpr):

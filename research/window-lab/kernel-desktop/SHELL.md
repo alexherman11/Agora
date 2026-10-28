@@ -357,6 +357,27 @@ the desktop layer over real icons, and real 150% DPI scaling beyond a 3840x2160 
 
 ## Rough spots (source edits and the world-level word that was missing)
 
+Builder, 27 Oct (NVIDIA performance readout behind the top bar; owner review pending):
+
+- **Read/observed:** NVIDIA Overlay.exe owns full-monitor `CEF-OSC-WIDGET` surfaces;
+  the compact FPS/GPU/CPU/LAT text crosses the 57-device-pixel bar edge at 150% DPI.
+  Moving that full-monitor window would displace other NVIDIA UI.
+- `performance_overlay.py`, `shell_native.py`, `kd_window.py`: identify only visible,
+  topmost NVIDIA CEF surfaces covering our bar. Place only Agora's top bar behind
+  them, including after bar placement and full-screen return. No NVIDIA input,
+  settings, size, position, process or window-manager rules are changed.
+- `pages/shell/shell.css`, `pages/shell/shell.js`, `shell_parts/shell-kit.js`:
+  the existing own-window layout reply supplies a readout slot (520 by 52 CSS px).
+  Both painters leave the right side clear and reserve the full increased rail
+  height through the existing AppBar mechanism. Missing world-level word:
+  a foreign overlay's occupied paint rectangle. NVIDIA publishes a full-screen
+  surface, so this adapter uses the compact top-right strip observed on Alex's
+  desktop rather than claiming to discover arbitrary overlay content bounds.
+- **Ran:** selection, ownership and fresh-screen layout tests; browser rendering
+  blocked by fixture startup/cleanup permissions. See BUILD-RESULT.md for exact
+  results and activation requirements. Live source activation and actual window
+  module restart remain for owner review; this is not a live acceptance claim.
+
 Post these on the Rough spots note (f747); I did not write to the live world.
 
 1. `kd_window.py` `SHELL_VIEWS`, `AppBar.resize`, `PageApi.layout/thumbs`: a window needs to say its own shape and reserved strip. Missing word: `window.shape <rects>` and `window.reserve <px>`, written by a page to its own window.
