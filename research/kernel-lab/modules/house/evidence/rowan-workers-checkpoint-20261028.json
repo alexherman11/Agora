@@ -1,0 +1,67 @@
+{
+  "at_utc": "2026-10-28T20:40:02Z",
+  "manager_source": "4c259b5d4c1a83b9ae2c0addf6e18e489339e8f1",
+  "adapter_source": "a34a3e4e7450be7561f0cd1b52e01888ef70339e",
+  "rowan": {
+    "person": "dk1190",
+    "agent": "dk1196",
+    "session": "01a1842e-15f0-7521-bdc5-45fc7c6a5e7a",
+    "turns": 8
+  },
+  "workers": [
+    {
+      "name": "Codex \u2014 Paste a screenshot into the JEFF chat",
+      "task": "dk1017",
+      "doing": "working",
+      "now": "authenticated Codex turn running",
+      "turns": 1,
+      "session": "01a18432-387d-7d41-a3a1-fd5756d18218",
+      "error": ""
+    },
+    {
+      "name": "Codex \u2014 Unpin things from the bottom dock",
+      "task": "dk1144",
+      "doing": "working",
+      "now": "authenticated Codex turn running",
+      "turns": 3,
+      "session": "01a18432-456a-7373-aa65-da32d65a292f",
+      "error": ""
+    },
+    {
+      "name": "Codex \u2014 Twitch chat in the new world",
+      "task": "dk1140",
+      "doing": "working",
+      "now": "authenticated Codex turn running",
+      "turns": 3,
+      "session": "01a18432-55b6-7010-a85a-2d2fd1c067f3",
+      "error": ""
+    }
+  ],
+  "manager_test_correction": {
+    "reproduction": "1 failed, 7 passed in 1.90s",
+    "cause": "process-wide Thread.start mock counted unrelated fixture threads",
+    "repair": "mock only builders.threading namespace; assert exact task launch arguments",
+    "verification": "43 passed in 2.21s"
+  },
+  "feature_test_hold": "Unpin and Twitch fixture operations denied before behavioral assertions. No retry or scratch relocation. Old Writing remains separately held.",
+  "screenshot_receipt": {
+    "source_report": ".worktrees/kernel-dk1017-ecb96f9ad0/BUILD-RESULT.md",
+    "in_memory_checks": "Ran 5 tests; OK (0.084s)",
+    "runtime_checks": "Ran 7 tests; FAILED (errors=7), setup WinError 5; no assertions",
+    "browser_check": "prepared, unrun"
+  },
+  "native_review": {
+    "messages": [
+      "dk1228",
+      "dk1230",
+      "dk1233"
+    ],
+    "findings": [
+      "stale reorder writes",
+      "menu registration cleanup",
+      "unpin hiding launcher entries",
+      "overly broad widget undo grant"
+    ],
+    "disposition": "source-only corrections requested; broader grant refused; fixture denials held"
+  }
+}

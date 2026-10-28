@@ -25,12 +25,16 @@ def test_unapproved_caller_and_task_never_dispatch(manager,m):
 
 def test_three_tasks_dispatch_as_requester_without_escalation(manager):
     manager.fixture_door.task['who']='Alex'
-    with patch('builders.threading.Thread.start') as start:
+    # Mock the builder's imported namespace, not process-wide Thread.start:
+    # resident fixtures can still finish unrelated background callbacks.
+    with patch('builders.threading', SimpleNamespace(Thread=Mock())) as threads:
         for task in ('dk1','dk2'):
             assert M.dispatch(manager,request(task)).get('external')
             assert manager.states[task]['manager']=='dk99'
         assert 'refused' in M.dispatch(manager,request('dk3'))  # default pool two
-        assert start.call_count==2
+        assert threads.Thread.call_count==2
+        assert threads.Thread.return_value.start.call_count==2
+        assert [call.kwargs['args'][0]['task'] for call in threads.Thread.call_args_list]==['dk1','dk2']
 
 @pytest.mark.parametrize('change',[{'enabled':False},{'tasks':['dk1','dk2','dk3','dk4']},{'approval':''}])
 def test_revocation_and_malformed_grant_fail_closed(manager,change):
@@ -107,9 +111,9 @@ def test_manager_notes_cannot_change_ownership_or_scope(manager):
 
 def test_reassigned_to_jeff_no_longer_starts_for_manager(manager):
     manager.fixture_door.task['who']='JEFF'
-    with patch('builders.threading.Thread.start') as start:
+    with patch('builders.threading', SimpleNamespace(Thread=Mock())) as threads:
         assert 'no longer owns' in M.dispatch(manager,request())['refused']
-        start.assert_not_called()
+        threads.Thread.assert_not_called()
 
 @pytest.mark.parametrize('change',[{'who':'JEFF'},{'text':'new instructions'},{'paused':'yes'}])
 def test_progress_write_revalidates_owner_instructions_and_hold(manager,change):

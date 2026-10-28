@@ -1,0 +1,81 @@
+{
+  "at_utc": "2026-10-28T20:28:53Z",
+  "manager_source": "4c259b5d4c1a83b9ae2c0addf6e18e489339e8f1",
+  "adapter_source": "a34a3e4e7450be7561f0cd1b52e01888ef70339e",
+  "rowan": {
+    "person": "dk1190",
+    "agent": "dk1196",
+    "session": "01a1842e-15f0-7521-bdc5-45fc7c6a5e7a",
+    "turns": 2
+  },
+  "workers": [
+    {
+      "name": "Codex \u2014 Paste a screenshot into the JEFF chat",
+      "task": "dk1017",
+      "doing": "working",
+      "now": "authenticated Codex turn running",
+      "turns": 0,
+      "session": "01a18432-387d-7d41-a3a1-fd5756d18218",
+      "chat": "dk1201"
+    },
+    {
+      "name": "Codex \u2014 Unpin things from the bottom dock",
+      "task": "dk1144",
+      "doing": "working",
+      "now": "authenticated Codex turn running",
+      "turns": 0,
+      "session": "01a18432-456a-7373-aa65-da32d65a292f",
+      "chat": "dk1202"
+    },
+    {
+      "name": "Codex \u2014 Twitch chat in the new world",
+      "task": "dk1140",
+      "doing": "working",
+      "now": "authenticated Codex turn running",
+      "turns": 0,
+      "session": "01a18432-55b6-7010-a85a-2d2fd1c067f3",
+      "chat": "dk1204"
+    }
+  ],
+  "cards": [
+    {
+      "id": "dk1017",
+      "title": "Paste a screenshot into the JEFF chat",
+      "who": "Rowan",
+      "lead": "dk1190",
+      "builder": "Codex \u2014 Paste a screenshot into the JEFF chat",
+      "build_run": "kernel-dk1017-ecb96f9ad0",
+      "build_phase": "working",
+      "build_detail": "authenticated Codex turn running",
+      "next_action": "Build chat paste/drop attachment handling. Ownership: screenshot worker owns chat attachments. Coordinate any shared shell files with dock/Twitch workers before edits. No screenshots without Alex, no visible test windows, no Conversation test posts. Preserve sessions and drafts.",
+      "blocker": null,
+      "evidence": null
+    },
+    {
+      "id": "dk1144",
+      "title": "Unpin things from the bottom dock",
+      "who": "Rowan",
+      "lead": "dk1190",
+      "builder": "Codex \u2014 Unpin things from the bottom dock",
+      "build_run": "kernel-dk1144-30394317b4",
+      "build_phase": "working",
+      "build_detail": "authenticated Codex turn running",
+      "next_action": "Build on live bars fix. Ownership: dock worker owns shared context-menu/dock behavior including settings unpin/reorder and undo. Coordinate shared shell files before edits. No WM/title-bar work, visible test windows or unrelated changes.",
+      "blocker": null,
+      "evidence": null
+    },
+    {
+      "id": "dk1140",
+      "title": "Twitch chat in the new world",
+      "who": "Rowan",
+      "lead": "dk1190",
+      "builder": "Codex \u2014 Twitch chat in the new world",
+      "build_run": "kernel-dk1140-229d1df9ea",
+      "build_phase": "working",
+      "build_detail": "authenticated Codex turn running",
+      "next_action": "Ownership: Twitch worker owns new read-only adapter/lens. Existing private .env credentials only, never world/report secrets. No sends as Alex, no presence flapping in world log. Coordinate bar entry integration with dock worker before shared-file edits. Preserve sessions, no visible test windows.",
+      "blocker": null,
+      "evidence": null
+    }
+  ]
+}
