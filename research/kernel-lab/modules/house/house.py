@@ -3,6 +3,8 @@
 An agent is a person in the world with a `house-agent` thing saying how it runs:
     make kind=house-agent name=JEFF person=<person> signer=jeff provider=claude model=claude-opus-5-5 reasoning=medium
          fallback_provider=codex fallback_model=gpt-6-astra soul=<thing> charter=<thing> speaks=text want=awake
+    wake_policy=addressed skips warm starts and task-change wakes while retaining next_steps=on context.
+    Chat addresses and explicit house.wake still reach it; compaction continues its addressed conversation.
 
 It is woken only when addressed: a said line whose `to` names its person (an @name, or any line in a closed chat it is
 in, such as the Conversation), a task card given to it (`who=` its name), or house.wake. Never by a timer. Each agent
@@ -389,7 +391,7 @@ class House:
         self.builders = Builders(self)
         for a in self.agents.values():
             self.catch_up(a)
-            if a.cfg.get("want", "awake") == "awake" and not (a.child and a.child.alive()):
+            if a.cfg.get("wake_policy") != "addressed" and a.cfg.get("want", "awake") == "awake" and not (a.child and a.child.alive()):
                 try:
                     a.start()             # warm, no turn: the first line to it is answered at model speed
                 except Exception as exc:  # noqa: BLE001
@@ -464,6 +466,8 @@ class House:
     def task_changes(self):
         """Event-driven reread, through each resident's own visibility fence."""
         for a in self.agents.values():
+            if a.cfg.get("wake_policy") == "addressed":
+                continue
             if a.cfg.get("next_steps") != "on" or not getattr(a, "door", None):
                 continue
             with a.lock:
@@ -529,7 +533,7 @@ class House:
                         with a.lock:
                             if a.inbox and not a.busy:
                                 a._begin()
-                            elif not (a.child and a.child.alive()):
+                            elif a.cfg.get("wake_policy") != "addressed" and not (a.child and a.child.alive()):
                                 try:
                                     a.start()             # awake again: warm, no turn
                                 except Exception as exc:  # noqa: BLE001
@@ -545,7 +549,7 @@ class House:
             r = rows[0]
             if r.get("kind") in TASK_KINDS:
                 for a in self.agents.values():
-                    if a.cfg.get("next_steps") != "on" and str(r.get("who", "")).casefold() == a.name.casefold():
+                    if a.cfg.get("wake_policy") != "addressed" and a.cfg.get("next_steps") != "on" and str(r.get("who", "")).casefold() == a.name.casefold():
                         a.wake(f"~ {msg.get('by') or 'someone'} gave you a task: {r.get('title') or target} ({target}); "
                                f"look {target}", record=msg.get("record"))
 

@@ -227,6 +227,24 @@ class LocalEntry:
         s = self.sessions.get(token)
         return {"account": s["account"], "method": s["method"], "agent": s.get("agent")} if s else None
 
+    def check_person_session(self, signer, account):
+        matches = [s for s in self.sessions.values() if s.get("signer") == signer or s.get("account") == account]
+        if matches and (len(matches) != 1 or matches[0] !=
+                        {"account": account, "method": "desktop", "signer": signer}):
+            raise ValueError("resident session conflicts with an existing identity")
+
+    def add_person_session(self, signer, account):
+        """Explicit reviewed move only. Never replaces an existing credential."""
+        self.check_person_session(signer, account)
+        if any(s.get("signer") == signer for s in self.sessions.values()):
+            return
+        sessions = dict(self.sessions)
+        sessions[secrets.token_urlsafe(24)] = {"account": account, "method": "desktop", "signer": signer}
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(sessions, indent=1), encoding="utf-8")
+        os.replace(tmp, self.path)
+        self.sessions = sessions
+
     def token(self, signer):
         return next(t for t, v in self.sessions.items() if v.get("signer") == signer)
 
@@ -369,13 +387,16 @@ def make_desk_handler(kernel, entry):
     return Handler
 
 
-def start(world=DEFAULT_WORLD, port=8810, modules=True, headless=False):
+def start(world=DEFAULT_WORLD, port=8810, modules=True, headless=False, resident_manifest=None):
     """-> (kernel, server, host, entry). Serves on a thread; the caller decides how long it lives."""
     world = Path(world)
     k = Kernel(world, None if (world / "log" / "0001.jsonl").exists() else genesis(headless))
     after_genesis(k, headless)
     entry = LocalEntry(k.keep_dir)
     moving_in(k)
+    if resident_manifest is not None:
+        from agents.move_resident import install, load_manifest
+        install(k, entry, load_manifest(resident_manifest))
     k.dev_sessions = lambda: entry.sessions             # the door's /dev/signin knows these sessions
     handler = make_desk_handler(k, entry)
     srv = DesktopServer(("127.0.0.1", port), handler)
@@ -398,12 +419,13 @@ def main():
     ap.add_argument("--world", default=str(DEFAULT_WORLD))
     ap.add_argument("--port", type=int, default=8810)
     ap.add_argument("--no-modules", action="store_true")
+    ap.add_argument("--resident-manifest", help="owner-reviewed Sable manifest; provision asleep before House starts")
     ap.add_argument("--log", help="write what it says here (it runs under pythonw, with no console)")
     a = ap.parse_args()
     if a.log:
         Path(a.log).parent.mkdir(parents=True, exist_ok=True)
         sys.stdout = sys.stderr = open(a.log, "a", encoding="utf-8", buffering=1)
-    k, srv, host, entry = start(a.world, a.port, modules=not a.no_modules)
+    k, srv, host, entry = start(a.world, a.port, modules=not a.no_modules, resident_manifest=a.resident_manifest)
     (k.keep_dir / "kdesk.pid").write_text(str(os.getpid()))
     print(f"kdesk: {k.name(k.place)} on http://127.0.0.1:{a.port} · {len(k.log.records)} records · modules "
           f"{', '.join(k.state.get(m, 'name') for m in k.things('module') if k.state.get(m, 'on'))}", flush=True)
