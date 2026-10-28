@@ -491,12 +491,74 @@ Assistant, October 27: "Found the blocker: the new world is running, but its Hou
             raise RuntimeError('candidate changed after review')
         changed = self.git(state['tree'], 'diff', '--name-only', state['review_base'], state['candidate']).splitlines()
         dirty = self.git(self.repo, 'diff', 'HEAD', '--name-only').splitlines()
-        if set(changed) & set(dirty):
-            raise RuntimeError('canonical uncommitted edits overlap candidate; preserve both and reconcile')
-        self.git(self.repo, 'merge', '--ff-only', state['candidate'])
+        overlap = sorted(set(changed) & set(dirty))
+        if not overlap:
+            self.git(self.repo, 'merge', '--ff-only', state['candidate'])
+        else:
+            self.carry_over(state, changed, overlap)
         state['landed_commit'] = self.git(self.repo, 'rev-parse', 'HEAD')
         self.phase(state, 'landed', 'source landed; activation and owner outcome verification remain',
                    landed_commit=state['landed_commit'], outcome='unverified')
+
+    def carry_over(self, state, changed, overlap):
+        """Land while someone else's uncommitted edits sit in files the candidate also changes (Alex, 28 Oct: land
+        just the builder's code while another session reworks its own). Each such file gets a three-way merge
+        (main, the edited file, the candidate); any conflict refuses before anything moves. Then main moves to the
+        candidate and the edited files keep their edits on top, still uncommitted. Copies go to the run folder."""
+        base, cand = state['review_base'], state['candidate']
+        folder = self.home/state['run']/'carried'
+        merged = {}
+        for f in overlap:
+            path = self.repo/f
+            if not path.is_file() or not self.git(self.repo, 'ls-tree', '--name-only', cand, '--', f):
+                raise RuntimeError(f'canonical uncommitted edits overlap candidate on {f} (added or deleted); reconcile by hand')
+            mine = path.read_bytes()
+            text = self.merge_file(mine, self.show(base, f), self.show(cand, f))
+            if text is None:
+                raise RuntimeError(f'canonical uncommitted edits conflict with candidate in {f}; preserve both and reconcile')
+            (folder/f).parent.mkdir(parents=True, exist_ok=True)
+            (folder/f).write_bytes(mine)
+            merged[f] = (mine, text)
+        self.git(self.repo, 'update-ref', '-m', 'House landing '+state['run'], 'refs/heads/main', cand, base)
+        self.git(self.repo, 'reset', '-q', cand, '--', *changed)
+        clean = [f for f in changed if f not in merged]
+        for f in clean:
+            if self.git(self.repo, 'ls-tree', '--name-only', cand, '--', f):
+                self.git(self.repo, 'checkout', '-q', '--', f)
+            elif (self.repo/f).exists():
+                (self.repo/f).unlink()
+        late = []
+        for f, (mine, text) in merged.items():
+            path = self.repo/f
+            now = path.read_bytes()
+            if now != mine:          # edited again while landing: merge the newest edits instead
+                text = self.merge_file(now, self.show(base, f), self.show(cand, f))
+                if text is None:
+                    late.append(f)
+                    continue
+            path.write_bytes(text)
+        self.event(state, 'carried', 'kept uncommitted edits on top of the landed code in ' + ', '.join(overlap)
+                   + (f'; NOT merged (edited during landing, conflicts): {", ".join(late)}' if late else '')
+                   + f'; copies in {folder}')
+        if late:
+            raise RuntimeError('landed, but uncommitted edits in ' + ', '.join(late) + ' conflict with it; see ' + str(folder))
+
+    def show(self, rev, f):
+        with self.git_lock:
+            return subprocess.run(['git', '-C', str(self.repo), 'cat-file', '--filters', f'{rev}:{f}'], capture_output=True, check=True,
+                                  stdin=subprocess.DEVNULL, timeout=60, creationflags=T.NO_WINDOW).stdout
+
+    def merge_file(self, mine, base, theirs):
+        """git merge-file on three byte strings; the merged bytes, or None on any conflict."""
+        with tempfile.TemporaryDirectory() as d:
+            paths = []
+            for name, data in (('mine', mine), ('base', base), ('theirs', theirs)):
+                p = Path(d)/name
+                p.write_bytes(data)
+                paths.append(str(p))
+            proc = subprocess.run(['git', 'merge-file', *paths], capture_output=True, stdin=subprocess.DEVNULL,
+                                  timeout=60, creationflags=T.NO_WINDOW)
+            return Path(paths[0]).read_bytes() if proc.returncode == 0 else None
 
     def row(self, state):
         phase = state['phase']
