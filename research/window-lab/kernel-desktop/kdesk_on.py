@@ -35,6 +35,8 @@ def start():
     # pythonw: no console window at all (a `cmd /c` start showed a black console on Alex's screen, 23 Oct 19:04);
     # kdesk writes its own log
     line = f'"{PYW}" "{HERE / "kdesk.py"}" --port {PORT} --log "{log}"'
+    if "--resident-manifest" in sys.argv:          # a reviewed resident move, this start only (agents/SABLE-MOVE.md)
+        line += f' --resident-manifest "{Path(sys.argv[sys.argv.index("--resident-manifest") + 1]).resolve()}"'
     ps = ("$r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = '"
           + line.replace("'", "''") + f"'; CurrentDirectory = '{HERE}' }}; $r.ReturnValue; $r.ProcessId")
     out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=60,
