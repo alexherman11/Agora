@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import queue
 import subprocess
+import tempfile
 import threading
 import time
 import urllib.request
@@ -110,15 +111,28 @@ class Builders:
             raise RuntimeError('requester has no unambiguous existing builder agent session; no credential was created')
         return Door(self.h.builder_url, tokens[0])
 
+    git_lock = threading.Lock()
+
     def git(self, cwd, *args):
-        # No automatic gc/maintenance: a background repack of this ~900 MB repo inherited our pipes and held a
-        # finished commit past the timeout (27 Oct, dk1022 marked uncertain though its commit had succeeded).
-        result = subprocess.run(['git', '-c', 'gc.auto=0', '-c', 'maintenance.auto=false', '-C', str(cwd), *args],
-                                capture_output=True, text=True,
-                                encoding='utf-8', errors='replace', timeout=120, creationflags=T.NO_WINDOW)
-        if result.returncode:
-            raise RuntimeError((result.stderr or result.stdout)[-2000:])
-        return result.stdout.strip()
+        """27 Oct: twice a git call finished its work but held the House past its timeout (a background repack, then
+        two parallel reviews' `git add` stuck ~25 min). So: no auto gc/maintenance; one git at a time; stdin is empty,
+        never the House's own kernel pipe; output goes to files, so no leftover child can hold a pipe open; and a
+        timeout kills git's whole process tree."""
+        cmd = ['git', '-c', 'gc.auto=0', '-c', 'maintenance.auto=false', '-C', str(cwd), *args]
+        with self.git_lock, tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+            proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=out, stderr=err, creationflags=T.NO_WINDOW)
+            try:
+                code = proc.wait(timeout=120)
+            except subprocess.TimeoutExpired:
+                subprocess.run(['taskkill', '/T', '/F', '/PID', str(proc.pid)], capture_output=True,
+                               stdin=subprocess.DEVNULL, timeout=30, creationflags=T.NO_WINDOW)
+                raise
+            out.seek(0), err.seek(0)
+            stdout = out.read().decode('utf-8', 'replace')
+            stderr = err.read().decode('utf-8', 'replace')
+        if code:
+            raise RuntimeError((stderr or stdout)[-2000:])
+        return stdout.strip()
 
     def update(self, state, **facts):
         door = self.session(state['requester'])
