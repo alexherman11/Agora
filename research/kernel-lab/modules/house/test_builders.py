@@ -234,6 +234,34 @@ def test_landing_keeps_someone_elses_uncommitted_edits_on_top(manager):
     assert (manager.home/s['run']/'carried/shared.py').read_bytes()==b'one, being reworked\ntwo\nthree\n'
 
 
+def test_landing_retries_a_busy_file_and_names_one_it_could_not_write(manager, monkeypatch):
+    s,base,cand=landing_repo(manager,b'one, being reworked\ntwo\nthree\n')
+    monkeypatch.setattr(B.time,'sleep',lambda _:None)
+    real=Path.write_bytes;fails={'n':2}
+    def busy(self,data):
+        if self.name=='shared.py' and self.parent==manager.repo and fails['n']:
+            fails['n']-=1;raise OSError(22,'Invalid argument')
+        return real(self,data)
+    monkeypatch.setattr(Path,'write_bytes',busy)
+    manager.publish(s)
+    assert s['phase']=='landed' and 'NOT carried' not in s['detail']
+    assert (manager.repo/'shared.py').read_bytes()==b'one, being reworked\ntwo\nthree, landed\n'
+    s2,_,_=landing_repo_again(manager)
+    fails['n']=99
+    manager.publish(s2)
+    assert s2['phase']=='landed' and 'NOT carried' in s2['detail'] and 'shared.py' in s2['detail']
+
+
+def landing_repo_again(manager):
+    """A second reviewed candidate on top of the first; line one's uncommitted edit is still there."""
+    repo=manager.repo;tree=repo.parent/'tree';base=manager.git(repo,'rev-parse','HEAD')
+    manager.git(tree,'reset','-q','--hard',base)
+    (tree/'only.py').write_bytes(b'newer\n');(tree/'shared.py').write_bytes(b'one\ntwo\nthree, landed again\n')
+    manager.git(tree,'commit','-qam','second');cand=manager.git(tree,'rev-parse','HEAD')
+    s=state(manager,'reviewed');s.update(review_base=base,candidate=cand,tree=str(tree))
+    return s,base,cand
+
+
 def test_landing_refuses_a_conflict_and_moves_nothing(manager):
     s,base,cand=landing_repo(manager,b'one\ntwo\nthree, theirs\n')
     with pytest.raises(RuntimeError,match='conflict'):

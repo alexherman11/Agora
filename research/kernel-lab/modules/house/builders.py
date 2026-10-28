@@ -492,12 +492,15 @@ Assistant, October 27: "Found the blocker: the new world is running, but its Hou
         changed = self.git(state['tree'], 'diff', '--name-only', state['review_base'], state['candidate']).splitlines()
         dirty = self.git(self.repo, 'diff', 'HEAD', '--name-only').splitlines()
         overlap = sorted(set(changed) & set(dirty))
+        late = []
         if not overlap:
             self.git(self.repo, 'merge', '--ff-only', state['candidate'])
         else:
-            self.carry_over(state, changed, overlap)
+            late = self.carry_over(state, changed, overlap)
         state['landed_commit'] = self.git(self.repo, 'rev-parse', 'HEAD')
-        self.phase(state, 'landed', 'source landed; activation and owner outcome verification remain',
+        # Main has moved either way, so the run is landed; edits that could not be carried are named, not hidden.
+        self.phase(state, 'landed', 'source landed; activation and owner outcome verification remain'
+                   + ('; uncommitted edits NOT carried: ' + '; '.join(late) if late else ''),
                    landed_commit=state['landed_commit'], outcome='unverified')
 
     def carry_over(self, state, changed, overlap):
@@ -530,18 +533,27 @@ Assistant, October 27: "Found the blocker: the new world is running, but its Hou
         late = []
         for f, (mine, text) in merged.items():
             path = self.repo/f
-            now = path.read_bytes()
-            if now != mine:          # edited again while landing: merge the newest edits instead
-                text = self.merge_file(now, self.show(base, f), self.show(cand, f))
-                if text is None:
-                    late.append(f)
-                    continue
-            path.write_bytes(text)
+            for attempt in range(6):
+                # 28 Oct: one write failed with [Errno 22] (the file was busy for a moment); main had already moved,
+                # so the run blocked with the edits sitting on the old code. Read, merge and write again, briefly.
+                try:
+                    now = path.read_bytes()
+                    if now != mine:          # edited again while landing: merge the newest edits instead
+                        text = self.merge_file(now, self.show(base, f), self.show(cand, f))
+                        if text is None:
+                            late.append(f'{f} (edited during landing; conflicts)')
+                            break
+                    path.write_bytes(text)
+                    break
+                except OSError as exc:
+                    if attempt == 5:
+                        late.append(f'{f} ({exc})')
+                    else:
+                        time.sleep(0.5)
         self.event(state, 'carried', 'kept uncommitted edits on top of the landed code in ' + ', '.join(overlap)
-                   + (f'; NOT merged (edited during landing, conflicts): {", ".join(late)}' if late else '')
+                   + (f'; NOT carried, reconcile from the copy: {"; ".join(late)}' if late else '')
                    + f'; copies in {folder}')
-        if late:
-            raise RuntimeError('landed, but uncommitted edits in ' + ', '.join(late) + ' conflict with it; see ' + str(folder))
+        return late
 
     def show(self, rev, f):
         with self.git_lock:
