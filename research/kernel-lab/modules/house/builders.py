@@ -234,7 +234,8 @@ class Builders:
         task = rows[0]
         # A card may have a new run once its last one landed or was released (e.g. landed then reverted).
         prev = self.states.get(target)
-        again = bool(prev) and prev['phase'] in ('landed', 'released') and target not in self.children
+        # ... or when its last run was cut off (House restart) or failed: nothing runs, and its worktree stays for reading
+        again = bool(prev) and prev['phase'] in ('landed', 'released', 'recovery-needed', 'blocked', 'uncertain')             and target not in self.children
         claimed = task.get('builder') or task.get('build_run')
         if held(task) or (claimed and not (again and task.get('build_run') in (prev['run'], None, ''))):
             return {'refused': 'task is held, finished, or already has a builder; reconcile it before a new build'}
