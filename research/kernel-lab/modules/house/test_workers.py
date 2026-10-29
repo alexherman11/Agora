@@ -77,11 +77,17 @@ def test_a_finished_turn_goes_to_the_chat_and_wakes_the_resident_there(manager):
 def test_what_the_resident_says_during_its_turn_starts_the_worker_after_it(manager):
     s = state(manager); s['chat'] = 'dk50'
     agent = Agent(busy=True); manager.h.agents = {'dk99': agent}
-    manager.session = lambda person: manager.fixture_door
-    manager.h.m.see = lambda line, *a, **k: dict(rows=[dict(chat='dk50', made_by='dk99', text='Now add a test')]) \
-        if line.startswith('look dk60') else dict(rows=[dict(manager.fixture_door.task)])
+    door = manager.fixture_door
+    real = door.call
+    # the worker's chat is closed to the House: only the resident's own session reads the line
+    door.call = lambda route, line, **kw: dict(ok=True, rows=[dict(chat='dk50', made_by='dk99', text='Now add a test')]) \
+        if line == 'look dk60' else real(route, line, **kw)
+    manager.session = lambda person: door
+    manager.h.m.see = lambda line, *a, **k: dict(rows=[]) if line.startswith('look dk60') else dict(rows=[dict(door.task)])
     with patch('builders.threading', SimpleNamespace(Thread=Mock())) as threads:
-        manager.hear(dict(word='say', said='dk60'))
+        manager.hear(dict(word='say', said='dk61', by_id='dk77'))      # someone else's line is never read
+        assert not any(w[1] == 'look dk61' for w in door.writes)
+        manager.hear(dict(word='say', said='dk60', by_id='dk99'))
         assert s['pending'] == ['Now add a test'] and s['phase'] == 'received'
         threads.Thread.assert_not_called()
         manager.owner_turn_ended('dk99')

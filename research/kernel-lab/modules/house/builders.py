@@ -551,10 +551,22 @@ class Builders:
     def hear(self, msg):
         if msg.get('word')!='say' or not msg.get('said'):
             return
-        rows=self.h.m.see('look '+msg['said']).get('rows') or []
-        if not rows:return
-        row=rows[0]
+        by=msg.get('by_id')
+        rows_by_person={}
         for state in list(self.states.values()):
+            if not state.get('chat') or (by and by!=state['requester']):
+                continue
+            # 28 Oct: a worker's chat is closed to the House itself, so Sable's answers there were never read. Read the
+            # line as the person in charge (its worker session sees its own chats).
+            person=state['requester']
+            if person not in rows_by_person:
+                try:
+                    rows_by_person[person]=self.session(person).call('/see','look '+msg['said']).get('rows') or []
+                except Exception:                          # noqa: BLE001  not theirs to see: not theirs to answer
+                    rows_by_person[person]=[]
+            rows=rows_by_person[person]
+            if not rows:continue
+            row=rows[0]
             # Only the actual requesting person in their private worker chat.
             # Agent-authored output cannot recursively wake itself.
             if row.get('chat')==state.get('chat') and row.get('made_by')==state['requester']:
