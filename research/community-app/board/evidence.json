@@ -6,16 +6,16 @@
   "days": 14,
   "timings": {
     "board.feed": {
-      "median_ms": 66.35,
-      "max_ms": 89.01
+      "median_ms": 70.11,
+      "max_ms": 91.76
     },
     "catch-up": {
-      "median_ms": 72.43,
-      "max_ms": 93.26
+      "median_ms": 67.53,
+      "max_ms": 97.15
     },
     "board.search q=council": {
-      "median_ms": 119.88,
-      "max_ms": 143.19
+      "median_ms": 119.29,
+      "max_ms": 143.15
     }
   },
   "pdf_preview": "no installed PDF renderer",

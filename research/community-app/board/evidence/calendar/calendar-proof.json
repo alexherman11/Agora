@@ -190,7 +190,7 @@
     {
       "check": "personal-view on the calendar part is accepted",
       "ok": true,
-      "detail": "ok make bd229 [r258] \u00b7 a view-preference"
+      "detail": "ok make bd230 [r267] \u00b7 a view-preference"
     },
     {
       "check": "Bea's own calendar now opens on the week",
@@ -205,7 +205,7 @@
     {
       "check": "personal-style on the calendar is accepted",
       "ok": true,
-      "detail": "ok make bd230 [r259] \u00b7 a part-style\n~ no other part-style has target=calendar (they say tokens); no other part-style has background=; no other part-style has personal=: still made, as you said"
+      "detail": "ok make bd231 [r268] \u00b7 a part-style\n~ no other part-style has target=calendar (they say tokens); no other part-style has background=; no other part-style has personal=: still made, as you said"
     },
     {
       "check": "Bea's calendar takes her own colour; Alex's does not",
@@ -222,7 +222,7 @@
     {
       "check": "personal-style reaches the new-since header part too",
       "ok": true,
-      "detail": "ok make bd231 [r260] \u00b7 a part-style\n~ no other part-style has target=board-catchup (they say calendar or tokens); no other part-style has background=#eef6ff (they say #fff4d6): still made, as you said"
+      "detail": "ok make bd232 [r269] \u00b7 a part-style\n~ no other part-style has target=board-catchup (they say calendar or tokens); no other part-style has background=#eef6ff (they say #fff4d6): still made, as you said"
     },
     {
       "check": "No horizontal overflow personal-week 1440",

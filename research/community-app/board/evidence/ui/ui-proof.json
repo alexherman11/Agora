@@ -494,9 +494,9 @@
       "check": "Scrolled every feed page with bounded DOM",
       "ok": true,
       "detail": {
-        "cold_start_to_board_ms": 2266.71,
-        "first_paint_upper_bound_ms": 1421.49,
-        "scroll_all_posts_ms": 9922.04,
+        "cold_start_to_board_ms": 2046.27,
+        "first_paint_upper_bound_ms": 1452.04,
+        "scroll_all_posts_ms": 9829.51,
         "feed_threads": 331,
         "pages_scrolled": 28,
         "max_feed_cards": 12
@@ -534,9 +534,9 @@
     }
   ],
   "metrics": {
-    "cold_start_to_board_ms": 2266.71,
-    "first_paint_upper_bound_ms": 1421.49,
-    "scroll_all_posts_ms": 9922.04,
+    "cold_start_to_board_ms": 2046.27,
+    "first_paint_upper_bound_ms": 1452.04,
+    "scroll_all_posts_ms": 9829.51,
     "feed_threads": 331,
     "pages_scrolled": 28,
     "max_feed_cards": 12
@@ -604,16 +604,16 @@
     "days": 14,
     "timings": {
       "board.feed": {
-        "median_ms": 66.45,
-        "max_ms": 91.98
+        "median_ms": 67.63,
+        "max_ms": 94.04
       },
       "catch-up": {
-        "median_ms": 68.52,
-        "max_ms": 92.12
+        "median_ms": 68.42,
+        "max_ms": 90.31
       },
       "board.search q=council": {
-        "median_ms": 116.9,
-        "max_ms": 148.64
+        "median_ms": 120.31,
+        "max_ms": 142.67
       }
     },
     "pdf_preview": "no installed PDF renderer",

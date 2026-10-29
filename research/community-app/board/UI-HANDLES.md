@@ -160,7 +160,10 @@ coming maybe_coming your_rsvp`); without an `add` or `rsvp` gesture it offers ne
 dated threads within `weeks` (default 6) of `around`, with who is coming by name. The event kind's
 `defaults='{"seats":"500"}'` fills seats for a quick add; set a different number on the kind thing.
 
-The `opens` value is just a name: the channel says which view it opens, the lens holds the parts. Lenses
+The `opens` value is just a name: the channel says which view it opens, the lens holds the parts. With nested lens parts
+(landed with asks & offers), a whole lens drops in as one line: `asks : lens, name seabright-asks` guarded
+`only when $view.opens = asks`, plus `opens=asks` on that channel (proved in a scratch copy by
+`test_calendar.py --routing-probe`; the shipped board lens does not nest it yet). Lenses
 built elsewhere (asks & offers, documents, map) drop in as one guarded part each; a channel without `opens`
 stays a feed. Every part keeps its name, so `personal-view <board widget> calendar.view=week` and
 `personal-style <board widget> target=calendar background=...` work just for the person who sets them.

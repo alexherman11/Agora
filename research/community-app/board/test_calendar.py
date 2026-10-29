@@ -99,6 +99,72 @@ def _probe():
         f.close()
 
 
+def _routing_probe():
+    """A channel's opens=<name> picks one guarded part of the real board lens; a landed lens (asks & offers)
+    drops in by name as a nested lens part. Scratch copy of the board lens only; the shipped one is untouched."""
+    lab = HERE.parents[1] / 'kernel-lab'
+    sys.path[:0] = [str(HERE), str(lab), str(lab / 'tests'), str(lab.parent / 'window-lab/kernel-desktop')]
+    from proof import Proof, install, line
+    from painter.arrangement import compile_view
+    from painter.catalogue import cards
+    from asks_install import NAME, VIEW
+    from ui_install import upsert, install_ui, Q
+    f = Proof()
+    try:
+        ids = install(lambda x: f.say('Alex', x), lambda x: f.see('Alex', x))
+        f.join('Bea')
+
+        class Door:
+            say = staticmethod(lambda x: f.say('Alex', x))
+            rows = staticmethod(lambda kind, **kv: f.say('Alex', 'rows ' + kind + ''.join(' ' + k + '=' + Q(v) for k, v in kv.items()))['rows'])
+        door = Door()
+        for card in cards():
+            name = card.pop('name'); path = lab / 'components' / f'{name}.js'
+            tid = upsert(door, 'component', name, **card, code=(path if path.exists() else lab / 'components/catalogue.js').read_text(encoding='utf-8'))
+            door.say('look ' + tid); door.say('component ' + tid)
+        install_ui(door)
+        asks_channel = ids['channels']['Asks & offers']
+        upsert(door, 'lens', NAME, title='Asks & offers', painter='components', text=(HERE / 'asks.lens').read_text(encoding='utf-8'),
+               view=json.dumps(dict(VIEW, asks_channel=asks_channel)))
+        board = (HERE / 'board.lens').read_text(encoding='utf-8')
+        anchor = '    catchup : board-catchup,'
+        assert anchor in board
+        drop_in = ('    asks : lens, name ' + NAME + '\n      only when $view.opens = asks and $view.search = "" and $view.queue != yes\n')
+        upsert(door, 'lens', 'routing-probe', title='Routing probe', painter='components', text=board.replace(anchor, drop_in + anchor, 1),
+               view=next(r for r in door.rows('lens', name='seabright-board'))['view'])
+        f.say('Bea', line('board.post', post_kind='ask', seats='1', text='Need a ladder on Saturday', **{'in': asks_channel}))
+        bea = f.k.actor_for(f.people['Bea'])
+
+        def tree(**view):
+            return compile_view(f.k, bea, 'routing-probe', reader=lambda c: f.raw('Bea', c, 'see'), view=view)['rows'][0]['tree']
+
+        def find(node, name):
+            if node['name'] == name: return node
+            return next((x for c in node['children'] if (x := find(c, name))), None)
+
+        def text_of(node):
+            return ' '.join([str(v) for v in node['settings'].values() if isinstance(v, str)] + [text_of(c) for c in node['children']])
+
+        asks_view = tree(channel=asks_channel, opens='asks')
+        f.check('opens=asks shows the nested asks lens and hides the feed and calendar',
+                find(asks_view, 'asks') is not None and find(asks_view, 'feed') is None and find(asks_view, 'calendar') is None)
+        f.check('the nested lens reads board.asks: the new ask is listed', 'Need a ladder on Saturday' in text_of(find(asks_view, 'asks')))
+        meetings = tree(channel=ids['channels']['Meetings & events'], opens='calendar')
+        f.check('opens=calendar shows the calendar, not asks or the feed',
+                find(meetings, 'calendar') is not None and find(meetings, 'asks') is None and find(meetings, 'feed') is None)
+        plain = tree(channel=ids['channels']['Neighbours'], opens='')
+        f.check('no opens: the channel stays a feed', find(plain, 'feed') is not None and find(plain, 'asks') is None and find(plain, 'calendar') is None)
+        f.check('the shipped board lens is unchanged by the probe', door.rows('lens', name='seabright-board')[0]['text'] == board)
+        print('ROUTING ' + json.dumps(dict(checks=f.checks)), flush=True)
+    finally:
+        f.close()
+
+
+def test_channel_routing_drops_in_a_lens_by_name():
+    result = subprocess.run([sys.executable, '-B', __file__, '--routing-probe'], capture_output=True, text=True, timeout=180)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_calendar_world_contract():
     # Proof imports a module named install; keep it in its own interpreter like the board's other probes.
     result = subprocess.run([sys.executable, '-B', __file__, '--probe'], capture_output=True, text=True, timeout=120)
@@ -107,3 +173,5 @@ def test_calendar_world_contract():
 
 if __name__ == '__main__' and '--probe' in sys.argv:
     _probe()
+if __name__ == '__main__' and '--routing-probe' in sys.argv:
+    _routing_probe()
