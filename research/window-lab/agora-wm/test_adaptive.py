@@ -67,6 +67,108 @@ class AdaptiveTests(unittest.TestCase):
 
 class RestoreFeedbackTests(unittest.TestCase):
     setUp=test_manager.ManagerTests.setUp
+    def test_external_restore_during_pending_minimise_is_not_lost(self):
+        from unittest.mock import patch
+        rows=[row('a',(16,16,900,700)),row('b',(-32000,-32000,160,28))]
+        rows[1]['state']='minimised';rows[1]['_preferred']=(900,700)
+        work=Rect(0,0,1600,1000)
+        self.m.ingest(rows,work)
+        self.m.mode='live';self.m.lease=Mock()
+        with patch('manager.time.monotonic',return_value=100):
+            self.m.pending['b']={'kind':'minimise','rect':None,'at':99.9}
+            restored=deepcopy(rows);restored[1]['state']='normal';restored[1]['rect']=[16,16,900,700]
+            self.m.ingest(restored,work)
+        self.assertFalse(self.m.state.windows['b'].minimised)
+        self.assertTrue(valid(self.m.state))
+
+    def test_dock_restore_replaces_pending_layout_and_updates_recency(self):
+        rows=[row('a',(16,16,900,700)),row('b',(-32000,-32000,160,28))]
+        rows[1]['state']='minimised';rows[1]['_preferred']=(900,700)
+        self.m.ingest(rows,Rect(0,0,1600,1000))
+        self.m.mode='live';self.m.lease=Mock()
+        self.m.pending['b']={'kind':'minimise','rect':None,'at':0}
+        self.m.action('restore','b')
+        self.assertFalse(self.m.state.windows['b'].minimised)
+        self.assertGreater(self.m.state.windows['b'].last_used,self.m.state.windows['a'].last_used)
+        # Supersede the minimise, retaining the native restore settling period.
+        self.assertEqual(self.m.pending['b']['kind'],'restore')
+        self.native.restore.assert_called_once()
+
+    def test_external_restore_supersedes_pending_before_and_after_timeout(self):
+        from unittest.mock import patch
+        for kind in ('minimise','placement'):
+            for elapsed in (.1,.4):
+                with self.subTest(kind=kind,elapsed=elapsed):
+                    self.setUp()
+                    work=Rect(0,0,1600,1000)
+                    rows=[row('a',(16,16,900,700)),row('b',(-32000,-32000,160,28))]
+                    rows[1].update(state='minimised',_preferred=(900,700))
+                    self.m.ingest(rows,work);self.m.mode='live';self.m.lease=Mock()
+                    self.m.pending['b']={'kind':kind,'rect':Rect(16,16,500,350),'at':100-elapsed}
+                    restored=deepcopy(rows);restored[1].update(state='normal',rect=[16,16,900,700])
+                    with patch('manager.time.monotonic',return_value=100):
+                        self.m.ingest(restored,work)
+                    self.assertTrue(self.m.state.windows['b'].managed)
+                    self.assertFalse(self.m.state.windows['b'].minimised)
+                    self.assertNotIn('b',self.m.failures)
+                    # Placement settles; no transition remains on the next tick.
+                    settled=deepcopy(restored)
+                    for r in settled:
+                        w=self.m.state.windows[r['key']]
+                        r.update(rect=w.rect.values(),state='minimised' if w.minimised else 'normal')
+                    with patch('manager.time.monotonic',return_value=101):
+                        self.m.ingest(settled,work)
+                    self.assertFalse(self.m.state.windows['b'].minimised)
+                    self.assertTrue(valid(self.m.state))
+
+    def test_expected_minimise_acknowledgement_keeps_window_minimised(self):
+        from unittest.mock import patch
+        work=Rect(0,0,1600,1000);rows=[row(),row('b')]
+        self.m.ingest(rows,work)
+        self.m.state=solve(self.m.state,{'type':'minimise','key':'b'}).state
+        self.m.mode='live';self.m.lease=Mock()
+        self.m.pending['b']={'kind':'minimise','rect':None,'at':100}
+        minimised=deepcopy(rows);minimised[1]['state']='minimised'
+        with patch('manager.time.monotonic',return_value=100.1):
+            self.m.ingest(minimised,work)
+        self.assertTrue(self.m.state.windows['b'].minimised)
+        self.assertEqual(self.m.pending['b']['kind'],'minimise')
+
+    def test_explicit_minimise_supersedes_a_pending_restore(self):
+        from unittest.mock import patch
+        work=Rect(0,0,1600,1000);rows=[row(),row('b')]
+        self.m.ingest(rows,work);self.m.mode='live';self.m.lease=Mock()
+        with patch('manager.time.monotonic',return_value=100):
+            self.m.action('restore','b')
+            self.m.action('minimise','b')
+        self.assertTrue(self.m.state.windows['b'].minimised)
+        self.assertEqual(self.m.pending['b']['kind'],'minimise')
+        minimised=deepcopy(rows);minimised[1]['state']='minimised'
+        with patch('manager.time.monotonic',return_value=100.4):
+            self.m.ingest(minimised,work)
+        self.assertTrue(self.m.state.windows['b'].managed)
+        self.assertTrue(self.m.state.windows['b'].minimised)
+        self.assertNotIn('b',self.m.failures)
+
+    def test_restore_waits_for_native_geometry_before_placement(self):
+        from unittest.mock import patch
+        work=Rect(0,0,1600,1000)
+        rows=[row('a',(16,16,900,700)),row('b',(-32000,-32000,160,28))]
+        rows[1].update(state='minimised',_preferred=(900,700))
+        self.m.ingest(rows,work);self.m.mode='live';self.m.lease=Mock()
+        with patch('manager.time.monotonic',return_value=100):
+            self.m.action('restore','b')
+        restored=deepcopy(rows);restored[1].update(state='normal',rect=[16,16,900,700])
+        with patch('manager.time.monotonic',return_value=100.1):
+            self.m.ingest(restored,work)
+        # Other windows may reflow; the restored window waits for fresh margins.
+        target=rows[1]['ref'].hwnd
+        self.assertNotIn(target,[c.args[0].hwnd for c in self.native.place.call_args_list])
+        with patch('manager.time.monotonic',return_value=100.4):
+            self.m.ingest(restored,work)
+        self.assertIn(target,[c.args[0].hwnd for c in self.native.place.call_args_list])
+        self.assertTrue(self.m.state.windows['b'].managed)
+
     def test_restore_geometry_is_not_replayed_as_drag(self):
         rows=[row('a',(16,16,900,700)),row('b',(-32000,-32000,160,28))]
         rows[1]['state']='minimised';rows[1]['_preferred']=(900,700)

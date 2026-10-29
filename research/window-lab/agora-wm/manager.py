@@ -202,6 +202,18 @@ class Manager:
             if key in self.pins and not w.pinned:w.rect=r;w.pinned=True;w.home=r
             elif key not in self.pins:w.pinned=False;w.home=None
             pending=self.pending.get(key)
+            if old and old['state']=='minimised' and row['state']!='minimised' and w.minimised:
+                # A new external restore supersedes layout work, even inside
+                # its acknowledgement interval. Do not lose this transition or
+                # treat the successful restore as a refused minimise.
+                self.pending.pop(key,None);pending=None
+                self.state=solve(self.state,{'type':'restore','key':key}).state
+                w=self.state.windows[key]
+                if self.mode=='live':
+                    # IsIconic can clear before native frame geometry settles.
+                    # Use the same restore acknowledgement as apply().
+                    pending={'kind':'restore','rect':w.rect,'at':now}
+                    self.pending[key]=pending
             dragging=self.gesture is not None and self.gesture.key==key
             if w.pinned and old and old['rect']!=row['rect'] and not pending and not dragging and key!=self.released \
                     and row['state']!='minimised' and old['state']!='minimised':
@@ -231,8 +243,6 @@ class Manager:
                 if row['state']=='minimised' and not w.minimised:
                     if dragging:self._drop_gesture();dragging=False
                     self.state=solve(self.state,{'type':'minimise','key':key}).state
-                elif row['state']!='minimised' and w.minimised and old['state']=='minimised':
-                    self.state=solve(self.state,{'type':'restore','key':key}).state
             if dragging and self.gesture:
                 self._show(self.gesture.step(r,now*1000),r)
             elif old and old['rect']!=row['rect'] and not pending and not w.pinned and key!=self.released \
@@ -338,9 +348,15 @@ class Manager:
         if not row or not self._managed(row):raise PermissionError('window is no longer manageable')
         if verb in ('minimise','restore') and key in self.pins:raise PermissionError('unpin before minimising/restoring')
         if verb in ('minimise','restore'):
-            self.state=solve(self.state,{'type':'manual','key':key}).state
+            # The latest explicit intent supersedes layout work (or the
+            # opposite action). The native call alone leaves stale policy.
+            self.pending.pop(key,None)
+            self.state=solve(self.state,{'type':verb,'key':key}).state
         self.lease.heartbeat();self.lease.save(row['ref'])
-        return getattr(self.native,verb)(row['ref'])
+        result=getattr(self.native,verb)(row['ref'])
+        if verb in ('minimise','restore') and key in self.state.windows:
+            self.pending[key]={'kind':verb,'rect':self.state.windows[key].rect,'at':time.monotonic()}
+        return result
 
     def reading(self):
         rows=public_rows(self.rows,self.pins)
