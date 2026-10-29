@@ -816,7 +816,7 @@ left. Then end your turn with a short summary for {boss}: done, or what you need
     def row(self, state):
         phase = state['phase']
         return dict(id=state['task'], person=state['task'], name=state['name'], role='builder',
-                    task=state['task'], chat=state.get('chat', ''), doing=phase, now=state.get('detail', ''),
+                    task=state['task'], build_run=state['run'], chat=state.get('chat', ''), doing=phase, now=state.get('detail', ''),
                     colour='sage' if phase=='working' else 'rose' if phase in ('blocked','recovery-needed') else 'sky',
                     provider=state.get('provider', 'codex'), model=state['model'], reasoning=state['reasoning'],
                     turns=state.get('turns',0), last_turn=state.get('updated',''),

@@ -46,6 +46,7 @@ sys.path.insert(0, str(HERE.parents[2] / "text-desk-lab" / "notation"))
 from modproto import Module, log            # noqa: E402
 import transport as T                        # noqa: E402
 import manager as BM                         # noqa: E402
+import work_overview                         # noqa: E402
 
 try:
     from quota_policy import quota_error     # noqa: E402  the old desk's own rule: what counts as a used-up plan
@@ -703,6 +704,9 @@ class House:
             if not self.m.see("look " + (state.get("chat") or state["task"]), use=msg.get("use")).get("rows"):
                 return {"refused": "this worker log belongs to its requester"}
             return self.builders.log(args["target"])
+        if word == "house.active":
+            rows = work_overview.rows(self.m, self.agents, self.builders, msg.get("use"))
+            return {"text": f"{len(rows)} active or blocked cards", "rows": rows}
         if word == "house.who":
             rows = [self.row(a) for a in self.agents.values()] + self.builders.rows(msg)
             text = (f"the house runs {len(rows)} agent{'' if len(rows) == 1 else 's'}:\n" + "\n".join(
@@ -856,6 +860,8 @@ OFFER = [
      "help": "house.review <task>: independently check a received committed result against current main, including hidden desktop checks. Does not land or close it."},
     {"word": "house.land", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "members",
      "help": "house.land <task>: publish the exact reviewed source if main and ownership still match. Activation and owner verification remain separate."},
+    {"word": "house.active", "kind": "see", "takes": "",
+     "help": "house.active: visible cards being worked on or blocked, with holder, blocker and resolver. Finished, queued and released work hides automatically."},
     {"word": "house.who", "kind": "see", "takes": "",
      "help": "house.who: the agents the house runs (JEFF and others), what each is doing (asleep, resting, idle, "
              "working), its model, its turns and how fast its last first words came."},
