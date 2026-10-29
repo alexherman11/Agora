@@ -843,7 +843,12 @@ OFFER = [
     {"word": "house.retry", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "members",
      "help": "house.retry <task>: retry a proven terminal startup failure before any model thread. Preserves its existing claim and worktree; refuses uncertain or changed work."},
     {"word": "house.tell", "kind": "do", "needs": TASK_NEEDS, "takes": "<id> <words>", "undo": "external", "may": "members",
-     "help": "house.tell <task> <words>: retain a follow-up for your active or received builder, continuing the same Codex thread. Held, uncertain, reviewed and landed work does not restart."},
+     "help": "house.tell <task> <words>: give a card's worker your words as its next instruction, continuing its same "
+             "thread and worktree. Its owner, the card's lead, a steward or Alex may tell it; others are refused. A "
+             "running worker reads them at its next turn boundary; a stopped one (received, blocked, reviewed) resumes "
+             "with them in a new turn. Its owner is still woken at each turn end, and so is anyone else who told it. "
+             "Landed or released work does not restart (house.build starts a new run); held cards, uncertain or "
+             "recovery-needed workers, and work under review or landing are refused."},
     {"word": "house.work", "kind": "do", "takes": "<words> [with=claude|codex]", "undo": "external", "may": "members",
      "help": "house.work <what to do, in plain words> [with=claude|codex]: make a card for it and start a worker on it, in "
              "your charge. You are woken each time it finishes a turn (its words also go in its chat); answer it with "
