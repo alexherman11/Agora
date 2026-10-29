@@ -37,6 +37,15 @@ def stamp():
     return time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
 
 
+def short(text, n):
+    """Cut at a whole word (Sable, 28 Oct: a card title ended mid-word)."""
+    text = ' '.join(str(text).split())
+    if len(text) <= n:
+        return text
+    cut = text[:n - 1].rsplit(' ', 1)[0].rstrip(' ,.;:')
+    return (cut or text[:n - 1]) + '…'
+
+
 def held(task):
     return task.get('lane', '').lower() == 'done' or any(
         str(task.get(k, '')).lower() in HELD for k in
@@ -247,7 +256,7 @@ class Builders:
             if self.full(provider):
                 return {'refused': f'worker capacity is occupied: all {self.capacity_for(provider)} {provider} workers are busy; nothing was queued'}
             run = 'kernel-' + target + '-' + uuid.uuid4().hex[:10]
-            state = dict(task=target, run=run, name=p['label']+' — '+str(task.get('title') or 'Builder')[:60], requester=caller['person'],
+            state = dict(task=target, run=run, name=p['label']+' — '+short(task.get('title') or 'Builder', 60), requester=caller['person'],
                          requester_name=caller.get('name', ''), provider=provider,
                          title=task.get('title') or target, phase='asked', detail='claim pending',
                          model=p['model'], reasoning=p['reasoning'], created=stamp(), activity=[],
@@ -419,15 +428,16 @@ class Builders:
             self.event(state, 'unsaid', str(exc))
         agent = self.owner(state)
         if agent is None:
+            self.event(state, 'told', 'posted in its chat; no resident to wake (Alex reads it there)')
             return
         left = MAX_TURNS - state.get('turns', 0)
         agent.wake(
             f"~ Your worker {state['name']} ({state['task']}) finished a turn and says:\n{words}\n\n"
-            f"~ You are in charge of this worker. What you say in this chat goes to it as your next instruction "
-            f"({left} turns left). When its work is done and it says what it tested: house.review {state['task']}, "
-            f"then house.land {state['task']} once the checks pass. Tell JEFF in Shop talk when it lands, or when "
-            f"something needs Alex. If you have nothing for the worker now, stay quiet here.",
-            chat=chat)
+            f"~ You are in charge of this worker. To answer it, run house.tell {state['task']} <your words>: that is "
+            f"its next instruction ({left} turns left). When its work is done and it says what it tested: "
+            f"house.review {state['task']}, then house.land {state['task']} once the checks pass. Tell JEFF in Shop "
+            f"talk when it lands, or when something needs Alex.")
+        self.event(state, 'told', f'woke {agent.name} in its chat {chat} (busy={agent.busy}, inbox={len(agent.inbox)})')
 
     def owner_turn_ended(self, person):
         """A resident's turn ended: what it said to its workers during that turn starts their next turn now."""
@@ -445,13 +455,13 @@ class Builders:
                 threading.Thread(target=self.guarded, args=(state, self.resume), daemon=True).start()
 
     def work(self, msg):
-        """work <what to do, in plain words> [with=claude|codex]: a card for the caller and a worker on it."""
+        """house.work <what to do, in plain words> [with=claude|codex]: a card for the caller and a worker on it."""
         caller = msg.get('caller') or {}
         args = msg.get('args') or {}
         kv = dict(args.get('kv') or {})
         words = ' '.join(str(args.get(k) or '') for k in ('target', 'words')).strip()
         if not words:
-            return {'refused': 'work <what to do, in plain words> [with=claude|codex]'}
+            return {'refused': 'house.work <what to do, in plain words> [with=claude|codex]'}
         provider = str(kv.get('with') or 'codex').lower()
         if provider not in PROVIDERS:
             return {'refused': 'with=claude or with=codex'}
@@ -462,7 +472,7 @@ class Builders:
         if self.full(provider):
             return {'refused': f'worker capacity is occupied: all {self.capacity_for(provider)} {provider} workers are busy; nothing was started'}
         name = caller.get('name') or ''
-        title = words.splitlines()[0][:80]
+        title = short(words.splitlines()[0], 80)
         made = door.call('/do', f'make kind=taskboard-task title={q(title)} text={q(words)} lane=Now '
                                 f'who={q(name)} lead={q(name)}')
         card = (made.get('made') or [None])[-1]
@@ -471,9 +481,9 @@ class Builders:
         out = self.start(dict(msg, args=dict(target=card, kv=dict(kv, **{'with': provider}))))
         if out.get('refused'):
             return {'refused': f'made card {card}, but the worker did not start: {out["refused"]}'}
-        return {'text': f"started a {PROVIDERS[provider]['label']} worker on {title} ({card}). Its chat is named after "
-                        f"it; you are woken there each time it finishes a turn, and what you say there is its next "
-                        f"instruction.", 'external': True, 'rows': out.get('rows', [])}
+        return {'text': f"started a {PROVIDERS[provider]['label']} worker on {title} ({card}). You are woken each time "
+                        f"it finishes a turn (its words also go in its chat); answer it with house.tell {card} <words>.",
+                'external': True, 'rows': out.get('rows', [])}
 
     def resume(self, state):
         self.assert_owned(state)
@@ -540,10 +550,22 @@ class Builders:
     def hear(self, msg):
         if msg.get('word')!='say' or not msg.get('said'):
             return
-        rows=self.h.m.see('look '+msg['said']).get('rows') or []
-        if not rows:return
-        row=rows[0]
+        by=msg.get('by_id')
+        rows_by_person={}
         for state in list(self.states.values()):
+            if not state.get('chat') or (by and by!=state['requester']):
+                continue
+            # 28 Oct: a worker's chat is closed to the House itself, so Sable's answers there were never read. Read the
+            # line as the person in charge (its worker session sees its own chats).
+            person=state['requester']
+            if person not in rows_by_person:
+                try:
+                    rows_by_person[person]=self.session(person).call('/see','look '+msg['said']).get('rows') or []
+                except Exception:                          # noqa: BLE001  not theirs to see: not theirs to answer
+                    rows_by_person[person]=[]
+            rows=rows_by_person[person]
+            if not rows:continue
+            row=rows[0]
             # Only the actual requesting person in their private worker chat.
             # Agent-authored output cannot recursively wake itself.
             if row.get('chat')==state.get('chat') and row.get('made_by')==state['requester']:
@@ -563,7 +585,8 @@ class Builders:
 and their answer is your next instruction. Ask them when something is unclear instead of guessing.
 Task: {state['title']} ({state['task']}). Task text: {task.get('text', '')}
 Acceptance: {task.get('acceptance', '') or 'what the task text asks for, working and tested'}
-You work only in this worktree, on this task. Read AGENTS.md first. Use the Agora tools (see, do, lines) to read the
+You work only in this worktree, on this task. Read AGENTS.md first; its `read a6529 :3` line points at the
+archived old desk, so skip it (the rules it lists are current). Use the Agora tools (see, do, lines) to read the
 world; never change credentials, security settings or providers, and never start another worker.
 No visible test windows (hidden fixtures only), no pushes, no merging to main, no deleting other people's work, no
 stopping Alex's programs. If something is denied, stop and say so; do not route around it.

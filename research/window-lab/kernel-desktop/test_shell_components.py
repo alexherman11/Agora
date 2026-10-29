@@ -37,6 +37,13 @@ class ShellPage(Page):
         self.browser = Browser(None, test_flags=['--disable-background-timer-throttling', '--disable-renderer-backgrounding',
                                                  '--disable-backgrounding-occluded-windows'])
         self.c = self.browser.__enter__()
+        try:
+            self._open(url, token, page, key, width, height)
+        except BaseException:
+            self.browser.__exit__(None, None, None)         # a page that never came up still closes its browser
+            raise
+
+    def _open(self, url, token, page, key, width, height):
         self.errors = []
         previous = self.c.on_event
 

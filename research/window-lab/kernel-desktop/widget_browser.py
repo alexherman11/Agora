@@ -21,6 +21,67 @@ from urllib.parse import urlsplit, quote
 HERE = Path(__file__).resolve().parent
 
 
+def _job_that_dies_with_us():
+    """A Windows job whose processes end when this process ends, however it ends.
+    28 Oct: 42 headless Chromes (452 processes, ~11.8 GB) outlived the tests and widget hosts that
+    started them, because only __exit__ closed them and a killed or failed owner never reaches it."""
+    import ctypes
+    from ctypes import wintypes as wt
+
+    class LIMIT(ctypes.Structure):
+        _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
+                    ("LimitFlags", wt.DWORD), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                    ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wt.DWORD),
+                    ("Affinity", ctypes.c_size_t), ("PriorityClass", wt.DWORD), ("SchedulingClass", wt.DWORD)]
+
+    class IO(ctypes.Structure):
+        _fields_ = [(n, ctypes.c_uint64) for n in ("r", "w", "o", "rb", "wb", "ob")]
+
+    class EXTENDED(ctypes.Structure):
+        _fields_ = [("Basic", LIMIT), ("Io", IO), ("ProcessMemoryLimit", ctypes.c_size_t),
+                    ("JobMemoryLimit", ctypes.c_size_t), ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                    ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+    k = ctypes.WinDLL("kernel32", use_last_error=True)
+    k.CreateJobObjectW.restype = wt.HANDLE
+    k.CreateJobObjectW.argtypes = [ctypes.c_void_p, wt.LPCWSTR]
+    k.SetInformationJobObject.argtypes = [wt.HANDLE, ctypes.c_int, ctypes.c_void_p, wt.DWORD]
+    job = k.CreateJobObjectW(None, None)
+    info = EXTENDED()
+    info.Basic.LimitFlags = 0x2000                       # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    if not job or not k.SetInformationJobObject(job, 9, ctypes.byref(info), ctypes.sizeof(info)):
+        return None
+    return job                                          # never closed by hand: the handle closes when we exit
+
+
+_JOB = None
+
+
+def _hold(process):
+    """Put a just-started browser in the job; its children follow it in."""
+    global _JOB
+    import ctypes
+    from ctypes import wintypes as wt
+    try:
+        if _JOB is None:
+            _JOB = _job_that_dies_with_us()
+        if _JOB:
+            k = ctypes.WinDLL("kernel32", use_last_error=True)
+            k.AssignProcessToJobObject.argtypes = [wt.HANDLE, wt.HANDLE]
+            k.AssignProcessToJobObject(_JOB, wt.HANDLE(int(process._handle)))
+    except Exception:                                   # noqa: BLE001  cleanup is a courtesy; the browser still runs
+        pass
+
+
+def _resume(process):
+    """Start a browser created suspended (Popen keeps no thread handle, so resume the whole process)."""
+    import ctypes
+    from ctypes import wintypes as wt
+    nt = ctypes.WinDLL("ntdll")
+    nt.NtResumeProcess.argtypes = [wt.HANDLE]
+    nt.NtResumeProcess(wt.HANDLE(int(process._handle)))
+
+
 class CDP:
     def __init__(self, url):
         p = urlsplit(url)
@@ -116,7 +177,9 @@ class Browser:
             '--headless=new', private, '--disable-gpu', '--no-first-run', '--no-default-browser-check',
             '--remote-debugging-port=0', '--remote-allow-origins=*', '--disable-background-networking',
             '--user-data-dir=' + self.tmp.name, *self.test_flags, 'about:blank'], stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL, creationflags=0x08000000)
+            stderr=subprocess.DEVNULL, creationflags=0x08000004)    # no window, and suspended until it is in the job
+        _hold(self.process)
+        _resume(self.process)
         active = Path(self.tmp.name) / 'DevToolsActivePort'
         end = time.monotonic() + 20
         port=None

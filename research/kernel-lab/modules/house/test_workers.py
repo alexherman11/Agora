@@ -10,7 +10,7 @@ import builders as B
 
 class Agent:
     def __init__(self, busy=False):
-        self.busy, self.woken = busy, []
+        self.busy, self.woken, self.name, self.inbox = busy, [], 'Sable', []
     def wake(self, text, chat=None, record=None):
         self.woken.append((text, chat))
 
@@ -71,17 +71,23 @@ def test_a_finished_turn_goes_to_the_chat_and_wakes_the_resident_there(manager):
     said = [w for w in manager.fixture_door.writes if w[1].startswith('say dk50 ')]
     assert said and 'the dock unpins now' in said[0][1]
     text, chat = agent.woken[0]
-    assert chat == 'dk50' and 'the dock unpins now' in text and 'house.review dk1' in text
+    assert chat is None and 'the dock unpins now' in text and 'house.tell dk1' in text and 'house.review dk1' in text
 
 
 def test_what_the_resident_says_during_its_turn_starts_the_worker_after_it(manager):
     s = state(manager); s['chat'] = 'dk50'
     agent = Agent(busy=True); manager.h.agents = {'dk99': agent}
-    manager.session = lambda person: manager.fixture_door
-    manager.h.m.see = lambda line, *a, **k: dict(rows=[dict(chat='dk50', made_by='dk99', text='Now add a test')]) \
-        if line.startswith('look dk60') else dict(rows=[dict(manager.fixture_door.task)])
+    door = manager.fixture_door
+    real = door.call
+    # the worker's chat is closed to the House: only the resident's own session reads the line
+    door.call = lambda route, line, **kw: dict(ok=True, rows=[dict(chat='dk50', made_by='dk99', text='Now add a test')]) \
+        if line == 'look dk60' else real(route, line, **kw)
+    manager.session = lambda person: door
+    manager.h.m.see = lambda line, *a, **k: dict(rows=[]) if line.startswith('look dk60') else dict(rows=[dict(door.task)])
     with patch('builders.threading', SimpleNamespace(Thread=Mock())) as threads:
-        manager.hear(dict(word='say', said='dk60'))
+        manager.hear(dict(word='say', said='dk61', by_id='dk77'))      # someone else's line is never read
+        assert not any(w[1] == 'look dk61' for w in door.writes)
+        manager.hear(dict(word='say', said='dk60', by_id='dk99'))
         assert s['pending'] == ['Now add a test'] and s['phase'] == 'received'
         threads.Thread.assert_not_called()
         manager.owner_turn_ended('dk99')
@@ -125,3 +131,10 @@ def test_a_claude_worker_runs_the_claude_cli_in_its_worktree(manager, tmp_path):
     assert 'Bash(git push:*)' in cmd[cmd.index('--disallowedTools') + 1]
     assert str(seen['cwd']) == str(tmp_path) and s['session'] == 'abc' and s['phase'] == 'received'
     assert any('All done' in w[1] for w in manager.fixture_door.writes if w[1].startswith('say dk50'))
+
+
+def test_titles_end_on_a_whole_word():
+    title = B.short('Write WORKERS.md, a one page guide for residents on running workers', 50)
+    assert title.endswith('…') and not title[:-1].endswith(('on r', ' r')) and len(title) <= 50
+    assert B.short('a b c d e f g h i j k l m n o p', 10) == 'a b c d…'
+    assert B.short('short', 10) == 'short'

@@ -270,6 +270,10 @@ class MemScreen(Screen):
     def close(self, wid):
         self.wins.pop(wid, None)
 
+    def reload(self, wid):
+        if wid in self.wins:
+            self.wins[wid]["reloads"] = self.wins[wid].get("reloads", 0) + 1
+
     def place(self, wid, box):
         if wid in self.wins:
             self.wins[wid]["box"] = box
@@ -302,6 +306,22 @@ class MemScreen(Screen):
 
     def work(self):
         return (0, 0, 3840, 2088 - BAR_H)
+
+
+def _page_visible(win):
+    """Make a window's WebView2 page visible even though WinForms never showed the window (it was shown by Win32)."""
+    def make():
+        from System.Reflection import BindingFlags
+        view = win.native.browser.webview
+        field = view.GetType().GetField("_coreWebView2Controller", BindingFlags.NonPublic | BindingFlags.Instance)
+        controller = field.GetValue(view) if field else None
+        if controller is not None:
+            controller.IsVisible = True
+    try:
+        from System import Func, Type
+        win.native.Invoke(Func[Type](make))
+    except Exception as exc:                            # noqa: BLE001  the window still opens; it may restore blank
+        log(f"page visible: {exc!r}")
 
 
 class GuiScreen(Screen):
@@ -370,6 +390,9 @@ class GuiScreen(Screen):
                         user32.SetPropW(early, "Agora.Window." + wid, wt.HANDLE(1))
                         user32.SetWindowPos(early, None, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE)
                         user32.ShowWindow(early, 7)             # SW_SHOWMINNOACTIVE: on the taskbar, tucked, not active
+                        # 28 Oct: shown past WinForms, the form still thinks it is hidden, so WebView2 keeps the page
+                        # hidden and the window restores as a blank cream box (JEFF chat, Writing, map). Tell the page.
+                        _page_visible(win)
                         rec["hwnd"] = early
                         on_shown()
                         return
@@ -455,6 +478,13 @@ class GuiScreen(Screen):
                 self.closing.add(wid)
         if rec:
             rec["w"].destroy()
+
+    def reload(self, wid):
+        """The page again from disk, in the same window: same place, same tuck, nothing closes."""
+        rec = self.wins.get(wid)
+        if rec:
+            # run_js may wait for an answer the reloading page never gives: let it wait on its own thread
+            threading.Thread(target=lambda: rec["w"].run_js("location.reload()"), daemon=True).start()
 
     def place(self, wid, box):
         rec = self.wins.get(wid)
@@ -725,6 +755,10 @@ class WindowHost:
             {"word": "window.close", "kind": "do", "takes": "<id>", "may": "anyone",
              "help": "window.close <window>: close it. Its window thing goes from the world; undo opens it again where "
                      "it was."},
+            {"word": "window.reload", "kind": "do", "takes": "[<id>] [all]", "may": "anyone",
+             "help": "window.reload <window> | all: load its page again from disk, in place (nothing closes or moves). "
+                     "After editing pages/ (html, js, css) this is all it takes. Changes the screen only, so nothing "
+                     "is recorded."},
             {"word": "window.focus", "kind": "do", "takes": "<id>", "may": "anyone",
              "help": "window.focus <window>: bring it forward, or tuck it away if it is in front already (what a "
                      "taskbar button does). Changes the screen only, so nothing is recorded."},
@@ -945,12 +979,20 @@ class WindowHost:
                     + (f" widget={widget['id']}" if widget else "")
                     + (f" edge={edge}" if edge else ""))
             return {"lines": [line], "saw": {}}
-        if word in ("window.move", "window.close", "window.focus"):
+        if word == "window.reload" and (target or (words[0] if words else "")).lower() == "all":
+            ids = [w for w in list(self.screen.wins)]
+            for wid in ids:
+                self.screen.reload(wid)
+            return {"text": f"{len(ids)} windows reloaded"}
+        if word in ("window.move", "window.close", "window.focus", "window.reload"):
             row = self.row_for(target, use)
             if row is None:
                 return {"refused": f"{target or 'that'} is not one of the windows open here; window.list shows them"}
             if word == "window.focus":
                 return {"text": f"{row.get('name')}: {self.screen.focus(row['id'])}"}
+            if word == "window.reload":
+                self.screen.reload(row["id"])
+                return {"text": f"{row.get('name')} reloaded"}
             if word == "window.close":
                 return {"lines": [f"forget {row['id']}"], "saw": {row["id"]: row["rev"]}}
             if row.get("edge"):
