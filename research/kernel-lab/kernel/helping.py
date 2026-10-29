@@ -349,6 +349,54 @@ def all_page(k, actor, group, pool):
             + [{"word": a["word"], "kind": a.get("word_kind"), "yours": False} for a in others]}
 
 
+FILL_IN_WORDS = {"fill-in", "fill-ins", "fillin", "fillins", "fills", "blanks", "blank", "handles", "handle", "dollar"}
+
+# every $ fill-in the kernel and its painter fill: (fill, where it works, what it says, how long it lasts). Kept beside
+# Kernel.SUPPLIED and verb_note's fill; a new fill-in gets a row here (dk1368).
+FILL_INS = (
+    ("$<name>", "any line", "the thing a line made with as=<name>", "this sign-in, until the kernel restarts"),
+    ("$new", "any line, verb steps", "the last thing made by an earlier line or step", "this sign-in"),
+    ("$me", "any line, verb steps", "who is acting (an agent is itself)", "the line"),
+    ("$here", "any line, verb steps", "the place", "the line"),
+    ("$today", "any line, verb steps, lenses", "the kernel's date, YYYY-MM-DD (UTC)", "the line"),
+    ("$now", "any line, verb steps, lenses", "the kernel's time, YYYY-MM-DDTHH:MM:SSZ", "the line"),
+    ("$1 $2 … $9", "verb steps", "the verb's words, in order", "one use of the verb"),
+    ("$*", "verb steps", "all the verb's words", "one use of the verb"),
+    ("$target, $this", "verb steps", "the thing the verb was said on", "one use of the verb"),
+    ("$<setting>", "verb steps", "the setting given as <setting>=…; one nobody gave is left out", "one use"),
+    ("$target, $item", "a rule's do=", "the thing the happening was about", "one firing"),
+    ("$by", "a rule's do=", "who did the happening", "one firing"),
+    ("$carried", "a lens drop gesture", "the thing dragged and dropped", "one drop"),
+    ("$view $viewer.<x> $item.<x>", "component lenses", "the view, who reads it, the row being painted", "one paint"),
+)
+FILL_INS_NOT_HERE = ("not carried from the old desk: $reach, $house, $session, $me.<prop> and other .<prop> chains, "
+                     "${…} and $( … ). A name kept with set <name> = <id> is as= now, for the sign-in")
+
+
+def fill_ins_page(k, actor, w):
+    """help $: every $ fill-in, where it works, and the as= names this sign-in holds now."""
+    lines = ["$ fill-ins: words starting with $ that are filled when the line runs. They fill where a thing goes, "
+             "never inside quoted text, so a note about $today keeps its words."]
+    width = max(len(f) for f, *_ in FILL_INS)
+    lines += [f"  {f.ljust(width)}  {says}; {where}; lasts {lasts}" for f, where, says, lasts in FILL_INS]
+    names = k.names.get((actor.id, actor.session)) or {}
+
+    def called(t):                                     # what it is called, never its id (Alex's rule, a5143)
+        a = k.shown(actor.person, t) or {}
+        return str(a.get("title") or a.get("name") or a.get("label") or a.get("kind") or "something gone")
+    if names:
+        lines.append("your names now: " + ", ".join(f"${n} = {called(t)}" for n, t in names.items()))
+    else:
+        lines.append("your names now: none. make … as=card, then $card in any later line")
+    lines.append("as= can't take a fill-in's own name (as=me is refused). A $name nothing fills is refused, saying why.")
+    lines.append(FILL_INS_NOT_HERE)
+    rows = [{"fill": f, "where": where, "says": says, "lasts": lasts} for f, where, says, lasts in FILL_INS]
+    rows += [{"fill": f"${n}", "where": "any line", "says": called(t), "thing": t, "lasts": "this sign-in",
+              "yours": True}
+             for n, t in names.items()]
+    return {"text": "\n".join(lines), "rows": rows}
+
+
 def answer(k, actor, words, group):
     """help [<anything>] -> {text, rows}."""
     from . import lines as L
@@ -360,6 +408,8 @@ def answer(k, actor, words, group):
         return all_page(k, actor, group, pool)
     if w == "check":
         return check_page(k, actor, group, pool)
+    if w.startswith("$") or w in FILL_IN_WORDS:
+        return fill_ins_page(k, actor, w)
     try:
         e = k.find_entry(w, group)
     except Exception:
