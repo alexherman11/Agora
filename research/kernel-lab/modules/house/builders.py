@@ -234,7 +234,8 @@ class Builders:
         task = rows[0]
         # A card may have a new run once its last one landed or was released (e.g. landed then reverted).
         prev = self.states.get(target)
-        again = bool(prev) and prev['phase'] in ('landed', 'released') and target not in self.children
+        # ... or when its last run was cut off (House restart) or failed: nothing runs, and its worktree stays for reading
+        again = bool(prev) and prev['phase'] in ('landed', 'released', 'recovery-needed', 'blocked', 'uncertain')             and target not in self.children
         claimed = task.get('builder') or task.get('build_run')
         if held(task) or (claimed and not (again and task.get('build_run') in (prev['run'], None, ''))):
             return {'refused': 'task is held, finished, or already has a builder; reconcile it before a new build'}
@@ -408,6 +409,26 @@ class Builders:
                 threading.Thread(target=self.guarded,args=(state,self.resume),daemon=True).start()
 
     # ---- a worker and the resident in charge of it talk in the worker's chat
+    def steward(self, person):
+        """A leader of the place: Alex and JEFF (Alex, 28 Oct: JEFF must be able to unstick anything)."""
+        if not person:
+            return False
+        for place in self.h.m.see('rows place').get('rows') or []:
+            rows = self.h.m.see('look ' + str(place.get('id'))).get('rows') or [{}]
+            if rows[0].get('member:' + person) == 'leader':
+                return True
+        return False
+
+    def may_act(self, state, msg):
+        """The one in charge of a worker acts on it; so may any steward, to unstick it."""
+        person = (msg.get('caller') or {}).get('person')
+        if person == state['requester']:
+            return True
+        if self.steward(person):
+            self.event(state, 'steward', f"{(msg.get('caller') or {}).get('name') or person} acted on it as a steward")
+            return True
+        return False
+
     def owner(self, state):
         """The House agent (resident or JEFF) in charge of this worker, or None when Alex asked for it himself."""
         if state.get('manager'):
@@ -495,7 +516,7 @@ class Builders:
     def retry(self, msg):
         """Only a proven pre-thread startup failure; never replay an unknown turn."""
         state=self.states.get(msg.get('args',{}).get('target'))
-        if not state or state['requester'] != msg.get('caller',{}).get('person'):
+        if not state or not self.may_act(state, msg):
             return {'refused':'only the requester may retry this startup'}
         with self.lock:
             if state['phase']!='blocked' or state.get('session') or state['task'] in self.children:
@@ -518,7 +539,7 @@ class Builders:
     def tell(self, msg, hold=False):
         state=self.states.get(msg.get('args',{}).get('target'))
         words=str(msg.get('args',{}).get('words') or '').strip()
-        if not state or state['requester'] != msg.get('caller',{}).get('person'):
+        if not state or not self.may_act(state, msg):
             return {'refused':'only the requester may continue this builder'}
         if not words:
             return {'refused':'house.tell <task> <words>: provide a follow-up'}
@@ -606,7 +627,7 @@ left. Then end your turn with a short summary for {boss}: done, or what you need
 
     def request_review(self, msg):
         state = self.states.get(msg.get('args', {}).get('target'))
-        if not state or state['requester'] != msg.get('caller', {}).get('person'):
+        if not state or not self.may_act(state, msg):
             return {'refused': 'only the requester may review this build'}
         with self.lock:
             # Review again: after main moved past a reviewed result, or after a review whose checks failed (the run
@@ -672,7 +693,7 @@ left. Then end your turn with a short summary for {boss}: done, or what you need
         for i, tests in enumerate(CHECKS):
             path = folder/f'check-{i}.txt'
             with path.open('w', encoding='utf-8') as out:
-                proc = subprocess.run([str(T.PY), '-B', '-m', 'pytest', '-q', *tests], cwd=tree,
+                proc = subprocess.run([str(T.PY), '-B', '-m', 'pytest', '-q', *tests], cwd=tree, env=T.clean_env('off'),
                                       stdout=out, stderr=subprocess.STDOUT, timeout=600, creationflags=T.NO_WINDOW)
             receipt = dict(tests=tests, returncode=proc.returncode, evidence=str(path),
                            sha256=hashlib.sha256(path.read_bytes()).hexdigest())
@@ -687,7 +708,7 @@ left. Then end your turn with a short summary for {boss}: done, or what you need
 
     def land(self, msg):
         state = self.states.get(msg.get('args', {}).get('target'))
-        if not state or state['requester'] != msg.get('caller', {}).get('person'):
+        if not state or not self.may_act(state, msg):
             return {'refused': 'only the requester may land this build'}
         with self.lock:
             if state['phase'] != 'reviewed':
