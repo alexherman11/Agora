@@ -272,6 +272,41 @@ def call(message):
             raise ValueError('no visible post in your feed')
         names = {r['id']: r['name'] for r in rows(use, 'person')}
         return dict(text=why(post, replies, names), rows=[dict(id=target, why=why(post, replies, names))])
+    if word == 'asks':
+        # Asks and offers stay ordinary board posts; this reading only says who, what, when and where each stands.
+        # open: nobody linked yet; matched: someone said "I can help" / "I need this" (a claim); done: its poster said so.
+        sides = {'ask', 'offer'}
+        side = kv.get('side') or 'all'
+        if side not in sides | {'all'}:
+            raise ValueError('side=ask, offer or all')
+        wanted = kv.get('status') or 'all'
+        if wanted not in ('open', 'matched', 'done', 'active', 'all'):
+            raise ValueError('status=open, matched, done, active (open or matched) or all')
+        names = {r['id']: r['name'] for r in rows(use, 'person')}
+        result = []
+        for p in threads:
+            if p.get('post_kind') not in sides or side not in ('all', p['post_kind']):
+                continue
+            linked = [key[6:] for key in p if key.startswith('claim:')]
+            status = 'done' if p.get('done') == 'yes' else 'matched' if linked else 'open'
+            if wanted not in ('all', status) and not (wanted == 'active' and status != 'done'):
+                continue
+            closed = bool(p.get('closes')) and stamp(now) >= stamp(p['closes'])
+            # the claim word gives a thing without seats one seat, so a full one cannot be linked again
+            seats = int(p['seats']) if str(p.get('seats', '')).isdecimal() else 1
+            result.append(dict(p, side=p['post_kind'], status=status, who=names.get(owner(p), 'A neighbour'),
+                               side_label=p['post_kind'].capitalize(), status_label=status.capitalize(),
+                               link_label='I can help' if p['post_kind'] == 'ask' else 'I need this',
+                               what=p.get('title') or p.get('text', ''), when=p['made'],
+                               linked=', '.join(names.get(x, 'A neighbour') for x in linked), linked_count=len(linked),
+                               yours='yes' if owner(p) == person else 'no', you_linked='yes' if person in linked else 'no',
+                               can_link='yes' if status != 'done' and not closed and len(linked) < seats
+                                          and owner(p) != person and person not in linked else 'no',
+                               replies=sum(1 for r in replies if r.get('thread') == p['id'])))
+        rank = {'open': 0, 'matched': 1, 'done': 2}
+        result.sort(key=lambda r: r['made'], reverse=True)
+        result.sort(key=lambda r: rank[r['status']])
+        return dict(text=str(len(result)) + ' asks and offers · ' + side + ' · ' + wanted, rows=result)
     if word == 'search':
         query = str(kv.get('q') or args.get('words') or '').casefold().strip()
         if not query:
@@ -394,6 +429,7 @@ SPECS = [
     ('why-here', 'see', '<id>', 'Read why this visible post is here: pin, upvotes, replies, answer and leader decision.'),
     ('search', 'see', 'q=<text> [in=<group> kind=<kind> person=<person> since=<UTC> before=<UTC>]', 'Search visible posts, replies and extracted document pages. No hidden files or private group text.'),
     ('calendar', 'see', '<id>', 'Export a visible event as RFC 5545 calendar text, with filename and MIME type for a download button.'),
+    ('asks', 'see', '[in=<group>] [side=ask|offer|all] [status=open|matched|done|active|all]', 'Asks and offers with who, what, when and status: open, matched (someone claimed it: I can help / I need this) or done (its poster set done=yes). Open first.'),
     ('badges', 'see', '', 'Read real names and current leader/steward badges; agents say agent for <person>.'),
 ]
 

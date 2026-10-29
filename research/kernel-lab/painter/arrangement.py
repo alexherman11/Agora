@@ -162,9 +162,11 @@ def compile_view(k, actor, target, _trail=(), reader=None, view=None):
         return compile_view(k, actor, target, (*_trail,lens['id']), reader=reader, view=view)
     if not lens or lens.get('kind') != 'lens' or lens.get('painter') != 'components':
         raise Refused('look-view needs a component lens, its widget or window')
-    preferences = [a for a in visible.values() if a.get('kind') == 'view-preference'
-                   and (a.get('made_by') in (actor.person,actor.id) or a.get('for')==actor.person)
-                   and a.get('lens') in (lens['id'], lens.get('name'))]
+    def preferences_for(l):
+        return [a for a in visible.values() if a.get('kind') == 'view-preference'
+                and (a.get('made_by') in (actor.person,actor.id) or a.get('for')==actor.person)
+                and a.get('lens') in (l['id'], l.get('name'))]
+    preferences = preferences_for(lens)
     # A viewer may own an arrangement without changing the shared lens.
     source = next((a['text'] for a in reversed(preferences) if 'text' in a), lens.get('text', ''))
     definitions = parse(source)
@@ -199,17 +201,36 @@ def compile_view(k, actor, target, _trail=(), reader=None, view=None):
             result.append(r)
         return result
     components = {a['name']: a for a in visible.values() if a.get('kind') == 'component' and a.get('name')}
-    styles = [a for a in visible.values() if a.get('kind') == 'part-style' and a.get('lens') in (lens['id'], lens.get('name'))
-              and (not a.get('personal') or a.get('made_by') in (actor.person,actor.id) or a.get('for')==actor.person)]
-    styles.sort(key=lambda a:bool(a.get('personal')))
     # Paint health is this screen's, kept in the kernel process's memory and never in the world (painter/health.py).
     from painter.health import reports_for
     reports = reports_for(k, actor.person, lens['id'])
     counts, shown, settings_seen = Counter(), {}, []
-    def expand(node, env, path, level=0):
+    nested = []
+    def nest(node, env, path, level, scope):
+        # `part : lens, name <lens>` paints another component lens in place, by name: its own templates,
+        # view defaults, personal views and styles come with it. The same lens also opens alone in a window.
+        wanted = str(node['settings'].get('name') or node['settings'].get('text') or '')
+        inner = next((a for a in visible.values() if a.get('kind') == 'lens' and wanted in (a['id'], a.get('name'))), None)
+        if not inner or inner.get('painter') != 'components':
+            raise Refused(f'lens part {node["name"]}: no visible component lens named {wanted}')
+        if inner['id'] in scope['lenses']: raise Refused('cyclic view reference')
+        prefs = preferences_for(inner)
+        inner_defs = parse(next((a['text'] for a in reversed(prefs) if 'text' in a), inner.get('text', '')))
+        inner_view = json.loads(inner.get('view', '{}') or '{}')
+        for preference in prefs:
+            inner_view.update({key[5:]:value for key,value in preference.items() if key.startswith('view.')})
+        # The host lens's view and this window's choices win; the nested lens only fills what is missing.
+        for key, value in inner_view.items(): view.setdefault(key, value)
+        if inner not in nested: nested.append(inner)
+        # The nested root takes the host part's name, so the host's personal views reach it as <part>.<setting>.
+        root = dict(inner_defs['root'], name=node['name'])
+        return expand(root, env, path, level+1, dict(defs=inner_defs, prefs=prefs+scope['prefs'], lenses=(*scope['lenses'], inner['id'])))
+    def expand(node, env, path, level=0, scope=None):
+        scope = scope or dict(defs=definitions, prefs=preferences, lenses=(lens['id'],))
         if level > 24:
             raise Refused('component arrangement nests too deeply')
         if node.get('when') and not condition(node['when'], env): return None
+        if node['component'] == 'lens': return nest(node, env, path, level, scope)
         for watch in node.get('watches',[]):
             command=resolve_line(watch,env)
             watch_values.append(dict(path=path,line=command,rows=read_rows(command)))
@@ -245,12 +266,12 @@ def compile_view(k, actor, target, _trail=(), reader=None, view=None):
             limit = min(100, max(1, int(resolve(node['settings'].get('limit', '100'), env) or 100)))
             total = len(items)
             items = items[offset:offset+limit] if 'limit' in node['settings'] else items
-            template = definitions.get(node.get('each'))
+            template = scope['defs'].get(node.get('each'))
             if not template: raise Refused('each needs a named template')
             kids = []
             for index, item in enumerate(items):
                 next_env = dict(env, **{alias or 'item':item, 'item':item})
-                child = expand(template, next_env, path+'/'+str(item.get('id') or index), level+1)
+                child = expand(template, next_env, path+'/'+str(item.get('id') or index), level+1, scope)
                 if child: kids.append(child)
             query_children = kids
         kind = node['component']
@@ -271,13 +292,13 @@ def compile_view(k, actor, target, _trail=(), reader=None, view=None):
                 if isinstance(result,(dict,list)):return result
             return resolve(value,env)
         settings = {key:setting_value(key,value) for key, value in node['settings'].items() if key not in ('limit','offset')}
-        for preference in preferences:
+        for preference in scope['prefs']:
             for key, value in preference.items():
                 if key.startswith(node['name']+'.'):
                     settings[key.split('.',1)[1]] = value
         enabled=settings.pop('enabled',True)
         displays={};formats=dict(node.get('formats',{}));labels=dict(node.get('labels',{}))
-        for preference in preferences:
+        for preference in scope['prefs']:
             for key,value in preference.items():
                 if key.startswith(node['name']+'.format.'):
                     formats[key.split('.format.',1)[1]]=value
@@ -316,7 +337,7 @@ def compile_view(k, actor, target, _trail=(), reader=None, view=None):
         reads = {v['id']:dict(rev=v['rev'],participant=True) for v in env.values() if isinstance(v,dict) and 'id' in v and 'rev' in v}
         for tid in reads:
             if tid in visible: shown[tid] = visible[tid]
-        children = query_children if query_children is not None else [x for child in node['children'] if (x := expand(child, env, path+'/'+child['name'], level+1))]
+        children = query_children if query_children is not None else [x for child in node['children'] if (x := expand(child, env, path+'/'+child['name'], level+1, scope))]
         if not query or kind != 'column': counts[kind] += 1
         report=reports.get(path,{})
         declared_parts=[]
@@ -339,11 +360,16 @@ def compile_view(k, actor, target, _trail=(), reader=None, view=None):
     base = dict(view=view, viewer=dict(id=actor.person, name=k.name(actor.person)), today=k.now().strftime('%Y-%m-%d'),
                 now=k.now().strftime('%Y-%m-%dT%H:%M:%SZ') if '$now' in source else '')
     tree = expand(definitions['root'], base, 'root')
+    # A nested lens's styles and tokens come first; the host lens's own, then personal ones, override them.
+    owners = [(lens['id'], lens.get('name'))] + [(a['id'], a.get('name')) for a in nested]
+    styles = [a for a in visible.values() if a.get('kind') == 'part-style' and any(a.get('lens') in names for names in owners)
+              and (not a.get('personal') or a.get('made_by') in (actor.person,actor.id) or a.get('for')==actor.person)]
+    styles.sort(key=lambda a:(bool(a.get('personal')), a.get('lens') in owners[0]))
     if reader:
         if not hasattr(actor, '_component_projection'): actor._component_projection = {}
         actor._component_projection[lens['id']] = dict(view=view, readings=reading_cache)
     used = [dict(components[name],trusted=components[name].get('reviewed_code')==hashlib.sha256(components[name].get('code','').encode()).hexdigest()) for name in counts if name in components]
-    for a in [lens, *used, *styles, *preferences, *shown.values()]: k.mark(actor, a['id'], a)
+    for a in [lens, *nested, *used, *styles, *preferences, *shown.values()]: k.mark(actor, a['id'], a)
     text = f"{lens.get('title') or lens.get('name')}: " + ', '.join(f'{n} {kind}' for kind,n in counts.items())
     tokens={};style_errors=[];paint_styles=[]
     for a in styles:

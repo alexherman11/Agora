@@ -1,0 +1,23 @@
+root : column, role nb-asks
+  heading : text "Asks & offers"
+  ask : input, label "Ask for something", hint "What would help? Press Enter to post."
+    on change do board.post post_kind=ask seats=$view.asks_seats text=$value in=$view.asks_channel
+  offer : input, label "Offer something", hint "What can you share? Press Enter to post."
+    on change do board.post post_kind=offer seats=$view.asks_seats text=$value in=$view.asks_channel
+  entries : list, label "Asks and offers", of reading:"board.asks in=$view.channel side=$view.asks_side status=$view.asks_status" as a, limit 30, each ask-item
+ask-item : column, role nb-ask
+  line : row
+    side : badge, label $a.side_label
+    status : badge, label $a.status_label
+    who : avatar, label $a.who, value $a.who
+  what : text-block, label "What", value $a.what
+  when : text-block, label "When", value $a.when
+    format value as short-relative
+  linked : text-block, label "Linked", value $a.linked
+    only when $a.linked_count > 0
+  link : button, label $a.link_label
+    only when $a.can_link = yes
+    on press do claim $item
+  done : button, label "Mark done"
+    only when $a.yours = yes and $a.status != done
+    on press do set $item done=yes
