@@ -60,3 +60,15 @@ went off and stayed off, because only a *new* `wm.mode live` request could arm i
 world's mode is the standing choice; restarts and non-panic lease ends re-arm from it once the gate is clear; the panic
 chord holds it out until a new request. Missing world-level word: **a standing intent versus a one-time request**: a
 setting a module should keep honouring across its own restarts, kept apart from a request that happened once.
+
+## 28 October 2026 — restore intent survives pending native work
+
+Builder draft for review. Missing world-level handle: **the latest window visibility
+intent supersedes an outstanding native operation**. `wm.restore` previously only
+cleared displacement and called Windows; the layout could keep the window minimised.
+`manager.py` now solves explicit restore/minimise intent, replaces stale pending
+work, and recognises an external restore during the acknowledgement interval.
+Both restore routes wait for native geometry to settle before placement, using the
+existing restore acknowledgement. Regressions live in `test_adaptive.py`; the
+guarded, HWND-allowlisted `hidden_restore.py` exercises four native fixtures and
+repeated dock/external restore races. No live activation or real Spotify launch.
