@@ -14,7 +14,7 @@ import subprocess
 import time
 from ctypes import wintypes as wt
 
-MINE = ("kernel-desktop\\kdesk.py", "kdesk.py --", "kernel-desktop\\kd_window.py", "kernel-desktop\\kd_guy.py",
+MINE = ("kernel-desktop\\kdesk_keeper.py", "kernel-desktop\\kdesk.py", "kdesk.py --", "kernel-desktop\\kd_window.py", "kernel-desktop\\kd_guy.py",
         "kernel-desktop\\kd_system.py", "kernel-desktop\\kd_media.py")
 
 
@@ -42,7 +42,9 @@ def work_area():
 
 def main():
     procs = processes()
-    kernels = [p for p in procs if "kdesk.py" in p[1].lower()]
+    # the keeper first (its tree is the kernel and every module), else the kernel's tree as before
+    kernels = ([p for p in procs if "kdesk_keeper.py" in p[1].lower()]
+               or [p for p in procs if "kdesk.py" in p[1].lower()])
     for pid, _ in kernels or procs:
         subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, creationflags=0x08000000)
     time.sleep(0.5)

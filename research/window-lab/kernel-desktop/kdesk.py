@@ -494,13 +494,35 @@ def start(world=DEFAULT_WORLD, port=8810, modules=True, headless=False, resident
         print(f"kdesk: worker sessions for {', '.join(added)}", flush=True)
     k.dev_sessions = lambda: entry.sessions             # the door's /dev/signin knows these sessions
     handler = make_desk_handler(k, entry)
-    srv = DesktopServer(("127.0.0.1", port), handler)
-    srv.window_origins = handler.window_origins = WindowOrigins(k, handler)
+    # Started by kdesk_keeper: the keeper holds the ports and the module processes, so a kernel restart closes
+    # neither (keeper_link.py). Without a keeper, everything below is as it always was.
+    import keeper_link
+    link = keeper_link.connect()
+    if link:
+        handler.widget_broker.guard_key = link.widget_key         # modules read it once; every kernel gets the same
+        keeper_link.install(KM)
+        srv = keeper_link.serve_on(DesktopServer, link.shared(port), handler)
+        origins = keeper_link.kept_origins(WindowOrigins, KD.Server, port)
+    else:
+        srv = DesktopServer(("127.0.0.1", port), handler)
+        origins = WindowOrigins
+    srv.window_origins = handler.window_origins = origins(k, handler)
+    if link:
+        link.serving = lambda: [srv, *srv.window_origins.servers]     # what a restart stops accepting on first
     os.environ['AGORA_WIDGET_HOST_KEY'] = handler.widget_broker.guard_key
     os.environ["AGORA_KDESK_PORT"] = str(srv.server_address[1])     # the modules (children) read where the door is
     host = KM.Host(k, HERE)
+    if link and modules:
+        # kept modules first: until each has its words back, a request would hear "window is not running".
+        # Requests wait in the keeper's queue meanwhile.
+        host.reconcile()
+        for mid, p in list(host.procs.items()):
+            if getattr(p, "adopted", False):
+                host.wait_offered(mid, 5)
+    if link:
+        srv.window_origins.begin()
     threading.Thread(target=srv.serve_forever, daemon=True, name="door").start()
-    if modules:
+    if modules and not link:
         host.reconcile()
     if modules and not headless:
         from widget_overlay import Overlays
@@ -514,6 +536,7 @@ def main():
     ap.add_argument("--world", default=str(DEFAULT_WORLD))
     ap.add_argument("--port", type=int, default=8810)
     ap.add_argument("--no-modules", action="store_true")
+    ap.add_argument("--headless", action="store_true", help="a new world's modules draw nothing (trials and tests)")
     ap.add_argument("--resident-manifest", help="owner-reviewed Sable or Pike manifest; provision asleep before House starts")
     ap.add_argument("--manager-manifest", help="approved fresh Rowan manifest; provision asleep before House starts")
     ap.add_argument("--log", help="write what it says here (it runs under pythonw, with no console)")
@@ -523,7 +546,8 @@ def main():
         sys.stdout = sys.stderr = open(a.log, "a", encoding="utf-8", buffering=1)
     # a start's time, so a traceback below it can be placed (28 Oct: the log had none, and old errors read as new)
     print(f"kdesk: starting {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}", flush=True)
-    k, srv, host, entry = start(a.world, a.port, modules=not a.no_modules, resident_manifest=a.resident_manifest, manager_manifest=a.manager_manifest)
+    k, srv, host, entry = start(a.world, a.port, modules=not a.no_modules, headless=a.headless,
+                                resident_manifest=a.resident_manifest, manager_manifest=a.manager_manifest)
     (k.keep_dir / "kdesk.pid").write_text(str(os.getpid()))
     print(f"kdesk: {k.name(k.place)} on http://127.0.0.1:{a.port} · {len(k.log.records)} records · modules "
           f"{', '.join(k.state.get(m, 'name') for m in k.things('module') if k.state.get(m, 'on'))}", flush=True)
@@ -537,7 +561,8 @@ def main():
     finally:
         if hasattr(srv, 'widget_overlays'):
             srv.widget_overlays.close()
-        host.stop_all()
+        if not os.environ.get("AGORA_KEEPER"):          # under a keeper, modules outlive this kernel on purpose
+            host.stop_all()
         srv.shutdown()
         srv.server_close()
 
