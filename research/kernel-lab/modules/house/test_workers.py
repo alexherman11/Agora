@@ -153,3 +153,9 @@ def test_a_steward_may_unstick_anyones_worker_and_others_may_not(manager):
     with patch('builders.threading', SimpleNamespace(Thread=Mock())):
         assert manager.tell(jeff).get('external')
     assert any(a['what'] == 'steward' for a in s['activity'])
+
+
+def test_nothing_the_house_starts_can_reach_the_live_keeper(monkeypatch):
+    monkeypatch.setenv('AGORA_KEEPER', '1234 secret')
+    assert 'AGORA_KEEPER' not in B.T.clean_env()
+    assert 'AGORA_KEEPER' not in B.T.clean_env('off')

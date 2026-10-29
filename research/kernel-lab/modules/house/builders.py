@@ -692,7 +692,7 @@ left. Then end your turn with a short summary for {boss}: done, or what you need
         for i, tests in enumerate(CHECKS):
             path = folder/f'check-{i}.txt'
             with path.open('w', encoding='utf-8') as out:
-                proc = subprocess.run([str(T.PY), '-B', '-m', 'pytest', '-q', *tests], cwd=tree,
+                proc = subprocess.run([str(T.PY), '-B', '-m', 'pytest', '-q', *tests], cwd=tree, env=T.clean_env('off'),
                                       stdout=out, stderr=subprocess.STDOUT, timeout=600, creationflags=T.NO_WINDOW)
             receipt = dict(tests=tests, returncode=proc.returncode, evidence=str(path),
                            sha256=hashlib.sha256(path.read_bytes()).hexdigest())

@@ -56,6 +56,9 @@ def find_claude():
 def clean_env(compact_at="400k", fake=None):
     """The child inherits nothing of a launcher's Claude session (house.py clean_env), and compacts at compact_at."""
     env = {k: v for k, v in os.environ.items() if not k.upper().startswith("CLAUDE")}
+    # 28 Oct: a review's hidden desktop tests started a kernel with the live keeper's AGORA_KEEPER, joined the live
+    # keeper and knocked Alex's kernel off it. Nothing the House starts may reach the live keeper.
+    env.pop("AGORA_KEEPER", None)
     env["CLAUDE_CODE_DISABLE_AUTO_MEMORY"] = "1"
     if str(compact_at).lower() != "off":
         env["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = str(compact_at)
