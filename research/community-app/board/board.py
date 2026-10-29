@@ -100,7 +100,7 @@ def call(message):
             raise ValueError('unknown post kind; make kind=kind name=… fields=… to add one')
         if definition.get('leaders_only') == 'yes' and not leader(use, person, group):
             raise ValueError('this kind is posted by a leader')
-        allowed = set(str(definition.get('fields', '')).split()) | {'text', 'title', 'in'}
+        allowed = set(str(definition.get('fields', '')).split()) | {'text', 'title', 'in', 'place'}
         if any(k not in allowed for k in kv):
             raise ValueError('this kind accepts: ' + ' '.join(sorted(allowed)))
         for required in str(definition.get('required', '')).split():
