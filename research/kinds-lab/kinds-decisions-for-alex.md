@@ -7,9 +7,9 @@
 ## Alex's answers (28 Oct, late, asked in the session; his words kept as written)
 1. **Spellings:** "the system should hold all the kinds, things coming into the system can declare what kinds they support, and it is the job of the system to handle duplicates in the on system dictionary. That is why there has to be an intelligence layer to support multiple kinds. It is literally essential for agora to function."
    - This is a new direction, wider than the producer spellings proposed below. It's being designed slowly, with reviewers, in [[kinds-intelligence]].
-2. **Child kinds:** "Children by declaration". Approved; being built.
-3. **Rules hear:** "You, your agents, leaders". Approved; being built with the review's round 2 points (sealed acts fire only `by=anyone`; `by` is maker-only).
-4. **Outside services:** "Public, or my own". Approved; being built.
+2. **Child kinds:** "Children by declaration". Built and live since 03:31Z, 29 Oct.
+3. **Rules hear:** "You, your agents, leaders". Built and live: new rules are `by=maker`; your existing five rules have no `by` and keep hearing everyone. Sealed acts fire only `by=anyone`.
+4. **Outside services:** "Public, or my own". Built and live: the map sends a place text only when it's public or the asker's own.
 
 ## Design calls
 
@@ -79,7 +79,7 @@
    - It says "never hand-edit", so it's yours.
 
 ## Housekeeping
-10. **Commit:** tonight's source fixes are uncommitted, about 20 files in `research/kernel-lab` and two desktop files. Each has a test and a Rough spots entry. Should I commit them?
+10. **Commit:** done on your yes, as 39f996a3b on main (only my files, and only my hunk of kd_window.py). Not pushed.
 
 ## Changes you'll notice
 - **"Verified" is yours alone now:**
