@@ -149,7 +149,13 @@ KERNEL_ENTRIES = [
        help="status <module>: what a running module says it is doing."),
     _k("rows", "see", "[<kind>] [k=<v> ...]", "anyone", "no", aliases="find",
        help="rows <kind> [field=value …]: the things of a kind you may see, as rows with their revs, in their `order`, "
-            "then as made: rows item meeting=sb40, rows window, rows any.\nfind kind=<kind> … says the same."),
+            "then as made: rows item meeting=sb40, rows window, rows any.\nfind kind=<kind> … says the same; "
+            "find <words>, when the first word is no kind, searches as search does."),
+    _k("search", "see", "<words> [limit=<n>] [kind=<kind>]", "anyone", "no",
+       help="search <words> [limit=12] [kind=<kind>]: the things of every kind you may see whose name, title or text "
+            "holds all the words, title matches first, then open work (Now first) above done, each with its kind "
+            "and a snippet. A name in the words is only words: search beach finds the beach board, the channels "
+            "its view shows, its button, map and cards. find <words> says the same; board.search q=… searches posts and pages."),
     _k("verb", "do", "<word> steps=<lines> help=<text> [may=<who>] [kind_of=do|see] [acts_on=<kind>] [needs=<needs>] "
                      "[in=<group>]", "leaders", "yes",
        help="verb <word> steps=\"<lines>\" help=\"<what it does>\": a new word made of other words, a verb note. Its "
@@ -898,8 +904,11 @@ def rows(k, actor, st, entry, tx, group, saw=None):
         ref = kind.split(":", 1)[1]
         items = next_rows(k, actor, ref)
         return {"text": packet(items, ref), "rows": items}
+    if (st.text.split() or [""])[0].lower() == "find" and "kind" not in st.kv and kind != "any" \
+            and not (k.things(kind) or k.kinds.decl(kind, group) or k.kinds.is_open(kind, group)):
+        return search(k, actor, st, entry, tx, group)      # find Seabright: no kind is called that, so words to search
     kv.pop("in", None)
-    exact = str(kv.pop("exact", "")).casefold() in ("yes", "true")
+    exact =str(kv.pop("exact", "")).casefold() in ("yes", "true")
     # a kind with a shape, or one another kind extends, also lists what has that shape (kinds.py), read under the
     # kind's names (start for a thing that says starts); exact=yes lists only things whose own kind is that word
     fitted = kind != "any" and not exact and k.kinds.is_open(kind, group)
@@ -936,7 +945,8 @@ def rows(k, actor, st, entry, tx, group, saw=None):
         except Refused:
             word = None
         return {"text": f"nothing here is a {kind}" + (f"; {kind} is a word: say {kind}" if word else
-                                                         "; kinds lists the kinds, rows any lists everything"),
+                                                         "; kinds lists the kinds, rows any lists everything, "
+                                                         f"search {st.words or kind} finds things by name or text"),
                 "rows": []}
     text = "\n".join(f"  {r['id']} · {r.get('kind')} · "
                      f"{r.get('title') or r.get('name') or r.get('word') or r.get('label') or (r.get('text') or '')[:60]}"
@@ -948,6 +958,101 @@ def rows(k, actor, st, entry, tx, group, saw=None):
         return {"text": f"0 {plural}: none you can see has " + " and ".join(f"{f}={v}" for f, v in kv.items())
                         + f"; rows {kind} alone lists them all", "rows": rows}
     return {"text": f"{len(rows)} {plural}" + ("\n" + text if rows else ""), "rows": rows}
+
+
+SEARCH_TITLE = ("title", "name", "label", "word")
+SEARCH_TEXT = ("text", "help", "goal", "acceptance", "next_action", "description", "about", "summary", "body")
+SEARCH_DONE = {"done", "closed", "cancelled", "canceled", "archived", "finished"}
+
+
+def _open_rank(a):
+    """0 for work in Now, 1 for anything not finished, 2 for done (its lane, status or state says so)."""
+    said = {str(a.get(f, "")).casefold() for f in ("lane", "status", "state")}
+    if said & SEARCH_DONE or str(a.get("done", "")).casefold() in ("yes", "true"):
+        return 2
+    return 0 if "now" in said else 1
+
+
+def _snippet(text, terms, width=90):
+    """The text around the first word searched for, on one line."""
+    text = " ".join(str(text).split())
+    low = text.casefold()
+    at = min((low.find(w) for w in terms if w in low), default=0)
+    start = max(0, at - width // 3)
+    return ("…" if start else "") + text[start:start + width] + ("…" if start + width < len(text) else "")
+
+
+def search(k, actor, st, entry, tx, group, saw=None):
+    """search <words> [limit=] [kind=] (or find <words>): every thing the asker may see whose name, title or text
+    holds all the words, any case; title matches first, then open work above done, then newest (dk1322, 28 Oct:
+    'search Seabright' resolved Seabright as the map and refused). The words never resolve to a thing."""
+    kv = dict(st.kv)
+    query = " ".join(x for x in (kv.pop("q", ""), st.target or "", st.words) if x).strip()
+    terms = query.casefold().replace('"', " ").split()
+    if not terms:
+        raise Refused("search needs words: search <words> [limit=12], e.g. search Seabright")
+    try:
+        limit = max(1, int(kv.pop("limit", 12)))
+    except ValueError:
+        raise Refused("limit= is a number: search <words> limit=20")
+    want = str(kv.pop("kind", "")).casefold()
+    phrase = " ".join(terms)
+
+    def visible(t):
+        a = k.shown(actor.person, t) if t != "world" else None
+        if a is None or a.get("forgotten") or (a.get("kind") == "word" and a.get("status") == "hidden"):
+            return None
+        kind = str(a.get("kind") or "thing").casefold()
+        return None if want and kind != want and not kind.endswith("-" + want) else a
+
+    def called(t, a):
+        return str(a.get("title") or a.get("label") or a.get("name") or a.get("word") or k.name(t))
+
+    found, shows = {}, {}
+    for t in list(k.state.things):
+        a = visible(t)
+        if a is None:
+            continue
+        # seabright-board-button reads as words too
+        title = " ".join(str(a[f]) for f in SEARCH_TITLE if a.get(f)).casefold().replace("-", " ").replace("_", " ")
+        body = " ".join(str(a[f]) for f in SEARCH_TEXT if a.get(f))
+        low, kind = body.casefold(), str(a.get("kind", "")).replace("-", " ")      # Seabright map: the map
+        if not all(w in title or w in low or w in kind for w in terms):
+            continue
+        rank = 0 if phrase in title else 1 if all(w in title or w in kind for w in terms) else 2 if any(
+            w in title for w in terms) else 4
+        found[t] = (rank, a, _snippet(body, terms) if body else "")
+        if rank < 4 and a.get("kind") in ("lens", "widget"):
+            # what a matching view shows is part of it: the Seabright board's lens reads rows board-channel, and its
+            # channels' own titles never say Seabright (Announcements, Asks & offers)
+            for kd in re.findall(r'reading:"rows ([a-z][a-z0-9-]*)', str(a.get("text", ""))):
+                if kd != "kind":
+                    shows.setdefault(kd, called(t, a))
+    for kd, view in shows.items():
+        for t in k.things(kd):
+            a = visible(t)
+            if t not in found and a is not None and (a.get("title") or a.get("name") or a.get("label")):
+                found[t] = (3, a, f"shown in {view}")
+    order = []
+    for t, (rank, a, snip) in found.items():
+        opened, num = _open_rank(a), t[len(k.tag):]
+        order.append(((opened == 2, rank, opened, -int(num) if num.isdecimal() else 0), t, rank, a, snip))
+    order.sort(key=lambda x: x[0])
+    found = order
+    rows = []
+    for _, t, rank, a, snip in found[:limit]:
+        row = {"id": t, "kind": str(a.get("kind") or "thing"), "name": called(t, a), "rev": k.state.rev.get(t, 0),
+               "match": "title" if rank < 3 else "part" if rank == 3 else "text", "snippet": snip}
+        row.update({f: a[f] for f in ("lane", "status") if a.get(f)})
+        rows.append(row)
+    if not rows:
+        return {"text": f"nothing you can see has {query!r} in its name, title or text"
+                        + (f" (of kind {want})" if want else "") + "; rows any lists everything", "rows": []}
+    head = f"{len(found)} thing{'s' if len(found) != 1 else ''} with {query!r}" + (
+        f" (the first {len(rows)}; limit={len(found)} shows all)" if len(found) > len(rows) else "")
+    lines = [f"  {r['id']} · {r['kind']} · {r['name'][:70]}" + (f" [{r['lane']}]" if r.get("lane") else "")
+             + (f" — {r['snippet']}" if r["snippet"] else "") for r in rows]
+    return {"text": head + "\n" + "\n".join(lines), "rows": rows}
 
 
 VERB_NAME = re.compile(r"^[a-z][a-z0-9-]{0,31}(\.[a-z][a-z0-9-]{0,31})?$")      # word or family.word
@@ -1079,6 +1184,6 @@ KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant":
           **{w: panes if w == "panes" else arrange for w in PANE_HELP},
           "counts": counts, "test": test, "look": look, "help": help_, "post": post, "like": like, "pin": pin, "undo": undo, "off": off,
           "status": status, "make": make, "set": set_, "forget": forget, "holds": holds, "claim": claim,
-          "vote": vote, "role": role, "rows": rows, "find": rows, "verb": verb,
+          "vote": vote, "role": role, "rows": rows, "find": rows, "search": search, "verb": verb,
           "who": who, "recent": recent, "kinds": kinds, "on": on, "press": press, "say": say, "chat": chat_word,
           "refusals": refusals, "failed": failed, "mark": mark, "actions": words_for, "turn": turn}

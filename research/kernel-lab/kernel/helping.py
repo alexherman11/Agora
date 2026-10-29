@@ -18,9 +18,10 @@ START = ("Lines: type a line, the world answers. A line is a word, then what it 
          "  window.open feed to=left      word, then a thing, then key=value\n"
          "  set dk74 at=40,40             a thing is named by its id (dk74); ids show in every answer\n"
          "  post \"hello there\"            quote text that has spaces\n"
+         "  search Seabright              things of any kind by name, title or text\n"
          "Every act gets a receipt [r812]; undo takes back your latest act (undo r812 takes back that one).\n"
          "A refused line or a broken button is kept: refusals lists what, who and why.")
-USEFUL = ("look", "help", "rows", "window.list", "window.open", "make", "set", "forget", "undo", "history", "post",
+USEFUL = ("look", "help", "rows", "search", "window.list", "window.open", "make", "set", "forget", "undo", "history", "post",
           "theme.use", "task.add", "verb", "rule", "who", "recent", "refusals")
 
 
