@@ -6,10 +6,12 @@ export default {mount(api,s){
   const press=(key,fallback,fn,cls='nb-text-button')=>P.press(L(key,fallback),fn,cls);
   const status=()=>api.part('status','p',{class:'nb-meta',role:'status','aria-live':'polite'});
   const safe=fn=>async()=>{try{await fn()}catch(e){api.tell(String(e.message||e).replace(/^refused:\s*/,'Please try again in a little while. '))}};
-  const open=(id,extra={})=>api.select({thread:id,replyTo:id,quote:'',source:'',page:1,documentPage:1,documentFile:'',...extra});
-  const chooseSaved=async()=>{const orders=await api.read('rows board-order');return api.select({order:orders.find(o=>o.rule==='bookmarks')?.id||'',offset:0,thread:'',search:'',queue:'no'})};
-  const chooseQueue=()=>api.select({queue:'yes',search:'',thread:''});
-  const chooseChannel=async channel=>{if(channel==='__saved')return chooseSaved();if(channel==='__queue')return chooseQueue();const orders=await api.read('rows board-order');return api.select({channel,offset:0,thread:'',search:'',queue:'no',summary:'',order:orders.some(o=>o.id===v.order&&o.rule==='bookmarks')?'':v.order||''})};
+  const open=(id,extra={})=>api.select({thread:id,replyTo:id,focus:'',quote:'',source:'',page:1,documentPage:1,documentFile:'',...extra});
+  const chooseSaved=async()=>{const orders=await api.read('rows board-order');return api.select({order:orders.find(o=>o.rule==='bookmarks')?.id||'',offset:0,thread:'',search:'',queue:'no',opens:''})};
+  const chooseQueue=()=>api.select({queue:'yes',search:'',thread:'',opens:''});
+  // A channel opens its own view when its world thing says so (board-channel opens=calendar); the lens
+  // arranges one part per view name. Conversations stay one press away in the toolbar.
+  const chooseChannel=async channel=>{if(channel==='__saved')return chooseSaved();if(channel==='__queue')return chooseQueue();const [orders,channels]=await Promise.all([api.read('rows board-order'),api.read('rows board-channel')]);return api.select({channel,offset:0,thread:'',search:'',queue:'no',summary:'',opens:channels.find(c=>c.group===channel)?.opens||'',calendarAdd:'no',calendarEvent:'',order:orders.some(o=>o.id===v.order&&o.rule==='bookmarks')?'':v.order||''})};
   const titleCase=value=>String(value||'').replace(/^./,c=>c.toUpperCase());
   const icons={discussion:'☰',question:'?',event:'▦',poll:'▥',ask:'↗',offer:'♡',document:'▤',announcement:'⌖',decision:'✓'};
   const viewer=api.node.viewer?.id;
@@ -30,33 +32,40 @@ export default {mount(api,s){
   if(kind==='board-navigation'){
     root.append(press('all','All conversations',()=>chooseChannel(''),!v.channel?'nb-channel active':'nb-channel'),text('p',L('channels','Channels'),'nb-eyebrow'));
     const links=P.node('div',{class:'nb-channel-list'}),phone=P.node('select',{'aria-label':L('channel','Channel'),on:{change:e=>chooseChannel(e.target.value)}},P.node('option',{value:''},L('all','All conversations')));
-    api.read('rows board-channel').then(api.guard(async channels=>{const [posts,seen]=await Promise.all([api.read('rows post'),api.read('rows board-seen')]);const since=seen.find(r=>(r.for||r.made_by)===api.node.viewer?.id)?.at||seen[0]?.at||'1970';for(const ch of channels){const unread=posts.filter(p=>p.groups?.includes(ch.group)&&p.made>since).length;const button=P.press(L(ch.title,ch.title),()=>chooseChannel(ch.group),'nb-channel'+(v.channel===ch.group?' active':''));if(unread)button.append(text('span',String(unread),'nb-unread'));links.append(button);phone.append(P.node('option',{value:ch.group},L(ch.title,ch.title)))}phone.value=v.channel||''})).catch(api.tell);
+    api.read('rows board-channel').then(api.guard(async channels=>{const [posts,seen]=await Promise.all([api.read('rows post'),api.read('rows board-seen')]);const mine=seen.filter(r=>(r.for||r.made_by)===viewer);for(const ch of channels){const since=mine.filter(r=>!r.group||r.group===ch.group).map(r=>r.at).sort().pop()||'1970';const unread=posts.filter(p=>p.groups?.includes(ch.group)&&p.made>since&&(p.for||p.made_by)!==viewer).length;const button=P.press(L(ch.title,ch.title),()=>chooseChannel(ch.group),'nb-channel'+(v.channel===ch.group?' active':''));if(unread)button.append(text('span',String(unread),'nb-unread'));links.append(button);phone.append(P.node('option',{value:ch.group},L(ch.title,ch.title)))}phone.value=v.channel||''})).catch(api.tell);
     const personal=P.node('div',{class:'nb-personal'},press('saved','Saved',chooseSaved,'nb-channel'));
     api.read('board.badges').then(api.guard(async people=>{const me=people.find(p=>p.id===api.node.viewer?.id);if(me?.badges.some(b=>['leader','steward'].includes(b))){const queue=await api.read('board.queue'),button=press('queue','Leaders’ queue',()=>api.select({queue:'yes',search:'',thread:''}),'nb-channel');button.append(text('span',String(queue.length),'nb-unread'));personal.append(button)}})).catch(()=>{});
     root.append(links,phone,personal);return root;
   }
   if(kind==='board-toolbar'){
     const title=text('h1',L('all','All conversations'));
-    api.read('rows board-channel').then(api.guard(ch=>{if(v.channel)title.textContent=ch.find(c=>c.group===v.channel)?.title||L('channel','Channel')}));
-    const order=P.node('select',{'aria-label':L('ordering','Order conversations'),on:{change:e=>api.select({order:e.target.value,offset:0})}});
+    const order=P.node('select',{'aria-label':L('ordering','Order conversations'),on:{change:e=>api.select({order:e.target.value,offset:0})}});order.hidden=!!v.opens;
+    const views=P.node('div',{class:'nb-views',role:'group','aria-label':L('views','Show')});
+    api.read('rows board-channel').then(api.guard(ch=>{const here=ch.find(c=>c.group===v.channel);if(v.channel)title.textContent=here?.title||L('channel','Channel');
+      if(here?.opens)for(const [value,label] of [[here.opens,here.opens_label||titleCase(here.opens)],['','Conversations']]){const b=press(value||'conversations',label,()=>api.select({opens:value,thread:'',offset:0}),'nb-view');b.setAttribute('aria-pressed',String((v.opens||'')===value));views.append(b)}}));
     api.read('rows board-order').then(api.guard(orders=>{for(const o of orders)order.append(P.node('option',{value:o.id},L(o.name,o.name)));if(v.order)order.value=v.order;else api.read('rows board-settings').then(api.guard(settings=>{order.value=settings[0]?.default_order||orders[0]?.id}))}));
-    root.append(P.node('div',{class:'nb-titleline'},title,order));return root;
+    root.append(P.node('div',{class:'nb-titleline'},title,views,order));return root;
   }
   if(kind==='board-catchup'){
+    // Per channel, and only when something is new: no rows, no header. The header jumps to the oldest unseen thing.
+    if(!api.children.length){root.hidden=true;root.dataset.empty='yes';return root}
     const groups=new Map();for(const child of api.children){const key=child.facts.thread||child.facts.id;if(!groups.has(key))groups.set(key,{...child,facts:{...child.facts,categories:[]}});const group=groups.get(key);if(!group.facts.categories.includes(child.facts.category))group.facts.categories.push(child.facts.category)}
-    const heading=text('h2',groups.size+' '+L('newthings','new things since your last visit')),entries=P.node('div',{class:'nb-catchup-entries'},...[...groups.values()].slice(0,v.catchupExpanded==='yes'?groups.size:s.previewCount).map(api.render));
-    api.read('rows board-seen').then(api.guard(rows=>{if(rows[0]?.at)heading.textContent=groups.size+' '+L('newthingssince','new things since')+' '+new Date(rows[0].at).toLocaleDateString(undefined,{weekday:'long'});if(v.summary&&v.summarySeenAt!==(rows[0]?.at||''))api.select({summary:''})}));
-    const toggle=P.node('button',{type:'button',class:'nb-catchup-toggle','aria-expanded':v.catchupExpanded==='yes',on:{click:()=>api.select({catchupExpanded:v.catchupExpanded==='yes'?'no':'yes'})}},heading,text('span','⌄'));
+    const oldest=[...api.children].map(c=>c.facts).sort((a,b)=>String(a.at||a.made).localeCompare(String(b.at||b.made)))[0];
+    const jump=()=>open(oldest.thread||oldest.id,{focus:oldest.first||oldest.id});
+    const heading=P.node('button',{type:'button',class:'nb-catchup-jump',title:L('jumpoldest','Go to the first thing you haven’t seen'),on:{click:jump}},text('h2',groups.size+' '+L('newthings','new since your last visit')));
+    const mine=rows=>rows.filter(r=>(r.for||r.made_by)===viewer&&['',v.channel||''].includes(r.group||'')).map(r=>r.at).sort().pop()||'';
+    api.read('rows board-seen').then(api.guard(rows=>{const at=mine(rows);if(at)heading.firstChild.textContent=groups.size+' '+L('newthingssince','new since')+' '+new Date(at).toLocaleDateString(undefined,{weekday:'long'});if(v.summary&&v.summarySeenAt!==at)api.select({summary:''})}));
+    const toggle=P.node('div',{class:'nb-catchup-toggle'},heading,P.node('button',{type:'button',class:'nb-catchup-expand','aria-label':L('showall','Show what’s new'),'aria-expanded':String(v.catchupExpanded==='yes'),on:{click:()=>api.select({catchupExpanded:v.catchupExpanded==='yes'?'no':'yes'})}},'⌄'));
+    const entries=P.node('div',{class:'nb-catchup-entries'},...[...groups.values()].slice(0,v.catchupExpanded==='yes'?groups.size:s.previewCount).map(api.render));
     const actions=P.node('div',{class:'nb-catchup-actions'},press('seen','Mark all seen',safe(()=>api.fire('seen',{select:{summary:''}}))));
     root.dataset.expanded=v.catchupExpanded||'no';root.append(toggle,entries,actions);
-    if(!api.children.length)root.append(text('p',L('caught','You’re all caught up. Come back whenever you like.'),'nb-meta'));
-    else api.read('model.status').then(api.guard(rows=>{if(v.summaryUnavailable!=='yes'&&rows[0]?.up&&rows[0]?.installed?.includes(rows[0]?.model))actions.append(press('summary','Summarise',async()=>{try{const seen=await api.read('rows board-seen'),caught=await api.rows('board.catch-up'+(v.channel?' in='+api.Q(v.channel):''));const snapshot=await api.fire('snapshot',{value:JSON.stringify(caught)});const summary=await api.fire('summarize',{target:snapshot.made[0]});const unavailable=/not running|unavailable|offline/i.test(summary.text||''),value=String(summary.text||'').replace(/^local model\s*·\s*.*?:\s+/i,'');await api.select({summary:unavailable?'':value,summaryUnavailable:unavailable?'yes':'no',summaryChannel:v.channel||'',summarySeenAt:seen[0]?.at||''})}catch{await api.select({summary:'',summaryUnavailable:'yes'})}}))})).catch(()=>{});
+    api.read('model.status').then(api.guard(rows=>{if(v.summaryUnavailable!=='yes'&&rows[0]?.up&&rows[0]?.installed?.includes(rows[0]?.model))actions.append(press('summary','Summarise',async()=>{try{const seen=mine(await api.read('rows board-seen')),caught=await api.rows('board.catch-up'+(v.channel?' in='+api.Q(v.channel):''));const snapshot=await api.fire('snapshot',{value:JSON.stringify(caught)});const summary=await api.fire('summarize',{target:snapshot.made[0]});const unavailable=/not running|unavailable|offline/i.test(summary.text||''),value=String(summary.text||'').replace(/^local model\s*·\s*.*?:\s+/i,'');await api.select({summary:unavailable?'':value,summaryUnavailable:unavailable?'yes':'no',summaryChannel:v.channel||'',summarySeenAt:seen})}catch{await api.select({summary:'',summaryUnavailable:'yes'})}}))})).catch(()=>{});
     if(v.summary&&api.children.length&&v.summaryChannel===(v.channel||''))root.append(P.node('div',{class:'nb-summary'},text('strong',L('modellabel','Local model summary')),text('p',v.summary,'nb-meta')));return root;
   }
   if(kind==='board-entry'){
     const button=P.press('',()=>open(f.about||f.thread||f.id,f.match==='document page'?{documentPage:f.page,documentFile:f.file_source,documentRequest:Number(api.view().documentRequest||0)+1}:{}),'nb-entry-button');
     if(f.match){button.append(text('strong',f.match==='document page'?L('page','Page')+' '+f.page+' '+L('of','of')+' '+f.title:f.title||L('conversation','Conversation')));const query=String(v.search||''),raw=f.text||'',at=raw.toLocaleLowerCase().indexOf(query.toLocaleLowerCase()),start=Math.max(0,at-55),snippet=raw.slice(start,start+220),match=snippet.toLocaleLowerCase().indexOf(query.toLocaleLowerCase()),body=P.node('p',{class:'nb-result-snippet'});if(match>=0&&query)body.append(document.createTextNode((start?'…':'')+snippet.slice(0,match)),P.node('mark',{},snippet.slice(match,match+query.length)),document.createTextNode(snippet.slice(match+query.length)));else body.textContent=snippet;button.append(body);const meta=text('p',L(f.post_kind,titleCase(f.post_kind))+' · '+api.format('stamp',f.made),'nb-meta');button.append(meta);Promise.all([api.read('board.badges'),api.read('rows board-channel')]).then(api.guard(([people,channels])=>{meta.prepend((people.find(p=>p.id===(f.for||f.made_by))?.name||L('neighbour','Neighbour'))+' · '+(channels.find(c=>f.groups?.includes(c.group))?.title||'')+' · ')}))}
-    else {const categories=f.categories||[f.category].filter(Boolean);for(const c of categories)button.append(text('span',({decision:'✓',event:'▦',answer:'☑',busy:'☰',following:'↳'})[c]||'·','nb-catchup-icon'));button.append(text('span',f.title||f.text||f.reason||L('conversation','Conversation')))}
+    else {const categories=f.categories||[f.category].filter(Boolean);for(const c of categories)button.append(text('span',({new:'✦',decision:'✓',event:'▦',answer:'☑',busy:'☰',following:'↳'})[c]||'·','nb-catchup-icon'));button.append(text('span',f.title||f.text||f.reason||L('conversation','Conversation')))}
     root.append(button);return root;
   }
   if(kind==='board-feed'){
@@ -118,6 +127,8 @@ export default {mount(api,s){
   if(kind==='board-thread'){
     if(!v.thread)return root;
     root.append(P.node('div',{class:'nb-titleline'},press('back','← Back',()=>api.select({thread:'',quote:''})),text('h2',L('conversation','Conversation'))),...kids());
+    const target=v.focus&&root.querySelector('[data-post="'+CSS.escape(v.focus)+'"]');
+    if(target){target.classList.add('nb-focus');if(api.draft.focused!==v.thread+' '+v.focus){api.draft.focused=v.thread+' '+v.focus;requestAnimationFrame(()=>target.scrollIntoView({block:'center'}))}}
     if(!root.querySelector('[data-post]')){if(!root.querySelector('.nb-notice'))root.append(text('p',L('unavailablethread','This conversation is unavailable.')));return root}
     const form=P.node('form',{'aria-label':L('replyform','Write a reply')}),input=api.part('reply','textarea',{'aria-label':L('replytext','Your reply'),placeholder:L('replyhint','Add something to the conversation…'),value:api.draft.text||'',rows:3}),out=status();
     input.addEventListener('input',()=>{api.draft.text=input.value});

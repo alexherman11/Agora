@@ -5,6 +5,7 @@ This reviewed process supplies the readings and multi-thing validations that
 the thin composition language cannot yet express.
 """
 from datetime import datetime, timedelta, timezone
+import json
 import re
 
 from protocol import hello, line, read, run
@@ -103,10 +104,20 @@ def call(message):
         allowed = set(str(definition.get('fields', '')).split()) | {'text', 'title', 'in'}
         if any(k not in allowed for k in kv):
             raise ValueError('this kind accepts: ' + ' '.join(sorted(allowed)))
+        # A kind's defaults are world data (kind fact defaults='{"seats":"500"}'), so a quick
+        # add from the calendar need not ask how many places a neighbourhood event has.
+        try:
+            defaults = json.loads(definition.get('defaults') or '{}')
+        except ValueError:
+            raise ValueError('this kind\'s defaults need a JSON object')
+        for key, value in (defaults.items() if isinstance(defaults, dict) else ()):
+            if key in allowed and key not in ('text', 'title', 'in') and not kv.get(key):
+                kv[key] = str(value)
         for required in str(definition.get('required', '')).split():
             if not kv.get(required):
                 raise ValueError('this kind needs ' + required + '=')
-        text = str(kv.pop('text', '') or args.get('words') or '').strip()
+        # A titled post may leave its notes empty; the title is then its text.
+        text = str(kv.pop('text', '') or args.get('words') or kv.get('title') or '').strip()
         if not text:
             raise ValueError('write some text before posting')
         if kv.get('closes'):
@@ -175,10 +186,13 @@ def call(message):
 
     if word in ('personal', 'seen', 'report'):
         if word == 'seen':
-            existing = [r for r in rows(use, 'board-seen') if owner(r) == person]
+            # One marker for the whole board, and one per channel (in=<group>) so catching up
+            # in one channel leaves the others' news alone.
+            group = kv.get('in') or ''
+            existing = [r for r in rows(use, 'board-seen') if owner(r) == person and (r.get('group') or '') == group]
             if existing:
                 return answer([line('set', existing[0]['id'], at=now)], existing[0])
-            return answer([line('make', kind='board-seen', at=now, sees='me')])
+            return answer([line('make', kind='board-seen', at=now, sees='me', **({'group': group} if group else {}))])
         post = get(use, 'post', target)
         if word == 'report':
             if not kv.get('reason'):
@@ -266,6 +280,34 @@ def call(message):
     posts = visible_posts(use, person, kv.get('in') or None)
     threads = [p for p in posts if not p.get('reply_to')]
     replies = [p for p in posts if p.get('reply_to')]
+    if word == 'events':
+        # A calendar's reading: dated threads near one day, each with who is coming by name.
+        # RSVPs are the existing board-rsvp things; nothing new is stored here.
+        try:
+            centre = stamp(kv.get('around') or now)
+        except ValueError:
+            raise ValueError('around needs a date, such as 2026-11-04')
+        weeks = max(1, min(26, int(kv['weeks']) if str(kv.get('weeks', '')).isdecimal() else 6))
+        low, high = centre - timedelta(weeks=weeks), centre + timedelta(weeks=weeks)
+        names = {r['id']: r['name'] for r in rows(use, 'person')}
+        rsvps = rows(use, 'board-rsvp')
+        result = []
+        for p in threads:
+            try:
+                start = stamp(p['start']) if p.get('start') else None
+            except ValueError:
+                continue
+            if not start or not low <= start <= high:
+                continue
+            mine = [r for r in rsvps if r.get('about') == p['id']]
+            coming = lambda status: [names.get(owner(r), 'A neighbour') for r in sorted(mine, key=lambda r: r['made'])
+                                     if r.get('status') == status]
+            own = next((r for r in mine if owner(r) == person), None)
+            result.append(dict(p, going=len(coming('going')), maybe=len(coming('maybe')),
+                               coming=', '.join(coming('going')), maybe_coming=', '.join(coming('maybe')),
+                               your_rsvp=own.get('status', '') if own else '', host=names.get(owner(p), 'A neighbour')))
+        result.sort(key=lambda p: (stamp(p['start']), p['id']))
+        return dict(text=str(len(result)) + ' events from ' + low.date().isoformat() + ' to ' + high.date().isoformat(), rows=result)
     if word == 'why-here':
         post = next((p for p in posts if p['id'] == target), None)
         if not post:
@@ -319,8 +361,8 @@ def call(message):
                                        made=doc['made'],made_by=owner(doc),groups=parent.get('groups',[]),post_kind='document'))
         return dict(text=str(len(result)) + ' matches', rows=result)
     if word == 'catch-up':
-        seen = [r for r in rows(use, 'board-seen') if owner(r) == person]
-        since = kv.get('since') or (seen[0]['at'] if seen else '1970-01-01T00:00:00+00:00')
+        seen = [r['at'] for r in rows(use, 'board-seen') if owner(r) == person and (r.get('group') or '') in ('', kv.get('in') or '')]
+        since = kv.get('since') or max(seen, key=stamp, default='1970-01-01T00:00:00+00:00')
         marks = own_marks(use, person)
         following = {r['about'] for r in marks if r.get('action') == 'follow'}
         result = []
@@ -328,12 +370,15 @@ def call(message):
             for category, when in [('decision', p.get('decided_at')), ('event', p.get('made') if p.get('post_kind') == 'event' else None),
                                    ('answer', p.get('answered_at'))]:
                 if when and stamp(when) > stamp(since):
-                    result.append(dict(p, category=category))
+                    result.append(dict(p, category=category, at=when))
+            # A new conversation someone else started; your own posts are never news to you.
+            if p.get('post_kind') != 'event' and owner(p) != person and stamp(p['made']) > stamp(since):
+                result.append(dict(p, category='new', at=p['made']))
         busy = []
         for p in threads:
-            fresh = [r for r in replies if r.get('thread') == p['id'] and stamp(r['made']) > stamp(since)]
+            fresh = sorted((r for r in replies if r.get('thread') == p['id'] and stamp(r['made']) > stamp(since)), key=lambda r: stamp(r['made']))
             if fresh:
-                busy.append(dict(p, category='busy', new_replies=len(fresh)))
+                busy.append(dict(p, category='busy', new_replies=len(fresh), at=fresh[0]['made'], first=fresh[0]['id']))
         result += sorted(busy, key=lambda p: (-p['new_replies'], p['id']))[:10]
         files={r['id']:r for r in rows(use,'file')};by_id={p['id']:p for p in posts}
         for e in rows(use,'event'):
@@ -393,7 +438,8 @@ SPECS = [
     ('catch-up', 'see', '[since=<UTC>] [in=<group>]', 'Plain data since your last-seen marker: decisions, events, answers, busiest threads and followed replies. No inference.'),
     ('why-here', 'see', '<id>', 'Read why this visible post is here: pin, upvotes, replies, answer and leader decision.'),
     ('search', 'see', 'q=<text> [in=<group> kind=<kind> person=<person> since=<UTC> before=<UTC>]', 'Search visible posts, replies and extracted document pages. No hidden files or private group text.'),
-    ('calendar', 'see', '<id>', 'Export a visible event as RFC 5545 calendar text, with filename and MIME type for a download button.'),
+    ('events', 'see', '[in=<group>] [around=<date>] [weeks=N]', 'Visible dated threads within N weeks (default 6) of a day, soonest first, with going/maybe counts, who is coming by name and your own RSVP. For a calendar view.'),
+    ('calendar', 'see', '<id>','Export a visible event as RFC 5545 calendar text, with filename and MIME type for a download button.'),
     ('badges', 'see', '', 'Read real names and current leader/steward badges; agents say agent for <person>.'),
 ]
 

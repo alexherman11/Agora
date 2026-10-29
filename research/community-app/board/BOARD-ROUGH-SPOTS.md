@@ -23,3 +23,29 @@ not additional kernel app commands. Definitions and composition remain world
 things. Files.py is a separate, minimally granted process with no network use
 and no durable private database. Conversion bytes and derived text remain CAS
 blobs beside the world. Existing model inference stays in the model process.
+
+## Meetings & events calendar (Claude, 28 Oct 2026, card dk1500)
+
+| Source | World-level word/property that was missing |
+|---|---|
+| board.py `board.events` | a reading that joins a dated thing to its RSVP things with names (who is coming); `rows` cannot join or count related things |
+| board.py `board.post` | kind `defaults` (world data) and a title standing in for empty text, so a quick calendar add need not ask for seats |
+| board-components.js | a lens cannot choose a part by a fact of the *selected* thing (`only when` sees view and the row, not the chosen channel's facts), so navigation copies `board-channel.opens` into `$view.opens` |
+| kernel-lab/components/calendar.js | the catalogue `calendar` was a month grid with no week, add or RSVP |
+
+Seen while testing, not fixed: the painter re-renders the whole tree when a reading changes, so a press that
+lands while another member's change arrives can be lost between pointer-down and release (the proof presses
+again, as a person would). Keyed, in-place repaint would remove it.
+
+## 'New since' header (Claude, 29 Oct 2026, card dk1512)
+
+| Source | World-level word/property that was missing |
+|---|---|
+| board.py `board.seen in=` | a last-seen marker per channel; one board-wide marker meant catching up in one channel cleared all |
+| board.py `board.catch-up` | new conversations (category `new`), `at` and `first`, so a view can find the oldest unseen thing |
+| board-components.js `$view.focus` | no word to scroll a thread to one post; the thread pane does it once per jump (draft-remembered) |
+
+Seen, not fixed: the `catch-up` verb (install.py, `steps='board.catch-up'`) does not pass `in=` through, so
+`catch-up in=<group>` silently answers for the whole board. Kernel line keys are lowercase only
+(`kernel/lines.py` KEY), so no component's camelCase setting (`weekStart`, `previewCount`) can be named in
+`personal-view`; lowercase settings (`view`, `label`) work.

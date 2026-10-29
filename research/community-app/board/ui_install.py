@@ -46,7 +46,7 @@ TOKENS = {
     'nb-kind-document':'#4f596c','nb-kind-announcement':'#315f52','nb-kind-decision':'#315f52',
     'motion-pulse':json.dumps(dict(**{'from':dict(opacity=.6),'to':dict(opacity=1)},duration=180)),
 }
-VIEW = dict(channel='',order='',offset=0,thread='',replyTo='',compose='no',search='',queue='no',
+VIEW = dict(channel='',order='',offset=0,thread='',replyTo='',focus='',compose='no',search='',queue='no',opens='',calendarView='',calendarDate='',calendarAdd='no',calendarEvent='',
             kind='',person='',since='',before='',quote='',source='',page=1,documentPage=1,documentFile='',documentRequest=0,hide='',report='',decide='',edit='',pin='')
 GRANTS = ('window.surface rows look look-view history components help component-health component-action '
           'board.* forgotten file-read upload files.convert attach like vote claim pin forget make set undo model.ask model.status '
@@ -107,10 +107,21 @@ def install_ui(door):
         tid=upsert(door,'component',name,category='community',purpose=purpose,settings=json.dumps(schema),
                    parts=json.dumps({p:dict(facts='bound visible row') for p in parts.split()}),slots=json.dumps(slots.split()),
                    gestures=gestures,example=f'root : {name}',uses='Community board; feed; neighbourhood',
-                   limitations='Presentation and guarded world-word gestures. No calendar page, map or notification routing.',code=code)
+                   limitations='Presentation and guarded world-word gestures. A channel opens its own view by its opens fact (a calendar today). No map or notification routing.',code=code)
         if door.rows('component',name=name)[0].get('reviewed_code')!=hashlib.sha256(code.encode()).hexdigest():
             door.say('look '+tid);door.say('component '+tid)
-    lens=upsert(door,'lens','seabright-board',title='Seabright board',painter='components',
+    # Each channel's own view and each kind's defaults are world data from definitions.json,
+    # brought onto an already-installed world here (a fresh world gets them from install).
+    data=json.loads((HERE/'definitions.json').read_text(encoding='utf-8'))
+    for definition in data['channels']:
+        for channel in door.rows('board-channel',title=definition['name']):
+            changes={k:definition[k] for k in ('opens','opens_label') if k in definition and channel.get(k)!=definition[k]}
+            if changes:door.say('look '+channel['id']);door.say(line('set',channel['id'],**changes))
+    for definition in data['kinds']:
+        for kind in door.rows('kind',name=definition['name']):
+            if definition.get('defaults') and not kind.get('defaults'):
+                door.say('look '+kind['id']);door.say(line('set',kind['id'],defaults=definition['defaults']))
+    lens=upsert(door,'lens','seabright-board',title='Seabright board',painter='components',right_click='ask',
                 text=(HERE/'board.lens').read_text(encoding='utf-8'),view=json.dumps(VIEW))
     upsert(door,'part-style','seabright-theme',lens='seabright-board',target='tokens',**TOKENS)
     widget=upsert(door,'widget','seabright-board',title='Seabright board',style='bars',receipts='quiet',component_lens='seabright-board',code=widget_source())

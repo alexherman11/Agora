@@ -11,6 +11,11 @@
       "detail": null
     },
     {
+      "check": "No 'new since' header on All conversations (only per channel)",
+      "ok": true,
+      "detail": null
+    },
+    {
       "check": "No horizontal overflow feed-catchup 1440",
       "ok": true,
       "detail": null
@@ -421,7 +426,7 @@
       "detail": null
     },
     {
-      "check": "Pointer mark seen clears the actual personal reading and cached summary",
+      "check": "Pointer mark seen clears the channel's personal reading and cached summary",
       "ok": true,
       "detail": null
     },
@@ -489,9 +494,9 @@
       "check": "Scrolled every feed page with bounded DOM",
       "ok": true,
       "detail": {
-        "cold_start_to_board_ms": 2172.02,
-        "first_paint_upper_bound_ms": 1700.57,
-        "scroll_all_posts_ms": 63285.86,
+        "cold_start_to_board_ms": 2266.71,
+        "first_paint_upper_bound_ms": 1421.49,
+        "scroll_all_posts_ms": 9922.04,
         "feed_threads": 331,
         "pages_scrolled": 28,
         "max_feed_cards": 12
@@ -529,9 +534,9 @@
     }
   ],
   "metrics": {
-    "cold_start_to_board_ms": 2172.02,
-    "first_paint_upper_bound_ms": 1700.57,
-    "scroll_all_posts_ms": 63285.86,
+    "cold_start_to_board_ms": 2266.71,
+    "first_paint_upper_bound_ms": 1421.49,
+    "scroll_all_posts_ms": 9922.04,
     "feed_threads": 331,
     "pages_scrolled": 28,
     "max_feed_cards": 12
@@ -599,20 +604,20 @@
     "days": 14,
     "timings": {
       "board.feed": {
-        "median_ms": 62.17,
-        "max_ms": 71.28
+        "median_ms": 66.45,
+        "max_ms": 91.98
       },
       "catch-up": {
-        "median_ms": 59.97,
-        "max_ms": 86.15
+        "median_ms": 68.52,
+        "max_ms": 92.12
       },
       "board.search q=council": {
-        "median_ms": 113.42,
-        "max_ms": 130.1
+        "median_ms": 116.9,
+        "max_ms": 148.64
       }
     },
     "pdf_preview": "no installed PDF renderer",
-    "model": "local model \u00b7 qwen3.5:9b: The community has decided to speak at the council meeting scheduled for November 4th at City Hall, with a decision made on October 22nd. Updates and sign-up instructions have been shared via posts and an event file, confirming the clerk verified the signup time before 7 pm.",
+    "model": "the local model is not running",
     "model_attempts": 1,
     "live_desktop_touched": false
   },

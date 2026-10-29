@@ -138,3 +138,39 @@ The compact channel picker includes a separate Your board group for Saved and
 the leader-only queue/count. Returning to a channel leaves the bookmark filter;
 other chosen orderings are preserved. These labels use the same label handles.
 
+
+## A channel's own view (calendar first)
+
+*Claude, 28 Oct 2026.* A `board-channel` may say `opens=<view name>` (and `opens_label=<button name>`).
+Choosing that channel opens the view instead of the feed; the toolbar shows `<label> | Conversations`.
+The lens arranges one part per view name, guarded by `only when $view.opens = <name>`; the feed is
+`only when $view.opens = ""`. Meetings & events has `opens=calendar`:
+
+```text
+calendar : calendar, of reading:"board.events in=$view.channel around=$view.calendarDate" as e, limit 100, each calendar-event, openKey "thread replyTo"
+  only when $view.opens = calendar and $view.search = "" and $view.queue != yes
+  on add do board.post post_kind=event in=$view.channel $fields
+  on rsvp do board.rsvp $target status=$value
+```
+
+To give Asks & offers its own view: `set <its board-channel> opens=asks opens_label="Asks & offers"`, add a
+part with `only when $view.opens = asks` to the lens, and nothing else changes. `calendar` is a gallery
+component (`help calendar`): its children's facts are the events (`start end title location text going maybe
+coming maybe_coming your_rsvp`); without an `add` or `rsvp` gesture it offers neither. `board.events` reads
+dated threads within `weeks` (default 6) of `around`, with who is coming by name. The event kind's
+`defaults='{"seats":"500"}'` fills seats for a quick add; set a different number on the kind thing.
+
+The `opens` value is just a name: the channel says which view it opens, the lens holds the parts. Lenses
+built elsewhere (asks & offers, documents, map) drop in as one guarded part each; a channel without `opens`
+stays a feed. Every part keeps its name, so `personal-view <board widget> calendar.view=week` and
+`personal-style <board widget> target=calendar background=...` work just for the person who sets them.
+(Line keys are lowercase, so camelCase settings such as `weekStart` can't be set this way yet.)
+
+## 'New since' (card dk1512)
+
+*Claude, 29 Oct 2026.* The catch-up header shows only inside a channel (`only when $view.channel != ""`), and
+only when that channel has something new for you; otherwise the part is hidden. Its heading
+("2 new since Thursday") jumps to the oldest unseen thing: it opens that thread with `$view.focus` set to the
+post (for a busy thread, its oldest unseen reply), which the thread pane outlines and scrolls to once.
+*Mark all seen* in a channel writes that channel's marker (`board.seen in=<group>`), leaving other channels'
+news alone. Your own posts are never news to you; channel unread counts use the same markers.

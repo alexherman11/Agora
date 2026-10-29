@@ -174,6 +174,11 @@ class UI:
         self.wait(p,'document.querySelectorAll(".nb-post").length>=12')
         self.check('Feed constructs twelve cards for more than 400 posts',p.js('document.querySelectorAll(".nb-feed>.nb-post").length===12'),self.seed['posts'])
         self.check('Slim bar; feed occupies unused reading-pane space',p.js('!document.querySelector(".nb-logo")&&!document.querySelector(".nb-thread")&&document.querySelector(".nb-centre").getBoundingClientRect().width>1000'))
+        self.check("No 'new since' header on All conversations (only per channel)",p.js('!document.querySelector(".nb-catchup")||document.querySelector(".nb-catchup").hidden'))
+        # The header lives in a channel, and only when something there is new: use the busiest.
+        self.busiest=max(self.channels.values(),key=lambda g:len(f.see('Alex','board.catch-up in='+g)['rows']))
+        self.navigate(p,channel=self.busiest,opens='')
+        self.wait(p,'!!document.querySelector(".nb-catchup:not([hidden])")&&!!document.querySelector(".nb-feed>.nb-post")')
         self.shots_for(p,'feed-catchup')
         self.resize(p,390,844)
         self.check('Phone first post is visible and catch-up is one collapsed row',p.js('document.querySelector(".nb-feed>.nb-post").getBoundingClientRect().top<innerHeight/2 && getComputedStyle(document.querySelector(".nb-catchup-entries")).display==="none"'))
@@ -184,6 +189,8 @@ class UI:
         self.choose(p,'.nb-phone-channel','')
         self.wait(p,'JSON.parse(document.querySelector(".nb-shell").dataset.view).order==="" && document.querySelectorAll(".nb-feed>.nb-post").length===12')
         self.resize(p,1440,900)
+        self.navigate(p,channel=self.busiest,opens='')
+        self.wait(p,'!!document.querySelector(".nb-catchup:not([hidden])")')
         self.check('Catch-up uses grouped thread rows',p.js('document.querySelectorAll(".nb-catchup .nb-entry").length<=3'))
         self.check('Catch-up and action text meet WCAG AA',self.contrast(p))
         self.drag_text(p,'.nb-feed>.nb-post .rich-text p')
@@ -379,11 +386,13 @@ class UI:
         self.navigate(p,channel=empty,search='',queue='no',thread='')
         self.wait(p,'document.body.innerText.includes("Room for a first conversation")')
         self.shots_for(p,'empty-channel')
-        self.navigate(p,channel='',thread='',search='',queue='no',offset=0)
-        before=bool(f.see('Alex','catch-up')['rows']);self.button(p,'Mark all seen')
-        self.world_wait(lambda:not f.see('Alex','catch-up')['rows'])
+        self.navigate(p,channel=self.busiest,thread='',search='',queue='no',offset=0)
+        caught=lambda:f.see('Alex','board.catch-up in='+self.busiest)['rows']
+        before=bool(caught());self.button(p,'Mark all seen')
+        self.world_wait(lambda:not caught())
         self.wait(p,'!document.querySelector(".nb-summary")')
-        self.check('Pointer mark seen clears the actual personal reading and cached summary',before and not f.see('Alex','catch-up')['rows'])
+        self.check("Pointer mark seen clears the channel's personal reading and cached summary",before and not caught())
+        self.navigate(p,channel='',offset=0)  # the rest pages the whole board's feed
         self.navigate(p,thread=made['id'],replyTo=made['id'])
         self.wait(p,'!!document.querySelector(".nb-thread [data-fact-id='+pdf_file['id']+']")')
         self.button(p,'Download','document.querySelector(".nb-thread [data-fact-id='+pdf_file['id']+']")')
@@ -434,6 +443,10 @@ class UI:
     def performance(self,p):
         start=time.perf_counter();pages=0;max_cards=0
         # Real wheel scrolling and pointer pagination over the complete feed.
+        # Fixture only: this hidden browser drops the host's stream, so the host shows its fixed "kernel is away"
+        # note (kd.css body.away::after), which takes pointer presses at the bottom right where the pager lands.
+        # Let presses through it here; the host's own note is reported, not changed, by this card.
+        p.c.js('document.head.append(Object.assign(document.createElement("style"),{textContent:"body.away::after{pointer-events:none}"}));0')
         total=len(self.f.see('Alex','board.feed')['rows'])
         for i in range((total+11)//12):
             max_cards=max(max_cards,p.js('document.querySelectorAll(".nb-feed>.nb-post").length'))
