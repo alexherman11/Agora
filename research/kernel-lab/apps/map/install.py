@@ -44,20 +44,27 @@ KINDS = {
                                           'page where things happen: events at it, posts about it.'),
 }
 LAYERS = [('Places', 'rows structure', 'place', '#8a6a3c', 1), ('Spots', 'rows spot', 'pin', '#2f7f8f', 2),
-          ('Events', 'rows event', 'pin', '#cf5a3c', 3), ('Routes', 'rows route', 'path', '#6c5bb3', 4)]
+          ('Events', 'rows event', 'pin', '#cf5a3c', 3), ('Routes', 'rows route', 'path', '#6c5bb3', 4),
+          ('Board', 'board.feed', 'pin', '#527f68', 5)]
 
 T = lambda type_='text', default='': dict(type=type_, default=default)
 COMPONENTS = {
+    'map-panel': ('The existing map, search, inspector and layers in a nestable panel. board=yes adds a Map entry; '
+                  'pins open their post in the containing board thread pane. State and layer toggles are local '
+                  'to this panel. Optional authored gestures enable editing through the containing widget.',
+                  'panel entry shell surface pin layers layer search inspector',
+                  '', 'put move open resume adopt open-page say edit forget replan',
+                  dict(map=T(default=MAP), board=T(default='no'), height=T(default='520px'), labels=T(default='{}'))),
     'map-shell': ('A map window: the map full-bleed, a column for search and what you pressed, one for layers.',
                   'shell', 'map side', '', dict(title=T(default='Map'), labels=T(default='{}'))),
     'geo-map': ('A flat 3D map of the live ground (OpenStreetMap, Overture buildings), anywhere on Earth, with the '
                 'placed things of every layer as pins and routes. Drag to move, scroll to zoom, right-drag to turn; '
                 'Add puts a spot, an event, a note or any kind at a building or a point; Route plans a walk.',
-                'surface pin', '', 'put move resume',
+                'surface pin', '', 'put move resume open',
                 dict(map=T(), hide=T(), focus=T(), style=T(), labels=T(default='{}'))),
     'map-layers': ('Layers of a map: show or hide each for yourself, + Add a layer from a gallery of readings (shared or '
                    'only yours), the ground\'s own layers, and how the map looks.',
-                   'layers', '', 'hide unhide make make-mine edit-layer forget-layer style', dict(map=T(), labels=T(default='{}'))),
+                   'layers layer', '', 'hide unhide make make-mine edit-layer forget-layer style', dict(map=T(), labels=T(default='{}'))),
     'map-search': ('Search for things, places, streets, corners and towns (map.find); choosing one flies there.',
                    'search', '', '', dict(map=T(), labels=T(default='{}'))),
     'map-inspector': ('What was pressed: a building\'s card (what is at it, the talk, its page), every fact of a thing, '

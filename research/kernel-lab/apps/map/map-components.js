@@ -13,6 +13,10 @@
 // Built by install.py as: geo-worker.js + geo-engine.js + this file.
 
 const MAP_CSS=`
+.gm-panel{min-width:0;width:100%}.gm-panel>.gm-shell{height:100%;min-height:280px}
+.gm-panel-entry{display:flex;align-items:center;gap:8px;margin:8px 0}
+.gm-panel-body{position:relative;min-width:0;overflow:hidden;border-radius:12px}
+.gm-panel-body>.gm-shell{height:100%}
 .gm-shell{position:relative;width:100%;height:100vh;overflow:hidden;background:var(--gm-sky,#cfe8f2);font:14px/1.45 var(--ag-font,system-ui,sans-serif);color:var(--ink,#26302c)}
 .gm-shell>.gm-stage{position:absolute;inset:0;z-index:0;isolation:isolate}
 .gm-col{position:absolute;top:12px;bottom:12px;display:flex;flex-direction:column;gap:10px;pointer-events:none;z-index:5;width:min(350px,calc(50% - 24px))}
@@ -210,6 +214,66 @@ function mapIcon(name){const d={look:'M3 3l6 15 2-6 6-2z',add:'M10 4v12M4 10h12'
   home:'M3 10l7-6 7 6v7h-5v-4H8v4H3z',globe:'M10 3a7 7 0 1 0 0 14a7 7 0 1 0 0-14M3 10h14M10 3c3 3 3 11 0 14M10 3c-3 3-3 11 0 14',layers:'M10 3l8 4-8 4-8-4zM2 11l8 4 8-4'}[name]||'';
   const s=mapEl('span',{'aria-hidden':'true'});s.innerHTML=`<svg width="16" height="16" viewBox="0 0 20 20"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;return s}
 
+// The panel composes the same map pieces as map.lens. Its facade keeps transient map state out of its
+// parent's channel/thread/tool/target values. All world writes still use the panel's authored gestures.
+function mapPanelApi(api,settings){
+  const prefix='map.'+api.node.path+'.';
+  const view=()=>Object.fromEntries(Object.entries(api.view()).filter(([k])=>k.startsWith(prefix)).map(([k,v])=>[k.slice(prefix.length),v]));
+  const select=values=>api.select(Object.fromEntries(Object.entries(values).map(([k,v])=>[prefix+k,v])));
+  const read=async line=>{
+    const rows=mapRows(await api.read(line));
+    if(!line.startsWith('map.layers '))return rows;
+    const v=view();
+    return rows.map(r=>r.kind==='map'?{...r,...(v.hide!==undefined?{hidden:v.hide}:{}),...(v.style?{mystyle:v.style}:{})}:r);
+  };
+  const localEvents=['hide','unhide','style'];
+  const facade={...api,view,select,read,node:{...api.node,gestures:[...api.node.gestures,...localEvents.map(event=>({event}))]},
+    fire:(event,values)=>{
+      if(event==='hide'||event==='unhide'){
+        const key=GEO_GROUND_KEYS.includes(values.layer)?'ground:'+values.layer:values.layer;
+        return read('map.layers '+mapQ(settings.map)).then(rows=>{
+          const hidden=new Set(String(mapHead(rows).hidden||'').split(/\s+/).filter(Boolean));
+          (event==='hide'?hidden.add.bind(hidden):hidden.delete.bind(hidden))(key);
+          return select({hide:[...hidden].join(' ')});
+        });
+      }
+      if(event==='style')return select({style:values.style});
+      // api.fire's post-action selection belongs to the containing lens, so namespace map-only values.
+      const next=values.select?Object.fromEntries(Object.entries(values.select).map(([k,v])=>[prefix+k,v])):undefined;
+      return api.fire(event,{...values,...(next?{select:next}:{})});
+    },
+    openThing:it=>{
+      if(settings.board==='yes'&&it.kind==='post')return api.select({
+        thread:it.thread||it.id,replyTo:it.thread||it.id,quote:'',source:'',page:1,documentPage:1,documentFile:''
+      });
+      if(mapHas(api,'open'))return api.fire('open',{thing:it.id,saw:{[it.id]:it.rev}});
+    }};
+  return facade;
+}
+const GEO_GROUND_KEYS=['buildings','streets','labels','places','props','water','green','shadows','names'];
+
+function mountPanel(api,settings){
+  if(!api.draft)return mapPaused(api);
+  const local=mapPanelApi(api,settings),root=api.part('panel','section',{class:'gm-panel','aria-label':'Map'});
+  const open=settings.board!=='yes'||local.view().open==='yes';
+  if(settings.board==='yes')root.append(api.part('entry','button',{type:'button',class:'gm-btn gm-panel-entry',
+    'aria-expanded':String(open),on:{click:()=>local.select({open:open?'no':'yes'})}},mapIcon('globe'),api.label('map','Map')));
+  if(!open)return root;
+  const body=mapEl('div',{class:'gm-panel-body'});
+  body.style.height=/^\d+(?:\.\d+)?(px|vh|rem|%)$/.test(settings.height||'')?settings.height:'520px';
+  body.style.minHeight='280px';
+  // Each piece retains its own draft (engine, search text, editors) across parent repaints.
+  const pieces=[['map','geo-map',mountGeoMap],['search','map-search',mountSearch],
+    ['inspect','map-inspector',mountInspector],['layers','map-layers',mountLayers]];
+  const children=pieces.map(([name,component])=>({name,component}));
+  const composed={...local,children,render:child=>{
+    const [name,,mount]=pieces.find(([name])=>name===child.name);
+    const drafts=api.draft.pieces||(api.draft.pieces={});
+    return mount({...local,draft:drafts[name]||(drafts[name]={})},settings);
+  }};
+  body.append(mountShell(composed));root.append(body);return root;
+}
+
 // ---- map-shell -----------------------------------------------------------------------------------------------------
 function mountShell(api){
   const root=api.part('shell','div',{class:'gm-shell'});
@@ -261,7 +325,9 @@ function mountGeoMap(api,settings){
   tools.append(mapEl('button',{type:'button','aria-pressed':String(E.tool==='look'),on:{click:()=>setTool('look')}},mapIcon('look'),'Look'));
   const addBtn=mapEl('button',{type:'button',class:'gm-add','aria-pressed':String(E.tool==='add'),'aria-haspopup':'menu','aria-expanded':String(!!d.menu),
     on:{click:()=>{d.menu=!d.menu;paintMenu()}}},mapIcon('add'),'Add');
-  tools.append(addBtn,mapEl('button',{type:'button','aria-pressed':String(E.tool==='route'),on:{click:()=>setTool('route')}},mapIcon('route'),'Route'));
+  if(mapHas(api,'put'))tools.append(addBtn);
+  // The route planner is an authored sibling in map.lens; panels may supply one separately.
+  if(api.node.component!=='map-panel')tools.append(mapEl('button',{type:'button','aria-pressed':String(E.tool==='route'),on:{click:()=>setTool('route')}},mapIcon('route'),'Route'));
   const menuSlot=mapEl('div');
   const KINDS=[['spot','📍','A spot','A place people can find: a bench, a gate, a view'],['event','📅','An event','Something happening, with a time'],
     ['note','📝','A note','A few words left at a place'],['other','✳️','Something else…','Any kind this world knows']];
@@ -316,6 +382,8 @@ function mountGeoMap(api,settings){
     if(E.api!==api)return;
     if(E.tool==='route'){addStop({label:mapName(it),lat:it.lat,lon:it.lon,ref:it.id});return}
     select({kind:'thing',thing:it.id,name:mapName(it),rev:it.rev,layer:it.layer?.name||'',ref:it.ref||''});
+    if(api.openThing)Promise.resolve(api.openThing(it)).catch(e=>api.tell(String(e?.message||e)));
+    else if(mapHas(api,'open'))mapFire(api,'open',{thing:it.id,saw:{[it.id]:it.rev}});
   };
   E.onMove=(it,lat,lon)=>{if(E.api!==api)return;mapFire(api,'move',{thing:it.id,lat:String(lat),lon:String(lon),saw:{[it.id]:it.rev}},'Moved '+mapName(it))};
   E.onEscape=()=>{if(E.api!==api)return;E.draft=null;E.draftEl?.remove();d.menu=false;paintMenu();api.select({tool:'look',stops:'[]'})};
@@ -388,6 +456,7 @@ function mountGeoMap(api,settings){
 // ---- map-layers ------------------------------------------------------------------------------------------------------
 function mountLayers(api,settings){
   const card=api.part('layers','section',{class:'gm-card','aria-label':'Layers'});
+  const controlId=key=>'gm-'+String(api.node.path||'map').replace(/[^a-z0-9_-]/gi,'-')+'-'+key;
   const add=mapEl('button',{type:'button',class:'gm-btn gm-primary gm-small','aria-expanded':String(!!api.draft.newLayer)},'+ Add a layer');
   card.append(mapEl('h3',{},mapIcon('layers'),api.label('title','Layers'),mapHas(api,'make')?add:null));
   const body=mapEl('div');card.append(body);
@@ -403,10 +472,11 @@ function mountLayers(api,settings){
     if(!layers.length)list.append(mapEl('p',{class:'gm-empty'},'No layers yet. Add one, or say ',mapEl('code',{},'make kind=map-layer map='+(head.name||settings.map)+' name=… shows="rows spot"')));
     for(const L of layers){
       const on=!hidden.has(L.id)&&L.on!=='no';
-      const box=mapEl('input',{type:'checkbox',id:'gm-layer-'+L.id,'aria-label':'Show '+L.name,on:{change:()=>mapFire(api,box.checked?'unhide':'hide',{layer:L.id})}});box.checked=on;
-      const row=mapEl('div',{class:'gm-layer',role:'listitem',title:'Shows: '+(L.shows||'')+(L.by?' · made by '+L.by:'')},
-        box,mapEl('span',{class:'gm-swatch',style:{background:L.color||'#cf5a3c'}}),mapEl('label',{for:'gm-layer-'+L.id},L.name||'A layer',L.only==='me'||L.sees==='me'||String(L.sees||'').startsWith('person:')?mapEl('span',{class:'gm-mine'},'only you'):null),
+      const box=mapEl('input',{type:'checkbox',id:controlId(L.id),'aria-label':'Show '+L.name,on:{change:()=>mapFire(api,box.checked?'unhide':'hide',{layer:L.id})}});box.checked=on;
+      const row=api.part('layer','div',{class:'gm-layer',role:'listitem',title:'Shows: '+(L.shows||'')+(L.by?' · made by '+L.by:'')},
+        box,mapEl('span',{class:'gm-swatch',style:{background:L.color||'#cf5a3c'}}),mapEl('label',{for:controlId(L.id)},L.name||'A layer',L.only==='me'||L.sees==='me'||String(L.sees||'').startsWith('person:')?mapEl('span',{class:'gm-mine'},'only you'):null),
         mapEl('span',{class:'gm-count'},String(L.count||0)+(L.unplaced?' · '+L.unplaced+' unplaced':'')));
+      row.setAttribute('data-fact-layer',String(L.name||'').toLowerCase().replace(/[^a-z0-9-]+/g,'-'));
       if(L.error)row.append(mapEl('span',{class:'gm-err'},L.error));
       list.append(row);
       const canEdit=mapHas(api,'edit-layer');
@@ -416,8 +486,8 @@ function mountLayers(api,settings){
     // the ground's own layers, for you
     list.append(mapEl('div',{class:'gm-sub'},'The ground'));
     for(const [key,label,sw] of [['buildings','Buildings','#efcfa9'],['shadows','Shadows','#8a8378'],['labels','Street and town names','#fffdf8'],['places','Shops, parks and stops','#4f9a4a']]){
-      const id='ground:'+key;const box=mapEl('input',{type:'checkbox',id:'gm-g-'+key,on:{change:()=>mapFire(api,box.checked?'unhide':'hide',{layer:key})}});box.checked=!hidden.has(id);
-      list.append(mapEl('div',{class:'gm-layer'},box,mapEl('span',{class:'gm-swatch',style:{background:sw}}),mapEl('label',{for:'gm-g-'+key},label),mapEl('span'),mapEl('span')));
+      const id='ground:'+key;const box=mapEl('input',{type:'checkbox',id:controlId('g-'+key),on:{change:()=>mapFire(api,box.checked?'unhide':'hide',{layer:key})}});box.checked=!hidden.has(id);
+      list.append(mapEl('div',{class:'gm-layer'},box,mapEl('span',{class:'gm-swatch',style:{background:sw}}),mapEl('label',{for:controlId('g-'+key)},label),mapEl('span'),mapEl('span')));
     }
     if(mapHas(api,'style')){
       list.append(mapEl('div',{class:'gm-sub'},'How it looks (for you)'));
@@ -724,6 +794,7 @@ function mountPlaceTalk(api,settings){
 
 export default {css:MAP_CSS,mount(api,settings){
   switch(api.node.component){
+    case 'map-panel':return mountPanel(api,settings);
     case 'map-shell':return mountShell(api,settings);
     case 'geo-map':return mountGeoMap(api,settings);
     case 'map-layers':return mountLayers(api,settings);

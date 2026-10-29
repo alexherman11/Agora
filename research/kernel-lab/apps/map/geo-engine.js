@@ -495,16 +495,17 @@ class GeoEngine{
     el._place=c;return el;
   }
   pinEl(it){
-    const el=document.createElement('button');el.type='button';el.className='gm-pin gm-look-'+(it.look||'pin')+(it.approx?' gm-approx':'');
-    el.dataset.component='geo-map';el.dataset.part='pin';el.dataset.path=this.api?.node?.path||'';
-    const facts={kind:it.kind,layer:(it.layer&&it.layer.name||'').toLowerCase().replace(/[^a-z0-9-]+/g,'-'),look:it.look,approx:it.approx?'yes':'no'};
+    const el=this.api.part('pin','button',{type:'button',class:'gm-pin gm-look-'+(it.look||'pin')+(it.approx?' gm-approx':'')});
+    const facts={kind:it.kind,post_kind:it.post_kind,layer:(it.layer&&it.layer.name||'').toLowerCase().replace(/[^a-z0-9-]+/g,'-'),look:it.look,approx:it.approx?'yes':'no'};
     for(const [k,v] of Object.entries(facts))if(v)el.setAttribute('data-fact-'+k,String(v));
     el.style.color=it.color;el._item=it;el._rev=it.rev+'|'+it.color+'|'+(it.title||it.name)+'|'+it.look;
     const label=it.title||it.name||it.label||(it.text?String(it.text).slice(0,40):'')||it.kind;
     el.setAttribute('aria-label',label+(it.layer?.name?' · '+it.layer.name:'')+(it.approx?' · approximate place':''));
     el.innerHTML='<span class="gm-pin-shadow"></span><span class="gm-pin-head"></span><span class="gm-pin-label"></span>';
     el.querySelector('.gm-pin-label').textContent=label;
-    if(it.kind==='event'&&it.start){const when=geoWhen(it.start);if(when)el.querySelector('.gm-pin-label').textContent=label+' · '+when}
+    if((it.kind==='event'||it.post_kind==='event')&&it.start){const when=geoWhen(it.start);if(when)el.querySelector('.gm-pin-label').textContent=label+' · '+when}
+    // Pointer activation is handled by pinDown (including dragging); click detail=0 covers keyboard/AT.
+    el.addEventListener('click',e=>{if(e.detail===0)this.onPin?.(it,e)});
     return el;
   }
   // --- input ------------------------------------------------------------------------------------------------
@@ -564,13 +565,13 @@ class GeoEngine{
     pin.setPointerCapture(e.pointerId);
     const r=this.root.getBoundingClientRect();
     const tip=pin.getBoundingClientRect();const grab={x:tip.left-e.clientX,y:tip.top-e.clientY};
-    const canMove=it.kind!=='route'&&it.kind!=='structure'&&(it.lat!=null)&&!it.at;
+    const canMove=this.api.node.gestures.some(g=>g.event==='move')&&it.kind!=='route'&&it.kind!=='structure'&&(it.lat!=null)&&!it.at&&!it.place;
     const mv=ev=>{if(!dragging&&Math.hypot(ev.clientX-start.x,ev.clientY-start.y)>6&&canMove){dragging=true;this.dragging=it.id;pin.classList.add('gm-dragging')}
       if(dragging){pin.style.transform=`translate(${ev.clientX+grab.x-r.left}px,${ev.clientY+grab.y-r.top}px)`}};
     const done=ev=>{pin.removeEventListener('pointermove',mv);pin.removeEventListener('pointerup',done);pin.removeEventListener('pointercancel',done);
       this.dragging=null;pin.classList.remove('gm-dragging');
-      if(!dragging){this.onPin?.(it,ev);return}
       if(ev.type==='pointercancel'){this.ask();return}
+      if(!dragging){this.onPin?.(it,ev);return}
       const g=this.ground(ev.clientX+grab.x-r.left,ev.clientY+grab.y-r.top);if(!g){this.ask();return}
       const [lat,lon]=this.toLL(g[0],g[1]);it.lat=lat;it.lon=lon;this.ask();this.onMove?.(it,lat,lon)};
     pin.addEventListener('pointermove',mv);pin.addEventListener('pointerup',done);pin.addEventListener('pointercancel',done);

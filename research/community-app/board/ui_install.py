@@ -54,6 +54,22 @@ GRANTS = ('window.surface rows look look-view history components help component-
 
 
 def install_ui(door):
+    # A place is optional on every board post. Keep neighbour-defined fields and labels.
+    for kind in door.rows('kind'):
+        if kind.get('name') not in {'discussion','question','announcement','event','poll','ask','offer','document','decision'}:
+            continue
+        fields=kind.get('fields','').split()
+        if 'place' not in fields:
+            fields.append('place')
+            extra={}
+            if kind.get('field_types'):
+                types=json.loads(kind['field_types']);types.setdefault('place','text')
+                extra['field_types']=json.dumps(types)
+            if kind.get('field_labels'):
+                labels=json.loads(kind['field_labels']);labels.setdefault('place','Link to a place')
+                extra['field_labels']=json.dumps(labels)
+            door.say('look '+kind['id'])
+            door.say(line('set',kind['id'],fields=' '.join(fields),**extra))
     compose={
         'discussion':('Share something','News, an idea, or a conversation.','☰'),
         'question':('Ask a question','Find an answer from your neighbours.','?'),
