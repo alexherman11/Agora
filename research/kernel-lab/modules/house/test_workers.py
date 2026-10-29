@@ -10,7 +10,7 @@ import builders as B
 
 class Agent:
     def __init__(self, busy=False):
-        self.busy, self.woken = busy, []
+        self.busy, self.woken, self.name, self.inbox = busy, [], 'Sable', []
     def wake(self, text, chat=None, record=None):
         self.woken.append((text, chat))
 
@@ -125,3 +125,10 @@ def test_a_claude_worker_runs_the_claude_cli_in_its_worktree(manager, tmp_path):
     assert 'Bash(git push:*)' in cmd[cmd.index('--disallowedTools') + 1]
     assert str(seen['cwd']) == str(tmp_path) and s['session'] == 'abc' and s['phase'] == 'received'
     assert any('All done' in w[1] for w in manager.fixture_door.writes if w[1].startswith('say dk50'))
+
+
+def test_titles_end_on_a_whole_word():
+    title = B.short('Write WORKERS.md, a one page guide for residents on running workers', 50)
+    assert title.endswith('…') and not title[:-1].endswith(('on r', ' r')) and len(title) <= 50
+    assert B.short('a b c d e f g h i j k l m n o p', 10) == 'a b c d…'
+    assert B.short('short', 10) == 'short'

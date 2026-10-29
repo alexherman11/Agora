@@ -653,7 +653,7 @@ class House:
             return BM.dispatch(self.builders, msg)
         if word == "house.build":
             return self.builders.start(msg)
-        if word == "work":
+        if word == "house.work":
             return self.builders.work(msg)
         if word == "house.retry":
             return self.builders.retry(msg)
@@ -805,8 +805,8 @@ OFFER = [
      "help": "house.retry <task>: retry a proven terminal startup failure before any model thread. Preserves its existing claim and worktree; refuses uncertain or changed work."},
     {"word": "house.tell", "kind": "do", "needs": TASK_NEEDS, "takes": "<id> <words>", "undo": "external", "may": "members",
      "help": "house.tell <task> <words>: retain a follow-up for your active or received builder, continuing the same Codex thread. Held, uncertain, reviewed and landed work does not restart."},
-    {"word": "work", "kind": "do", "takes": "<words> [with=claude|codex]", "undo": "external", "may": "members",
-     "help": "work <what to do, in plain words> [with=claude|codex]: make a card for it and start a worker on it, in "
+    {"word": "house.work", "kind": "do", "takes": "<words> [with=claude|codex]", "undo": "external", "may": "members",
+     "help": "house.work <what to do, in plain words> [with=claude|codex]: make a card for it and start a worker on it, in "
              "your charge. You are woken in the worker's chat each time it finishes a turn; what you say there is its "
              "next instruction. Then house.review <card> and house.land <card>. Up to four Claude and four Codex "
              "workers run at once (house-settings claude_workers, codex_workers). Only Alex, JEFF and the residents "
