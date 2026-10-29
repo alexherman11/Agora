@@ -1,0 +1,54 @@
+
+====================================================================================================
+## Q6. Timings at scale
+====================================================================================================
+  open the built world (4314 records, 3302 things): 1.39s
+  [steward] verb issue.done acts_on=issue steps="set $1 status=closed" help="issue.done <issue>"
+      -> ok ok verb issue.done (dk3302) [r4326] · a new word in Alex's desktop: set $1 statu
+
+  [no shared kind]
+   rows taskboard-task (closed kind)                               13.4 ms rows=358
+   rows issue (closed kind)                                        26.5 ms rows=1058
+   actions <card>                                                  14.1 ms rows=3
+   actions <issue>                                                 16.8 ms rows=6
+   kinds <issue>                                                    3.2 ms rows=1
+   plain dispatch: done <issue id>                                  0.7 ms
+   plain dispatch: done <card id>                                   1.2 ms
+   plain dispatch: done <name in three apps>                        5.4 ms
+   task.done <name> (resolve only, refusal path)                    8.1 ms
+   compile board lens dk262                                       121.3 ms rows=1
+   compile work lens dk898                                         52.1 ms rows=1
+   users('taskboard-task')                                          2.4 ms
+   look + set <issue> estimate=3                                    6.1 ms rows=0
+  [steward] make kind=kind name=task needs="title|name lane|status|state"
+      -> ok ok make dk3303 [r4328] · a kind
+  [steward] make kind=kind name=dated needs="due|when"
+      -> ok ok make dk3304 [r4329] · a kind
+  [steward] make kind=kind name=assigned needs="assignee|who"
+      -> ok ok make dk3305 [r4330] · a kind
+  [steward] make kind=kind name=labelled needs="labels"
+      -> ok ok make dk3306 [r4331] · a kind
+  [steward] set dk262 text="# Arrangement only: five reviewed components; same task facts and words as v2.
+root : column, of tag:taskboard-settings as view, each 
+      -> ok ok set dk262 [r4332] · text=# Arrangement only: five reviewed components; same task facts and words as v2. | root : column, of tag:taskboard-settings as view, each board-view | board-view : board, filter 
+  [steward] set dk898 text="# Work: who is at work and what is moving, one page (Alex, 27 Oct: \"a really good overview of all the work being
+# done, where i can 
+      -> ok ok set dk898 [r4333] · text=# Work: who is at work and what is moving, one page (Alex, 27 Oct: "a really good overview of all the work being | # done, where i can click in and view more closely or chat 
+
+  [shared kind task + 3 more kinds]
+   rows taskboard-task (closed kind)                               14.8 ms rows=358
+   rows issue (closed kind)                                        29.6 ms rows=1058
+   rows task (fitted, 2174 fit)                                    97.5 ms rows=2174
+   rows task exact=yes                                              3.7 ms rows=0
+   rows task lane=Now                                              57.4 ms rows=79
+   actions <card>                                                  16.2 ms rows=3
+   actions <issue>                                                 13.5 ms rows=6
+   kinds <issue>                                                    2.5 ms rows=5
+   plain dispatch: done <issue id>                                  0.9 ms
+   plain dispatch: done <card id>                                   2.1 ms
+   plain dispatch: done <name in three apps>                        3.9 ms
+   task.done <name> (resolve only, refusal path)                    8.6 ms
+   compile board lens dk262                                       186.3 ms rows=1
+   compile work lens dk898                                        125.2 ms rows=1
+   users('taskboard-task')                                          2.2 ms
+   look + set <issue> estimate=3                                    7.1 ms rows=0

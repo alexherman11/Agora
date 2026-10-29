@@ -290,3 +290,21 @@ def test_priority_does_not_follow_error_volume_and_parent_result_does_not_close(
     assert attention[0]["target"] == parent
     assert attention[0]["verified"] == "no"
     assert k.state.get(parent, "lane") == "Now"
+
+
+def test_an_agent_cannot_attest_for_its_person(world):
+    """Values review V3 (ran): an agent for Alex attested "verified by Alex" through task.verify and a plain set."""
+    k, a, j, w = world
+    agent = k.actor_for(a.person, agent="Helper")
+    t = say(k, a, f'make kind=taskboard-task title="Ship it" lane=Done acceptance="it runs" lead={a.person} '
+                  f'next_action=check')["made"][0]
+    evidence = say(k, a, 'make kind=note title="it runs"')["made"][0]
+    token = basis(k, a.person, t)
+    say(k, agent, f"look {t}")
+    out = say(k, agent, f"task.verify {t} basis={token} evidence={evidence}", False)
+    assert "can't attest for them" in out["text"]
+    say(k, agent, f"set {t} verified_basis={token} verified_evidence={evidence}")     # a raw set is not attestation
+    assert rows(k, a, a.person)[0]["verified"] == "no"
+    say(k, a, f"look {t}")
+    say(k, a, f"task.verify {t} basis={basis(k, a.person, t)} evidence={evidence}")
+    assert not [r for r in rows(k, a, a.person) if r["target"] == t]                   # verified done: off the list

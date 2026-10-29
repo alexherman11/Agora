@@ -22,7 +22,13 @@ MAY_WORDS = {"anyone", "members", "leaders", "stewards", "maker", "nobody"}
 
 
 class Refused(Exception):
-    """A refusal: nothing was written. Its text names the way that is open."""
+    """A refusal: nothing was written. Its text names the way that is open. `kept`, when given, is what the refusals
+    log keeps instead: the log is read by stewards, who may not see what the refusal told its caller (a private title;
+    kernel review H1, 28 Oct)."""
+
+    def __init__(self, *args, kept=None):
+        super().__init__(*args)
+        self.kept = kept
 
 
 class Actor:
@@ -94,6 +100,11 @@ class Kernel:
         self._local = threading.local()                # this thread's verb and rule depth, and the rule it runs
         self._rules_q = None                           # rules' own thread, started by the first happening one answers
         self.rules_fired = []                          # the last rules that ran: (rule, happening n, what it said)
+        self.turns = {}                                # agent id -> the turn it is working: {because, work, since}
+        from .kinds import Kinds
+        from .bonds import Bonds
+        self.kinds = Kinds(self)                       # kinds as needs, aspect spellings, promises (kinds.py)
+        self.bonds = Bonds(self)                       # what things share, read from the log (bonds.py)
         if not self.log.records:
             if genesis is None:
                 raise ValueError("an empty world needs a genesis")
@@ -105,10 +116,30 @@ class Kernel:
     def _new_kernel_words(self):
         """A world founded before a kernel word existed gets its entry, by one record of the kernel's own. A word the
         world renamed is found by its bound name, so nothing is added twice."""
-        from .words import KERNEL_ENTRIES
+        from .words import KERNEL_ENTRIES, KERNEL
         with self.lock:
             have = {self.state.get(e, "bound") or self.state.get(e, "word") for e in self.things("word")
                     if self.state.get(e, "from") == "kernel"}
+            # a word this kernel no longer runs (held or removed, e.g. around while the graph is held, 28 Oct) rests
+            # hidden rather than answering "unbound"; it comes back by itself when a kernel has it again
+            mine = [e for e in self.things("word") if self.state.get(e, "from") == "kernel"]
+            gone = [e for e in mine if (self.state.get(e, "bound") or self.state.get(e, "word")) not in KERNEL
+                    and self.state.get(e, "status", "live") != "hidden"]
+            back = [e for e in mine if self.state.get(e, "retired") == "yes"
+                    and (self.state.get(e, "bound") or self.state.get(e, "word")) in KERNEL]
+            if gone or back:
+                said = "; ".join(x for x in (
+                    ("the kernel no longer runs: " + " ".join(self.state.get(e, "word") for e in gone)) if gone else "",
+                    ("the kernel runs again: " + " ".join(self.state.get(e, "word") for e in back)) if back else "") if x)
+                tx = Tx(self)
+                tx.part("words", None, said)
+                for e in gone:
+                    tx.set(e, "status", "hidden")
+                    tx.set(e, "retired", "yes")
+                for e in back:
+                    tx.set(e, "status", "live")
+                    tx.set(e, "retired")
+                self._commit(tx, by="kernel", words=said)
             missing = [e for e in KERNEL_ENTRIES if e["bound"] not in have]
             if not missing:
                 return
@@ -361,6 +392,11 @@ class Kernel:
             self._local.predicate, self._local.predicate_depth = previous, depth
 
     def guard(self, actor, entry, st):
+        """Every place a word meets its thing passes here (a typed line, a verb's steps, a module's answer): the
+        word's shape first (kinds.py: what its code reads), then the thing's own allows. test."""
+        first = st.target or (st.words.split() or [""])[0]   # a word taking only words may still be given a thing
+        if first and L.ID.fullmatch(str(first)):
+            self.kinds.check_word(actor, entry, first)
         ref = self.state.get(st.target, "allows." + (entry.get("bound") or entry["word"]))
         if ref and not self.predicate(actor.person, ref, st.target, st.kv.get("answer", "")):
             raise Refused(self.state.get(st.target, "refusal", "That does not fit yet. Please try again."))
@@ -444,7 +480,7 @@ class Kernel:
         if claims:
             out["claimed_by"] = ", ".join(self.name(p) for p in claims)       # in the order they were claimed
             out["claims"] = len(claims)
-        if str(a.get("seats", "")).isdigit():
+        if str(a.get("seats", "")).isdecimal():
             out["seats_left"] = max(0, int(a["seats"]) - len(claims))
         from .history import times
         out.update(times(self, t))
@@ -520,40 +556,106 @@ class Kernel:
             return kind
         return None
 
+    TELLS_APART = ("start", "starts", "when", "due", "lane", "status", "state", "place", "location", "where", "chat",
+                   "made")
+
+    def choices(self, actor, ids, limit=6):
+        """'dk1 (a meeting, start 2026-11-02), dk7 (a meeting, start 2026-11-09) and 15 more': the things a name could
+        mean, each with the first fact that tells them apart, as the asker sees them (friction 9, trials 28 Oct:
+        `done "Dentist"` matched 17 and the question listed no way to pick)."""
+        rows = [(t, self.shown(actor.person, t) or {}) for t in ids]
+        apart = next((f for f in self.TELLS_APART
+                      if len({str(a.get(f, "")) for _, a in rows}) > 1 and all(a.get(f) for _, a in rows[:limit])), None)
+        out = []
+        for t, a in rows[:limit]:
+            v = str(a.get(apart, ""))[:16 if apart == "made" else 40] if apart else ""
+            kd = str(a.get("kind") or "thing")
+            out.append(f"{t} (a{'n' if kd[:1] in 'aeiou' else ''} {kd}" + (f", {apart} {v}" if v else "") + ")")
+        more = len(rows) - limit
+        return ", ".join(out) + (f" and {more} more" if more > 0 else "")
+
     def resolve_name(self, actor, st, entry):
         """A name where a word takes a thing: the whole of its free words first ("buy milk"), then the first word.
         Sets st.target and returns True; refuses when two things share the name; False when nothing is called it."""
-        hint = self.usage_kind(entry)
+        shaped = self.kinds.word_shape(entry)
+        hint = None if shaped else self.usage_kind(entry)
         tries = [(st.words, "")] + ([(st.words.split()[0], st.words.split(None, 1)[1])] if " " in st.words else [])
         for name, rest in tries:
             hits = self.named(actor, name, hint)
+            if shaped and len(hits) > 1:
+                # a word that says its shape: the things called that which it reaches (rsvp Beach cleanup: the event)
+                hits = [h for h in hits if self.kinds.reaches(actor, entry, h[0])] or hits
             if len(hits) == 1:
                 st.target, st.words = hits[0][0], rest.strip()
                 return True
             if hits:
                 raise Refused(f"{len(hits)} things are called {name.strip()}: "
-                              + ", ".join(f"{t} (a {kd})" for t, kd in hits[:5]) + f". Say {st.word} with one of those ids")
+                              + self.choices(actor, [t for t, _ in hits]) + f". Say {st.word} with one of those ids",
+                              kept=f"{len(hits)} things share the name said; asked which")      # never the name: it can be a title
         return False
 
     def plain_verb(self, actor, st, group):
         """A plain verb nothing else answers to (close, open, move, done): the family word it means for its thing
-        (P2, Alex 27 Oct: no declarations; work it out from the names, ask only when two fit). -> entry id or None."""
+        (P2, Alex 27 Oct: no declarations; work it out from the names, ask only when two fit). Words that say their
+        shape come first (kinds.py, Alex 28 Oct): those whose shape the thing has, its own kind's first, then the shape
+        needing most, then the nearest group; a tie asks. -> entry id or None."""
         word = st.word
         cands = []
         for e in self.entries():
             w = str(self.state.get(e, "word") or "")
-            if "." in w and w.rsplit(".", 1)[1] == word and self.shown(actor.person, e) is not None:
+            if "." in w and w.rsplit(".", 1)[1] == word and self.shown(actor.person, e) is not None \
+                    and self._may_answer_plainly(e, actor):
                 cands.append(e)
         if not cands:
             return None
-        kinds = []                                  # the kinds of whatever the line names
+        named = []                                  # the things the line names
         if st.target and L.ID.match(st.target):
-            kinds = [self.state.get(st.target, "kind")]
+            named = [st.target]
         elif st.words:
             for name in [st.words] + ([st.words.split()[0]] if " " in st.words else []):
-                kinds = list(dict.fromkeys(kd for _, kd in self.named(actor, name)))
-                if kinds:
+                named = [t for t, _ in self.named(actor, name)]
+                if named:
                     break
+        # a word living in a group answers there and below, as find_entry looks: the line's group or the thing's
+        scopes = set(self.up(group or self.place))
+        for t in named:
+            scopes |= set(self.up((self.groups_of(t) or [self.place])[0]))
+        cands = [e for e in cands if (self.state.get(e, "lives") or self.place) in scopes] or cands
+        if named and any(self.kinds.word_shape(self.state.things[e]) for e in cands):
+            levels = {g: i for i, g in enumerate(self.up(group or self.place))}
+            ranked = []
+            for e in cands:
+                for t in named:
+                    if self.kinds.word_shape(self.state.things[e]):
+                        hit = self.kinds.reaches(actor, self.state.things[e], t)
+                    else:
+                        # a word with no shape made for this thing's own kind (window.close for a window) competes
+                        # as its own kind's word, rather than losing silently to any word with a shape (trials 28 Oct)
+                        hit = ((0, 0), None) if self._family_fits(e, self.state.get(t, "kind"), exact=True) else None
+                    if hit:
+                        ranked.append((hit[0], levels.get(self.state.get(e, "lives"), 99), e, t))
+            if ranked:
+                ranked.sort(key=lambda x: (x[0], x[1]))
+                best = [r for r in ranked if (r[0], r[1]) == (ranked[0][0], ranked[0][1])]
+                if len({r[2] for r in best}) == 1 and len({r[3] for r in ranked}) == 1:
+                    return best[0][2]
+                said = ", ".join(dict.fromkeys(self.state.get(r[2], "word") for r in best))
+                if len({r[3] for r in ranked}) > 1:
+                    which = list(dict.fromkeys(r[3] for r in ranked))
+                    raise Refused(f"{len(which)} things called {st.words or st.target} could take {word} ({said}): "
+                                  f"{self.choices(actor, which)}. Say {word} with one of those ids",
+                                  kept=f"{len(which)} things sharing the name said could take {word}; asked which")
+                raise Refused(f"{word} could mean {said} for {st.words or st.target}; say which")
+            cands = [e for e in cands if not self.kinds.word_shape(self.state.things[e])]
+            if not cands:
+                family = self._family(word, actor)
+                if len(family) == 1 and len(named) == 1:      # one word it could be: its own reason, what is missing
+                    self.kinds.check_word(actor, self.state.things[family[0]], named[0])
+                kinds_ = ", ".join(dict.fromkeys(f"a {self.state.get(t, 'kind')}" for t in named))
+                said = ", ".join(self.state.get(e, "word") for e in self._family(word, actor))
+                raise Refused(f"nothing called {word} acts on {kinds_}; {word} means {said} for other things "
+                              f"(actions {named[0]} lists what does)")
+        kinds = list(dict.fromkeys(self.state.get(t, "kind") for t in named))
 
         def fits(e, kind):
             ns = str(self.state.get(e, "word")).rsplit(".", 1)[0]
@@ -574,18 +676,42 @@ class Kernel:
             raise Refused(f"nothing you can see is called {st.words or st.target}; {word} means {said} (help {word})")
         raise Refused(f"{word} could mean {said}; say which, or name the thing (help {word})")
 
+    def _may_answer_plainly(self, e, actor):
+        """Whether a family word may answer a plain word for this actor: the kernel's, a module's, one a steward or its
+        group's leader made, or the actor's own. A member's verb answers only its maker plainly; anyone may still say
+        it by its full name (trials 28 Oct: a member's tidy.done took over done for everyone)."""
+        a = self.state.things.get(e, {})
+        if a.get("from") != "verb":
+            return True
+        maker = a.get("made_by")
+        person = self.state.get(maker, "for") if self.state.get(maker, "kind") == "agent" else maker
+        scope = a.get("lives") or self.place
+        return person == actor.person or self.is_steward(person) or (scope != self.place and self.is_leader(person, scope))
+
+    def _family_fits(self, e, kind, exact=False):
+        ns = str(self.state.get(e, "word")).rsplit(".", 1)[0]
+        if ns == kind or (not exact and ns in str(kind).split("-")):
+            return True
+        usage = (str(self.state.get(e, "help") or "").splitlines() or [""])[0]
+        return f"<{kind}>" in usage or f"<{kind}>" in str(self.state.get(e, "takes") or "") if exact else (
+            f"<{kind}" in usage or f"<{kind}" in str(self.state.get(e, "takes") or ""))
+
+    def _family(self, word, actor):
+        return [e for e in self.entries() if str(self.state.get(e, "word") or "").rsplit(".", 1)[-1] == word
+                and "." in str(self.state.get(e, "word")) and self.shown(actor.person, e) is not None]
+
     def name_target(self, actor, st, entry, group):
         """A word that takes a thing, given a name: its dictionary entry's name (word.set window.open), or a thing so
         called (window.close Help; the kind its usage names first). Sets st.target; refuses when two things share it."""
         takes = self.takes_id(entry.get("takes"))
         first_takes = (str(entry.get("takes") or "").split() or [""])[0]
         names_a_thing = (takes and first_takes in ("<id>", "[<id>]")) or (
-            entry.get("from") == "verb" and self.usage_kind(entry))     # task.done <task>: a verb about a thing
+            entry.get("from") == "verb" and (self.usage_kind(entry) or self.kinds.word_shape(entry)))  # task.done <task>
         if not (names_a_thing and not st.target and st.words):
             return
         first = st.words.split()[0]
         plain = not L.ID.match(first) and not L.RECORD.match(first)
-        if plain and self.usage_kind(entry) and self.resolve_name(actor, st, entry):
+        if plain and (self.usage_kind(entry) or self.kinds.word_shape(entry)) and self.resolve_name(actor, st, entry):
             return
         try:
             named = self.find_entry(first, group) if plain else None
@@ -725,8 +851,10 @@ class Kernel:
                 # a painted gesture: stale only if what it read, or what it writes, changed since it was painted
                 rev = int(s.get("rev", 0))
                 for a in set(aspects) | set(s.get("aspects") or []):
+                    # a painted row read under a kind shows `start` for a thing that says `starts` (kinds.filled), so
+                    # an aspect also counts its other spellings: wider, never narrower (kernel review H2, 28 Oct)
                     names = [x for thing, x in self.state.history if thing == t and x.startswith(a[:-1])] if a.endswith("*") \
-                        else [a]
+                        else sorted(self.kinds.spellings_of(a))
                     last = max([self.state.last_seq(t, x) for x in names] + [0])
                     if last > rev:
                         raise Refused(f"stale: {t} changed since it was painted ({a.rstrip(':*')}, r{last}); "
@@ -861,9 +989,59 @@ class Kernel:
         try:
             if saw is not None:
                 saw = {t: (v if isinstance(v, dict) else int(v)) for t, v in dict(saw).items()}
-            return self.run(actor, line, saw=saw, mode=mode)
+            out = self.run(actor, line, saw=saw, mode=mode)
         except (Refused, ValueError, TypeError) as exc:
             return {"ok": False, "text": f"refused: {exc}", "rows": [], "records": [], "made": []}
+        if mode == "see":
+            with self.lock:
+                self.outside_marks(self.state.get(mid, "for"), out.get("rows"))
+        return out
+
+    # ------------------------------------------------------------------ what may go to an outside service
+    @staticmethod
+    def _place_rule(rule):
+        return any(tok.strip() in ("public", "place") for tok in str(rule).split("|"))
+
+    def place_sees(self, t, aspect=None):
+        """Whether everyone in the place sees this thing (and everything its visibility follows), and, given an aspect,
+        that aspect of it: a module reading on its own sees as the place does (`_sees`)."""
+        seen, cur = set(), t
+        while cur:
+            if cur in seen or len(seen) > 32:
+                return False
+            seen.add(cur)
+            x = self.state.things.get(cur)
+            if not x or x.get("forgotten") or not self._place_rule(x.get("sees", "place")) or x.get("sees_when"):
+                return False
+            cur = x.get("visibility_of")
+        rule = (self.state.things.get(t) or {}).get(f"sees.{aspect}") if aspect else None
+        return rule is None or self._place_rule(rule)
+
+    def own(self, person, t):
+        """Whether a thing is this person's own: made by them or their agent, or made for them (a module's work)."""
+        a = self.state.things.get(t) or {}
+        if a.get("for"):
+            return bool(person) and person == a["for"]  # made for someone: theirs alone (review H2: a module installed
+            #                                             for Alex made Pike's crew note, and it counted as Alex's)
+        maker = a.get("made_by")
+        mp = self.state.get(maker, "for") if self.state.get(maker, "kind") == "agent" else maker
+        return bool(person) and person in (maker, mp)
+
+    def outside_marks(self, person, rows):
+        """On each row a module reads, what it may send to an outside service (Alex, 28 Oct: "Public, or my own"):
+        `outside` is public (everyone in the place sees it), yours (the reader's own) or no; `outside_not` lists the
+        aspects the reader sees that are narrower than the place. A module with network access isn't contained
+        (SHAPE section 11): this is what an honest module asks, not a wall."""
+        for row in rows or []:
+            t = row.get("id") if isinstance(row, dict) else None
+            if not t or t not in self.state.things:
+                continue
+            row["outside"] = "public" if self.place_sees(t) else ("yours" if self.own(person, t) else "no")
+            narrow = sorted(a[5:] for a in self.state.things[t] if a.startswith("sees.") and a[5:] in row
+                            and not self.place_sees(t, a[5:]))
+            if narrow:
+                row["outside_not"] = narrow
+        return rows
 
     def _grant_names(self, who, word):
         return [g for g in self._grants_to(who) if self._matches(self.state.get(g, "words"), word)]
@@ -879,7 +1057,9 @@ class Kernel:
         for m in h.get("made") or ():
             if self.state.get(m, "kind") == "said":         # a said line: whom it calls (chat.py), so a waker need
                 out["said"] = m                              # not read it again
-                out["to"] = str(self.state.get(m, "to") or "").split()
+                # only people who may see the line, now: an older record (before chat.py kept `to` inside the chat)
+                # or a chat that closed since must not wake an outsider with its text (card dk1245)
+                out["to"] = [p for p in str(self.state.get(m, "to") or "").split() if self.shown(p, m) is not None]
                 out["by_id"] = h.get("for") or h.get("by")
         return out
 
@@ -937,9 +1117,11 @@ class Kernel:
         finally:
             self._local.runs = depth
         if depth == 0 and not out.get("ok"):
-            text = out.get("text", "")
+            kept = out.pop("kept", None)
+            text = kept or out.get("text", "")
             self.refusals.keep(text[text.find("refused:"):] if "refused:" in text else text, line, actor=actor,
-                               via="press" if press else "line", mode=mode if mode != "do" else None)
+                               via="press" if press else "line", mode=mode if mode != "do" else None,
+                               vouched=bool(kept))
         return out
 
     def _run(self, actor, line, press=None, saw=None, mode="do"):
@@ -954,9 +1136,9 @@ class Kernel:
         handles = {}
         for i, s in enumerate(steps):
             s = self.fill_handles(s, handles)
-            pressed = None
+            pressed = pressed_id = None
             try:
-                s, pressed = self.pressed_line(actor, s)       # press <button>: its does= runs here, as a typed line
+                s, pressed, pressed_id = self.pressed_line(actor, s)   # press <button>: its does= runs here, typed
                 r = self.step(actor, s, press=press if len(steps) == 1 else None, saw=saw, mode=mode)
                 if pressed:
                     r = dict(r, text=f"pressed {pressed}: {r.get('text', '')}")
@@ -964,6 +1146,9 @@ class Kernel:
             except Refused as exc:
                 # a pressed button's refusal names the line it ran, so a receipt or `refusals` says which line failed
                 texts.append(f"refused: pressing {pressed} ran {s}: {exc}" if pressed else f"refused: {exc}")
+                if getattr(exc, "kept", None):
+                    # by id only: a member's label and does= line are their words (refusals session, 28 Oct)
+                    out["kept"] = f"refused: pressing {pressed_id}: {exc.kept}" if pressed else f"refused: {exc.kept}"
                 if steps[i + 1:]:
                     texts.append(f"not run: {' | '.join(steps[i + 1:])}")
                 out["ok"] = False
@@ -979,16 +1164,16 @@ class Kernel:
         return out
 
     def pressed_line(self, actor, text):
-        """press <button> -> (its does= line, its label). The line runs as an ordinary typed line, outside any lock, so
+        """press <button> -> (its does= line, its label, its id). The line runs as an ordinary typed line, outside any lock, so
         a module word in it answers as it would from a click. Anything else -> (text, None)."""
         st = L.parse(text)
         with self.lock:
             try:
                 eid = self.find_entry(st.word)
             except Refused:
-                return text, None
+                return text, None, None
             if not eid or self.state.get(eid, "bound") != "press" or self.state.get(eid, "from") != "kernel":
-                return text, None
+                return text, None, None
             if not st.target and st.words:
                 self.name_target(actor, st, self.entry(eid), None)
             if not st.target:
@@ -1000,7 +1185,7 @@ class Kernel:
             if not line:
                 raise Refused(f"{a.get('label') or st.target} has nothing to press: only a thing with does=\"<line>\" "
                               f"(a button) runs a line")
-            return line, str(a.get("label") or st.target)
+            return line, str(a.get("label") or st.target), st.target
 
     @staticmethod
     def fill_handles(text, handles):
@@ -1118,13 +1303,28 @@ class Kernel:
             seal = self.seal(actor.person, entry["id"], st.target)
             return self._commit(tx, by="sealed", words=words, entry=entry["id"], seal=seal, press=press)
         by = actor.module if actor.kind == "module" else actor.id
+        turn = self.turn_of(actor) if not getattr(self._local, "cause", None) else {}
         return self._commit(tx, by=by, words=words, entry=entry["id"], press=press, undoes=undoes,
                             rule=getattr(self._local, "rule", None),         # a rule ran it (never on a sealed act)
                             caused_by=getattr(self._local, "cause", None),   # the act whose happening fired that rule
+                            because=turn.get("because"),                     # what the agent's turn is answering
+                            work=turn.get("work"),                           # the card the turn is working on
                             external=tx.extra.get("external"),
                             **{"for": actor.person if by != actor.person else None,
                                "via": "module" if actor.kind == "module" else ("agent" if actor.kind == "agent" else None),
                                "saw": saw})
+
+    def turn_of(self, actor):
+        """The turn an agent is working (kernel `turn`, said by the house that woke it): what it answers and the card
+        it works on. A module answering an agent's call carries the agent's turn. Kept in memory, never in the world."""
+        a = actor
+        for _ in range(8):
+            if a is None:
+                return {}
+            if a.kind in ("agent", "person"):
+                return self.turns.get(a.id) or {}
+            a = a.caller
+        return {}
 
     # ------------------------------------------------------------------ verb notes (SHAPE section 4)
     def verb_note(self, actor, st, entry, group, text, press=None, saw=None, mode="do"):
@@ -1157,7 +1357,7 @@ class Kernel:
                     return st.target or (args[0] if args else "")
                 if key == "*":
                     return " ".join(args)
-                if key.isdigit():
+                if key.isdecimal():
                     return args[int(key) - 1] if len(args) >= int(key) else ""
                 if key in st.kv:
                     return shlex.quote(st.kv[key])
@@ -1221,7 +1421,9 @@ class Kernel:
                     try:
                         self.name_target(actor, s2, e, g)            # a step given a name ($2 = "Appearance")
                     except Refused as exc:
-                        raise Refused(f"{entry['word']} stopped at '{x}': {exc}; nothing was done")
+                        raise Refused(f"{entry['word']} stopped at '{x}': {exc}; nothing was done",
+                                      kept=f"{entry['word']} stopped at '{x}': {exc.kept}; nothing was done"
+                                      if getattr(exc, "kept", None) else None)
                     if s2.target and L.ID.match(s2.target):
                         if self.shown(actor.person, s2.target) is None:
                             raise self.no_such(s2.target)
@@ -1258,11 +1460,12 @@ class Kernel:
         from .words import KERNEL
         tx, notes, handles, asked, external = Tx(self), [], {}, [], []
 
-        def stop(x, why):
+        def stop(x, why, kept=None):
             for mid, use in asked:
                 self.modules.done(mid, use, {"ok": False, "refused": why, "made": [], "text": why})
             if not asked:
-                return Refused(f"{entry['word']} stopped at '{x}': {why}; nothing was done")
+                return Refused(f"{entry['word']} stopped at '{x}': {why}; nothing was done",
+                               kept=f"{entry['word']} stopped at '{x}': {kept}; nothing was done" if kept else None)
             # an earlier step's module may already have acted on the screen; the world records none of it
             who = ", ".join(dict.fromkeys(self.state.get(m, "name") for m, _ in asked))
             return Refused(f"{entry['word']} stopped at '{x}': {why}. Nothing was recorded, but {who} answered an "
@@ -1287,7 +1490,7 @@ class Kernel:
                 try:
                     self.name_target(actor, s2, e, g)            # tidy Feed Appearance: $2 by name, as typed
                 except Refused as exc:
-                    raise stop(x, str(exc).removeprefix("refused: "))
+                    raise stop(x, str(exc).removeprefix("refused: "), getattr(exc, "kept", None))
                 if s2.target and L.ID.match(s2.target):
                     if s2.target in tx.made:
                         if self.source(e)[0] == "module":
@@ -1323,7 +1526,7 @@ class Kernel:
                     try:
                         notes += self._admit_lines(tx, mid, actor, e, ans)
                     except Refused as exc:
-                        raise stop(x, str(exc).replace("; nothing was done", ""))
+                        raise stop(x, str(exc).replace("; nothing was done", ""), getattr(exc, "kept", None))
                 continue
             with self.lock:
                 if e.get("word_kind") == "see":
@@ -1338,7 +1541,7 @@ class Kernel:
                 try:
                     res = KERNEL[name](self, actor, s2, e, tx, g, saw=saw)
                 except Refused as exc:
-                    raise stop(x, str(exc))
+                    raise stop(x, str(exc), getattr(exc, "kept", None))
                 notes.append(res["text"])
                 self.keep_handle(x, tx.made[made_before:], handles)
         with self.lock:
@@ -1385,6 +1588,37 @@ class Kernel:
             return False                    # a rule's act may wake rules, three deep at most
         return any(self._rule_matches(self.state.things[r], h) for r in self.things('rule'))
 
+    def _rule_hears(self, rid, r, h, maker):
+        """Whose acts a rule hears: `by=` (Alex, 28 Oct: "You, your agents, leaders"). A rule runs as its maker, so by
+        default it hears only acts its maker would trust: the maker's own, their agents', and the leaders' of the
+        rule's group (the place's stewards for a rule in the place). `by=anyone` hears everyone, as do rules made
+        before by= existed. A sealed act is heard only by `by=anyone`: matching it on who acted would tell the rule's
+        maker who did it (security review round 2; SHAPE section 8). A module acting on its own is no one's act."""
+        by = str(r.get("by") or "anyone")
+        if by == "anyone":
+            return True
+        first = h
+        rec = h.get("record")
+        if rec and rec <= len(self.log.records) and self.log.records[rec - 1].get("caused_by"):
+            # a rule's own act is judged by the act that started the chain, so a member's act can't reach a
+            # by=maker rule through a leader's by=anyone rule (approved-builds review M4)
+            cause = self.log.records[self.log.records[rec - 1]["caused_by"] - 1]
+            first = {"by": cause.get("by"), "for": cause.get("for")}
+        if h.get("by") == "sealed" or first.get("by") == "sealed":
+            return False
+        who = first.get("for") or first.get("by")
+        if who and self.state.get(who, "kind") in ("module", "widget"):
+            # a module on its own acts for the person it is installed for (Alex's window module: a new window is his
+            # screen's); a module installed for no one (a relay of outside text) is no one's act
+            who = self.state.get(who, "for")
+        if not who:
+            return False
+        if who in (maker.id, maker.person):
+            return True
+        if self.state.get(who, "kind") != "person":
+            return False
+        return any(self.is_leader(who, g) for g in (self.groups_of(rid) or [self.place]))
+
     def _rule_matches(self, r, h):
         word = r.get('on_entry') == h.get('entry') if r.get('on_entry') else r.get('on') == h.get('word')
         return word and (not r.get('of_kind') or self.state.get(h.get('target'), 'kind') == r['of_kind'])
@@ -1424,7 +1658,7 @@ class Kernel:
             if actor is None:
                 continue
             with self.lock:
-                if not self.may_hear(actor.person, h):
+                if not self.may_hear(actor.person, h) or not self._rule_hears(rid, r, h, actor):
                     continue
             by = "" if h.get("by") == "sealed" else str(h.get("for") or h.get("by") or "")
             line = str(r.get('do_bound') or r.get("do") or "").replace("$target", h.get("target") or "").replace("$by", by)
@@ -1504,7 +1738,7 @@ class Kernel:
         showed (`press_saw`): an answer that writes a thing the page showed is fenced on that too, so two leaders
         pressing Next on one painted agenda move it once, though the module read it fresh both times."""
         author = Actor(mid, caller.person, "module", module=mid, caller=caller)
-        saw = {k: int(v) for k, v in (ans.get("saw") or {}).items()}
+        saw = self._module_saw(mid, ans)
         with self.lock:
             tx = Tx(self)
             notes = self._admit_lines(tx, mid, caller, entry, ans, press_saw)
@@ -1515,11 +1749,32 @@ class Kernel:
             return {"text": f"{body}\n~ by {self.name(mid)} for {self.name(caller.person)}", "record": rec["seq"],
                     "made": tx.made}
 
+    def _module_saw(self, mid, ans):
+        """What a module says it read: thing -> rev, or thing -> {rev, aspects} (the per-aspect form fence() reads, so an
+        unrelated change to a thing doesn't refuse an answer). Anything else is a refusal, never a crash (found 28 Oct by
+        the kernel-shape review: a dict saw raised TypeError at the door)."""
+        out = {}
+        for t, v in (ans.get("saw") or {}).items():
+            try:
+                if isinstance(v, dict):
+                    aspects = v.get("aspects")
+                    if aspects is not None and not (isinstance(aspects, list) and all(isinstance(a, str) for a in aspects)):
+                        raise ValueError
+                    # no aspects named: the whole thing, as a bare rev fences it (a {rev} alone would fence only what
+                    # the answer writes, weaker than the int it stands for; kernel review round 2)
+                    out[str(t)] = {"rev": int(v.get("rev", 0)), "aspects": aspects} if aspects else int(v.get("rev", 0))
+                else:
+                    out[str(t)] = int(v)
+            except (TypeError, ValueError):
+                raise Refused(f"{self.name(mid)} said it read {t} as {str(v)[:60]}; saw takes a rev, or "
+                              f"{{rev, aspects}}; nothing was done")
+        return out
+
     def _admit_lines(self, tx, mid, caller, entry, ans, press_saw=None):
         """A module's answer lines into `tx`, each checked as the caller narrowed to the module. Lock held."""
         from .words import KERNEL
         author = Actor(mid, caller.person, "module", module=mid, caller=caller)
-        saw = {k: int(v) for k, v in (ans.get("saw") or {}).items()}
+        saw = self._module_saw(mid, ans)
         if True:
             notes, handles = [], {}
             for line in ans["lines"]:
@@ -1574,6 +1829,8 @@ class Kernel:
             t = row.get("id") if isinstance(row, dict) else None
             if t in marks:
                 self.seen.setdefault(caller.seen_key, {})[t] = dict(marks[t])
+        with self.lock:
+            self.outside_marks(caller.person, r.get("rows"))
         return r
 
     def on_offer(self, mid, words):
@@ -1606,6 +1863,11 @@ class Kernel:
                 may = w.get("may") or "anyone"
                 if not all(t.strip() in MAY_WORDS for t in may.split(" or ")):
                     may = "anyone"
+                try:
+                    shape = self._offered_shape(w)
+                except Refused as exc:
+                    out.append(f"refused: {word}: {exc}")
+                    continue
                 tx = Tx(self)
                 tx.part("offer", None, f"offer {word}")
                 e = tx.mint()
@@ -1620,14 +1882,29 @@ class Kernel:
                 tx.set(e, "from", f"module:{self.state.get(mid, 'name')}")
                 tx.set(e, "bound", word)            # what the module answers to, whatever the entry is called later
                 tx.set(e, "lives", self.place)
+                for a, v in shape.items():
+                    if v:
+                        tx.set(e, a, v)             # the shape its code reads (kinds.py)
                 rec = self._commit(tx, by=mid, words=f"offer {word}", via="offer")
                 out.append(f"published {word} as {e} [r{rec['seq']}]")
         return out
+
+    def _offered_shape(self, w):
+        """acts_on and needs a module offers with a word (kinds.py), tidied; refuses what the kernel can't read."""
+        from .kinds import KIND_NAME
+        acts_on = str(w.get("acts_on") or "").strip().casefold()
+        if acts_on and not KIND_NAME.match(acts_on):
+            raise Refused(f"acts_on={acts_on} is not a kind name")
+        return {"acts_on": acts_on, "needs": self.kinds.check_shape_text(w.get("needs"))}
 
     def _refresh_offer(self, mid, eid, word, w):
         """A module offers a word it already has. A field the module itself wrote last follows the new offer; a field
         a steward changed (word-set, or an undo of one) stays the world's, with a notice when they now differ."""
         new = {"help": (w.get("help") or "").strip(), "takes": w.get("takes") or ""}
+        try:
+            new.update(self._offered_shape(w))
+        except Refused:
+            pass                                    # an unreadable shape leaves the one the world has
         if w.get("undo") in ("yes", "no", "external"):
             new["undo"] = w["undo"]
         if w.get("may") and all(t.strip() in MAY_WORDS for t in w["may"].split(" or ")):

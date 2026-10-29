@@ -27,7 +27,10 @@ def people_named(k, actor, names):
                 or p == name]
         if not hits:
             raise Refused(f"no person here is called {name}; rows person lists them")
-        out.append(hits[0])
+        if len(hits) > 1 and name not in hits:
+            # two people share the name: never pick one silently for a closed chat (security review M4, 28 Oct)
+            raise Refused(f"{len(hits)} people are called {name} ({', '.join(hits[:5])}); say with= by id")
+        out.append(hits[0] if name not in hits else name)
     return list(dict.fromkeys(out))
 
 
@@ -69,10 +72,19 @@ def say(k, actor, st, entry, tx, group, saw=None):
     reply = st.kv.get("reply_to")
     if reply and (k.state.get(reply, "kind") != "said" or k.shown(actor.person, reply) is None):
         raise Refused(f"reply_to={reply}: no said line you can see is called that")
+    if reply and k.state.get(reply, "chat") != chat:
+        # a reply quoting a closed chat's line into an open one would carry that line's id there (security review L4)
+        raise Refused(f"reply_to={reply} is a line in another chat; a reply goes in the chat of the line it answers")
     # the words as said, with their own quotes: text=<value> is the whole of them (the lens sends that); else the
     # line, whose parse drops quotes around words
     to, unknown = addressed(k, chat, text if "text" in st.kv else (st.text or text), actor.person)
-    outside = [p for p in to if people and p not in people]
+    # a line calls only people who can see its chat: `to` is what wakers (the house) read, and they read with their
+    # own wider sight, so a name outside the chat must never reach the record (card dk1245, 28 Oct: the receipt said
+    # "does not reach them" while `to` still held them)
+    outside = [p for p in to if k.shown(p, chat) is None]
+    to = [p for p in to if p not in outside]
+    if outside and not to and people:
+        to = [p for p in people if p != actor.person]     # it still speaks to the chat's own people, as an unnamed line does
     t = tx.mint()
     tx.set(t, "kind", "said")
     tx.set(t, "text", text)
@@ -129,7 +141,7 @@ def chat(k, actor, st, entry, tx, group, saw=None):
     if not c or k.state.get(c, "kind") != "chat":
         raise Refused("chat <chat> [limit=<n>]: say which chat; rows chat lists them")
     limit = st.kv.get("limit", "20")
-    limit = min(int(limit), 200) if str(limit).isdigit() else 20
+    limit = min(int(limit), 200) if str(limit).isdecimal() else 20
     got = lines_of(k, actor.person, c)
     since = st.kv.get("since")
     if since:

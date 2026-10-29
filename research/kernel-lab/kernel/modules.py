@@ -3,7 +3,8 @@
 Newline-separated JSON over the module's stdin and stdout. Every message has a type `t`.
 
     kernel -> module            module -> kernel
-    hello {module, id, grants,  offer {words: [{word, kind, takes, help, may?}]}
+    hello {module, id, grants,  offer {words: [{word, kind, takes, help, may?, undo?, acts_on?, needs?}]}
+                                (acts_on/needs: the shape the word's code reads; kinds.py)
            owner, place, for?,
            home}
     call {use, word, args,      see {use, line}        -> kernel answers {t: rows, use, text, rows, refused?}
@@ -76,34 +77,41 @@ class ModuleProcess:
             fh.flush()
         except OSError:
             fh = None
-        for line in self.proc.stderr:
-            self.err = (self.err + [line.rstrip()])[-20:]
-            if fh:
-                try:
-                    fh.write(line)
-                    fh.flush()
-                except (OSError, ValueError):
-                    fh = None
+        try:
+            for line in self.proc.stderr:
+                self.err = (self.err + [line.rstrip()])[-20:]
+                if fh:
+                    try:
+                        fh.write(line)
+                        fh.flush()
+                    except (OSError, ValueError):
+                        fh = None
+        except (ValueError, OSError):
+            pass                                   # `stop` closed the pipe under us
         if fh:
             fh.close()
 
     def _read(self):
-        for line in self.proc.stdout:
-            try:
-                msg = json.loads(line)
-            except json.JSONDecodeError:
-                self.err = (self.err + [f"not JSON: {line.strip()[:200]}"])[-20:]
-                continue
-            try:
-                self.handle(msg)
-            except Exception as exc:                # noqa: BLE001  one bad message never stops the reader
-                self.err = (self.err + [f"{msg.get('t')} failed in the kernel: {exc!r}"])[-20:]
-                self.host.kernel.refusals.keep(f"its {msg.get('t')} message failed in the kernel: {exc!r}",
-                                               str(msg.get("line") or msg.get("word") or ""), by=self.mid,
-                                               via="module", kind="error")
-        self.stdout_closed.set()
-        for p in list(self.pending.values()):
-            p["event"].set()                       # the process ended: every open call is answered by its absence
+        try:
+            for line in self.proc.stdout:
+                try:
+                    msg = json.loads(line)
+                except json.JSONDecodeError:
+                    self.err = (self.err + [f"not JSON: {line.strip()[:200]}"])[-20:]
+                    continue
+                try:
+                    self.handle(msg)
+                except Exception as exc:                # noqa: BLE001  one bad message never stops the reader
+                    self.err = (self.err + [f"{msg.get('t')} failed in the kernel: {exc!r}"])[-20:]
+                    self.host.kernel.refusals.keep(f"its {msg.get('t')} message failed in the kernel: {exc!r}",
+                                                   str(msg.get("line") or msg.get("word") or ""), by=self.mid,
+                                                   via="module", kind="error")
+        except (ValueError, OSError):
+            pass                                   # `stop` closed the pipe under us: the module is ending anyway
+        finally:
+            self.stdout_closed.set()
+            for p in list(self.pending.values()):
+                p["event"].set()                   # the process ended: every open call is answered by its absence
 
     def handle(self, msg):
         """One message from the module. Unknown types are ignored."""

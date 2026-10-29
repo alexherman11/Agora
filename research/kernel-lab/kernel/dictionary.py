@@ -38,10 +38,15 @@ def word_set(k, actor, st, entry, tx, group, saw=None):
         raise Refused('stewards edit place words; group leaders edit their scoped entries')
     values = dict(st.kv)
     values.pop('in', None)
-    allowed = {'help', 'aliases', 'may', 'undo', 'takes', 'once', 'sealed', 'status'}
+    allowed = {'help', 'aliases', 'may', 'undo', 'takes', 'once', 'sealed', 'status', 'acts_on', 'needs'}
     if not values or any(f not in allowed and not re.fullmatch(r'(label|help)\.[a-z][a-z0-9-]*', f)
                          for f in values):
-        raise Refused('word-set edits help, aliases, may, undo, takes, once, sealed, status, label.<lang>, help.<lang>')
+        raise Refused('word-set edits help, aliases, may, undo, takes, once, sealed, status, acts_on, needs, '
+                      'label.<lang>, help.<lang>')
+    if values.get('acts_on'):
+        values['acts_on'] = k.kinds.check_acts_on(values['acts_on'], scope)   # a typo would refuse everything
+    if values.get('needs'):
+        values['needs'] = k.kinds.check_shape_text(values['needs'])     # what the word's code reads (kinds.py)
     if 'help' in values and not values['help'].strip():
         raise Refused('a word with no help is not published')
     if 'may' in values and not all(x.strip() in MAY_WORDS for x in values['may'].split(' or ')):

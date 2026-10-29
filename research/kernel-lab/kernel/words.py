@@ -150,7 +150,8 @@ KERNEL_ENTRIES = [
     _k("rows", "see", "[<kind>] [k=<v> ...]", "anyone", "no", aliases="find",
        help="rows <kind> [field=value …]: the things of a kind you may see, as rows with their revs, in their `order`, "
             "then as made: rows item meeting=sb40, rows window, rows any.\nfind kind=<kind> … says the same."),
-    _k("verb", "do", "<word> steps=<lines> help=<text> [may=<who>] [kind_of=do|see] [in=<group>]", "leaders", "yes",
+    _k("verb", "do", "<word> steps=<lines> help=<text> [may=<who>] [kind_of=do|see] [acts_on=<kind>] [needs=<needs>] "
+                     "[in=<group>]", "leaders", "yes",
        help="verb <word> steps=\"<lines>\" help=\"<what it does>\": a new word made of other words, a verb note. Its "
             "steps run as whoever says it, so it never adds power, and a do verb's steps are one act, which one undo "
             "takes back. $1 $2 … and $* are what follows the word.\n"
@@ -189,9 +190,23 @@ KERNEL_ENTRIES = [
     _k("failed", "do", "why=<text> [line=<text>] [where=<page>]", "anyone", "no",
        help="failed why=\"…\" [line=\"…\"] [where=dock]: say that something failed outside any line (a frame "
             "stopped, a native call threw, a bar fell back), so it lands in refusals. Writes nothing in the world."),
-    _k("kinds", "see", "", "anyone", "no",
-       help="kinds: every kind of thing you can see, with how many. rows <kind> lists one kind; help <kind> says what "
-            "acts on it."),
+    _k("kinds", "see", "[<words>]", "anyone", "no",
+       help="kinds: every kind of thing you can see, with how many. kinds <thing>: every kind it is, nearest first, "
+            "each with why (its own kind, what that extends, and every kind whose needs it has). A kind may say what "
+            "its things need: make kind=kind name=event needs=\"title start|starts\" (start|starts: either spelling; "
+            "game=yes: a marker someone sets) and extend others: name=meeting extends=event needs=place. A kind with "
+            "needs is declared by leaders and only widens. rows <kind> lists one kind; actions <thing> says what acts on it."),
+    _k("mark", "do", "<id> <kind>", "maker or leaders", "yes",
+       help="mark <thing> <kind>: set a kind's markers (a game needs run and game=yes: mark sets game=yes) on a thing "
+            "that has the kind's other needs, or say what it lacks. It is a set: undo takes it back."),
+    _k("actions", "see", "<id>", "anyone", "no",
+       help="actions <thing>: what you can do with it: every word whose shape it has (what the word's code reads, from "
+            "acts_on=<kind> and needs=), grouped by kind, most specific first; then the lenses that show it."),
+    _k("turn", "do", "<id> [r<n>|<id>|done] [work=<id>]", "anyone", "no",
+       help="turn <agent> r<n> [work=<card>]: what an agent's acts are answering now (the line that woke it) and the "
+            "card it works on, so every act it makes says because=… and work=… in the log. turn <agent> done ends it. "
+            "A house says it when it wakes an agent; you may say it for your own agents. Kept in memory, never written "
+            "as a fact."),
     _k("on", "do", "<module>", "stewards", "yes",
        help="on <module>: turn a module back on, with the grants its off took back. undo turns it off again."),
     _k("press", "see", "<id>", "anyone", "no",
@@ -210,6 +225,7 @@ SEES_SAID = {"me", "leaders", "group", "place"}      # what `make … sees=` may
 from .blobs import PROTECTED
 RESERVED.update(PROTECTED | {'pin_until', 'forget_reason'})
 RESERVED.add('via_actor')
+RESERVED.update({'outside', 'outside_not'})      # the kernel's answer to a module, never a fact (review, Low)
 RESERVED_PREFIX = ("in:", "like:", "member:", "answer:", "sees.", "vote:", "claim:", "contact:")
 
 FLOOR_HELP = {e["word"]: e["help"] for e in KERNEL_ENTRIES if e["word"] in FLOOR}
@@ -238,8 +254,11 @@ def _post_row(k, t, a):
 
 def _module_of(k, st):
     m = st.target or (k.module_named(st.words.split()[0]) if st.words else None)
+    if not st.target and not st.words:
+        # `status` alone (28 Oct, seen in the desktop's refusals: "no module called (nothing) here")
+        raise Refused(f"{st.word} <module>: say which module, like {st.word} house (rows module lists them)")
     if not m or k.state.get(m, "kind") not in ("module", "widget"):
-        raise Refused(f"no module called {st.target or st.words or '(nothing)'} here")
+        raise Refused(f"no module called {st.target or st.words} here (rows module lists them)")
     return m
 
 
@@ -283,9 +302,11 @@ def look(k, actor, st, entry, tx, group, saw=None):
                     "rows": [dict(a, id=t, rev=k.state.rev.get(t,0))]}
         facts = [f"{x}={v}" for x, v in a.items() if x not in ("kind", "made_by", "for") and
                  not x.startswith(("in:", "member:", "claim:", "contact:"))]
+        also = [f"{kd} ({why})" for kd, why in k.kinds.kinds_of(a, (k.groups_of(t) or [k.place])[0])[1:]]
         who = k.name(a.get("made_by")) if a.get("made_by") else None
         return {"text": f"{a.get('title') or k.name(t)} ({t}), a{'n' if str(kind)[:1] in 'aeiou' else ''} {kind}"
-                        + (f" by {who}" if who else "") + ("\n  " + "\n  ".join(facts) if facts else ""),
+                        + (f" by {who}" if who else "") + (f"; also {', '.join(also[:4])}" if also else "")
+                        + ("\n  " + "\n  ".join(facts) if facts else ""),
                 "rows": [dict(a, id=t, rev=k.state.rev.get(t,0))]}
     posts = []
     for t in k.things("post"):
@@ -417,6 +438,25 @@ def _may_undo(k, actor, rec):
     return any(k.is_leader(p, g) for t in touched for g in k.groups_of(t))
 
 
+STEERING = {'on', 'on_entry', 'do', 'do_bound', 'of_kind', 'by'}
+
+
+def _rule_by(v):
+    """A rule's by=: maker (its maker, their agents and its group's leaders; the default) or anyone."""
+    v = str(v).strip().lower()
+    if v not in ('maker', 'anyone'):
+        raise Refused("a rule's by= is maker (you, your agents and your group's leaders: the default) or anyone "
+                      "(everyone's acts, said on purpose)")
+    return v
+
+
+def rule_maker(k, actor, t):
+    """Whether this actor is the rule's maker, or acts for the maker's person (Alex steers a rule his agent made)."""
+    maker = k.state.get(t, 'made_by')
+    person = k.state.get(maker, 'for') if k.state.get(maker, 'kind') == 'agent' else maker
+    return maker in (actor.id, actor.person) or (person is not None and person == actor.person)
+
+
 def undo(k, actor, st, entry, tx, group, saw=None):
     undone = k.undone()
     if st.target:
@@ -465,6 +505,7 @@ def undo(k, actor, st, entry, tx, group, saw=None):
         return all(x in undone or x in seqs or k.log.records[x - 1].get("undoes") for x in seqs_after)
 
     writes = []
+    left_off = set()
     for r in group_recs:
         facts = [f for part in r["parts"] for f in part["facts"]]
         for target in {f[0] for f in facts}:
@@ -481,6 +522,12 @@ def undo(k, actor, st, entry, tx, group, saw=None):
             back = k.state.before(t, a, r["seq"])
             cur[(t, a)] = (None if back is GONE else back, prev_seq(t, a, r["seq"]))
             writes.append((t, a, back))
+            # a rule runs as its maker: someone else's undo may switch it off, never re-point it or switch it back on
+            # (security review round 2: a steward's undo turned a member's rule back to an old `do`, as the member)
+            if k.state.get(t, 'kind') == 'rule' and not rule_maker(k, actor, t) and (
+                    a in STEERING or (a in ('off', 'forgotten') and (back is GONE or back in (None, ''))
+                                      and not _own(k, actor, r))):
+                left_off.add(t)       # undoing the maker's own forget is switching it on too (review M6)
         for t in {f[0] for f in facts if f[1] == "kind" and f[2] == "0"}:
             later = [s for (tt, _), hist in k.state.history.items() if tt == t for s, _ in hist
                      if s > r["seq"] and s not in seqs]
@@ -488,6 +535,8 @@ def undo(k, actor, st, entry, tx, group, saw=None):
                 raise Refused(f"r{seq} cannot be undone: {k.name(t)} has changed since (r{max(later)}); undo that first")
     for t, a, back in writes:
         tx.set(t, a, back)
+    for t in sorted(left_off):
+        tx.set(t, 'off', 'yes')
     tx.extra["undoes"] = seq
     if len(group_recs) > 1:
         tx.extra["undoes_too"] = sorted(seqs - {seq})
@@ -504,6 +553,9 @@ def undo(k, actor, st, entry, tx, group, saw=None):
         said += f", and what {n} rule act{'' if n == 1 else 's'} did because of it"
     if left:
         said += f" (r{', r'.join(str(r['seq']) for r in left)} by rules cannot go back)"
+    if left_off:
+        said += (f"; {', '.join(sorted(left_off))} left switched off: a rule runs as its maker, so only they "
+                 f"switch it back on")
     return {"text": f"{said} [r?]"}
 
 
@@ -602,6 +654,8 @@ def make(k, actor, st, entry, tx, group, saw=None):
         closed = closed_sees(k, actor, kv)          # with="Alex, JEFF": only those people see it
     _writable(k, kv)
     _conditions(k, kv, group)
+    if kind == "kind":
+        k.kinds.validate_decl(actor, kv, group)         # needs and extends: readable, by leaders, no cycle (kinds.py)
     from painter.handles import validate_write
     validate_write(k, actor, kind, kv, tx)
     if kind == 'rule':
@@ -611,6 +665,7 @@ def make(k, actor, st, entry, tx, group, saw=None):
             raise Refused('a rule needs on=<published word>')
         kv['on_entry'] = eid
         kv['do_bound'] = bind(k, kv.get('do', ''), group)
+        kv['by'] = _rule_by(kv.get('by') or 'maker')       # whose acts it hears (kernel._rule_hears)
     t = tx.mint()
     tx.set(t, "kind", kind)
     _within(k, actor, st, tx, t)
@@ -659,7 +714,7 @@ def _make_notes(k, actor, kind, kv):
                                      f"in look and rows (kinds lists the kinds there are)")
     notes = []
     for key, v in kv.items():
-        if key in ("title", "name", "text", "label", "about") or v == "":
+        if key in ("title", "name", "text", "label", "about") or v == "" or (kind == "kind" and key in ("needs", "extends")):
             continue
         said = {str(a.get(key)) for a in others if a.get(key) not in (None, "")}
         if not said:
@@ -681,6 +736,21 @@ def set_(k, actor, st, entry, tx, group, saw=None):
         raise Refused(f"{t} is a {k.state.get(t, 'kind')}; set changes only things made with make")
     if not st.kv:
         raise Refused("set needs k=v: set <thing> label=Feed")
+    # a thing that already spells this aspect another way, under a kind it fits: write what was said, and say so
+    # (kinds.py). Not a refusal: spellings can be vocabularies (lane|status), and refusing blocked the House's
+    # status=paused hold and advised a write that hid the card (trials 28 Oct); a silent rewrite would dodge grant
+    # fields: and undo, and read a hidden aspect
+    seen_as = k.shown(actor.person, t) or {}
+    spelled = []
+    for key, v in st.kv.items():
+        if key in ("in", "as") or v == "":
+            continue
+        other = k.kinds.spelled_otherwise(seen_as, key, (k.groups_of(t) or [k.place])[0])
+        if other:
+            spelled.append(f"\n~ {seen_as.get('title') or k.name(t)} also says {other[0]}, which {'an' if other[1][:1] in 'aeiou' else 'a'} {other[1]} reads as "
+                           f"{key}; set {t} {other[0]}= changes that one")
+    if k.state.get(t, "kind") == "kind":
+        k.kinds.validate_decl(actor, st.kv, (k.groups_of(t) or [k.place])[0], old=dict(k.state.things.get(t, {})), t=t)
     if all(str(k.state.get(t, a) if k.state.get(t, a) is not None else '') == str(v) for a, v in st.kv.items()):
         return {"text": f"{k.name(t)} already says {', '.join(f'{a}={v}' for a, v in st.kv.items())}; nothing changed"}
     _writable(k, st.kv)
@@ -693,7 +763,22 @@ def set_(k, actor, st, entry, tx, group, saw=None):
     validate_write(k,actor,k.state.get(t,'kind'),candidate,tx)
     if k.state.get(t, 'kind') == 'rule':
         from .dictionary import bind
+        # a rule runs as its maker, so what it does is the maker's to say: a leader may switch it off or forget it,
+        # never re-point it (security review C1, 28 Oct: a steward set a member's rule to say into the member's DM, as
+        # the member, and to publish the member's private upload)
+        maker = k.state.get(t, 'made_by')
+        steering = STEERING & set(st.kv)
+        if steering and not rule_maker(k, actor, t):
+            raise Refused(f"{t} is {k.name(maker)}'s rule and runs as them, so only they change what it does "
+                          f"({', '.join(sorted(steering))}); set {t} off=yes switches it off, forget {t} removes it")
+        if 'off' in st.kv and str(st.kv['off']) not in ('yes', 'True') and k.state.get(t, 'off') \
+                and not rule_maker(k, actor, t):
+            # switching off is moderation; switching on is acting as the maker (security review round 2)
+            raise Refused(f"{t} is {k.name(maker)}'s rule and runs as them, so only they switch it back on; "
+                          f"undo takes back your own off=yes")
         values = dict(st.kv)
+        if 'by' in values:
+            values['by'] = _rule_by(values['by'])     # by= with nothing is refused, never "everyone" (review, Low)
         if 'on' in values:
             eid = k.find_entry(values['on'], group)
             if not eid:
@@ -708,7 +793,8 @@ def set_(k, actor, st, entry, tx, group, saw=None):
             tx.set(t, key, v)
         else:
             tx.set(t, key)                      # k= with nothing after it: the fact goes
-    return {"text": f"ok set {t} [r?] · " + ", ".join(f"{a}={v}" if v else f"{a} taken away" for a, v in st.kv.items())}
+    return {"text": f"ok set {t} [r?] · " + ", ".join(f"{a}={v}" if v else f"{a} taken away" for a, v in st.kv.items())
+                    + "".join(spelled)}
 
 
 def forget(k, actor, st, entry, tx, group, saw=None):
@@ -748,7 +834,7 @@ def claim(k, actor, st, entry, tx, group, saw=None):
     t = st.target
     a = k.state.things.get(t, {})
     taken = [x for x in a if x.startswith("claim:")]
-    seats = int(a.get("seats", 1)) if str(a.get("seats", 1)).isdigit() else 1
+    seats = int(a.get("seats", 1)) if str(a.get("seats", 1)).isdecimal() else 1
     if f"claim:{actor.person}" in a:
         raise Refused(f"you already hold a seat on {t}; undo gives it back")
     if a.get("closes") and k.now().strftime("%Y-%m-%dT%H:%MZ") >= str(a["closes"]):
@@ -813,25 +899,48 @@ def rows(k, actor, st, entry, tx, group, saw=None):
         items = next_rows(k, actor, ref)
         return {"text": packet(items, ref), "rows": items}
     kv.pop("in", None)
+    exact = str(kv.pop("exact", "")).casefold() in ("yes", "true")
+    # a kind with a shape, or one another kind extends, also lists what has that shape (kinds.py), read under the
+    # kind's names (start for a thing that says starts); exact=yes lists only things whose own kind is that word
+    fitted = kind != "any" and not exact and k.kinds.is_open(kind, group)
     rows = []
-    for t in (list(k.state.things) if kind == "any" else k.things(kind)):
+    for t in (list(k.state.things) if kind == "any" or fitted else k.things(kind)):
         if t == "world":
             continue
         a = k.shown(actor.person, t)
-        if a is None or any(str(a.get(f, "")) != v for f, v in kv.items()):
+        if a is None:
+            continue
+        why = k.kinds.fits(a, kind, group) if fitted else None
+        if fitted and not why:
+            continue
+        if fitted:
+            a = k.kinds.filled(a, kind, group)
+        if any(str(a.get(f, "")) != v for f, v in kv.items()):
             continue
         row = {x: v for x, v in a.items() if not x.startswith(("in:", "member:"))}
+        if why and a.get("kind") != kind:
+            row["as"] = why + (f"; {a['as']}" if a.get("as") else "")   # has title, start; a meeting, so an event
         row['groups'] = k.groups_of(t)
         if a.get("made_by"):
             row["by"] = k.name(a["made_by"])
         rows.append(dict(row, id=t, rev=k.state.rev.get(t, 0)))
-    rows.sort(key=lambda r: (int(r["order"]) if str(r.get("order", "")).isdigit() else 10 ** 9,
+    rows.sort(key=lambda r: (int(r["order"]) if str(r.get("order", "")).isdecimal() else 10 ** 9,
                              int(r["id"][len(k.tag):] or 0)))       # then in the order they were made
     for r in rows:
         k.mark(actor, r["id"], r)
     what = kind if kind != "any" else "thing"
+    if not rows and kind != "any" and not kv and not k.things(kind) and not k.kinds.decl(kind, group):
+        # rows refusals: nothing in the world is one, and "0 refusalses" read as an empty log (JEFF, 28 Oct)
+        try:
+            word = k.find_entry(kind, group)
+        except Refused:
+            word = None
+        return {"text": f"nothing here is a {kind}" + (f"; {kind} is a word: say {kind}" if word else
+                                                         "; kinds lists the kinds, rows any lists everything"),
+                "rows": []}
     text = "\n".join(f"  {r['id']} · {r.get('kind')} · "
                      f"{r.get('title') or r.get('name') or r.get('word') or r.get('label') or (r.get('text') or '')[:60]}"
+                     + (f" ({r['as']})" if r.get("as") else "")
                      for r in rows)
     plural = what if len(rows) == 1 else what + ("es" if what.endswith(("s", "x", "ch", "sh")) else "s")
     if not rows and kv:
@@ -868,13 +977,20 @@ def verb(k, actor, st, entry, tx, group, saw=None):
     e = tx.mint()
     from .dictionary import bind
     tx.set(e, 'steps_bound', bind(k, steps, group, w, e))
-    for a, v in [("kind", "word"), ("word", w), ("word_kind", wk), ("takes", kv.get("takes", "[<words>]")),
+    # a verb that says its shape takes a thing first (rsvp.go <event>), so the check sees what it acts on
+    takes = kv.get("takes") or ("<id> [<words>]" if kv.get("acts_on") or kv.get("needs") else "[<words>]")
+    for a, v in [("kind", "word"), ("word", w), ("word_kind", wk), ("takes", takes),
                  ("help", help_), ("may", may), ("undo", "yes" if wk == "do" else "no"), ("from", "verb"),
                  ("bound", w), ("steps", steps), ("lives", group), ("made_by", actor.id)]:
         tx.set(e, a, v)
     for key in ("once", "sealed", "fence"):
         if kv.get(key):
             tx.set(e, key, kv[key])
+    from .kinds import KIND_NAME
+    if kv.get("acts_on"):
+        tx.set(e, "acts_on", k.kinds.check_acts_on(kv["acts_on"], group))   # the kind its steps act on (kinds.py)
+    if kv.get("needs"):
+        tx.set(e, "needs", k.kinds.check_shape_text(kv["needs"]))
     return {"text": f"ok verb {w} ({e}) [r?] · a new word in {k.name(group)}: {steps}"}
 
 
@@ -943,6 +1059,8 @@ from .blobs import upload, attach, file_result, file_read
 from .world_words import dictionary_copy, group_word, clock, forgotten
 from .readings import who, recent, kinds, on, press
 from .refusals import refusals, failed
+from .kinds import mark, words_for
+from .bonds import turn                  # the graph's readings (around, nearby, preview) are held (28 Oct)
 from .chat import say, chat as chat_word, closed_sees
 from .store import GONE
 from .next_steps import change as task_change
@@ -963,4 +1081,4 @@ KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant":
           "status": status, "make": make, "set": set_, "forget": forget, "holds": holds, "claim": claim,
           "vote": vote, "role": role, "rows": rows, "find": rows, "verb": verb,
           "who": who, "recent": recent, "kinds": kinds, "on": on, "press": press, "say": say, "chat": chat_word,
-          "refusals": refusals, "failed": failed}
+          "refusals": refusals, "failed": failed, "mark": mark, "actions": words_for, "turn": turn}

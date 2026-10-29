@@ -72,7 +72,7 @@ class Facade:
     # ------------------------------------------------------------------ ids
     def num(self, t):
         tag = self.k.tag
-        return int(t[len(tag):]) if t.startswith(tag) and t[len(tag):].isdigit() else None
+        return int(t[len(tag):]) if t.startswith(tag) and t[len(tag):].isdecimal() else None
 
     def to_kernel(self, desk_id):
         m = re.fullmatch(r"([asf])(\d+)", str(desk_id or ""))

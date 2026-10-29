@@ -1,0 +1,96 @@
+
+====================================================================================================
+## Q2. done <thing> across three apps
+====================================================================================================
+  entries for the plain words themselves: {'done': None, 'close': None, 'move': None, 'assign': None}
+
+  Phase A: apps as installed (no word has a shape)
+   [A] done <taskboard-task id> x358 (1.22 ms each): 358 pick:task.done
+   [A] done <issue id> x1058 (1.17 ms each): 1058 refuse:nothing called done acts on a issue; done means task.done for other things
+   [A] done <gh-issue id> x758 (1.08 ms each): 758 refuse:nothing called done acts on a gh-issue; done means task.done for other things
+   [A] close <taskboard-task id> x358 (1.15 ms each): 358 refuse:nothing called close acts on a taskboard-task; close means window.close, pane.close, wm.cl
+   [A] close <issue id> x1058 (1.16 ms each): 1058 pick:issue.close
+   [A] close <gh-issue id> x758 (1.17 ms each): 758 ask:close could mean issue.close, gh.close for a gh-issue; say which
+   [A] move <taskboard-task id> x358 (1.06 ms each): 358 pick:task.move
+   [A] move <issue id> x1058 (1.17 ms each): 1058 pick:issue.move
+   [A] move <gh-issue id> x758 (1.24 ms each): 758 pick:issue.move
+   [A] assign <taskboard-task id> x358 (1.42 ms each): 358 pick:task.assign
+   [A] assign <issue id> x1058 (1.47 ms each): 1058 pick:issue.assign
+   [A] assign <gh-issue id> x758 (1.40 ms each): 758 ask:assign could mean issue.assign, gh.assign for a gh-issue; say which
+   [A] done <name of a converted card> x58 (4.4 ms each): 58 pick:task.done
+   [A] close <name of a converted card> x58 (4.3 ms each): 57 ask:close could mean issue.close, gh.close for a taskboard-task or a issue or a gh-issue; say which; 1 refuse:nothing you can see is called When the may vocabulary is not enough, may becomes a see word that ans
+
+  Phase B1: the two new apps add done words with shapes; Alex's task.* are untouched (no shape)
+  [steward] verb issue.done acts_on=issue steps="set $1 status=closed" help="issue.done <issue>: close it."
+      -> ok ok verb issue.done (dk3302) [r4315] · a new word in Alex's desktop: set $1 status=closed
+  [steward] verb gh.done needs="kind=gh-issue" steps="set $1 state=closed" help="gh.done <gh-issue>: close it."
+      -> ok ok verb gh.done (dk3303) [r4316] · a new word in Alex's desktop: set $1 state=closed
+   'Signing in and the public site' is dk91 (Alex's card), dk1188 (issue), dk1189 (gh-issue)
+   done <name> -> ('ask', '2 things called Signing in and the public site could take done (issue.done, gh.done); say which by id')
+  [steward] make kind=taskboard-task title="Pay rent" lane=Now who=Alex
+      -> ok ok make dk3304 [r4317] · a taskboard-task
+  [Tracker import] make kind=issue name="Pay rent" status=open
+      -> ok ok make dk3305 [r4318] · an issue
+   card dk3304, issue dk3305: done "Pay rent" -> ('pick', 'issue.done')
+   done dk3304 (the card, by id) -> ('pick', 'task.done')
+   [B1] done <taskboard-task id> x359 (1.30 ms each): 359 pick:task.done
+   [B1] done <issue id> x1059 (1.22 ms each): 1059 pick:issue.done
+   [B1] done <gh-issue id> x758 (1.86 ms each): 758 pick:gh.done
+   [B1] done <name of a converted card> x58 (4.4 ms each): 1 ask:2 things called The kernel's first shape: built for many people, carrying the language could take do; 1 ask:2 things called Signing in and the public site could take done (issue.done, gh.done); say which by i; 1 ask:2 things called One dictionary, tried first in the desk we live in could take done (issue.done, gh.d; 1 ask:2 things called A server ready for 200 strangers could take done (issue.done, gh.done); say which by
+   [B1] close <name of a converted card> x58 (3.9 ms each): 57 ask:close could mean issue.close, gh.close for a taskboard-task or a issue or a gh-issue; say which; 1 refuse:nothing you can see is called When the may vocabulary is not enough, may becomes a see word that ans
+
+  Phase B2: every app's words say their shape (task.* acts_on=taskboard-task, issue.* acts_on=issue, gh.* needs=kind=gh-issue)
+   [B2] done <taskboard-task id> x359 (1.29 ms each): 359 pick:task.done
+   [B2] done <issue id> x1059 (1.30 ms each): 1059 pick:issue.done
+   [B2] done <gh-issue id> x758 (1.11 ms each): 758 pick:gh.done
+   [B2] close <taskboard-task id> x359 (1.22 ms each): 359 refuse:nothing called close acts on a taskboard-task; close means window.close, pane.close, wm.cl
+   [B2] close <issue id> x1059 (1.14 ms each): 1059 pick:issue.close
+   [B2] close <gh-issue id> x758 (1.18 ms each): 758 pick:gh.close
+   [B2] move <taskboard-task id> x359 (1.15 ms each): 359 pick:task.move
+   [B2] move <issue id> x1059 (1.04 ms each): 1059 pick:issue.move
+   [B2] move <gh-issue id> x758 (1.00 ms each): 758 refuse:nothing called move acts on a gh-issue; move means window.move, pane.move for other things
+   [B2] assign <taskboard-task id> x359 (1.02 ms each): 359 pick:task.assign
+   [B2] assign <issue id> x1059 (1.08 ms each): 1059 pick:issue.assign
+   [B2] assign <gh-issue id> x758 (1.09 ms each): 758 pick:gh.assign
+   [B2] done <name of a converted card> x58 (3.9 ms each): 1 ask:3 things called The kernel's first shape: built for many people, carrying the language could take do; 1 ask:3 things called Signing in and the public site could take done (task.done, issue.done, gh.done); say; 1 ask:3 things called One dictionary, tried first in the desk we live in could take done (task.done, issue; 1 ask:3 things called A server ready for 200 strangers could take done (task.done, issue.done, gh.done); s
+   [B2] close <name of a converted card> x58 (3.7 ms each): 1 ask:2 things called The kernel's first shape: built for many people, carrying the language could take cl; 1 ask:2 things called Signing in and the public site could take close (issue.close, gh.close); say which b; 1 ask:2 things called One dictionary, tried first in the desk we live in could take close (issue.close, gh; 1 ask:2 things called A server ready for 200 strangers could take close (issue.close, gh.close); say which
+   done <name in three apps> -> ('ask', '3 things called Signing in and the public site could take done (task.done, issue.done, gh.done); say which by id')
+   done "Pay rent" -> ('ask', '2 things called Pay rent could take done (task.done, issue.done); say which by id')
+   task.done <name> (explicit word) -> ok ok set dk91 [r4330] · lane=Done | ok make dk3306 [r4330] · a taskboard-event | ~ task.done, one act [r4330]
+
+  Phase B, a thing that fits two shapes: an issue imported from GitHub that keeps both vocabularies
+  [steward] make kind=gh-issue title="Both worlds" name="Both worlds" number=9999 state=open status=open
+      -> ok ok make dk3307 [r4331] · a gh-issue | ~ no other gh-issue has status=: still made, as you said
+  [steward: issue.done reads name and status, not the kind] word-set issue.done acts_on="" needs="name status"
+      -> ok ok word.set issue.done [r4332] · acts_on taken away · needs now name status
+   done <both> -> ('pick', 'gh.done')
+  [steward: gh.done reads title and state] word-set gh.done needs="title state"
+      -> ok ok word.set gh.done [r4333] · needs now title state (was kind=gh-issue)
+   done <both> -> ('ask', 'done could mean issue.done, gh.done for dk3307; say which')
+  [steward] make kind=note name="Groceries" status=open
+      -> ok ok make dk3308 [r4334] · a note | ~ no other note has status=: still made, as you said
+   done <a plain note with name+status> -> ('pick', 'issue.done')
+
+  Phase B, a thing that fits none: a document, a chat, a lane
+   done dk79 (taskboard-lane) -> ('refuse', 'nothing called done acts on a taskboard-lane; done means task.done, issue.done, gh.done for other things (actions dk79 lists what does)')
+   done dk828 (chat) -> ('refuse', 'nothing called done acts on a chat; done means task.done, issue.done, gh.done for other things (actions dk828 lists what does)')
+   done dk863 (document) -> ('refuse', 'nothing called done acts on a document; done means task.done, issue.done, gh.done for other things (actions dk863 lists what does)')
+
+  Phase C: a member hijacks the plain word with a more specific shape
+  [Sable (member)] verb tidy.done acts_on=issue needs="project estimate" steps="forget $1" help="tidy.done <issue>: tidy it away."
+      -> ok ok verb tidy.done (dk3309) [r4335] · a new word in Alex's desktop: forget $1
+   Alex: done <issue with project+estimate> -> ('pick', 'tidy.done')
+  [Alex types done] done dk1186
+      -> ok ok forget dk1186 [r4336] · out of every view; undo brings it back | ~ tidy.done, one act [r4336]
+   issue forgotten? dk2
+
+  Phase D (fresh copy): the Tracker team learns Agora says done, and aliases issue.close as issue.done
+  [steward] look dk1177
+      -> ok issue.close (dk1177), a do word: issue.c
+  [steward] word-set issue.close aliases=issue.done
+      -> ok ok word.set issue.close [r4315] · aliases now issue.done
+   done <issue> -> ('refuse', 'nothing called done acts on a issue; done means task.done for other things')
+  [steward] verb issue.done acts_on=issue steps="set $1 status=closed" help="issue.done <issue>: close it."
+      -> REFUSED refused: issue.done already answers here; choose another word, so no word is hidden behind it
+  [steward edits 'issue.done'] word-set issue.done needs="name"
+      -> ok ok word.set issue.close [r4316] · needs now name

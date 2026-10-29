@@ -1,0 +1,60 @@
+
+====================================================================================================
+## Q3. Can the House build an issue? (reaches isn't works)
+====================================================================================================
+  re-offer: ['published house.manage as dk3302 [r4315]', 'bound house.retry to dk995; refreshed needs [r4316]', 'bound house.tell to dk979; refreshed needs [r4317]', 'bound house.build to dk980; refreshed help, needs [r4318]', 'bound house.review to dk981; refreshed needs [r4319]', 'bound house.land to dk982; refreshed needs [r4320]']
+  house.build entry: {'needs': 'kind=taskboard-task|task', 'acts_on': None, 'may': 'stewards'}
+  [steward: card] house.build dk91
+      -> REFUSED refused: house.build is unbound: house is not running
+  [steward: issue] house.build dk1188
+      -> REFUSED refused: house.build acts on things with kind taskboard-task or task; Signing in and the public site (dk1188, a issue) has no kind taskboard-task or task
+  [steward: task.build verb on an issue] task.build dk1188
+      -> REFUSED refused: house.build acts on things with kind taskboard-task or task; Signing in and the public site (dk1188, a issue) has no kind taskboard-task or task
+   build <issue> (plain) -> ('refuse', 'nothing called build acts on a issue; build means task.build for other things')
+   build <card> (plain) -> ('pick', 'house.build')
+
+  -- the steward widens the House to the Tracker and GitHub kinds
+  [steward] word-set house.build needs="kind=taskboard-task|task|issue|gh-issue"
+      -> ok ok word.set house.build [r4321] · needs now kind=taskboard-task|task|issue|gh-issue (was kind=taskboard-task|task)
+  [steward: issue] house.build dk1188
+      -> REFUSED refused: house.build is unbound: house is not running
+  [steward: gh-issue] house.build dk1189
+      -> REFUSED refused: house.build is unbound: house is not running
+   house.build <task_thing>:
+  [steward] make kind=task_thing title="A task by another name" text="Build me" who=Alex lane=Now
+      -> ok ok make dk3303 [r4322] · a task_thing | ~ task_thing is new here: no lens, rule or word mentions it yet, so it shows only in look and rows (kinds lists the kinds there are)
+  [steward: task_thing] house.build dk3303
+      -> REFUSED refused: house.build acts on things with kind taskboard-task or task or issue or gh-issue; A task by another name (dk3303, a task_thing) has no kind taskboard-task or task or issue or gh-issue
+
+  -- what builders.py then reads (modules/house/builders.py: held() :39, who :196, title/basis :205-208, prompt :405-408)
+   gh-issue          247  finished but not held: buildable
+   gh-issue          758  no text: prompt's Task text is empty
+   gh-issue          569  owned by someone else under another spelling: owner check skipped
+   gh-issue          758  total
+   issue             260  finished but not held: buildable
+   issue            1058  no text: prompt's Task text is empty
+   issue            1058  no title: prompt says 'Codex — Builder', Current task: <id>
+   issue             686  owned by someone else under another spelling: owner check skipped
+   issue            1058  total
+   taskboard-task      2  no text: prompt's Task text is empty
+   taskboard-task    358  total
+   look <issue> as the House reads it: keys ['assignee', 'changed', 'converted_from', 'description', 'due', 'estimate', 'id', 'kind', 'labels', 'made', 'made_by', 'name', 'project', 'rev', 'status']
+
+  -- an honest shape: what builders.py reads, as needs
+   needs='title text': reaches {'taskboard-task': 356} (Alex's real 58 cards: 56)
+   needs='title text who': reaches {'taskboard-task': 337} (Alex's real 58 cards: 37)
+   needs='title text acceptance': reaches {'taskboard-task': 20} (Alex's real 58 cards: 20)
+   needs='title|name text|description|body': reaches {'taskboard-task': 356, 'issue': 1056, 'gh-issue': 756} (Alex's real 58 cards: 56)
+
+  -- widening by the shared kind instead: house.build acts_on=task
+  [steward] make kind=kind name=task needs="title|name lane|status|state"
+      -> ok ok make dk3304 [r4323] · a kind
+  [steward] word-set house.build acts_on=task needs=""
+      -> ok ok word.set house.build [r4324] · acts_on now task · needs taken away
+   house.build entry: {'needs': None, 'acts_on': 'task'}
+   house.build now reaches: {'taskboard-task': 358, 'issue': 1058, 'gh-issue': 758, 'task_thing': 1}
+
+  -- the House re-offers (as at every start), then ships a narrower shape
+   re-offer: ['bound house.tell to dk979']
+   new House offer: ['bound house.tell to dk979'] | notices: ["house now offers house.build with different acts_on, needs, but a steward edited its entry dk980; the steward's edit stays (word-set house.build … to take the new)"]
+   house.build entry: {'needs': None, 'acts_on': 'task'}

@@ -88,9 +88,9 @@ def acts(k, actor, by=None, kind=None, since=0, limit=15):
 def recent(k, actor, st, entry, tx, group, saw=None):
     kv = st.kv
     since = kv.get("since", "0").lstrip("r")
-    if not since.isdigit():
+    if not since.isdecimal():
         raise Refused("since= takes a record, like since=r1200")
-    limit = min(int(kv.get("limit", "15")) if str(kv.get("limit", "15")).isdigit() else 15, 100)
+    limit = min(int(kv.get("limit", "15")) if str(kv.get("limit", "15")).isdecimal() else 15, 100)
     by = kv.get("by") or (st.words.split()[0] if st.words else None)
     rows = acts(k, actor, by=by, kind=kv.get("kind"), since=int(since), limit=limit)
     head = f"{len(rows)} latest act{'' if len(rows) == 1 else 's'} you can see" + (f" by {by}" if by else "")
@@ -99,6 +99,11 @@ def recent(k, actor, st, entry, tx, group, saw=None):
 
 
 def kinds(k, actor, st, entry, tx, group, saw=None):
+    if st.words.strip() or st.target:
+        from .kinds import kinds_reading
+        if st.target:
+            st.words = (st.target + " " + st.words).strip()
+        return kinds_reading(k, actor, st)
     count = {}
     for t, a in list(k.state.things.items()):
         if t == "world" or a.get("forgotten") or k.shown(actor.person, t) is None:

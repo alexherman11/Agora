@@ -831,6 +831,11 @@ class WindowHost:
             import native_shell
             mine = [r['hwnd'] for r in self.screen.wins.values() if r.get('hwnd')]
             rows = native_shell.windows(mine)
+            if caller.get("person") != self.owner and caller.get("id") != self.owner:
+                # a steward who isn't the owner (JEFF, a resident) sees which programs are open, never their titles:
+                # a title is what's in the window (a chat, a mail subject). Interim until dk1095 (security review M5,
+                # 28 Oct; JEFF: only Alex sees a native window unless he shares it)
+                rows = [dict(r, name=r.get('program') or 'a window') for r in rows]
             pins = self.m.see('rows any bar=taskbar', use=use)
             for pin in pins.get('rows') or []:
                 if pin.get('path'):

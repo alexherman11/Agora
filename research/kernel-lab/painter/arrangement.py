@@ -226,7 +226,11 @@ def compile_view(k, actor, target, _trail=(), reader=None, view=None):
                 items = read_rows(command)
             else:
                 tag = selector.removeprefix('tag:')
-                items = [a for a in visible.values() if a.get('kind') == tag]
+                # a kind with a shape (or one another extends) also draws what has that shape, read under the
+                # kind's names: an event that says starts shows as start (kernel/kinds.py)
+                fitted = k.kinds.is_open(tag)
+                items = [a for a in visible.values() if a.get('kind') == tag] if not fitted else [
+                    k.kinds.filled(a, tag) for a in visible.values() if k.kinds.fits(a, tag)]
             for clause in clauses:
                 clause = clause.strip()
                 key, _, value = clause.removeprefix('prop:').partition('=')

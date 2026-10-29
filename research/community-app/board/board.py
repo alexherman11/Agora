@@ -113,7 +113,7 @@ def call(message):
             stamp(kv['closes'])
         if kv.get('start'):
             stamp(kv['start'])
-        if 'seats' in kv and (not str(kv['seats']).isdigit() or not 1 <= int(kv['seats']) <= 10000):
+        if 'seats' in kv and (not str(kv['seats']).isdecimal() or not 1 <= int(kv['seats']) <= 10000):
             raise ValueError('seats needs a number from 1 to 10000')
         if kv.get('options'):
             options = kv['options'].split()
@@ -191,8 +191,11 @@ def call(message):
         return answer([line('make', kind='board-mark', about=target, action=action, sees='me')], post)
 
     if word == 'rsvp':
-        event = next((r for r in rows(use, 'post') + rows(use, 'event') if r['id'] == target), None)
-        if not event or (event.get('post_kind') != 'event' and event['kind'] != 'event'):
+        # what an RSVP reaches is the word's shape (NEEDS below), checked by the kernel before the board is asked,
+        # so a steward can widen it in the world (word-set board.rsvp needs=...) without editing this file
+        event = next((r for r in rows(use, 'post') + rows(use, 'event') if r['id'] == target), None) \
+            or next(iter(read(use, line('look ' + target))), None)
+        if not event:
             raise ValueError('RSVP to an event')
         status = kv.get('status', 'going')
         if status not in ('going', 'maybe'):
@@ -212,7 +215,8 @@ def call(message):
         return dict(text=str(len(result)) + ' reports visible to your leadership', rows=result)
 
     if word == 'calendar':
-        event = next((r for r in rows(use, 'post') + rows(use, 'event') if r['id'] == target), None)
+        event = next((r for r in rows(use, 'post') + rows(use, 'event') if r['id'] == target), None) \
+            or next(iter(read(use, line('look ' + target))), None)
         if not event or not event.get('start'):
             raise ValueError('choose an event with a start time')
         def escape(s):
@@ -393,6 +397,10 @@ SPECS = [
     ('badges', 'see', '', 'Read real names and current leader/steward badges; agents say agent for <person>.'),
 ]
 
+# the shape each word's code reads (kernel kinds.py): the kernel refuses a thing without it, naming what is missing
+NEEDS = {'rsvp': 'kind|post_kind=event', 'calendar': 'kind|post_kind=event start'}
+
 if __name__ == '__main__':
-    run([dict(word='board.' + name, kind=kind, takes=takes, may='members', undo='yes' if kind == 'do' else 'no', help=help)
+    run([dict(word='board.' + name, kind=kind, takes=takes, may='members', undo='yes' if kind == 'do' else 'no', help=help,
+              **({'needs': NEEDS[name]} if name in NEEDS else {}))
          for name, kind, takes, help in SPECS], call, 'Community board words; world definitions and caller-visible readings; no private store')

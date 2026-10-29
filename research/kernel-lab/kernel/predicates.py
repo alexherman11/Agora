@@ -10,7 +10,18 @@ import hashlib
 from .kernel import Refused
 
 
-def evaluate(k, person, target, expression, value="", policy=False):
+def _num(x):
+    """A number from a fact (facts from lines are text: "6"), or None."""
+    if isinstance(x, bool) or x is None:
+        return None
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return None
+
+
+def evaluate(k, person, target, expression, value="", policy=False, row=None):
+    """`row`, when given, is the thing's facts to judge (a kind's promise judges what an act would leave)."""
     if len(expression) > 2048:
         raise Refused("test's expression is too long")
     try:
@@ -25,8 +36,8 @@ def evaluate(k, person, target, expression, value="", policy=False):
         # A normal reading sees exactly the same facts as look.
         if not isinstance(name, str) or name.startswith(("like:", "vote:", "claim:", "contact:", "sees")):
             return None
-        row = k.state.things.get(target, {}) if policy else (k.shown(person, target) or {})
-        return row.get(name)
+        facts = row if row is not None else (k.state.things.get(target, {}) if policy else (k.shown(person, target) or {}))
+        return facts.get(name)
 
     def used(word, thing):
         if not isinstance(word, str) or not isinstance(thing, str):
@@ -34,7 +45,8 @@ def evaluate(k, person, target, expression, value="", policy=False):
         eid = k.find_entry(word, (k.groups_of(thing) or [k.place])[0])
         return bool(eid and k.used(person, eid, thing))
 
-    functions = {"field": field, "used": used,
+    functions = {"field": field, "used": used, "num": _num,
+                 "has": lambda name: field(name) not in (None, ""),
                  "digest": lambda s: hashlib.sha256(str(s).strip().casefold().encode()).hexdigest()}
 
     def visit(n):
@@ -50,12 +62,20 @@ def evaluate(k, person, target, expression, value="", policy=False):
         if isinstance(n, ast.Compare) and len(n.ops) == 1 and isinstance(n.ops[0], (ast.Eq, ast.NotEq)):
             same = visit(n.left) == visit(n.comparators[0])
             return same if isinstance(n.ops[0], ast.Eq) else not same
+        if isinstance(n, ast.Compare) and len(n.ops) == 1 and isinstance(n.ops[0], (ast.Lt, ast.Gt, ast.LtE, ast.GtE)):
+            a, b = _num(visit(n.left)), _num(visit(n.comparators[0]))
+            if a is None or b is None:
+                return False                     # only numbers compare; num(field('panels')) <= 6
+            op = n.ops[0]
+            return a < b if isinstance(op, ast.Lt) else a > b if isinstance(op, ast.Gt) else \
+                a <= b if isinstance(op, ast.LtE) else a >= b
         if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in functions and not n.keywords:
             try:
                 return functions[n.func.id](*(visit(x) for x in n.args))
             except (TypeError, ValueError) as exc:
                 raise Refused("test's function arguments do not match; help test says how") from exc
-        raise Refused("test understands literals, and/or/not, ==/!=, field, used and digest only")
+        raise Refused("test understands literals, and/or/not, ==/!=, < > <= >= on numbers, field, has, num, used and "
+                      "digest only")
 
     result = visit(root.body)
     if type(result) is not bool:

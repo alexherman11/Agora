@@ -1,0 +1,78 @@
+
+====================================================================================================
+## E1. Widen-only is enforced on set, not on a second make
+====================================================================================================
+  [steward: second declaration, wide] make kind=kind name=issue needs="name"
+      -> ok ok make dk3302 [r4326] · a kind
+  [steward narrows by set] set dk3302 needs="name status project"
+      -> REFUSED refused: that would make issue need more (status, project), and issue.close, issue.reopen, issue.move, issue.assign, issue.estimate rely on it; a kind only widens (make a new kind for the narrower meaning)
+  [steward narrows by a third make] make kind=kind name=issue needs="name status project"
+      -> ok ok make dk3303 [r4327] · a kind
+   issue shape now: ['name', 'status', 'project']
+   declarations of issue: [('dk1171', None, 'Alex'), ('dk3302', 'name', 'Alex'), ('dk3303', 'name status project', 'Alex')]
+   issues without project now refused by every issue.* word: 0 (of 1058)
+
+====================================================================================================
+## E2. Before Alex shapes task.*, a member's shaped word wins done on Alex's own cards
+====================================================================================================
+  [Sable (member)] verb tidy.done needs="title lane" steps="set $1 who=Sable" help="tidy.done <card>: take it."
+      -> ok ok verb tidy.done (dk3302) [r4315] · a new word in Alex's desktop: set $1 who=Sable
+   done <card id> over all cards: {'tidy.done': 358}
+  [Alex types done on his own card] done dk95
+      -> ok ok set dk95 [r4316] · who=Sable | ~ tidy.done, one act [r4316]
+   dk95 now: {'lane': 'Backlog', 'who': 'Sable'}
+
+====================================================================================================
+## E3. A world-level lane mapping: lane things carry the other apps' values
+====================================================================================================
+  [steward] make kind=kind name=task needs="title|name lane|status|state"
+      -> ok ok make dk3302 [r4315] · a kind
+  [steward] set dk79 issue_status=open gh_state=open
+      -> ok ok set dk79 [r4316] · issue_status=open, gh_state=open
+  [steward] set dk80 issue_status=in_progress
+      -> ok ok set dk80 [r4317] · issue_status=in_progress
+  [steward] set dk81 issue_status=closed gh_state=closed
+      -> ok ok set dk81 [r4318] · issue_status=closed, gh_state=closed
+  [steward] set dk262 text="# Arrangement only: five reviewed components; same task facts and words as v2.
+root : column, of tag:taskboard-settings as view, each 
+      -> ok ok set dk262 [r4319] · text=# Arrangement only: five reviewed components; same task facts and words as v2. | root : column, of tag:taskboard-settings as view, each board-view | board-view : board, filter 
+   board: {('Backlog', 'taskboard-task'): 154, ('Backlog', 'issue'): 523, ('Backlog', 'gh-issue'): 511, ('Now', 'taskboard-task'): 79, ('Now', 'issue'): 275, ('Done', 'taskboard-task'): 125, ('Done', 'issue'): 260, ('Done', 'gh-issue'): 247} (528 ms)
+   view text: Task board · Components: 2174 flag, 2174 text-block, 2174 menu, 2174 card, 3 lane, 1 board
+  [steward] look dk1194
+      -> ok Agents connect through an MCP 
+   the drop gesture on an issue card says task-move $carried to=Done; as typed by Alex:
+  [steward] task-move dk1194 to=Done
+      -> REFUSED refused: Agents connect through an MCP adapter on the door with two tools, do and see says status (as a kind task, either spelling reads); set dk1194 status=Done changes it, rather than adding lane beside it
+   a lens could say the plain word instead (move $carried to=$lane.name):
+   move <issue> to=Done -> ('pick', 'issue.move')
+  [steward] move dk1194 to=Done
+      -> ok ok set dk1194 [r4320] · status=Done | ~ issue.move, one act [r4320]
+   the issue now says status = Done (the Tracker knows open|in_progress|closed)
+
+====================================================================================================
+## E4. What actions and kinds say for a gh-issue with every app shaped and the shared kinds declared
+====================================================================================================
+  [steward] make kind=kind name=task needs="title|name lane|status|state"
+      -> ok ok make dk3302 [r4326] · a kind
+  [steward] make kind=kind name=assigned needs="assignee|who"
+      -> ok ok make dk3303 [r4327] · a kind
+  [steward] verb gh.done needs="kind=gh-issue" steps="set $1 state=closed" help="gh.done <gh-issue>: close it."
+      -> ok ok verb gh.done (dk3304) [r4328] · a new word in Alex's desktop: set $1 state=cl
+A server ready for 200 strangers (dk1193):
+  gh-issue · a gh-issue
+  task · has title, state
+  assigned · has assignee
+A server ready for 200 strangers (dk1193), a gh-issue:
+  as what it hasn:
+    gh.assign · gh.assign <gh-issue> who=<login>.
+    gh.close · gh.close <gh-issue>: close it here (the adapter syncs to GitHub).
+    gh.done · gh.done <gh-issue>: close it.
+    gh.reopen · gh.reopen <gh-issue>: reopen it.
+  and 145 words that take any thing (help lists them)
+Signing in and the public site (dk91), a taskboard-task:
+  as a taskboard-task:
+    task.assign · task.assign <task> who=<name>: assign the work. Look first. The history thing is authored by the rea
+    task.done · task.done <task>: finish the card, recording the move and history in one undoable act.
+    task.move · task.move <task> to=Backlog|Now|Done: move a card. Look first when typing. One act records the move 
+  lenses that show it: taskboard (as taskboard-task), taskboard-components (as taskboard-task), work (as taskboard-task)
+  and 145 words that take any thing (help lists them)

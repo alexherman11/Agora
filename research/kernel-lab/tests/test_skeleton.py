@@ -353,6 +353,23 @@ class Skeleton(unittest.TestCase):
         self.k.admit(self.tally, alex, "tally.pin-top", entry, {"lines": [f"pin {p}"], "saw": {p: self.k.state.rev[p]}})
         self.assertEqual(self.k.state.get(p, "pinned"), self.person("google:alex"))
 
+    def test_a_module_may_say_which_aspects_it_read(self):
+        """saw {thing: {rev, aspects}}: an unrelated change since the read doesn't refuse the answer, a change to what it
+        read or writes does, and a malformed saw is a refusal, not a crash (28 Oct: int() raised TypeError)."""
+        p = self.ok(self.maya, "post Aspects, not revs")["made"][0]
+        rev = self.k.state.rev[p]
+        self.ok(self.bea, f"like {p}")                      # an unrelated change after the module read p
+        alex = self.k.actor_for(self.person("google:alex"))
+        entry = self.k.entry(self.k.find_entry("tally.pin-top"))
+        with self.assertRaisesRegex(Refused, "saw takes a rev"):
+            self.k.admit(self.tally, alex, "tally.pin-top", entry, {"lines": [f"pin {p}"], "saw": {p: "soon"}})
+        with self.assertRaisesRegex(Refused, "saw takes a rev"):
+            self.k.admit(self.tally, alex, "tally.pin-top", entry,
+                         {"lines": [f"pin {p}"], "saw": {p: {"rev": rev, "aspects": "text"}}})
+        self.k.admit(self.tally, alex, "tally.pin-top", entry,
+                     {"lines": [f"pin {p}"], "saw": {p: {"rev": rev, "aspects": ["text"]}}})
+        self.assertEqual(self.k.state.get(p, "pinned"), self.person("google:alex"))
+
     def test_the_seam_and_the_door_trust_only_the_session(self):
         code, out = post(self.url + "/keep/account", {"account": "google:mallory", "name": "M", "invite": INVITE})
         self.assertEqual(code, 403)

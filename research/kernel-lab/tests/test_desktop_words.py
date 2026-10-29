@@ -195,9 +195,9 @@ class DesktopWords(unittest.TestCase):
 
     def test_rules_answer_what_their_maker_may_hear(self):
         car = self.do(self.alex, "make kind=carpool pickup=\"Murray & 5th\" seats=2")["made"][0]
-        rule = self.do(self.alex, 'make kind=rule on=claim do="make kind=reminder text=\\"a seat was taken on '
+        rule = self.do(self.alex, 'make kind=rule on=claim by=anyone do="make kind=reminder text=\\"a seat was taken on '
                                   '$target\\" sees=me"')["made"][0]
-        spy = self.do(self.sam, 'make kind=rule on=make do="post I saw $target being made"')["made"][0]
+        spy = self.do(self.sam, 'make kind=rule on=make by=anyone do="post I saw $target being made"')["made"][0]
         n_sam_posts = len([t for t in self.k.things("post") if self.k.state.get(t, "made_by") == self.sam_id])
         self.do(self.sam, f"claim {car}")
         got = until(lambda: f"a seat was taken on {car}" in self.reminders(self.alex))

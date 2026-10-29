@@ -77,7 +77,9 @@ def attested(k, reader, target, p, key, token, evidence=None):
                  for f in part["facts"] if f[0] == target}
         if key not in facts:
             continue
-        if facts[key] != token or person(k, r.get("by")) != reviewer(k, p):
+        # the reviewer's own act, never an agent or module acting for them (values review V3, ran: an agent for Alex
+        # attested "verified by Alex" through task.verify and through a plain set)
+        if facts[key] != token or r.get("via") or r.get("for") or person(k, r.get("by")) != reviewer(k, p):
             return False
         if evidence:
             if facts.get("verified_evidence") != evidence or k.shown(reader, evidence) is None:
@@ -188,6 +190,10 @@ def change(k, actor, st, entry, tx, group, saw=None):
     if not allowed:
         raise Refused("only the designated reviewer may attest" if action in {"review", "verify"}
                       else "only the task's owner, lead or asker may maintain it")
+    if action in {"review", "verify"} and (actor.kind != "person" or actor.id != actor.person):
+        # "reviewed" and "verified" say the reviewer looked; an agent or module saying so for them is not that
+        raise Refused(f"{action} is {k.name(actor.person)}'s own act: an agent or module can't attest for them "
+                      f"(they say it from their own session)")
     kv = dict(st.kv)
     required = {"next": ("next_action", "acceptance"),
                 "revise": ("goal", "acceptance", "request_ref", "next_action"),

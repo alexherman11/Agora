@@ -56,6 +56,7 @@ PORT = os.environ.get("AGORA_KDESK_PORT", "8810")
 URL = f"http://127.0.0.1:{PORT}"
 FAKE = os.environ.get("HOUSE_FAKE_MODEL")            # a scripted model's URL, for hidden tests (fake_model.py)
 TASK_KINDS = ("taskboard-task", "task")
+TASK_NEEDS = "kind=" + "|".join(TASK_KINDS)        # the shape house.build and its kin read (kernel kinds.py)
 MESSAGE_WORDS = ("say",)
 
 
@@ -190,9 +191,8 @@ class Agent:
         """Something addressed to it. Said now if it is free, else at the end of its turn. Never blocks."""
         with self.lock:
             self.inbox.append({"text": text, "chat": chat, "record": record, "at": time.time()})
-            if record:
-                self.state["cursor"] = max(int(self.state.get("cursor", 0)), int(record))
-                self.save()
+            # the cursor moves when a line is said to the model, not when it is queued (`_begin`), so a restart with
+            # lines waiting finds them again in catch-up (security review round 2: queued chats were lost)
             if not self.busy:
                 self._begin()
 
@@ -208,7 +208,15 @@ class Agent:
             self.log("error", self.state["error"])
             self.house.publish()
             return
-        items, self.inbox = self.inbox, []
+        # one turn answers one chat: its reply is said into that chat, so lines from another chat (a closed one) must
+        # never be in the same turn (security review H1, 28 Oct: a Conversation secret was answered into Shop talk).
+        # Items with no chat (a task, house.wake) are their own turn too. The rest wait; a turn's end begins the next.
+        first = self.inbox[0].get("chat")
+        items = [i for i in self.inbox if i.get("chat") == first]
+        self.inbox = [i for i in self.inbox if i.get("chat") != first]
+        record = next((i["record"] for i in reversed(items) if i.get("record")), None)
+        if record:
+            self.house.mark_turn(self, record)          # its acts this turn say because=r<record> in the log
         chats = [i["chat"] for i in items if i.get("chat")]
         parts = []
         if self.state.pop("welcome_due", None):
@@ -223,6 +231,13 @@ class Agent:
                      "receipts": [], "line": None, "woken_by": items[-1]["text"].splitlines()[0][:160]}
         if self.child.send(text):
             self.busy = True
+            sent = [int(i["record"]) for i in items if i.get("record")]
+            if sent:
+                # at least once, never lost: past what was said, but not past a line still waiting in another chat
+                waiting = [int(i["record"]) for i in self.inbox if i.get("record")]
+                upto = min(max(sent), min(waiting) - 1) if waiting else max(sent)
+                self.state["cursor"] = max(int(self.state.get("cursor", 0)), upto)
+                self.save()
             if context:
                 self.state["next_steps_context"] = context
             self.state.pop("next_steps_queued", None)
@@ -272,6 +287,7 @@ class Agent:
                 self.turn["receipts"][-1] += f" ({ev['refused']} refused)"
                 self._receipts()
         elif e == "result":
+            self.house.mark_turn(self, None)            # the turn is over: later acts answer nothing it was told
             left = self.turn.get("receipts") or []
             if left and not self.turn.get("line") and self.turn.get("chat"):     # with no chat, each was kept as it came
                 self.activity("acts", "\n".join(left))
@@ -488,20 +504,87 @@ class House:
         for r in self.m.see("rows said").get("rows") or []:
             rev = int(r.get("rev") or 0)
             if rev > cursor and a.person in str(r.get("to") or "").split() and r.get("made_by") != a.person \
-                    and r.get("for") != a.person:
+                    and r.get("for") != a.person and self.sees_line(a, r.get("id"), r.get("chat")):
                 got.append((rev, r))
         if not got:
             return
         got.sort(key=lambda x: x[0])
-        text = "~ for you while the house was away:\n" + "\n".join(
-            self.line_text(r.get("id"), dict(r, by_name=r.get("by")), r.get("chat")) for _, r in got)
-        a.wake(text, chat=got[-1][1].get("chat"), record=got[-1][0])
+        by_chat = {}
+        for rev, r in got:                                   # one wake per chat, oldest chat first (security review H1)
+            by_chat.setdefault(r.get("chat"), []).append((rev, r))
+        for chat, lines in by_chat.items():
+            text = "~ for you while the house was away:\n" + "\n".join(
+                self.line_text(r.get("id"), dict(r, by_name=r.get("by")), r.get("chat")) for _, r in lines)
+            a.wake(text, chat=chat, record=lines[-1][0])
 
     def chat_name(self, c):
         if c not in self.chat_names:
             rows = self.m.see(f"look {c}").get("rows") or [{}]
             self.chat_names[c] = rows[0].get("name") or c
         return self.chat_names[c]
+
+    def sees_line(self, a, sid, chat):
+        """Whether this agent may see a said line now, asked through its own door: covers closed chats, group-held
+        chats, sees_when, and people who left (security review M3, 28 Oct: catch-up read with the house's sight).
+        Without a door session for it, no: an agent with no session can't take a turn anyway, and the house's own
+        sight is wider than the agent's (round 2: the fallback handed a removed member a group chat's line)."""
+        door = getattr(a, "door", None)
+        if door is None:
+            try:
+                tok = self.token_for(a.cfg.get("signer") or a.name.lower())
+            except Exception:                         # noqa: BLE001  no session: hand nothing on
+                tok = None
+            door = Door(tok) if tok else None
+        if door is None or not sid:
+            return False
+        try:
+            out = door.post("/see", f"look {sid}")
+        except Exception:                             # noqa: BLE001  a door that won't answer hands nothing on
+            return False
+        return bool(out.get("ok", True) and out.get("rows"))
+
+    def in_chat(self, person, c):
+        """Whether a closed chat (with=) holds this person; an open chat holds anyone. The house reads with its own
+        wide sight, so catch-up checks the chat's people before handing a line on (card dk1245; the kernel keeps
+        `to` inside the chat for new lines, this guards older records). Read fresh: a chat's people can change."""
+        if not c:
+            return True
+        rows = self.m.see(f"look {c}").get("rows") or []
+        if not rows:
+            return False                     # a chat the house can't read: hand nothing on (fail closed)
+        people = str(rows[0].get("with") or "").split()
+        return not people or person in people
+
+    def context(self, said, row, who):
+        """What a line is bound up with, and who is working near the agent, for its wake (kernel around and nearby;
+        research/kinds-lab/fresh-kinds-and-bonds.md). HELD 28 Oct with the graph work: around and nearby left the
+        dictionary (privacy leaks, round 5), and these lines pasted others' titles raw into a wake. Not called."""
+        out = []
+        try:
+            got = self.m.see(f"around {said} toward=strongest limit=8")
+            skip = {said, row.get("chat"), who, row.get("made_by"), row.get("for")}
+            near = [x for x in got.get("rows") or [] if x.get("id") not in skip
+                    and x.get("kind") not in ("person", "agent", "place", "group", "chat")][:4]
+            out += [f"~ around this: {x['name']} ({x['id']}, {x['kind']}): {x['why']}" for x in near]
+            busy = self.m.see(f"nearby {who}").get("rows") or []
+            out += [f"~ nearby: {x['who']} {x['how']}: {x['name']} ({x['id']}), {x['minutes_ago']} min ago"
+                    for x in busy[:3]]
+        except Exception as exc:                     # noqa: BLE001  context is a help, never a reason not to wake
+            log(f"house: no context for {said}: {exc!r}")
+        return ("\n" + "\n".join(out)) if out else ""
+
+    def mark_turn(self, a, record):
+        """Tell the kernel what an agent's acts now answer (kernel `turn`), so the log says why; done at its end."""
+        who = a.cfg.get("person")
+        if not who:
+            return
+        line = f"turn {who} r{record}" if record else f"turn {who} done"
+        try:
+            out = self.m.do(line, timeout=5)
+            if out.get("refused") or out.get("ok") is False:
+                a.log("turn", out.get("refused") or out.get("text"))
+        except Exception as exc:                     # noqa: BLE001
+            log(f"house: {line} failed: {exc!r}")
 
     def line_text(self, sid, row, chat):
         who = row.get("by_name") or row.get("speaker") or ""
@@ -520,7 +603,8 @@ class House:
             rows = self.m.see(f"look {msg['said']}").get("rows") or [{}]
             r = dict(rows[0], by_name=msg.get("by"))
             for p in to:
-                self.agents[p].wake(self.line_text(msg["said"], r, r.get("chat")), chat=r.get("chat"),
+                self.agents[p].wake(self.line_text(msg["said"], r, r.get("chat")),
+                                    chat=r.get("chat"),
                                     record=msg.get("record"))
             return
         target = msg.get("target")
@@ -589,7 +673,7 @@ class House:
         a = self.agents.get(args.get("target") or "")
         if word == "house.activity" and a is not None:
             n = str((args.get("kv") or {}).get("limit", "10"))
-            rows = a.recent_activity(min(int(n), 100) if n.isdigit() else 10)
+            rows = a.recent_activity(min(int(n), 100) if n.isdecimal() else 10)
             for r in rows:
                 r["line"] = f"{r['at'][11:16]}  {r['what']:<5} {' '.join(str(r['text']).split())[:240]}"
             return {"text": (f"{a.name}'s activity outside any chat, latest last:\n" + "\n".join(
@@ -597,7 +681,7 @@ class House:
                 f"{a.name} has done nothing outside a chat yet", "rows": rows}
         if word == "house.log" and a is not None:
             n = str((args.get("kv") or {}).get("limit", "60"))
-            log = self.log_of(a, min(int(n), 300) if n.isdigit() else 60)
+            log = self.log_of(a, min(int(n), 300) if n.isdecimal() else 60)
             return {"text": "\n".join(" ".join(x.split("\t")) for x in log) or f"{a.name} has no log yet",
                     "rows": [{"person": a.person, "name": a.name, "log": "\n".join(log), "lines": len(log)}]}
         if a is None:
@@ -711,15 +795,15 @@ class House:
 OFFER = [
     {"word": "house.manage", "kind": "do", "needs": "kind=taskboard-task|task", "takes": "<id> [action=<word>] [<words>]", "undo": "external", "may": "members",
      "help": "house.manage <task> action=build|tell|retry|report|review|land|note [words]: only the explicitly approved resident person, for its three locally approved tasks. Builders and other people are refused before effects."},
-    {"word": "house.retry", "kind": "do", "takes": "<id>", "undo": "external", "may": "stewards",
+    {"word": "house.retry", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "stewards",
      "help": "house.retry <task>: retry a proven terminal startup failure before any model thread. Preserves its existing claim and worktree; refuses uncertain or changed work."},
-    {"word": "house.tell", "kind": "do", "takes": "<id> <words>", "undo": "external", "may": "stewards",
+    {"word": "house.tell", "kind": "do", "needs": TASK_NEEDS, "takes": "<id> <words>", "undo": "external", "may": "stewards",
      "help": "house.tell <task> <words>: retain a follow-up for your active or received builder, continuing the same Codex thread. Held, uncertain, reviewed and landed work does not restart."},
-    {"word": "house.build", "kind": "do", "takes": "<id>", "undo": "external", "may": "stewards",
+    {"word": "house.build", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "stewards",
      "help": "house.build <task>: claim a ready task and start an authenticated Codex builder asynchronously, within the shared configured capacity (default two, maximum four). Uses your existing agent session; never creates credentials. Result receipt is not task completion."},
-    {"word": "house.review", "kind": "do", "takes": "<id>", "undo": "external", "may": "stewards",
+    {"word": "house.review", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "stewards",
      "help": "house.review <task>: independently check a received committed result against current main, including hidden desktop checks. Does not land or close it."},
-    {"word": "house.land", "kind": "do", "takes": "<id>", "undo": "external", "may": "stewards",
+    {"word": "house.land", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "stewards",
      "help": "house.land <task>: publish the exact reviewed source if main and ownership still match. Activation and owner verification remain separate."},
     {"word": "house.who", "kind": "see", "takes": "",
      "help": "house.who: the agents the house runs (JEFF and others), what each is doing (asleep, resting, idle, "

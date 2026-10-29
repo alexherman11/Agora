@@ -86,6 +86,7 @@ class Call:
         self.person = (msg.get("caller") or {}).get("person", "")
         self.saw = {}
         self.looked = {}
+        self.refused = {}            # ref -> what the kernel said when a look of it was refused
         self.ground = None           # the ground around the map's centre, made when first needed
 
     def see(self, line):
@@ -109,8 +110,9 @@ class Call:
             return self.looked[ref]
         try:
             rows, _ = self.see("look " + q(ref) if not re.fullmatch(r"[A-Za-z]+\d+", ref) else "look " + ref)
-        except ValueError:
+        except ValueError as exc:
             rows = []
+            self.refused[ref] = str(exc)
         row = rows[0] if rows else None
         self.looked[ref] = row
         if row and row.get("id"):
@@ -244,7 +246,12 @@ def position(call, gf, row, depth=0):
         if hits:
             return hits[0]["lat"], hits[0]["lon"], True
         # not a name in the tiles here (a beach is an area, not a point): ask the wider world, a few new names a
-        # call at most (each new one waits its turn at Nominatim; answers are kept, so later readings are instant)
+        # call at most (each new one waits its turn at Nominatim; answers are kept, so later readings are instant).
+        # Only a place text everyone here sees, or the asker's own, may go outside (Alex, 28 Oct: "Public, or my
+        # own"); the kernel says which on each row it hands a module (kernel.outside_marks). A row without that
+        # answer is treated as private.
+        if row.get("outside") not in ("public", "yours") or "location" in (row.get("outside_not") or ()):
+            return None
         text = str(row["location"])
         cached = (text.lower().strip(), None if not getattr(gf, "near", None) else (round(gf.near[0], 1), round(gf.near[1], 1)))
         if cached in geo_cache or getattr(call, "geocoded", 0) < 3:
@@ -256,7 +263,7 @@ def position(call, gf, row, depth=0):
     return None
 
 
-def point_of(call, gf, text):
+def point_of(call, gf, text, search=True):
     """A stop or a centre: 'lat,lon', a thing (id or name), a building ref, or a name on the ground."""
     text = str(text).strip()
     ll = latlon_text(text)
@@ -281,6 +288,18 @@ def point_of(call, gf, text):
         p = position(call, gf, thing)
         if p:
             return p[0], p[1], thing.get("name") or thing.get("title") or thing["id"]
+        # a thing it names is not a search: its title is not an address, and it may be private (security review,
+        # 28 Oct: a private meeting's title went to Nominatim). Only text that names nothing goes outside.
+        raise ValueError(f"{thing['id']} has no place the map can read; give it location=, at= or lat= lon=")
+    why = call.refused.get(text, "")
+    if "things are called" in why or "share the name" in why:
+        raise ValueError(why)                      # which one? the caller picks; the name never goes outside
+    if re.fullmatch(r"[a-z]{2,4}\d+", text):
+        raise ValueError(f"{text}: no thing you can see has that id")     # an id is never a search
+    if not search:
+        # saved text (a route's stops, a layer's search) is its thing's, not typed now: it goes outside only when that
+        # thing is public or the caller's own (approved-builds review H3, 28 Oct)
+        raise ValueError(f"{text}: not a place this map knows here, and it isn't yours to look up outside")
     found = geocode(text)
     if found:
         return found[0]["lat"], found[0]["lon"], found[0]["name"]
@@ -352,7 +371,10 @@ def geocode(text, near=None, limit=5):
         geo_last[0] = time.time()
     params = dict(q=text, format="jsonv2", limit=str(limit), addressdetails="0")
     if near:
-        params["viewbox"] = "%f,%f,%f,%f" % (near[1] - 0.6, near[0] + 0.5, near[1] + 0.6, near[0] - 0.5)
+        # the box around a rounded centre: its midpoint was the map's exact centre, sent with every query (for a home
+        # map, Alex's address; security review H4, 28 Oct). 0.1 degrees is what the cache key already uses.
+        lat0, lon0 = round(near[0], 1), round(near[1], 1)
+        params["viewbox"] = "%.1f,%.1f,%.1f,%.1f" % (lon0 - 0.6, lat0 + 0.5, lon0 + 0.6, lat0 - 0.5)
     try:
         status, body = tiles().http.get("https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode(params))
         rows = json.loads(body) if status == 200 else []
@@ -392,6 +414,10 @@ def w_find(call, a):
     near = latlon_text(a["kv"].get("near")) or centre_of(m)
     rows = []
     words = [w for w in re.findall(r"[a-z0-9']+", text.lower())]
+    # searching what the world already places sends nothing out: other things' location text is placed from the ground
+    # and from answers already kept, never geocoded on the side (security review H4, 28 Oct). Only the words the
+    # person typed may go to the outside search, below.
+    call.geocoded = 3
     for kind in ("spot", "structure", "event"):
         try:
             things, _ = call.see("rows " + kind)
@@ -640,12 +666,12 @@ def w_adopt(call, a):
 
 
 # --- routes -------------------------------------------------------------------------------------------------------
-def plan(call, m, stops_text, mode):
+def plan(call, m, stops_text, mode, search=True):
     bits = [s for s in re.split(r"\s*(?:>|→|;)\s*", str(stops_text)) if s.strip()]
     if len(bits) < 2:
         raise ValueError('stops="first > second > …" (things, names on the map, or lat,lon)')
     gf = ground_getter(call, m)
-    pts = [point_of(call, gf, b) for b in bits]
+    pts = [point_of(call, gf, b, search) for b in bits]
     if m.get("ground") and all(ground_file(call, m).contains(p[0], p[1], 50) for p in pts):
         g = ground_file(call, m)
     else:
@@ -682,7 +708,8 @@ def w_route(call, a):
     stops = kv.get("stops") or (existing or {}).get("stops")
     if not stops:
         raise ValueError('map.route name="…" stops="a > b > c" [mode=walk|bike]')
-    r = plan(call, m, stops, mode)
+    typed = bool(kv.get("stops"))
+    r = plan(call, m, stops, mode, search=typed or (existing or {}).get("outside") in ("public", "yours"))
     facts = dict(stops=stops, stop_points=r["stop_points"], mode=mode, path=polyline(r["path"]),
                  metres=str(r["metres"]), minutes=str(r["minutes"]), streets=", ".join(r["streets"][:12]),
                  planned=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
@@ -717,6 +744,10 @@ def w_layers(call, a):
         try:
             if not shows.startswith(SHOWS_START):
                 raise ValueError("a layer shows a reading: rows <kind> …, board.…, map.near … or map.find …")
+            if shows.startswith(("map.find", "map.near")) and layer.get("outside") not in ("public", "yours"):
+                # a layer's saved search is its maker's text: it isn't sent outside for someone else (review H3)
+                raise ValueError("this layer searches with its maker's text, which goes outside only for them or "
+                                 "when the layer is public")
             found, _ = call.see(shows)
             row["items"] = placed(call, gf, found)
             row["count"] = len(row["items"])

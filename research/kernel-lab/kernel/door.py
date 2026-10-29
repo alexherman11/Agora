@@ -190,7 +190,7 @@ def make_handler(kernel, entry, secret):
                                         "grant_scopes": ["kind", "thing", "fields"]})
             if u.path in ("/door/stream", "/stream"):
                 last = self.headers.get("Last-Event-ID") or q.get("since")
-                return self._stream(int(last) if last and last.isdigit() else None)
+                return self._stream(int(last) if last and last.isdecimal() else None)
             if u.path == "/dev/signin" and kernel.dev_sessions is not None:
                 # dev only (start_kernel.py --dev-entry): sets the session cookie on this loopback origin, then goes on
                 tok = q.get("token", "")

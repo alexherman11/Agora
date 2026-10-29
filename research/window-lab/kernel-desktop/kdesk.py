@@ -486,6 +486,8 @@ def main():
     if a.log:
         Path(a.log).parent.mkdir(parents=True, exist_ok=True)
         sys.stdout = sys.stderr = open(a.log, "a", encoding="utf-8", buffering=1)
+    # a start's time, so a traceback below it can be placed (28 Oct: the log had none, and old errors read as new)
+    print(f"kdesk: starting {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}", flush=True)
     k, srv, host, entry = start(a.world, a.port, modules=not a.no_modules, resident_manifest=a.resident_manifest, manager_manifest=a.manager_manifest)
     (k.keep_dir / "kdesk.pid").write_text(str(os.getpid()))
     print(f"kdesk: {k.name(k.place)} on http://127.0.0.1:{a.port} · {len(k.log.records)} records · modules "

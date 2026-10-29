@@ -70,7 +70,7 @@ def main():
     tasks=door.rows('taskboard-task');histories={t['id']:door.request('/see',dict(line='history '+t['id']))['rows'] for t in tasks}
     windows=door.request('/see',dict(line='window.list'))
     before=dict(at=datetime.now(timezone.utc).isoformat(),tasks=len(tasks),task_hash=digest(tasks),
-                missing_priority=sum(not str(t.get('priority','')).isdigit() for t in tasks),windows=windows.get('rows',[]),
+                missing_priority=sum(not str(t.get('priority','')).isdecimal() for t in tasks),windows=windows.get('rows',[]),
                 history_hashes={t:digest(h) for t,h in histories.items()})
     print('Live before:',len(tasks),'tasks;',before['missing_priority'],'missing priorities;',len(before['windows']),'window/work rows.',flush=True)
     if not args.install:return

@@ -1,0 +1,48 @@
+
+====================================================================================================
+## Q1. Can Alex's board lens show the other apps' items?
+====================================================================================================
+  opened built world in 1.04s; things=3302
+  board before: {('Backlog', 'taskboard-task'): 154, ('Now', 'taskboard-task'): 79, ('Done', 'taskboard-task'): 125}  (91 ms)
+
+  -- steward opens Alex's own kind to the other apps' things
+  [steward] set dk76 needs="title|name lane|status|state"
+      -> REFUSED refused: that would make taskboard-task need more (title|name, lane|status|state), and lens taskboard, lens taskboard-components, lens work rely on it; a kind only widens (make a new kind for the narrower meaning)
+  [steward] set dk76 extends=issue
+      -> REFUSED refused: that would make taskboard-task need more (kind=issue), and lens taskboard, lens taskboard-components, lens work rely on it; a kind only widens (make a new kind for the narrower meaning)
+
+  -- steward instead declares a shared kind and points the board at it
+  [steward] make kind=kind name=task needs="title|name lane|status|state"
+      -> ok ok make dk3302 [r4315] · a kind
+  rows task, by own kind: {'taskboard-task': 358, 'issue': 1058, 'gh-issue': 758}
+  [steward] set dk262 text="# Arrangement only: five reviewed components; same task facts and words as v2.
+root : column, of tag:taskboard-settings as view, each 
+      -> ok ok set dk262 [r4316] · text=# Arrangement only: five reviewed components; same task facts and words as v2. | root : column, of tag:taskboard-settings as view, each board-view | board-view : board, filter 
+  lens now says tag:task: True
+  board after tag:task: {('Backlog', 'taskboard-task'): 154, ('Now', 'taskboard-task'): 79, ('Done', 'taskboard-task'): 125}  (155 ms)
+  an issue read as a task: title="The kernel's first shape: built for many people, carrying the language" lane='in_progress' as='title as name, lane as status' who=None
+  a gh-issue read as a task: title="The kernel's first shape: built for many people, carrying the language" lane='open' as='lane as state'
+
+  -- the only way to get them on the board: lanes named after the other apps' values
+  [steward] make kind=taskboard-lane name=open order=3
+      -> ok ok make dk3303 [r4317] · a taskboard-lane | ~ no other taskboard-lane has order=3 (they say 0 or 1 or 2): still made, as y
+  [steward] make kind=taskboard-lane name=in_progress order=4
+      -> ok ok make dk3304 [r4318] · a taskboard-lane | ~ no other taskboard-lane has order=4 (they say 0 or 1 or 2 or 3): still made,
+  [steward] make kind=taskboard-lane name=closed order=5
+      -> ok ok make dk3305 [r4319] · a taskboard-lane
+  board with six lanes: {('Backlog', 'taskboard-task'): 154, ('Now', 'taskboard-task'): 79, ('Done', 'taskboard-task'): 125, ('open', 'gh-issue'): 511, ('open', 'issue'): 523, ('in_progress', 'issue'): 275, ('closed', 'issue'): 260, ('closed', 'gh-issue'): 247}  (597 ms)
+  view text: Task board · Components: 2174 flag, 2174 text-block, 2174 menu, 2174 card, 6 lane, 1 board
+
+  -- what else is a task now (false fits in the real world)
+   needs='title|name lane|status|state': other things that fit: {}
+   needs='title|name status|lane': other things that fit: {}
+   needs='name status': other things that fit: {}
+   needs='title state': other things that fit: {}
+
+  -- the work lens (dk898) reads who=Alex and lane=Now; issues say assignee and status
+  [steward] set dk898 text="# Work: who is at work and what is moving, one page (Alex, 27 Oct: \"a really good overview of all the work being
+# done, where i can 
+      -> ok ok set dk898 [r4320] · text=# Work: who is at work and what is moving, one page (Alex, 27 Oct: "a really good overview of all the work being | # done, where i can click in and view more closely or chat 
+  [steward (widen? adds a need)] set dk3302 needs="title|name lane|status|state who|assignee"
+      -> REFUSED refused: that would make task need more (who|assignee), and lens taskboard-components, lens work rely on it; a kind only widens (make a new kind for the narrower meaning)
+  work view: Work: 137 text, 5 band, 130 badge, 130 row, 3 column, 1 grid. Style: badge[doing=working] {"color": "#0B6E55", "background": "#D9F2E8", "radius": "12px"}; badge[doing=error] {"color": "#A32D2D", "background": "#F8DEDE", "radius": "12px"}; badge[who=Alex] {"color": "#8A4B00", "background": "#FCEBD3",

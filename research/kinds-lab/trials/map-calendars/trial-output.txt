@@ -1,0 +1,350 @@
+
+====================================================================================================
+LOAD: 50 spots, 300 board events, 300 feed items, 100 meetings
+====================================================================================================
+  50 spots made
+  board 300, feed 300, meetings 100; failures {}
+  TIME load: 5489 ms total, 7.3 ms each
+
+====================================================================================================
+Q1. ONE calendar lens over all three sources
+====================================================================================================
+-- S0: the world as it is. The board's own post-kind declaration dk333 is named event (fields/required, no needs)
+  rows event -> {}
+  [ok] make kind=lens name=all-events painter=components text="root : column, of tag:event as e, by start, each row
+         row : text \"EV|$e.title|$e.start|$e.end|
+               -> ok make dk1921 [r2934] · a lens
+  lens of tag:event draws 0 rows
+  map layer Events (dk866) shows: rows event -> board events on it today: 0
+-- S1: the steward opens the board's own declaration (dk333) with needs
+  [NO] set dk333 needs="title start"
+               -> refused: that would make event need more (title, start), and lens all-events rely on it; a kind only widens (make a new kind for the narrower meaning)
+-- S1b: ... or makes a second declaration named event beside it
+  [ok] make kind=kind name=event needs="title start"
+               -> ok make dk1922 [r2935] · a kind
+  rows event -> {'board': 182}
+  board events with no title (the board allows it: text is the post): 118
+-- S2: widen event to every source's spelling
+  [ok] set dk1922 needs="title|summary|name start|dtstart|when"
+               -> ok set dk1922 [r2936] · needs=title|summary|name start|dtstart|when
+  rows event -> {'taskboard-task': 32, 'board': 182, 'feed': 300, 'meeting': 100}
+  things that are now events but are no calendar's: {'taskboard-task': 32}
+     e.g. dk90 taskboard-task | The kernel's first shape: built for many people, c | start = 2026-10-24T17:28:29Z | has title, when; start as when
+     e.g. dk91 taskboard-task | Signing in and the public site | start = 2026-10-24T17:28:29Z | has title, when; start as when
+     e.g. dk92 taskboard-task | One dictionary, tried first in the desk we live in | start = 2026-10-24T17:28:29Z | has title, when; start as when
+-- S2b: include untitled board posts: title|summary|name|text
+  [ok] set dk1922 needs="title|summary|name|text start|dtstart|when"
+               -> ok set dk1922 [r2937] · needs=title|summary|name|text start|dtstart|when
+  rows event -> {'taskboard-task': 32, 'board': 300, 'feed': 300, 'meeting': 100}
+-- S3: keep tasks out with a marker: needs kind|post_kind=event|vevent|meeting
+  [NO] set dk1922 needs="title|summary|name|text start|dtstart|when kind|post_kind=event|vevent|meeting"
+               -> refused: that would make event need more (kind|post_kind=event|vevent|meeting), and lens all-events rely on it; a kind only widens (make a new kind for the narrower meaning)
+-- S3b: a new kind, happening, with the marker (the narrower meaning gets a new name)
+  [ok] make kind=kind name=happening needs="title|summary|name|text start|dtstart|when kind|post_kind=event|vevent|meeting"
+               -> ok make dk1923 [r2938] · a kind
+  rows happening -> {'board': 300, 'feed': 300, 'meeting': 100}
+  [ok] make kind=lens name=happenings painter=components text="root : column, of tag:happening as e, by start, limit 100, each row
+         row : text \"EV|$e.title|$
+               -> ok make dk1924 [r2939] · a lens
+  lens of tag:happening (limit 100) draws 100 collection {'total': 700, 'offset': 0, 'limit': 100}
+  lens of tag:event (no limit said) draws 732 collection {'total': 732, 'offset': 0, 'limit': 100}
+  first rows it draws: [('Film night', '20261101', '', 'vevent'), ('Native plant sale', '20261102', '', 'vevent'), ('Docent-led tide walk', '20261102', '', 'vevent'), ('Docent-led tide walk', '20261102', '', 'vevent')]
+  paged through 700 rows of tag:happening
+  start formats in one calendar: {'ical-date': 61, 'date': 34, 'iso-Z': 249, 'iso-offset': 37, 'local-no-zone': 76, 'ical-floating': 34, 'ical-utc': 205, 'words': 4}
+  sorted by start as text: 80 adjacent pairs out of chronological order; runs [['ical', 61], ['iso', 396], ['ical', 239], ['words', 4]]; unreadable as a time: 4
+  feed items with dtend: 221; feed rows the lens shows an end for: 0
+-- S4: the end, an optional aspect with two spellings: end|dtend
+  [NO] set dk1922 needs="title|summary|name|text start|dtstart|when end|dtend"
+               -> refused: that would make event need more (end|dtend), and lens all-events rely on it; a kind only widens (make a new kind for the narrower meaning)
+-- S5: who may declare: Sable (the importer) tries
+  [NO] make kind=kind name=vevent-shape needs="summary dtstart"
+               -> refused: a kind with needs or extends changes what words reach for everyone in Alex's desktop; its leaders declare it (a steward for the place)
+  [NO] make kind=kind name=feed-event extends=event
+               -> refused: a kind with needs or extends changes what words reach for everyone in Alex's desktop; its leaders declare it (a steward for the place)
+  [NO] set dk1922 needs="title|summary|name|text|label start|dtstart|when"
+               -> refused: set is for whoever made it or leaders of Alex's desktop; help set says more
+-- S6: Sable's view of the calendar (Alex's meetings are sees=me)
+  Sable: rows event -> {'taskboard-task': 32, 'board': 300, 'feed': 300}
+-- S7: a second declaration narrows a kind the widen-only rule protects
+  [ok] make kind=kind name=event needs="title start seats"
+               -> ok make dk1933 [r2956] · a kind
+  rows event after a later declaration -> {'board': 182}
+  [ok] forget dk1933
+               -> ok forget dk1933 [r2957] · out of every view; undo brings it back
+  (forgot it again) rows event -> {'taskboard-task': 32, 'board': 300, 'feed': 300, 'meeting': 100}
+-- S8: extends: Alex's meetings as events by lineage
+  [ok] make kind=kind name=meeting extends=event
+               -> ok make dk1934 [r2958] · a kind
+  [ok] make kind=meeting sees=me name="Think about the garage" status=tentative
+               -> ok make dk1935 [r2959] · a meeting
+  a meeting with no when is in rows event: a meeting, so an event; title as name
+  [ok] verb cal.go acts_on=event steps="set $1 going=yes" help="cal.go <event>: going"
+               -> ok verb cal.go (dk1936) [r2960] · a new word in Alex's desktop: set $1 going=yes
+  [NO] cal.go dk1935
+               -> refused: cal.go acts on an event; Think about the garage (dk1935, a meeting) has no start or dtstart or when
+  [ok] kinds dk1935
+               -> Think about the garage (dk1935):
+           meeting · a meeting
+           event · a meeting, so an event
+  rows meeting after `meeting extends=event` -> {'taskboard-task': 32, 'board': 300, 'feed': 300, 'meeting': 101}
+  [ok] kinds dk1221
+               -> Dog beach meetup (dk1221):
+           post · a post
+           happening · has title, start, post_kind=event
+           event · has title, start
+           meeting · has title, start
+
+====================================================================================================
+Q2. On the map: what map.py reads, driven for real (network cut off)
+====================================================================================================
+-- the Events layer (shows=rows event), as Alex
+{
+ "rows": 733,
+ "placed": 99,
+ "geocode_tried": 3,
+ "ms": 149,
+ "placed_by": {
+  "board/place=id": 61,
+  "board/place=text": 38
+ },
+ "unplaced_by": {
+  "board/location text": 127,
+  "board/nothing placeable": 74,
+  "feed/location text": 230,
+  "feed/nothing placeable": 70,
+  "meeting/nothing placeable": 10,
+  "meeting/where (map never reads it)": 91,
+  "taskboard-task/nothing placeable": 32
+ }
+}
+-- a located kind: spellings of the map's own words, so `rows located` hands the map at=
+  [ok] make kind=kind name=located needs="at|place|where"
+               -> ok make dk1937 [r2961] · a kindground: offline trial: no tiles
+
+  rows located -> {'window': 5, 'ask-request': 2, 'board': 99, 'meeting': 91}
+{
+ "rows": 197,
+ "placed": 157,
+ "geocode_tried": 0,
+ "ms": 242,
+ "placed_by": {
+  "board/at=id": 61,
+  "board/at=text": 38,
+  "meeting/at=id": 50,
+  "meeting/at=text": 3,
+  "window/at=text": 5
+ },
+ "unplaced_by": {
+  "ask-request/at=text": 2,
+  "meeting/at=text": 38
+ }
+}
+-- ... and with location too (at|place|where|location): free text read as at=
+  [ok] set dk1937 needs="at|place|where|location"
+               -> ok set dk1937 [r2962] · needs=at|place|where|location
+{
+ "rows": 554,
+ "placed": 214,
+ "geocode_tried": 3,
+ "ms": 370,
+ "placed_by": {
+  "board/at=id": 61,
+  "board/at=text": 66,
+  "feed/at=text": 29,
+  "meeting/at=id": 50,
+  "meeting/at=text": 3,
+  "window/at=text": 5
+ },
+ "unplaced_by": {
+  "ask-request/at=text": 2,
+  "board/at=text": 99,
+  "feed/at=text": 201,
+  "meeting/at=text": 38
+ }
+}
+-- a lat|geo spelling for iCal GEO (lat;lon in one value)
+  [ok] make kind=kind name=geofix needs="lat|geo lon|geo"
+               -> ok make dk1938 [r2963] · a kind
+{
+ "rows": 120,
+ "placed": 51,
+ "unplaced_by": {
+  "feed/lat/lon": 69
+ }
+}
+-- map.show / map.near on each source (the module's own words, reading raw things)
+  map.show dk1230 (board place=id): refused: dk1230: not a place this map knows (try map.find dk1230) | nominatim asked: ['dk1230']
+  map.show dk1312 (board location text): refused: dk1312: not a place this map knows (try map.find dk1312) | nominatim asked: ['dk1312']
+  map.show dk1225 (board place=name): refused: dk1225: not a place this map knows (try map.find dk1225) | nominatim asked: ['dk1225']
+  map.show dk1524 (feed geo+location): refused: dk1524: not a place this map knows (try map.find dk1524) | nominatim asked: ['Santa Cruz Wharf', 'dk1524']
+  map.show dk1821 (meeting where=spot): refused: dk1821: not a place this map knows (try map.find dk1821) | nominatim asked: ['dk1821']
+  map.show dk1822 (meeting where=Zoom): refused: dk1822: not a place this map knows (try map.find dk1822) | nominatim asked: ['dk1822']
+-- controls: map.show a spot by id; map.near 0,0 (windows say at=x,y on the screen)
+  map.show dk1171 -> your map turns to Seabright Beach
+  map.near 0,0 within=5000 -> nothing placed within 5000 m of 0,0
+  look <board event> rows: [{'id': 'dk1230', 'kind': 'post', 'text': 'Meet by the steps, we will go when the tide is low.', 'by': 'Alex', 'likes': 0, 'pinned': False, 'rev': 2243, 'in': ['dk309']}]
+-- map.show by a private meeting's NAME (what leaves the machine?)
+  map.show 'Review lease with the landlord' -> refused: Review lease with the landlord: not a place this map knows (try map.find Review lease with the landlord) | nominatim asked: ['Review lease with the landlord']
+-- map.near a spot, kind=event
+  map.near Seabright Beach kind=event within=400 -> 11 within 400 m of Seabright Beach
+  map.near Seabright Beach kind=located within=400 -> 28 within 400 m of Seabright Beach
+
+====================================================================================================
+Q3. board.rsvp and board.calendar on feed items and meetings
+====================================================================================================
+  in the copied world board.rsvp says needs = None / board.calendar needs = None (the module has not re-offered since)
+  re-offer: ['bound board.rsvp to dk297; refreshed needs [r2964]', 'bound board.calendar to dk303; refreshed needs [r2965]']
+  [NO] board.rsvp dk1221
+               -> refused: board.rsvp is unbound: board is not running
+  [NO] board.calendar dk1221
+               -> refused: board.calendar is unbound: board is not running
+  [NO] board.rsvp dk1522
+               -> refused: board.rsvp acts on things with kind or post_kind event; dk1522 (dk1522, a vevent) has no kind or post_kind event
+  [NO] board.calendar dk1522
+               -> refused: board.calendar acts on things with kind or post_kind event, start; dk1522 (dk1522, a vevent) has no kind or post_kind event, start
+  [NO] board.rsvp dk1821
+               -> refused: board.rsvp acts on things with kind or post_kind event; 1:1 with Dr. Ortiz (dk1821, a meeting) has no kind or post_kind event
+  [NO] board.calendar dk1821
+               -> refused: board.calendar acts on things with kind or post_kind event, start; 1:1 with Dr. Ortiz (dk1821, a meeting) has no kind or post_kind event, start
+-- a steward widens board.rsvp to the feed and to meetings (one line, no reload)
+  [NO] word-set board.rsvp needs="kind|post_kind=event|vevent|meeting"
+               -> refused: stale: dk297 changed since you looked (r2964 by board); look dk297 again
+  [ok] look dk297
+               -> board.rsvp (dk297), a do word: RSVP through claim, with a going/maybe marker. Both reserve one event seat. Undo releases the seat and status together.
+  [ok] word-set board.rsvp needs="kind|post_kind=event|vevent|meeting"
+               -> ok word.set board.rsvp [r2966] · needs now kind|post_kind=event|vevent|meeting (was kind|post_kind=event)
+  [NO] board.rsvp dk1522
+               -> refused: board.rsvp is unbound: board is not running
+     board.py answers: {"lines": ["claim dk1522", "make kind=\"board-rsvp\" status=\"going\" about=\"dk1522\" within=\"dk1522\" in=\"dk1\""], "saw": {"dk1522": 2535}}
+  [ok] claim dk1522
+               -> ok claim dk1522 [r2967] · yours; 0 seats left
+  [ok] make kind="board-rsvp" status="going" about="dk1522" within="dk1522" in="dk1"
+               -> ok make dk1939 [r2968] · a board-rsvp
+  [NO] board.rsvp dk1536
+               -> refused: board.rsvp is unbound: board is not running
+     board.py answers: {"lines": ["claim dk1536", "make kind=\"board-rsvp\" status=\"going\" about=\"dk1536\" within=\"dk1536\" in=\"dk1\""], "saw": {"dk1536": 2549}}
+  [ok] claim dk1536
+               -> ok claim dk1536 [r2970] · yours; 0 seats left
+  [ok] make kind="board-rsvp" status="going" about="dk1536" within="dk1536" in="dk1"
+               -> ok make dk1941 [r2971] · a board-rsvp
+  [NO] board.rsvp dk1821
+               -> refused: board.rsvp is unbound: board is not running
+     board.py answers: {"lines": ["claim dk1821", "make kind=\"board-rsvp\" status=\"going\" about=\"dk1821\" within=\"dk1821\" in=\"dk1\""], "saw": {"dk1821": 2834}}
+  [ok] claim dk1821
+               -> ok claim dk1821 [r2973] · yours; 0 seats left
+  [ok] make kind="board-rsvp" status="going" about="dk1821" within="dk1821" in="dk1"
+               -> ok make dk1943 [r2974] · a board-rsvp
+-- a second person RSVPs the same feed item (no seats: claim counts 1)
+  [NO] claim dk1522
+               -> refused: dk1522 is taken (1 seat, all claimed); look shows what is open
+-- Sable RSVPs Alex's private meeting by id
+  [NO] board.rsvp dk1821
+               -> refused: no thing called dk1821 here; look shows what there is
+-- board.calendar widened by spelling: start|dtstart|when
+  [ok] look dk303
+               -> board.calendar (dk303), a see word: Export a visible event as RFC 5545 calendar text, with filename and MIME type for a download button.
+  [ok] word-set board.calendar needs="kind|post_kind=event|vevent|meeting start|dtstart|when"
+               -> ok word.set board.calendar [r2976] · needs now kind|post_kind=event|vevent|meeting start|dtstart|when (was kind|post_kind=event start)
+  [NO] board.calendar dk1221
+               -> refused: board.calendar is unbound: board is not running
+     raw {'start': '2026-11-15T16:30Z'} -> board.py: ['DTSTART:20261115T163000Z']
+  [NO] board.calendar dk1237
+               -> refused: board.calendar is unbound: board is not running
+     raw {'start': '2026-11-30'} -> board.py: ['DTSTART;VALUE=DATE:20261130']
+  [NO] board.calendar dk1522
+               -> refused: board.calendar is unbound: board is not running
+     raw {'dtstart': '20261129T020000Z'} -> board.py: ['DTSTART:20261129T020000Z']
+  [NO] board.calendar dk1523
+               -> refused: board.calendar is unbound: board is not running
+     raw {'dtstart': '20261106'} -> board.py: ['DTSTART:20261106']
+  [NO] board.calendar dk1529
+               -> refused: board.calendar is unbound: board is not runningground: offline trial: no tiles
+
+     raw {'dtstart': '20261120T180000', 'tzid': 'America/Los_Angeles'} -> board.py: 'ValueError: use a date or a time with UTC/timezone, such as 2026-11-04T19:00Z'
+  [NO] board.calendar dk1821
+               -> refused: board.calendar is unbound: board is not running
+     raw {'when': '2026-11-09T16:00-08:00'} -> board.py: ['DTSTART:20261110T000000Z']
+  [NO] board.calendar dk1824
+               -> refused: board.calendar is unbound: board is not running
+     raw {'when': '2026-11-23 15:00'} -> board.py: 'ValueError: use a date or a time with UTC/timezone, such as 2026-11-04T19:00Z'
+  [NO] board.calendar dk1822
+               -> refused: board.calendar is unbound: board is not running
+     raw {'when': 'tomorrow after lunch'} -> board.py: "ValueError: Invalid isoformat string: 'tomorrow after lunch'"
+-- the safer move: the word says acts_on=event (the kind a steward keeps), and the module re-offers
+  [ok] look dk303
+               -> board.calendar (dk303), a see word: Export a visible event as RFC 5545 calendar text, with filename and MIME type for a download button.
+  [ok] word-set board.calendar acts_on=event needs="kind|post_kind=event|vevent|meeting"
+               -> ok word.set board.calendar [r2977] · acts_on now event · needs now kind|post_kind=event|vevent|meeting (was kind|post_kind=event|vevent|meeting start|dtstart|when)
+  re-offer: ['bound board.calendar to dk303'] | entry now acts_on = event needs = kind|post_kind=event|vevent|meeting
+
+====================================================================================================
+Q4. Collisions and set's spelling refusal
+====================================================================================================
+  [NO] set dk90 start=2026-11-30T09:00Z
+               -> refused: The kernel's first shape: built for many people, carrying the language says when (as a kind event, either spelling reads); set dk90 when=2026-11-30T09:00Z changes it, rather than adding start beside it
+  [NO] set dk1522 start=2026-11-05T19:00Z
+               -> refused: dk1522 says dtstart (as a kind happening, either spelling reads); set dk1522 dtstart=2026-11-05T19:00Z changes it, rather than adding start beside it
+  [ok] set dk1522 dtstart=2026-11-05T19:00Z
+               -> ok set dk1522 [r2978] · dtstart=2026-11-05T19:00Z
+  [NO] set dk1821 title="Lunch moved"
+               -> refused: 1:1 with Dr. Ortiz says name (as a kind happening, either spelling reads); set dk1821 name=Lunch moved changes it, rather than adding title beside it
+  [ok] set dk1221 end=2026-11-05T21:00Z
+               -> ok set dk1221 [r2979] · end=2026-11-05T21:00Z
+  [ok] set dk1522 end=2026-11-05T21:00Z
+               -> ok set dk1522 [r2980] · end=2026-11-05T21:00Z
+  [NO] set dk1526 start=2026-11-06T10:00Z
+               -> refused: dk1526 says dtstart (as a kind happening, either spelling reads); set dk1526 dtstart=2026-11-06T10:00Z changes it, rather than adding start beside it
+  status values by source: {'feed:CANCELLED': 13, 'feed:CONFIRMED': 254, 'feed:TENTATIVE': 33, 'meeting:cancelled': 24, 'meeting:confirmed': 34, 'meeting:done': 27, 'meeting:tentative': 15}
+  rows happening status=cancelled -> {'meeting': 24} (feed says CANCELLED)
+  other things that say where=: {'grant': 39, 'ask-request': 2}
+     e.g. {'kind': 'grant', 'where': 'dk1'}
+  rows located -> {'window': 5, 'ask-request': 2, 'board': 226, 'feed': 230, 'meeting': 91}
+-- dates vs datetimes under start
+  board events whose start is a date: 34; meetings whose when is words: 4
+
+====================================================================================================
+Q5. Timings at this scale
+====================================================================================================
+  things in world: 1945 records: 2980
+  TIME rows event (fitted, widened): median 35.8 ms (min 33.8, max 36.7, n=5)
+  TIME rows happening (fitted, marker): median 36.3 ms (min 34.2, max 41.6, n=5)
+  TIME rows event exact=yes: median 1.6 ms (min 1.5, max 2.2, n=5)
+  TIME rows vevent (closed kind): median 8.6 ms (min 8.4, max 9.1, n=5)
+  TIME lens compile of tag:event (all): median 36.0 ms (min 35.1, max 56.8, n=3)
+  TIME lens compile of tag:happening limit 100: median 25.2 ms (min 24.4, max 25.5, n=3)
+  TIME actions <board event>: median 8.8 ms (min 8.0, max 9.6, n=5)
+  TIME actions <meeting>: median 9.9 ms (min 8.4, max 11.0, n=5)
+  TIME kinds <feed item>: median 1.6 ms (min 1.4, max 2.3, n=5)
+  [ok] verb meeting.done needs="kind=meeting" steps="set $1 status=done" help="meeting.done <meeting>: done"
+               -> ok verb meeting.done (dk1945) [r2981] · a new word in Alex's desktop: set $1 status=done
+  [ok] verb vevent.done needs="kind=vevent" steps="set $1 attended=yes" help="vevent.done <vevent>: went"
+               -> ok verb vevent.done (dk1946) [r2982] · a new word in Alex's desktop: set $1 attended=yes
+  [ok] verb post.done needs="kind|post_kind=event" steps="set $1 attended=yes" help="post.done <event>: went"
+               -> ok verb post.done (dk1947) [r2983] · a new word in Alex's desktop: set $1 attended=yes
+  done family: ['task.done', 'meeting.done', 'vevent.done', 'post.done']
+  [ok] done dk1821
+               -> ok set dk1821 [r2984] · status=done
+         ~ meeting.done, one act [r2984]
+  [ok] done dk1522
+               -> ok set dk1522 [r2985] · attended=yes
+         ~ vevent.done, one act [r2985]
+  [ok] done dk1221
+               -> ok set dk1221 [r2986] · attended=yes
+         ~ post.done, one act [r2986]
+  [ok] done dk90
+               -> ok set dk90 [r2987] · lane=Done
+         ok make dk1948 [r2987] · a taskboard-event
+         ~ task.done, one act [r2987]
+  [NO] done "Dentist"
+               -> refused: 17 things called Dentist could take done (meeting.done); say which by id
+  [NO] board.rsvp "Beach cleanup"
+               -> refused: 8 things are called Beach cleanup: dk1253 (a post), dk1261 (a post), dk1292 (a post), dk1302 (a post), dk1321 (a post). Say board.rsvp with one of those ids
+  TIME plain word: done <meeting id> (refused or run, each re-said): median 3.1 ms (min 3.0, max 5.5, n=5)
+  TIME plain word: done "Dentist" (by name): median 6.5 ms (min 5.8, max 7.0, n=5)
+  TIME named lookup board.rsvp "Potluck": median 4.5 ms (min 3.6, max 5.6, n=5)
+  TIME set with spelling check (feed dtstart): median 1.8 ms (min 1.7, max 5.6, n=5)
+  TIME 10 x (set + rows event): cache cleared by each write: median 374.9 ms (min 348.5, max 401.4, n=2)
+  TIME map placed() over rows located (no tiles, no Nominatim): median 398.3 ms (min 362.0, max 417.3, n=3)
+  TIME reopen: 905 ms, 3000 records
+
+results -> C:\Users\Alex\AppData\Local\Temp\claude\C--Projects-Agora4\e6d17725-6072-416c-9336-f572113f9a0e\scratchpad\trial-map\results-7.json

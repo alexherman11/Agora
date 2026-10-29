@@ -1,0 +1,104 @@
+
+====================================================================================================
+## Q5. Spellings, mark, widen-only, leaders-only: a member and the steward
+====================================================================================================
+  [Sable (member)] make kind=kind name=todo needs="name status"
+      -> REFUSED refused: a kind with needs or extends changes what words reach for everyone in Alex's desktop; its leaders declare it (a steward for the place)
+  [Sable (member)] make kind=kind name=todo
+      -> ok ok make dk3302 [r4315] · a kind
+
+  -- order matters: words first, then the shape
+  [steward: shape issue after words use it] set dk1171 needs="name status"
+      -> REFUSED refused: that would make issue need more (name, status), and issue.close, issue.reopen, issue.move, issue.assign, issue.estimate rely on it; a kind only widens (make a new kind for the narrower meaning)
+  [steward: a second declaration instead] make kind=kind name=issue needs="name status"
+      -> ok ok make dk3303 [r4327] · a kind
+   issue shape now: ['name', 'status']
+   rows issue: 1058 | issue.close reaches a note with name+status?
+  [steward] make kind=note name="Shopping" status=open
+      -> ok ok make dk3304 [r4328] · a note | ~ no other note has status=: still made, as you said
+  [steward] look dk3304
+      -> ok Shopping (dk3304), a note by A
+  [steward] issue.close dk3304
+      -> ok ok set dk3304 [r4329] · status=closed | ~ issue.close, one act [r4329]
+  [steward] make kind=issue name="No status yet"
+      -> ok ok make dk3305 [r4330] · an issue
+  [steward] look dk3305
+      -> ok No status yet (dk3305), an iss
+   a bare issue is in rows issue? True
+  [steward: close an issue that has no status yet] issue.close dk3305
+      -> REFUSED refused: issue.close acts on an issue; No status yet (dk3305, a issue) has no status
+
+  -- a member shadows the steward's kind with a later, closed declaration
+  [Sable (member)] make kind=kind name=issue help="my issues"
+      -> ok ok make dk3306 [r4331] · a kind
+   issue shape now: None | rows issue: 1059
+  [steward] look dk3304
+      -> ok Shopping (dk3304), a note by A
+  [steward: reopen the note it reached a moment ago] issue.reopen dk3304
+      -> REFUSED refused: issue.reopen acts on an issue with kind issue; Shopping (dk3304, a note) has no kind issue
+  [Sable forgets her own declaration] forget dk3306
+      -> ok ok forget dk3306 [r4332] · out of every view; undo brings it back
+   issue shape back: ['name', 'status']
+  [Sable edits the steward's declaration] set dk3303 needs="name"
+      -> REFUSED refused: set is for whoever made it or leaders of Alex's desktop; help set says more
+  [Sable edits the steward's declaration's help] set dk3303 help="hijacked"
+      -> REFUSED refused: set is for whoever made it or leaders of Alex's desktop; help set says more
+
+  -- widen-only lets the steward widen a kind under the words that act on it
+  [steward drops status (a widening)] set dk3303 needs="name"
+      -> ok ok set dk3303 [r4333] · needs=name
+  [steward] look dk79
+      -> ok Backlog (dk79), a taskboard-la
+  [steward: issue.close on Alex's Backlog LANE] issue.close dk79
+      -> ok ok set dk79 [r4334] · status=closed | ~ issue.close, one act [r4334]
+   lane dk79 now: {'name': 'Backlog', 'status': 'closed'}
+  [steward] look dk171
+      -> ok Help (dk171), a window by wind
+  [steward: issue.assign on a window] issue.assign dk171 who=Bea
+      -> ok ok set dk171 [r4335] · assignee=Bea | ~ issue.assign, one act [r4335]
+  [steward: take it back (narrow)] set dk3303 needs="name status"
+      -> REFUSED refused: that would make issue need more (status), and issue.close, issue.reopen, issue.move, issue.assign, issue.estimate rely on it; a kind only widens (make a new kind for the narrower meaning)
+
+  -- spellings: a shared kind with lane|status, then the House's own hold
+  [steward] make kind=kind name=task needs="title|name lane|status|state"
+      -> ok ok make dk3307 [r4336] · a kind
+  [steward] look dk94
+      -> ok Agents connect through an MCP 
+  [steward: hold a build (builders.py HELD reads status)] set dk94 status=paused
+      -> REFUSED refused: Agents connect through an MCP adapter on the door with two tools, do and see says lane (as a kind task, either spelling reads); set dk94 lane=paused changes it, rather than adding status beside it
+   of Alex's 58 real cards, 49 have no status, so none of them can be held this way now
+  [steward] look dk1191
+      -> ok One dictionary, tried first in
+  [steward: the adapter mirrors GitHub Projects' status field] set dk1191 status=triaged
+      -> REFUSED refused: One dictionary, tried first in the desk we live in says state (as a kind task, either spelling reads); set dk1191 state=triaged changes it, rather than adding status beside it
+  [steward] look dk1190
+      -> ok One dictionary, tried first in
+  [steward: drag an issue on the board] task.move dk1190 to=Now
+      -> REFUSED refused: task.move acts on a taskboard-task with kind taskboard-task; One dictionary, tried first in the desk we live in (dk1190, a issue) has no kind taskboard-task
+
+  -- mark
+  [steward] make kind=kind name=tracked needs="title|name tracked=yes"
+      -> ok ok make dk3308 [r4337] · a kind
+  [Sable] look dk1191
+      -> ok One dictionary, tried first in
+  [Sable marks a GitHub issue (the adapter made it)] mark dk1191 tracked
+      -> REFUSED refused: mark is for whoever made it or leaders of Alex's desktop; help mark says more
+  [steward marks it] mark dk1191 tracked
+      -> ok ok mark dk1191 [r4338] · tracked=yes · One dictionary, tried first in the desk we live in is a tracked now
+  [steward: mark a gh-issue a task] mark dk1191 task
+      -> ok One dictionary, tried first in the desk we live in is a task already; nothing changed
+
+  -- the needs grammar on real values
+  [steward: Linear's real status value] make kind=kind name=wip needs="status=In Progress"
+      -> ok ok make dk3309 [r4339] · a kind
+   wip shape: ['status=In', 'progress']
+  [steward] make kind=kind name=finished needs="lane|status|state=Done|closed"
+      -> ok ok make dk3310 [r4340] · a kind
+   finished shape: ['lane|status|state=Done|closed']
+   rows finished: {'taskboard-lane': 1, 'taskboard-task': 125, 'issue': 260, 'gh-issue': 247, 'note': 1}
+  [steward: a typo in acts_on] verb issue.archive acts_on=isue steps="set $1 archived=yes" help="issue.archive <issue>"
+      -> ok ok verb issue.archive (dk3311) [r4341] · a new word in Alex's desktop: set $1 archived=yes
+  [steward] look dk1190
+      -> ok One dictionary, tried first in
+  [steward] issue.archive dk1190
+      -> REFUSED refused: issue.archive acts on an isue with kind isue; One dictionary, tried first in the desk we live in (dk1190, a issue) has no kind isue

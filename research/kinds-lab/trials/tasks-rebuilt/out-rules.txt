@@ -1,0 +1,69 @@
+
+====================================================================================================
+## Q4. Rules (of_kind=) and grants (only=kind:) after widening
+====================================================================================================
+  -- the steward widens task.done to issues (needs=kind=taskboard-task|issue), no shared kind
+  [steward] word-set task.done needs="kind=taskboard-task|issue"
+      -> ok ok word.set task.done [r4315] · needs now kind=taskboard-task|issue
+  [steward] rows issue
+      -> ok 1058 issues |   dk1186 · issue · The kernel's first shape: bui
+  [steward] task.done dk1196
+      -> ok ok set dk1196 [r4316] · lane=Done | ok make dk3302 [r4316] · a taskboard-event | ~ task.done, one act [r4316]
+   the issue now says: {'status': 'open', 'lane': 'Done'}
+  [steward] look dk92
+      -> ok One dictionary, tried first in the desk 
+  [steward] task.done dk92
+      -> ok ok set dk92 [r4317] · lane=Done | ok make dk3303 [r4317] · a taskboard-event | ~ task.done, one act [r4317]
+   announcement posts about the card: 1 | about the issue: 0
+
+  -- a shared kind exists (title|name lane|status), then task.done on an issue
+  [steward] make kind=kind name=task needs="title|name lane|status|state"
+      -> ok ok make dk3305 [r4319] · a kind
+  [steward] look dk1198
+      -> ok Feed ordering by bridging (Polis, Commun
+  [steward] task.done dk1198
+      -> REFUSED refused: Feed ordering by bridging (Polis, Community Notes) says status (as a kind task, either spelling reads); set dk1198 status=Done changes it, rather than adding lane beside it
+
+  -- the steward widens the rule to the shared kind
+  [steward] set dk168 of_kind=task
+      -> ok ok set dk168 [r4320] · of_kind=task
+  [steward] look dk93
+      -> ok A server ready for 200 strangers (dk93),
+  [steward] task.done dk93
+      -> ok ok set dk93 [r4321] · lane=Done | ok make dk3306 [r4321] · a taskboard-event | ~ task.done, one act [r4321]
+   announcement posts about the card after of_kind=task: 0
+  [steward] set dk168 of_kind="taskboard-task,issue"
+      -> ok ok set dk168 [r4322] · of_kind=taskboard-task,issue
+   rule matches a card's happening? False
+
+  -- grants: summarize may write only kind:taskboard-task
+  [summarize for Alex: card] set dk92 short="sum"
+      -> ok ok set dk92 [r4323] · short=sum
+  [summarize for Alex: issue] set dk1196 short="sum"
+      -> REFUSED refused: summarize's grant for set reaches only taskboard-task things, not a issue; nothing was done
+  [steward widens the grant to the shared kind] set dk175 only=kind:task
+      -> REFUSED refused: dk175 is a grant; set changes only things made with make
+  [steward adds a grant for the shared kind] grant dk174 words="set" only=kind:task
+      -> ok ok grant summarize set [r4324] · undo takes it back
+  [summarize for Alex: issue, after only=kind:task] set dk1196 short="sum2"
+      -> REFUSED refused: summarize's grant for set reaches only taskboard-task, task things, not a issue; nothing was done
+  [steward adds a grant for issue by own kind] grant dk174 words="set" only=kind:issue
+      -> ok ok grant summarize set [r4325] · undo takes it back
+  [summarize for Alex: issue, after only=kind:issue] set dk1196 short="sum3"
+      -> ok ok set dk1196 [r4326] · short=sum3
+  [steward] make kind=note title="Private plan" lane=Now text="not for the model"
+      -> ok ok make dk3309 [r4327] · a note | ~ no other note has lane=: still made, as you said
+  [summarize: a note that fits task (title, lane)] set dk3309 short="x"
+      -> REFUSED refused: summarize's grant for set reaches only taskboard-task, task, issue things, not a note; nothing was done
+
+  -- the board widget draws issues (lens tag:task), then Alex drags one to Done
+  [board widget for Alex] task.move dk1200 to=Done
+      -> REFUSED refused: taskboard-components's grant for set reaches only taskboard-task,taskboard-settings things, not a issue; nothing was done
+  [board widget for Alex] issue.move dk1200 to=closed
+      -> REFUSED refused: taskboard-components holds no grant for issue.move; nothing was done
+  [steward grants the board the Tracker's word] grant dk263 words="issue.move set" only=kind:issue
+      -> ok ok grant taskboard-components issue.move set [r4328] · undo takes it back
+  [board widget for Alex] issue.move dk1200 to=closed (after grant)
+      -> ok ok set dk1200 [r4329] · status=closed | ~ issue.move, one act [r4329]
+  [board widget for Alex] task.move dk1200 to=Done (the board's own drop word, after grant)
+      -> REFUSED refused: Dictionary entries carry translations says status (as a kind task, either spelling reads); set dk1200 status=Done changes it, rather than adding lane beside it
