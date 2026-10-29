@@ -433,11 +433,10 @@ class Builders:
         left = MAX_TURNS - state.get('turns', 0)
         agent.wake(
             f"~ Your worker {state['name']} ({state['task']}) finished a turn and says:\n{words}\n\n"
-            f"~ You are in charge of this worker. What you say in this chat goes to it as your next instruction "
-            f"({left} turns left). When its work is done and it says what it tested: house.review {state['task']}, "
-            f"then house.land {state['task']} once the checks pass. Tell JEFF in Shop talk when it lands, or when "
-            f"something needs Alex. If you have nothing for the worker now, stay quiet here.",
-            chat=chat)
+            f"~ You are in charge of this worker. To answer it, run house.tell {state['task']} <your words>: that is "
+            f"its next instruction ({left} turns left). When its work is done and it says what it tested: "
+            f"house.review {state['task']}, then house.land {state['task']} once the checks pass. Tell JEFF in Shop "
+            f"talk when it lands, or when something needs Alex.")
         self.event(state, 'told', f'woke {agent.name} in its chat {chat} (busy={agent.busy}, inbox={len(agent.inbox)})')
 
     def owner_turn_ended(self, person):
@@ -482,9 +481,9 @@ class Builders:
         out = self.start(dict(msg, args=dict(target=card, kv=dict(kv, **{'with': provider}))))
         if out.get('refused'):
             return {'refused': f'made card {card}, but the worker did not start: {out["refused"]}'}
-        return {'text': f"started a {PROVIDERS[provider]['label']} worker on {title} ({card}). Its chat is named after "
-                        f"it; you are woken there each time it finishes a turn, and what you say there is its next "
-                        f"instruction.", 'external': True, 'rows': out.get('rows', [])}
+        return {'text': f"started a {PROVIDERS[provider]['label']} worker on {title} ({card}). You are woken each time "
+                        f"it finishes a turn (its words also go in its chat); answer it with house.tell {card} <words>.",
+                'external': True, 'rows': out.get('rows', [])}
 
     def resume(self, state):
         self.assert_owned(state)

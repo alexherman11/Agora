@@ -807,8 +807,8 @@ OFFER = [
      "help": "house.tell <task> <words>: retain a follow-up for your active or received builder, continuing the same Codex thread. Held, uncertain, reviewed and landed work does not restart."},
     {"word": "house.work", "kind": "do", "takes": "<words> [with=claude|codex]", "undo": "external", "may": "members",
      "help": "house.work <what to do, in plain words> [with=claude|codex]: make a card for it and start a worker on it, in "
-             "your charge. You are woken in the worker's chat each time it finishes a turn; what you say there is its "
-             "next instruction. Then house.review <card> and house.land <card>. Up to four Claude and four Codex "
+             "your charge. You are woken each time it finishes a turn (its words also go in its chat); answer it with "
+             "house.tell <card> <words>. Then house.review <card> and house.land <card>. Up to four Claude and four Codex "
              "workers run at once (house-settings claude_workers, codex_workers). Only Alex, JEFF and the residents "
              "have workers."},
     {"word": "house.build", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "members",

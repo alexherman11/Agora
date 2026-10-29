@@ -71,7 +71,7 @@ def test_a_finished_turn_goes_to_the_chat_and_wakes_the_resident_there(manager):
     said = [w for w in manager.fixture_door.writes if w[1].startswith('say dk50 ')]
     assert said and 'the dock unpins now' in said[0][1]
     text, chat = agent.woken[0]
-    assert chat == 'dk50' and 'the dock unpins now' in text and 'house.review dk1' in text
+    assert chat is None and 'the dock unpins now' in text and 'house.tell dk1' in text and 'house.review dk1' in text
 
 
 def test_what_the_resident_says_during_its_turn_starts_the_worker_after_it(manager):
