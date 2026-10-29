@@ -138,3 +138,18 @@ def test_titles_end_on_a_whole_word():
     assert title.endswith('…') and not title[:-1].endswith(('on r', ' r')) and len(title) <= 50
     assert B.short('a b c d e f g h i j k l m n o p', 10) == 'a b c d…'
     assert B.short('short', 10) == 'short'
+
+
+def test_a_steward_may_unstick_anyones_worker_and_others_may_not(manager):
+    s = state(manager)                                   # requested by dk99
+    manager.session = lambda person: manager.fixture_door
+    task_row = dict(manager.fixture_door.task)
+    manager.h.m.see = lambda line, *a, **k: (dict(rows=[dict(id='dk1000', kind='place')]) if line == 'rows place' else
+        dict(rows=[{'kind': 'place', 'member:dk827': 'leader', 'member:dk55': 'member'}]) if line == 'look dk1000' else
+        dict(rows=[task_row]))
+    jeff = dict(args=dict(target='dk1', words='carry on'), caller=dict(person='dk827', name='JEFF'))
+    other = dict(args=dict(target='dk1', words='carry on'), caller=dict(person='dk55', name='Someone'))
+    assert 'refused' in manager.tell(other)
+    with patch('builders.threading', SimpleNamespace(Thread=Mock())):
+        assert manager.tell(jeff).get('external')
+    assert any(a['what'] == 'steward' for a in s['activity'])

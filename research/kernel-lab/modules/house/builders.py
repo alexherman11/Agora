@@ -408,6 +408,26 @@ class Builders:
                 threading.Thread(target=self.guarded,args=(state,self.resume),daemon=True).start()
 
     # ---- a worker and the resident in charge of it talk in the worker's chat
+    def steward(self, person):
+        """A leader of the place: Alex and JEFF (Alex, 28 Oct: JEFF must be able to unstick anything)."""
+        if not person:
+            return False
+        for place in self.h.m.see('rows place').get('rows') or []:
+            rows = self.h.m.see('look ' + str(place.get('id'))).get('rows') or [{}]
+            if rows[0].get('member:' + person) == 'leader':
+                return True
+        return False
+
+    def may_act(self, state, msg):
+        """The one in charge of a worker acts on it; so may any steward, to unstick it."""
+        person = (msg.get('caller') or {}).get('person')
+        if person == state['requester']:
+            return True
+        if self.steward(person):
+            self.event(state, 'steward', f"{(msg.get('caller') or {}).get('name') or person} acted on it as a steward")
+            return True
+        return False
+
     def owner(self, state):
         """The House agent (resident or JEFF) in charge of this worker, or None when Alex asked for it himself."""
         if state.get('manager'):
@@ -495,7 +515,7 @@ class Builders:
     def retry(self, msg):
         """Only a proven pre-thread startup failure; never replay an unknown turn."""
         state=self.states.get(msg.get('args',{}).get('target'))
-        if not state or state['requester'] != msg.get('caller',{}).get('person'):
+        if not state or not self.may_act(state, msg):
             return {'refused':'only the requester may retry this startup'}
         with self.lock:
             if state['phase']!='blocked' or state.get('session') or state['task'] in self.children:
@@ -518,7 +538,7 @@ class Builders:
     def tell(self, msg, hold=False):
         state=self.states.get(msg.get('args',{}).get('target'))
         words=str(msg.get('args',{}).get('words') or '').strip()
-        if not state or state['requester'] != msg.get('caller',{}).get('person'):
+        if not state or not self.may_act(state, msg):
             return {'refused':'only the requester may continue this builder'}
         if not words:
             return {'refused':'house.tell <task> <words>: provide a follow-up'}
@@ -606,7 +626,7 @@ left. Then end your turn with a short summary for {boss}: done, or what you need
 
     def request_review(self, msg):
         state = self.states.get(msg.get('args', {}).get('target'))
-        if not state or state['requester'] != msg.get('caller', {}).get('person'):
+        if not state or not self.may_act(state, msg):
             return {'refused': 'only the requester may review this build'}
         with self.lock:
             # Review again: after main moved past a reviewed result, or after a review whose checks failed (the run
@@ -687,7 +707,7 @@ left. Then end your turn with a short summary for {boss}: done, or what you need
 
     def land(self, msg):
         state = self.states.get(msg.get('args', {}).get('target'))
-        if not state or state['requester'] != msg.get('caller', {}).get('person'):
+        if not state or not self.may_act(state, msg):
             return {'refused': 'only the requester may land this build'}
         with self.lock:
             if state['phase'] != 'reviewed':

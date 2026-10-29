@@ -31,6 +31,7 @@ Off switch: off house (every agent's process ends with it).
 import json
 import re
 import os
+import subprocess
 import queue
 import sys
 import threading
@@ -439,6 +440,38 @@ class House:
         for p in [p for p in self.agents if p not in seen]:
             self.agents.pop(p).stop("its house-agent thing is gone")
 
+    def restart(self, msg):
+        """house.restart kernel|house (stewards; Alex, 28 Oct: JEFF must be able to unstick the system). The kernel
+        restarts through the keeper, and the House and every module stay. The House is turned off and on by a detached
+        helper, a few seconds later, so the asker's turn can end first. Other modules: `off <module>`, `on <module>`."""
+        what = str((msg.get("args") or {}).get("target") or (msg.get("args") or {}).get("words") or "").strip().lower()
+        if what == "kernel":
+            sys.path.insert(0, str(T.REPO / "research" / "window-lab" / "kernel-desktop"))
+            from kdesk_keeper import ask
+            out = ask("restart-kernel")
+            if out is None:
+                return {"refused": "no keeper answers, so the kernel cannot restart without closing the desktop"}
+            return {"text": str(out.get("text") or "the kernel restarts; windows and modules stay"), "external": True}
+        if what == "house":
+            caller = msg.get("caller") or {}
+            agent = self.agents.get(caller.get("person"))
+            token = self.token_for(agent.cfg.get("signer")) if agent else None
+            if not token:
+                try:                                  # Alex: his agent's session acts for him
+                    token = self.builders.session(caller.get("person")).token
+                except RuntimeError:
+                    return {"refused": "house.restart house needs a session of the asker's own"}
+            tok = self.home / f"restart-{int(time.time())}.token"
+            tok.write_text(token, encoding="utf-8")
+            line = f'"{T.PY}" "{HERE / "restart_house.py"}" --url {URL} --token-file "{tok}" --delay 5'
+            ps = ("$r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = '"
+                  + line.replace("'", "''") + "' }; $r.ReturnValue")
+            subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=60,
+                           creationflags=T.NO_WINDOW)
+            return {"text": "the House turns off in 5 seconds and on again; every agent's turn ends then, and builders "
+                            "come back as recovery-needed if they were mid-turn", "external": True}
+        return {"refused": "house.restart kernel, or house.restart house; for another module: off <module>, then on <module>"}
+
     def token_for(self, signer):
         try:
             sessions = json.loads((self.world / "keep" / "sessions.json").read_text(encoding="utf-8"))
@@ -655,6 +688,8 @@ class House:
             return self.builders.start(msg)
         if word == "house.work":
             return self.builders.work(msg)
+        if word == "house.restart":
+            return self.restart(msg)
         if word == "house.retry":
             return self.builders.retry(msg)
         if word == "house.tell":
@@ -811,6 +846,10 @@ OFFER = [
              "house.tell <card> <words>. Then house.review <card> and house.land <card>. Up to four Claude and four Codex "
              "workers run at once (house-settings claude_workers, codex_workers). Only Alex, JEFF and the residents "
              "have workers."},
+    {"word": "house.restart", "kind": "do", "takes": "<kernel|house>", "undo": "external", "may": "stewards",
+     "help": "house.restart kernel|house: unstick the desktop. kernel: the kernel restarts through the keeper; windows, "
+             "the House and every module stay. house: the House turns off and on again 5 seconds later (every agent's "
+             "turn ends). Any other module: off <module>, then on <module>."},
     {"word": "house.build", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "members",
      "help": "house.build <task> [with=claude|codex]: claim a ready task and start a worker on it in your charge (Codex unless with=claude), within that kind's pool (four each by default). Uses your existing agent session; never creates credentials. Result receipt is not task completion."},
     {"word": "house.review", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "members",
