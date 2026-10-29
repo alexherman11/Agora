@@ -800,14 +800,14 @@ class WindowHost:
             {"word": "window.move", "kind": "do", "takes": "<id> [to=<spot>] [at=<x,y>] [size=<w,h>]", "may": "anyone",
              "help": f"window.move <window> to=<spot> | at=x,y [size=w,h]: put a window somewhere ({spots}). Changes "
                      f"the screen only (where a window sits is not in the world), so nothing is recorded."},
-            {"word": "window.close", "kind": "do", "takes": "<id>", "may": "anyone",
+            {"word": "window.close", "kind": "do", "takes": "<id>", "may": "anyone", "acts_on": "window",
              "help": "window.close <window>: close it. Its window thing goes from the world; undo opens it again where "
                      "it was."},
             {"word": "window.reload", "kind": "do", "takes": "[<id>] [all]", "may": "anyone",
              "help": "window.reload <window> | all: load its page again from disk, in place (nothing closes or moves). "
                      "After editing pages/ (html, js, css) this is all it takes. Changes the screen only, so nothing "
                      "is recorded."},
-            {"word": "window.focus", "kind": "do", "takes": "<id>", "may": "anyone",
+            {"word": "window.focus", "kind": "do", "takes": "<id>", "may": "anyone", "acts_on": "window",
              "help": "window.focus <window>: bring it forward, or tuck it away if it is in front already (what a "
                      "taskbar button does). Changes the screen only, so nothing is recorded."},
             {"word": "window.opened", "kind": "hear", "takes": "<id>", "may": "anyone",

@@ -1,5 +1,40 @@
 > Written by Claude (PROOF a13428, epic a13308), 23 October 2026. Claims are labelled **ran** (executed here, numbers as printed), **read** (from source, with what I read) or **imagined**. Alex's words are in quotation marks.
 
+## Right-click anything: the shared menu (29 Oct, Claude, card dk1344)
+
+Alex: right-click anything in Agora and get a menu that fits it, with no per-view wiring. `pages/menu.js` is that
+menu, brought over from the old desk's `lens.js` menu (selection words, Copy, the ask box). Every widget window
+(`widget.html`) and the desktop's own pages (`frame.html` strip, `lines`, `help`, `thing`) load it; a view gets it by
+being opened, with no code of its own.
+
+- **How a widget window reaches it.** The frame's trusted bootstrap (`widget-host.js`) listens last for `contextmenu`
+  and says only where the press was, the words selected under it (kept from the press, as the old desk did), and the
+  thing the pressed part shows: `data-thing`, or the painter's `data-fact-id`, which every painted part already
+  carries. The host page reads that thing again **as the viewer** (`look`, `actions`), draws the menu over the frame
+  and runs a line only when the viewer presses an entry. The widget's own grants are never used or widened.
+- **What fits what.** Selected words: **Comment** (says into the Conversation: your words, the quote as `> `, and
+  `— from [[id|name]]`, `about=` the thing) and Copy. A Needs-you item (its `who` is you and it is not Done, as the Work
+  view's band says): **Delete** (`forget`; undo brings it back). Any thing: Look, Open in each lens that shows it, and
+  its own words from `actions <thing>` that need nothing more than the thing. No thing: the window's own words
+  (`actions <window>`). Always last: *Ask for a change…* (`ask`).
+- **Who keeps their own menu.** A view that calls `preventDefault` on its right-click (Writing, the task board cards)
+  keeps its menu. The painter's ask-only menu (`right_click=ask`) gives way to the shared one, which ends with the same
+  ask box. Shift+right-click, inputs and editable words keep the browser's. Shell bars, bar slots and overlays are left
+  out (their windows are shaped or see-through; shell components keep `api.ask`).
+- **Guard.** A frame chooses where its menu opens, so an entry takes no click in the menu's first 300 ms; the menu's
+  head always names the thing as the kernel says it, so a frame cannot dress one thing up as another.
+
+- **A window's own words.** `window.close` and `window.focus` now say `acts_on=window` (`kd_window.py`), so
+  `actions <window>` offers them and an empty spot's menu has them. Before, `actions` listed no word for a window.
+  The old desk's `examine` is `actions` here.
+- **Not covered.** Old-painter lens windows (`frame.html` → `/lens.html`) keep lens.js's own menu inside the lens; no
+  live window uses that path today (`window.list`, 29 Oct). The shell bars keep `api.ask`.
+
+**Ran 29 Oct:** `test_shared_menu.py` 7 passed: hidden browser, trial world, a lens made by the test with no menu code.
+Then (dk1476) 10 passed: a second fresh view of posts, opened as a desktop window, adds a button inside a post (the
+post's menu), Comment on a post's words (linked back, `about=` the post) and the window's own words.
+Evidence: [evidence/shared-menu-needs-you.png](evidence/shared-menu-needs-you.png).
+
 ## After an edit: restart only what changed (28 Oct, Claude)
 
 Alex: "would be great in general if we could restart just parts of the code so we dont have to reload the whole

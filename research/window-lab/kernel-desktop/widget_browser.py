@@ -163,6 +163,10 @@ class CDP:
 
 
 class Browser:
+    # Routes the trusted host page may also reach, beyond the widget door. Empty for the overlay host; a hidden test of
+    # the shared right-click menu (test_shared_menu.py) sets ('/see', '/do'), as a desktop window's page has them.
+    also_allow = ()
+
     def __init__(self, url=None, host_key=None, test_flags=()):
         self.test_flags = list(test_flags)
         self.allowed_origin = (urlsplit(url).scheme + '://' + urlsplit(url).netloc) if url else None
@@ -213,7 +217,7 @@ class Browser:
                 p = event['params']
                 url = urlsplit(p['request']['url'])
                 local = url.scheme + '://' + url.netloc == self.allowed_origin
-                path_ok = url.path in ('/desk/widget.html', '/desk/kd.css', '/desk/kd.js', '/desk/widget-host.js', '/dev/signin', '/desk/theme.css', '/desk/theme.json', '/desk/theme-live.js') or url.path.startswith('/desk/widget/') or (
+                path_ok = url.path in ('/desk/widget.html', '/desk/kd.css', '/desk/kd.js', '/desk/widget-host.js', '/dev/signin', '/desk/theme.css', '/desk/theme.json', '/desk/theme-live.js', '/desk/menu.js', *self.also_allow) or url.path.startswith('/desk/widget/') or (
                     p['request'].get('method') == 'GET' and __import__('re').fullmatch(r'/files/[a-zA-Z]+\d+',url.path))
                 if p.get('frameId') == main and local and path_ok:
                     headers=dict(p['request'].get('headers') or {})
