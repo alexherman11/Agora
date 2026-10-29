@@ -65,7 +65,39 @@ class Door:
         return rows[0]
 
 
+PROVIDERS = {  # Alex, 28 Oct: up to four Claude and four Codex workers at a time
+    'claude': dict(model='claude-opus-5-5', reasoning='medium', label='Claude'),
+    'codex': dict(model='gpt-6.1-sol', reasoning='medium', label='Codex'),
+}
+MAX_TURNS = 25          # a worker's conversation with its resident ends here; review or a new card starts afresh
+CLAUDE_TOOLS = ('Bash', 'Read', 'Edit', 'MultiEdit', 'Write', 'Glob', 'Grep', 'TodoWrite',
+                'mcp__agora__see', 'mcp__agora__do', 'mcp__agora__lines')
+CLAUDE_DENIED = ('Bash(git push:*)', 'Bash(git checkout main:*)', 'Bash(git switch main:*)', 'Bash(git reset --hard:*)',
+                 'Bash(git worktree:*)', 'Bash(git branch -D:*)', 'Bash(rm -rf /*)', 'Bash(taskkill:*)', 'Bash(shutdown:*)')
+
+
 class Builders:
+    def capacity_for(self, provider):
+        """Each provider has its own pool: house-settings `claude_workers` / `codex_workers` (1 to 4), default 4.
+        The older shared `builder_capacity` still sizes the Codex pool when `codex_workers` is not set."""
+        reading = self.h.m.see('rows house-settings')
+        if reading.get('ok') is False:
+            raise RuntimeError('worker capacity unavailable; no new worker admitted')
+        settings = [r for r in reading.get('rows', []) if r.get('kind') == 'house-settings']
+        if len(settings) > 1:
+            raise RuntimeError('ambiguous house settings; no new worker admitted')
+        row = settings[0] if settings else {}
+        raw = row.get(provider + '_workers', row.get('builder_capacity', 4) if provider == 'codex' else 4)
+        value = str(raw).strip()
+        if value not in ('1', '2', '3', '4'):
+            raise RuntimeError(f'{provider}_workers must be 1 to 4; no new worker admitted')
+        return int(value)
+
+    def full(self, provider):
+        busy = sum((s['phase'] in ACTIVE or s['task'] in self.children) and s.get('provider', 'codex') == provider
+                   for s in self.states.values())
+        return busy >= self.capacity_for(provider)
+
     @property
     def capacity(self):
         """World-configured shared pool, bounded by the existing four-worker cap.
@@ -202,15 +234,23 @@ class Builders:
         if task.get('who') and task.get('who') not in (caller.get('name'), 'JEFF'):
             return {'refused': 'task has another owner; ask that owner to release it first'}
         self.session(caller['person'])  # validate before recording or spawning anything
+        kv = (msg.get('args') or {}).get('kv') or {}
+        provider = str(kv.get('with') or kv.get('provider') or 'codex').lower()
+        if provider not in PROVIDERS:
+            return {'refused': 'with=claude or with=codex'}
+        if msg.get('_managed') and provider != 'codex':
+            return {'refused': 'managed builds use Codex workers'}
+        p = PROVIDERS[provider]
         with self.lock:
             if target in self.states and not again:
                 return {'text': 'existing request: ' + self.states[target]['phase'], 'rows': [self.row(self.states[target])]}
-            if sum(s['phase'] in ACTIVE or s['task'] in self.children for s in self.states.values()) >= self.capacity:
-                return {'refused': 'builder capacity is occupied; no request was queued'}
+            if self.full(provider):
+                return {'refused': f'worker capacity is occupied: all {self.capacity_for(provider)} {provider} workers are busy; nothing was queued'}
             run = 'kernel-' + target + '-' + uuid.uuid4().hex[:10]
-            state = dict(task=target, run=run, name='Codex — '+str(task.get('title') or 'Builder')[:60], requester=caller['person'],
+            state = dict(task=target, run=run, name=p['label']+' — '+str(task.get('title') or 'Builder')[:60], requester=caller['person'],
+                         requester_name=caller.get('name', ''), provider=provider,
                          title=task.get('title') or target, phase='asked', detail='claim pending',
-                         model='gpt-6.1-sol', reasoning='medium', created=stamp(), activity=[],
+                         model=p['model'], reasoning=p['reasoning'], created=stamp(), activity=[],
                          task_owner=task.get('who',''), pending=[], basis={k:task.get(k,'') for k in ('title','text','acceptance','who')})
             if msg.get('_managed'):
                 state['manager'] = caller['person']
@@ -279,19 +319,29 @@ class Builders:
         (folder/'token').write_text(door.token, encoding='utf-8')
         mcp = T.mcp_config(self.h.builder_url, folder/'token', folder/'mcp.json')
         events = queue.Queue()
-        cmd = [str(T.PY), str(T.REPO/'research/codex-residents/codex_worker.py'),
-               '--model', state['model'], '--reasoning', state['reasoning'], '--timeout', '2400',
-               '--prompt-file', str(folder/'prompt.md'), '--mcp-config', mcp, '--lease', str(folder/'process.lock')]
+        claude = state.get('provider') == 'claude'
+        label = PROVIDERS[state.get('provider', 'codex')]['label']
+        if claude:
+            cmd = [T.find_claude(), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
+                   '--model', state['model'], '--effort', state['reasoning'],
+                   '--mcp-config', mcp, '--strict-mcp-config', '--setting-sources', '',
+                   '--permission-mode', 'acceptEdits', '--allowedTools', ','.join(CLAUDE_TOOLS),
+                   '--disallowedTools', ','.join(CLAUDE_DENIED)]
+        else:
+            cmd = [str(T.PY), str(T.REPO/'research/codex-residents/codex_worker.py'),
+                   '--model', state['model'], '--reasoning', state['reasoning'], '--timeout', '2400',
+                   '--prompt-file', str(folder/'prompt.md'), '--mcp-config', mcp, '--lease', str(folder/'process.lock')]
         if state.get('session'):
             cmd += ['--resume', state['session']]
         self.assert_owned(state)
         child = T.Child(cmd, tree, T.clean_env(), events, lambda *_: None, stderr=folder/'stderr.log')
         self.children[state['task']] = child
         state['pid'] = child.proc.pid
-        self.phase(state, 'preparing', 'adapter started; awaiting authenticated Codex thread', builder_chat=state['chat'])
+        self.phase(state, 'preparing', f'adapter started; awaiting authenticated {label} thread', builder_chat=state['chat'])
         if not child.send(prompt):
             raise RuntimeError('initial send uncertain; no replay')
         ended = False
+        said = []                    # this turn's words, the last of which go to the resident in the worker's chat
         try:
             while not ended:
                 try:
@@ -304,21 +354,27 @@ class Builders:
                 if kind == 'init':
                     state['session'] = e['session']
                     state['thread_started'] = stamp()
-                    self.event(state, 'init', 'authenticated Codex thread started')
+                    self.event(state, 'init', f'authenticated {label} thread started')
+                    if claude and state['phase'] != 'working':     # Claude has no separate turn-started event
+                        state['turn_started'] = stamp()
+                        self.phase(state, 'working', f'authenticated {label} turn running')
                 elif kind == 'turn_started':
                     state['turn_started'] = stamp()
                     state['turn_id'] = e.get('turn')
-                    self.phase(state, 'working', 'authenticated Codex turn running')
+                    self.phase(state, 'working', f'authenticated {label} turn running')
                 elif kind == 'tool':
                     self.event(state, 'act', e.get('name', 'tool'))
                 elif kind == 'text':
                     self.event(state, 'said', e['text'])
+                    said.append(e['text'])
                 elif kind == 'result':
                     state['result_received'] = stamp()
                     state['result_ok'] = bool(e.get('ok'))
                     if not e.get('ok'):
                         raise RuntimeError('worker failed: '+str(e.get('detail')))
                     state['turns']=state.get('turns',0)+1
+                    self.report_turn(state, said[-1] if said else '(the worker ended its turn without words)')
+                    said = []
                     self.assert_owned(state)
                     with self.lock:
                         pending = state.get('pending', [])
@@ -342,6 +398,83 @@ class Builders:
                     self.save(state)
                 threading.Thread(target=self.guarded,args=(state,self.resume),daemon=True).start()
 
+    # ---- a worker and the resident in charge of it talk in the worker's chat
+    def owner(self, state):
+        """The House agent (resident or JEFF) in charge of this worker, or None when Alex asked for it himself."""
+        if state.get('manager'):
+            return None                  # Rowan's managed builds are woken by manager.notify
+        return getattr(self.h, 'agents', {}).get(state['requester'])
+
+    def report_turn(self, state, words):
+        """End of a worker turn: its last words go into its chat (as the worker, so they never count as the owner's
+        instruction), and the resident in charge is woken there. Whatever the resident says back in that chat is the
+        worker's next instruction (hear)."""
+        words = str(words).strip()[:3500]
+        chat = state.get('chat')
+        if not chat:
+            return
+        try:
+            self.session(state['requester']).call('/do', f'say {chat} text={q(words)}')
+        except Exception as exc:                          # noqa: BLE001  the activity record still has it
+            self.event(state, 'unsaid', str(exc))
+        agent = self.owner(state)
+        if agent is None:
+            return
+        left = MAX_TURNS - state.get('turns', 0)
+        agent.wake(
+            f"~ Your worker {state['name']} ({state['task']}) finished a turn and says:\n{words}\n\n"
+            f"~ You are in charge of this worker. What you say in this chat goes to it as your next instruction "
+            f"({left} turns left). When its work is done and it says what it tested: house.review {state['task']}, "
+            f"then house.land {state['task']} once the checks pass. Tell JEFF in Shop talk when it lands, or when "
+            f"something needs Alex. If you have nothing for the worker now, stay quiet here.",
+            chat=chat)
+
+    def owner_turn_ended(self, person):
+        """A resident's turn ended: what it said to its workers during that turn starts their next turn now."""
+        for state in list(self.states.values()):
+            if state['requester'] != person or not state.get('pending'):
+                continue
+            with self.lock:
+                if state['phase'] != 'received' or state['task'] in self.children:
+                    continue
+                if self.full(state.get('provider', 'codex')):
+                    self.event(state, 'held', 'resident replied, but all workers of this kind are busy; it waits')
+                    continue
+                state['phase'] = 'preparing'
+                self.save(state)
+                threading.Thread(target=self.guarded, args=(state, self.resume), daemon=True).start()
+
+    def work(self, msg):
+        """work <what to do, in plain words> [with=claude|codex]: a card for the caller and a worker on it."""
+        caller = msg.get('caller') or {}
+        args = msg.get('args') or {}
+        kv = dict(args.get('kv') or {})
+        words = ' '.join(str(args.get(k) or '') for k in ('target', 'words')).strip()
+        if not words:
+            return {'refused': 'work <what to do, in plain words> [with=claude|codex]'}
+        provider = str(kv.get('with') or 'codex').lower()
+        if provider not in PROVIDERS:
+            return {'refused': 'with=claude or with=codex'}
+        try:
+            door = self.session(caller.get('person'))
+        except RuntimeError:
+            return {'refused': 'only Alex, JEFF and the residents have workers'}
+        if self.full(provider):
+            return {'refused': f'worker capacity is occupied: all {self.capacity_for(provider)} {provider} workers are busy; nothing was started'}
+        name = caller.get('name') or ''
+        title = words.splitlines()[0][:80]
+        made = door.call('/do', f'make kind=taskboard-task title={q(title)} text={q(words)} lane=Now '
+                                f'who={q(name)} lead={q(name)}')
+        card = (made.get('made') or [None])[-1]
+        if not card:
+            return {'refused': 'the card was not made: ' + str(made.get('text', ''))[:200]}
+        out = self.start(dict(msg, args=dict(target=card, kv=dict(kv, **{'with': provider}))))
+        if out.get('refused'):
+            return {'refused': f'made card {card}, but the worker did not start: {out["refused"]}'}
+        return {'text': f"started a {PROVIDERS[provider]['label']} worker on {title} ({card}). Its chat is named after "
+                        f"it; you are woken there each time it finishes a turn, and what you say there is its next "
+                        f"instruction.", 'external': True, 'rows': out.get('rows', [])}
+
     def resume(self, state):
         self.assert_owned(state)
         with self.lock:
@@ -357,8 +490,8 @@ class Builders:
         with self.lock:
             if state['phase']!='blocked' or state.get('session') or state['task'] in self.children:
                 return {'refused':'retry only applies to a terminal startup failure before any Codex thread'}
-            if sum(s['phase'] in ACTIVE or s['task'] in self.children for s in self.states.values())>=self.capacity:
-                return {'refused':'builder capacity is occupied'}
+            if self.full(state.get('provider','codex')):
+                return {'refused':'worker capacity is occupied: all '+state.get('provider','codex')+' workers are busy'}
             state['phase']='preparing';self.save(state)
             def launch(s):
                 self.assert_owned(s)
@@ -372,7 +505,7 @@ class Builders:
             threading.Thread(target=self.guarded,args=(state,launch),daemon=True).start()
         return {'text':'pre-thread startup retry recorded; same claim and worktree, no task replay','external':True}
 
-    def tell(self, msg):
+    def tell(self, msg, hold=False):
         state=self.states.get(msg.get('args',{}).get('target'))
         words=str(msg.get('args',{}).get('words') or '').strip()
         if not state or state['requester'] != msg.get('caller',{}).get('person'):
@@ -387,8 +520,13 @@ class Builders:
                 return {'refused':'builder needs review or recovery; message did not restart it'}
             if len(state.setdefault('pending',[])) >= 10:
                 return {'refused':'ten follow-ups already pending; no more were queued'}
-            if state['phase']=='received' and state['task'] not in self.children and sum(
-                    s['phase'] in ACTIVE or s['task'] in self.children for s in self.states.values()) >= self.capacity:
+            if state.get('turns',0) >= MAX_TURNS:
+                return {'refused':f'this worker has had {MAX_TURNS} turns; review it, or start a new card'}
+            if hold:          # said during the resident's own turn: starts the worker when that turn ends
+                state['pending'].append(words[:8000])
+                self.event(state,'heard',words)
+                return {'text':'follow-up retained until your turn ends','external':True}
+            if state['phase']=='received' and state['task'] not in self.children and self.full(state.get('provider','codex')):
                 return {'refused':'builder capacity is occupied; follow-up did not start or queue another builder'}
             # Explicit owner correction replaces the task basis, never its authority.
             state['basis']={k:task.get(k,'') for k in ('title','text','acceptance','who')}
@@ -412,36 +550,27 @@ class Builders:
                 seen=state.setdefault('heard',[])
                 if msg['said'] in seen:return
                 seen.append(msg['said']);self.save(state)
+                agent=self.owner(state)
                 out=self.tell(dict(args=dict(target=state['task'],words=row.get('text','')),
-                                   caller=dict(person=state['requester'])))
+                                   caller=dict(person=state['requester'])),
+                              hold=bool(agent is not None and agent.busy))
                 if out.get('refused'):self.event(state,'held',out['refused'])
 
     def prompt(self, state, task):
-        return f'''You are {state['name']}, a Codex builder for the requesting person inside Alex's kernel desktop.
-Current task: {state['title']} ({state['task']}). Read its current card and charter via Agora see.
-Task text: {task.get('text', '')}
-Acceptance: {task.get('acceptance', '')}
-You own only this task in this House-created worktree. Read AGENTS.md and the approved direction at
-C:/Projects/Agora4/research/kernel-lab/agents/MOVING-IN.md (canonical source, not yet tracked in older worker bases).
-The current world is kernel8810, not Frontier. Use Agora see/do/lines with the existing requester-bound agent session;
-never change credentials, security settings or provider, use paid fallback, or start another worker.
-Preserve existing user work and apps. No visible test windows, OBS operations, global window-manager changes,
-forced process stops, deletions, publishing or pushes. Use hidden fixtures. Stop an exact denied action and report it;
-do not route around a denial. No task.done or merging to main: owner review remains required.
-Use the pinned {T.PY}. Implement the existing requested task and test affected behavior.
-Your sandbox cannot write .git (index.lock is denied): never stage or commit, and don't work around it. Leave your source
-changes in this worktree; at review the House commits everything you left to your branch, except BUILD-RESULT.md and
-top-level dot-folders. So keep scratch, temp fixtures and logs out of the tree or under a top-level dot-folder.
-For writing import: first inspect sources/permissions, preserve originals/authorship/current writing, use idempotent
-provenance and prepare a reviewable importer/manifest; do not import private or ambiguous content without review.
-Do not read sessions/*.pickle directly or grep exported transcripts. Never expose secrets.
-Before each irreversible effect check the current task for correction, pause, cancellation and owner changes.
-Leave BUILD-RESULT.md at worktree root (untracked): exact changes and the files you changed, commands/results, limitations,
-activation requirements and blockers. A model ending is received, not reviewed or verified. End with a useful result.
-<transcript_evidence>
-User, October 27, message Sentinel_cd8f7f9ae8c4819196c8b9c06fd41908: "awesome, can i get you to get  some codex workers get codex workers working in the world and have them start pickup up tasks and completing them?"
-Assistant, October 27: "Found the blocker: the new world is running, but its House can only run JEFF; the Codex worker launcher hasn’t been built yet. I’ll have the coordinator implement that missing piece, then start with the window-minimising bug and the old-world writing import, which JEFF identified as unclaimed."
-</transcript_evidence>
+        boss = state.get('requester_name') or 'the person who asked'
+        return f'''You are {state['name']}, a coding worker in Alex's Agora desktop (the kernel world on 8810).
+{boss} is in charge of you. Your last message each turn is posted in your chat with {boss}; they answer there,
+and their answer is your next instruction. Ask them when something is unclear instead of guessing.
+Task: {state['title']} ({state['task']}). Task text: {task.get('text', '')}
+Acceptance: {task.get('acceptance', '') or 'what the task text asks for, working and tested'}
+You work only in this worktree, on this task. Read AGENTS.md first. Use the Agora tools (see, do, lines) to read the
+world; never change credentials, security settings or providers, and never start another worker.
+No visible test windows (hidden fixtures only), no pushes, no merging to main, no deleting other people's work, no
+stopping Alex's programs. If something is denied, stop and say so; do not route around it.
+Use the pinned {T.PY}. Do not commit: leave your changes in the worktree; at review the House commits them to your
+branch (except BUILD-RESULT.md and top-level dot-folders, where scratch and temp fixtures belong).
+When done, leave BUILD-RESULT.md at the worktree root: what you changed (files), what you ran and its results, what is
+left. Then end your turn with a short summary for {boss}: done, or what you need from them.
 '''
 
     def assert_owned(self, state):
@@ -460,10 +589,14 @@ Assistant, October 27: "Found the blocker: the new world is running, but its Hou
             # Review again: after main moved past a reviewed result, or after a review whose checks failed (the run
             # stays blocked with its review receipts). Never an active, uncertain or pre-review failure.
             again = state['phase'] == 'reviewed' or (state['phase'] == 'blocked' and state.get('review_base'))
+            if state.get('pending') and state['phase'] == 'received' and state['task'] not in self.children:
+                # the requester chose review over what it last said to the worker in the same turn
+                self.event(state, 'dropped', 'review asked; not sent to the worker: ' + ' | '.join(state['pending'])[:500])
+                state['pending'] = []
             if (state['phase'] != 'received' and not again) or state['task'] in self.children or state.get('pending'):
                 return {'refused': 'review requires a received, reviewed or review-failed result, not an active or uncertain worker'}
-            if sum(s['phase'] in ACTIVE or s['task'] in self.children for s in self.states.values()) >= self.capacity:
-                return {'refused': 'builder capacity is occupied; review did not start'}
+            if self.full(state.get('provider', 'codex')):
+                return {'refused': 'worker capacity is occupied: all ' + state.get('provider', 'codex') + ' workers are busy; review did not start'}
             if again:
                 self.event(state, 'review-again', 'independent checks requested again on the current main')
             state['phase'] = 'reviewing'
@@ -538,8 +671,8 @@ Assistant, October 27: "Found the blocker: the new world is running, but its Hou
                 return {'refused': 'independent review has not passed'}
             if any(s['phase'] == 'landing' for s in self.states.values()):
                 return {'refused': 'another source publication is running'}
-            if sum(s['phase'] in ACTIVE or s['task'] in self.children for s in self.states.values()) >= self.capacity:
-                return {'refused': 'builder capacity is occupied; publication did not start'}
+            if self.full(state.get('provider', 'codex')):
+                return {'refused': 'worker capacity is occupied: all ' + state.get('provider', 'codex') + ' workers are busy; publication did not start'}
             state['phase'] = 'landing'
             self.save(state)
             threading.Thread(target=self.guarded, args=(state, self.publish), daemon=True).start()
@@ -641,7 +774,7 @@ Assistant, October 27: "Found the blocker: the new world is running, but its Hou
         return dict(id=state['task'], person=state['task'], name=state['name'], role='builder',
                     task=state['task'], chat=state.get('chat', ''), doing=phase, now=state.get('detail', ''),
                     colour='sage' if phase=='working' else 'rose' if phase in ('blocked','recovery-needed') else 'sky',
-                    provider='codex', model=state['model'], reasoning=state['reasoning'],
+                    provider=state.get('provider', 'codex'), model=state['model'], reasoning=state['reasoning'],
                     turns=state.get('turns',0), last_turn=state.get('updated',''),
                     first_words_ms=None, error=state.get('detail','') if phase=='blocked' else '',
                     acts=[], acts_text='', waiting=0, session=state.get('session',''))

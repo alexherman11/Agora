@@ -312,6 +312,10 @@ class Agent:
                 self.save()
                 if self.inbox:
                     self._begin()
+            try:
+                self.house.builders.owner_turn_ended(self.cfg.get("person"))
+            except Exception as exc:                  # noqa: BLE001
+                self.log("error", f"workers after turn: {exc!r}")
             self.house.publish()
         elif e == "exit":
             with self.lock:
@@ -649,6 +653,8 @@ class House:
             return BM.dispatch(self.builders, msg)
         if word == "house.build":
             return self.builders.start(msg)
+        if word == "work":
+            return self.builders.work(msg)
         if word == "house.retry":
             return self.builders.retry(msg)
         if word == "house.tell":
@@ -795,15 +801,21 @@ class House:
 OFFER = [
     {"word": "house.manage", "kind": "do", "needs": "kind=taskboard-task|task", "takes": "<id> [action=<word>] [<words>]", "undo": "external", "may": "members",
      "help": "house.manage <task> action=build|tell|retry|report|review|land|note [words]: only the explicitly approved resident person, for its three locally approved tasks. Builders and other people are refused before effects."},
-    {"word": "house.retry", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "stewards",
+    {"word": "house.retry", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "members",
      "help": "house.retry <task>: retry a proven terminal startup failure before any model thread. Preserves its existing claim and worktree; refuses uncertain or changed work."},
-    {"word": "house.tell", "kind": "do", "needs": TASK_NEEDS, "takes": "<id> <words>", "undo": "external", "may": "stewards",
+    {"word": "house.tell", "kind": "do", "needs": TASK_NEEDS, "takes": "<id> <words>", "undo": "external", "may": "members",
      "help": "house.tell <task> <words>: retain a follow-up for your active or received builder, continuing the same Codex thread. Held, uncertain, reviewed and landed work does not restart."},
-    {"word": "house.build", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "stewards",
-     "help": "house.build <task>: claim a ready task and start an authenticated Codex builder asynchronously, within the shared configured capacity (default two, maximum four). Uses your existing agent session; never creates credentials. Result receipt is not task completion."},
-    {"word": "house.review", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "stewards",
+    {"word": "work", "kind": "do", "takes": "<words> [with=claude|codex]", "undo": "external", "may": "members",
+     "help": "work <what to do, in plain words> [with=claude|codex]: make a card for it and start a worker on it, in "
+             "your charge. You are woken in the worker's chat each time it finishes a turn; what you say there is its "
+             "next instruction. Then house.review <card> and house.land <card>. Up to four Claude and four Codex "
+             "workers run at once (house-settings claude_workers, codex_workers). Only Alex, JEFF and the residents "
+             "have workers."},
+    {"word": "house.build", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "members",
+     "help": "house.build <task> [with=claude|codex]: claim a ready task and start a worker on it in your charge (Codex unless with=claude), within that kind's pool (four each by default). Uses your existing agent session; never creates credentials. Result receipt is not task completion."},
+    {"word": "house.review", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "members",
      "help": "house.review <task>: independently check a received committed result against current main, including hidden desktop checks. Does not land or close it."},
-    {"word": "house.land", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "stewards",
+    {"word": "house.land", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "members",
      "help": "house.land <task>: publish the exact reviewed source if main and ownership still match. Activation and owner verification remain separate."},
     {"word": "house.who", "kind": "see", "takes": "",
      "help": "house.who: the agents the house runs (JEFF and others), what each is doing (asleep, resting, idle, "

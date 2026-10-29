@@ -257,6 +257,9 @@ class LocalEntry:
 
     def check_person_session(self, signer, account):
         matches = [s for s in self.sessions.values() if s.get("signer") == signer or s.get("account") == account]
+        # its own worker session (worker_sessions) belongs with it, not against it
+        matches = [s for s in matches if s != {"account": account, "method": "desktop", "signer": f"{signer}-workers",
+                                               "agent": f"{signer}-workers"}]
         if matches and (len(matches) != 1 or matches[0] !=
                         {"account": account, "method": "desktop", "signer": signer}):
             raise ValueError("resident session conflicts with an existing identity")
@@ -302,8 +305,37 @@ class LocalEntry:
         os.replace(tmp, self.path)
         self.sessions = sessions
 
+    def add_worker_session(self, account, signer):
+        """Alex, 28 Oct: residents start and run their own workers. A worker acts for its resident through an agent
+        session of that person (`<signer>-workers`), like the agent for Alex. Never replaces or reuses a credential;
+        a person who already has an agent session (Alex, Rowan) keeps it."""
+        if any(v.get("account") == account and v.get("agent") for v in self.sessions.values()):
+            return False
+        name = f"{signer}-workers"
+        if any(v.get("signer") == name for v in self.sessions.values()):
+            raise ValueError(f"{name} belongs to another account")
+        sessions = dict(self.sessions)
+        sessions[secrets.token_urlsafe(24)] = {"account": account, "method": "desktop", "signer": name, "agent": name}
+        tmp = self.path.with_suffix(".workers.tmp")
+        tmp.write_text(json.dumps(sessions, indent=1), encoding="utf-8")
+        os.replace(tmp, self.path)
+        self.sessions = sessions
+        return True
+
     def token(self, signer):
         return next(t for t, v in self.sessions.items() if v.get("signer") == signer)
+
+
+def worker_sessions(k, entry):
+    """Every House agent's person (JEFF, the residents) gets a worker session if it has none. -> names added."""
+    added = []
+    person_account = {p: a for a, p in k.accounts.items()}
+    for agent in k.things("house-agent"):
+        person, signer = k.state.get(agent, "person"), k.state.get(agent, "signer")
+        account = person_account.get(person)
+        if account and signer and entry.add_worker_session(account, signer):
+            added.append(signer)
+    return added
 
 
 class WindowOrigins:

@@ -25,13 +25,14 @@ def test_unapproved_caller_and_task_never_dispatch(manager,m):
 
 def test_three_tasks_dispatch_as_requester_without_escalation(manager):
     manager.fixture_door.task['who']='Alex'
+    manager.capacity_for=lambda provider:2           # a pool of two, set in house-settings
     # Mock the builder's imported namespace, not process-wide Thread.start:
     # resident fixtures can still finish unrelated background callbacks.
     with patch('builders.threading', SimpleNamespace(Thread=Mock())) as threads:
         for task in ('dk1','dk2'):
             assert M.dispatch(manager,request(task)).get('external')
             assert manager.states[task]['manager']=='dk99'
-        assert 'refused' in M.dispatch(manager,request('dk3'))  # default pool two
+        assert 'refused' in M.dispatch(manager,request('dk3'))  # pool of two
         assert threads.Thread.call_count==2
         assert threads.Thread.return_value.start.call_count==2
         assert [call.kwargs['args'][0]['task'] for call in threads.Thread.call_args_list]==['dk1','dk2']

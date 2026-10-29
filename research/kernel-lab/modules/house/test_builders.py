@@ -72,9 +72,10 @@ def test_capacity_and_duplicate_are_not_running_claims(manager):
         assert a['rows'][0]['doing']=='asked'
         assert manager.start(msg())['rows'][0]['doing']=='asked'
         assert launch.call_count==1
-        manager.start(msg('dk2'))
-        assert 'refused' in manager.start(msg('dk3'))
-        assert launch.call_count==2
+        for target in ('dk2','dk3','dk4'):           # four Codex workers by default (Alex, 28 Oct)
+            manager.start(msg(target))
+        assert 'refused' in manager.start(msg('dk5'))
+        assert launch.call_count==4
 
 
 def test_foreign_owner_not_stolen(manager):
