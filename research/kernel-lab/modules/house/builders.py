@@ -22,6 +22,7 @@ import transport as T
 import manager as M
 
 ACTIVE = {'asked', 'preparing', 'working', 'reviewing', 'landing'}
+RESUMABLE = {'received', 'blocked', 'reviewed'}   # stopped, not landed or released: house.tell gives it a new turn
 HELD = {'yes', 'true', '1', 'paused', 'held', 'blocked', 'cancelled', 'canceled'}
 CHECKS = [
     ['research/kernel-lab/tests/test_chat.py', 'research/kernel-lab/tests/test_paint_health.py'],
@@ -387,8 +388,7 @@ class Builders:
                     said = []
                     self.assert_owned(state)
                     with self.lock:
-                        pending = state.get('pending', [])
-                        state['pending'] = []
+                        pending = self.take_pending(state)
                     if pending:
                         self.event(state, 'heard', 'delivering queued owner follow-up')
                         if not child.send('\n'.join(pending)):
@@ -429,6 +429,31 @@ class Builders:
             return True
         return False
 
+    def alex(self, person):
+        """Alex's own person, from the existing account mapping (never a name guess)."""
+        try:
+            accounts = json.loads((self.h.world / 'keep' / 'accounts.json').read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            return False
+        return bool(person) and accounts.get('desktop:alex') == person
+
+    def may_tell(self, state, task, msg):
+        """Alex, 28 Oct (dk1489): ownership is for being woken and for checking in, not a lock on talking. Anyone
+        with equal or higher authority over the card may tell its worker: its owner, the card's lead, a steward, Alex.
+        Returns how the caller holds that authority, or None."""
+        caller = msg.get('caller') or {}
+        person, name = caller.get('person'), str(caller.get('name') or '').strip()
+        if person and person == state['requester']:
+            return 'owner'
+        lead = str(task.get('lead') or '').strip()
+        if lead and (lead == person or (name and lead.casefold() == name.casefold())):
+            return 'lead'
+        if self.alex(person):
+            return 'Alex'
+        if self.steward(person):
+            return 'steward'
+        return None
+
     def owner(self, state):
         """The House agent (resident or JEFF) in charge of this worker, or None when Alex asked for it himself."""
         if state.get('manager'):
@@ -447,14 +472,30 @@ class Builders:
             self.session(state['requester']).call('/do', f'say {chat} text={q(words)}')
         except Exception as exc:                          # noqa: BLE001  the activity record still has it
             self.event(state, 'unsaid', str(exc))
+        with self.lock:
+            tellers, state['tellers'] = state.get('tellers') or [], []     # others whose words this turn followed
+            self.save(state)
+        left = MAX_TURNS - state.get('turns', 0)
+        agents = getattr(self.h, 'agents', {})
+        for t in tellers:
+            other = agents.get(t['person'])
+            if other is None:
+                self.event(state, 'told', f"{t['name']} told it this turn; not a House agent to wake (reads its chat)")
+                continue
+            other.wake(
+                f"~ The worker {state['name']} ({state['task']}), which you told something, finished a turn and says:\n"
+                f"{words}\n\n~ Its owner {state.get('requester_name') or state['requester']} is woken too and stays in "
+                f"charge of it. You may answer it with house.tell {state['task']} <your words> ({left} turns left).")
+            self.event(state, 'told', f"woke {t['name']}, who told it this turn ({t['as']})")
         agent = self.owner(state)
         if agent is None:
             self.event(state, 'told', 'posted in its chat; no resident to wake (Alex reads it there)')
             return
-        left = MAX_TURNS - state.get('turns', 0)
+        others = ', '.join(sorted({t['name'] for t in tellers}))
         agent.wake(
             f"~ Your worker {state['name']} ({state['task']}) finished a turn and says:\n{words}\n\n"
-            f"~ You are in charge of this worker. To answer it, run house.tell {state['task']} <your words>: that is "
+            + (f"~ This turn it also followed words from {others}; you are still in charge.\n" if others else '')
+            + f"~ You are in charge of this worker. To answer it, run house.tell {state['task']} <your words>: that is "
             f"its next instruction ({left} turns left). When its work is done and it says what it tested: "
             f"house.review {state['task']}, then house.land {state['task']} once the checks pass. Tell JEFF in Shop "
             f"talk when it lands, or when something needs Alex.")
@@ -466,14 +507,34 @@ class Builders:
             if state['requester'] != person or not state.get('pending'):
                 continue
             with self.lock:
-                if state['phase'] != 'received' or state['task'] in self.children:
+                if state['phase'] not in RESUMABLE or state['task'] in self.children:
                     continue
                 if self.full(state.get('provider', 'codex')):
                     self.event(state, 'held', 'resident replied, but all workers of this kind are busy; it waits')
                     continue
-                state['phase'] = 'preparing'
-                self.save(state)
+                self.reopen(state)
                 threading.Thread(target=self.guarded, args=(state, self.resume), daemon=True).start()
+
+    def take_pending(self, state):
+        """Hand the queued words to the worker; whoever said them (besides its owner) hears how this turn ends."""
+        pending, state['pending'] = state.get('pending', []), []
+        if pending:
+            state['tellers'], state['told_by'] = state.get('told_by') or [], []
+        self.save(state)
+        return pending
+
+    def reopen(self, state):
+        """A stopped worker (received, blocked, reviewed) takes a new turn in the same worktree. A review's receipts
+        are about a result that is about to change, so they move to `earlier_reviews` instead of standing as current."""
+        was = state['phase']
+        if was != 'received':
+            old = {k: state.pop(k) for k in ('review_base', 'candidate', 'checks', 'self_proof_sha256') if k in state}
+            if old:
+                state.setdefault('earlier_reviews', []).append(dict(old, phase=was, detail=state.get('detail', ''), at=stamp()))
+            self.event(state, 'reopened', f"was {was} ({str(state.get('detail', ''))[:300]}); a new turn on the same worktree")
+        state['reopened_from'] = was if was != 'received' else state.get('reopened_from', '')
+        state['phase'] = 'preparing'
+        self.save(state)
 
     def work(self, msg):
         """house.work <what to do, in plain words> [with=claude|codex]: a card for the caller and a worker on it."""
@@ -509,9 +570,11 @@ class Builders:
     def resume(self, state):
         self.assert_owned(state)
         with self.lock:
-            pending=state['pending'];state['pending']=[]
-            self.save(state)
-        self.run_worker(state, 'Owner follow-up on this same task. Retain its scope and all safety boundaries.\n'+'\n'.join(pending))
+            pending=self.take_pending(state)
+        prompt='Follow-up on this same task. Retain its scope and all safety boundaries.\n'+'\n'.join(pending)
+        if not state.get('session'):      # stopped before any model thread: the worker has not read its task yet
+            prompt=self.prompt(state,self.session(state['requester']).look(state['task']))+'\n'+prompt
+        self.run_worker(state, prompt)
 
     def retry(self, msg):
         """Only a proven pre-thread startup failure; never replay an unknown turn."""
@@ -539,34 +602,59 @@ class Builders:
     def tell(self, msg, hold=False):
         state=self.states.get(msg.get('args',{}).get('target'))
         words=str(msg.get('args',{}).get('words') or '').strip()
-        if not state or not self.may_act(state, msg):
-            return {'refused':'only the requester may continue this builder'}
+        if not state:
+            return {'refused':'this card has no worker; house.build or house.work starts one'}
+        task=self.session(state['requester']).look(state['task'])
+        caller=msg.get('caller') or {}
+        how=self.may_tell(state, task, msg)
+        if not how:
+            return {'refused':"only the worker's owner, the card's lead, a steward or Alex may tell this worker"}
         if not words:
             return {'refused':'house.tell <task> <words>: provide a follow-up'}
-        task=self.session(state['requester']).look(state['task'])
         if held(task) or task.get('build_run') != state['run'] or task.get('who','') != state.get('task_owner',''):
             return {'refused':'task is held or claim changed; message did not wake it'}
         with self.lock:
-            if state['phase'] not in ('asked','preparing','working','received'):
-                return {'refused':'builder needs review or recovery; message did not restart it'}
+            phase=state['phase']
+            if phase in ('landed','released'):
+                return {'refused':f'this worker is {phase}; start a new run with house.build {state["task"]}'}
+            if phase not in ('asked','preparing','working') and phase not in RESUMABLE:
+                # reviewing/landing: the House is acting on its result now; uncertain/recovery-needed: a process
+                # may still be alive or a write's outcome is unknown, so a new turn could run twice.
+                return {'refused':f'worker is {phase}; reconcile it before a new turn (message did not restart it)'}
+            if phase in RESUMABLE and state['task'] not in self.children and not state.get('tree'):
+                return {'refused':'worker stopped before its worktree was made; house.retry '+state['task']+' starts it'}
             if len(state.setdefault('pending',[])) >= 10:
                 return {'refused':'ten follow-ups already pending; no more were queued'}
             if state.get('turns',0) >= MAX_TURNS:
                 return {'refused':f'this worker has had {MAX_TURNS} turns; review it, or start a new card'}
+            if how!='owner':  # the worker knows who said it; the owner stays in charge and is still woken
+                name=caller.get('name') or caller.get('person') or 'someone'
+                words=f'From {name} ({how}; {state.get("requester_name") or "your owner"} stays in charge): {words}'
+                added=not any(t['person']==caller.get('person') for t in state.setdefault('told_by',[]))
+                if added:
+                    state['told_by'].append(dict(person=caller.get('person'),name=name,**{'as':how}))
             if hold:          # said during the resident's own turn: starts the worker when that turn ends
                 state['pending'].append(words[:8000])
                 self.event(state,'heard',words)
                 return {'text':'follow-up retained until your turn ends','external':True}
-            if state['phase']=='received' and state['task'] not in self.children and self.full(state.get('provider','codex')):
+            resume=phase in RESUMABLE and state['task'] not in self.children
+            if resume and self.full(state.get('provider','codex')):
+                if how!='owner' and added:state['told_by'].pop()
                 return {'refused':'builder capacity is occupied; follow-up did not start or queue another builder'}
             # Explicit owner correction replaces the task basis, never its authority.
             state['basis']={k:task.get(k,'') for k in ('title','text','acceptance','who')}
             state['pending'].append(words[:8000])
             self.event(state,'heard',words)
-            if state['phase']=='received' and state['task'] not in self.children:
-                state['phase']='preparing';self.save(state)
+            if how!='owner':
+                self.event(state,how,f"{caller.get('name') or caller.get('person')} told it as {how}, not its owner")
+            if resume:
+                self.reopen(state)
                 threading.Thread(target=self.guarded,args=(state,self.resume),daemon=True).start()
-        return {'text':'follow-up retained for this builder; it will be read at the next turn boundary','external':True}
+        told='' if how=='owner' else '; its owner is woken when it ends that turn, and so are you'
+        if resume and phase!='received':
+            return {'text':f'worker was {phase}; it resumes with your words in a new turn on the same worktree{told}',
+                    'external':True}
+        return {'text':f'follow-up retained for this builder; it will be read at the next turn boundary{told}','external':True}
 
     def hear(self, msg):
         if msg.get('word')!='say' or not msg.get('said'):
