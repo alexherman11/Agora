@@ -338,7 +338,9 @@ class GuiScreen(Screen):
     def start(self, then):
         import widget_guard
         import window_profiles
+        import window_transparency
         window_profiles.install()
+        window_transparency.install()
         widget_guard.install()
         # pywebview needs a window before start: a hidden one that holds the loop and shows nothing
         self.anchor = self.webview.create_window("Agora window host", html="<html></html>", hidden=True,
@@ -349,13 +351,15 @@ class GuiScreen(Screen):
         s = scale()
         x, y, w, h = box
         api = PageApi(self, wid)
+        glassy = view in SHELL_VIEWS and bar in ("top", "bottom")
         win = self.webview.create_window(title, url, js_api=api, x=int(x / s), y=int(y / s), width=max(200, int(w / s)),
                                          height=max(30, int(h / s)), frameless=True, easy_drag=False, on_top=bool(bar) and bar != "layer", min_size=(120, 24),
-                                         background_color="#F6F3EC", text_select=True, hidden=True,
-                                         transparent=view in SHELL_VIEWS and bar in ("top", "bottom"))
+                                         background_color="#F6F3EC", text_select=True, hidden=True, transparent=glassy)
         rec = {"w": win, "hwnd": None, "view": view, "bar": bar}
         with self.lock:
             self.wins[wid] = rec
+        if glassy:
+            win.agora_navigated = lambda ok: self._bar_page(wid, url, ok)   # window_transparency
 
         def shown_once():
             try:
@@ -372,6 +376,8 @@ class GuiScreen(Screen):
 
         def loaded():
             if rec["hwnd"] is None:
+                if rec.get("page_failed"):
+                    return                                  # an error page is never shown; _bar_page tries again
                 if bar and bar != "layer":
                     # A bar is a tool window before it is ever visible. 27 Oct: shown first, it was for a moment a
                     # visible frameless Agora window, the window manager took the dock for a tile and moved it.
@@ -379,6 +385,11 @@ class GuiScreen(Screen):
                         early = int(win.native.Handle.ToInt64())
                         ex = user32.GetWindowLongPtrW(early, GWL_EXSTYLE)
                         user32.SetWindowLongPtrW(early, GWL_EXSTYLE, (ex | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW)
+                        if glassy:
+                            # dk1136: on glass before it is ever visible. Off glass, the transparent page drew the
+                            # whole window white (3840x840, 2340x690) for the moment between this show and _make_bar.
+                            import shell_native
+                            shell_native.glass(early)
                     except Exception:
                         pass
                 if tucked and not bar:
@@ -439,7 +450,7 @@ class GuiScreen(Screen):
             import shell_native
             shell_native.glass(hwnd)
             placed = shell_native.bar_placer(view, hwnd, lambda h: user32.ShowWindow(h, SW_SHOWNOACTIVATE), scale,
-                                             lambda: self.bar_hidden.get(wid))
+                                             lambda: not self._bar_may_show(wid))
             height = shell_native.initial_reserve(view, scale())
         self.bar_hidden[wid] = False
         try:
@@ -466,10 +477,47 @@ class GuiScreen(Screen):
                 self.bar_hidden[wid] = full
                 if full:
                     user32.ShowWindow(hwnd, SW_HIDE)
-                else:
+                elif self._bar_may_show(wid):
                     user32.ShowWindow(hwnd, SW_SHOWNOACTIVATE)
                     user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE)
             time.sleep(0.5)
+
+    def _bar_may_show(self, wid):
+        rec = self.wins.get(wid) or {}
+        return not self.bar_hidden.get(wid) and not rec.get("page_failed")
+
+    def _bar_page(self, wid, url, ok):
+        """A see-through bar's navigation ended (window_transparency; GUI thread). WebView2's error page is opaque and
+        DWM does not clip it to the region, so a bar on one would be a big white block (dk1136): hidden, and its page
+        tried again until it comes. A page that arrives shows the bar again (unless a game is full screen)."""
+        rec = self.wins.get(wid)
+        if not rec:
+            return
+        failed, rec["page_failed"] = rec.get("page_failed"), not ok
+        hwnd = rec["hwnd"]
+        if not ok:
+            if hwnd:
+                user32.ShowWindow(hwnd, SW_HIDE)
+            if not failed:
+                log(f"window {wid}: its page did not load; hidden, trying again every 5 s")
+
+            def again():
+                time.sleep(5)
+                if self.wins.get(wid) is rec and rec.get("page_failed") and wid not in self.closing:
+                    try:
+                        # Not Window.load_url (it waits for `shown`, which a bar WinForms never showed never sets), nor
+                        # the control's Source (it ignores the URL it already holds, the failed one): Navigate itself.
+                        from System import Func, Type
+                        form = rec["w"].native
+                        rec["w"].events.loaded.clear()
+                        form.Invoke(Func[Type](lambda: form.browser.webview.CoreWebView2.Navigate(url)))
+                    except Exception as exc:            # noqa: BLE001  the next failure, if any, tries again
+                        log(f"window {wid}: trying its page again: {exc!r}")
+            threading.Thread(target=again, daemon=True, name="bar-page-again").start()
+        elif failed:
+            log(f"window {wid}: its page loaded")
+            if hwnd and wid in self.bars and self._bar_may_show(wid):
+                user32.ShowWindow(hwnd, SW_SHOWNOACTIVATE)
 
     def close(self, wid):
         with self.lock:
