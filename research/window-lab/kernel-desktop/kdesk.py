@@ -489,6 +489,9 @@ def start(world=DEFAULT_WORLD, port=8810, modules=True, headless=False, resident
     if manager_manifest is not None:
         from agents.new_manager import install as install_manager, load_manifest as load_manager_manifest
         install_manager(k, entry, load_manager_manifest(manager_manifest))
+    added = worker_sessions(k, entry)
+    if added:
+        print(f"kdesk: worker sessions for {', '.join(added)}", flush=True)
     k.dev_sessions = lambda: entry.sessions             # the door's /dev/signin knows these sessions
     handler = make_desk_handler(k, entry)
     srv = DesktopServer(("127.0.0.1", port), handler)
