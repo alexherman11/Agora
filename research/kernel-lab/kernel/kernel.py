@@ -37,9 +37,26 @@ class Actor:
     def __init__(self, id, person, kind, module=None, caller=None):
         self.id, self.person, self.kind, self.module, self.caller = id, person, kind, module, caller
         self.seen_key = id   # hosts may separate observations without changing lasting authorship
+        self.session = None  # the door's sign-in this actor came through (a digest, never the token): as= names last for it
 
     def __repr__(self):
         return f"Actor({self.id} for {self.person}, {self.kind})"
+
+
+class _Names(dict):
+    """A sign-in's as= names, newest last; a supplied name (help $) is never kept, and the oldest go past the cap."""
+
+    def __init__(self, supplied, cap):
+        super().__init__()
+        self.supplied, self.cap, self.new = supplied, cap, None      # new: the last thing made ($new)
+
+    def __setitem__(self, name, thing):
+        if name in self.supplied:
+            return
+        self.pop(name, None)
+        super().__setitem__(name, thing)
+        while len(self) > self.cap:
+            del self[next(iter(self))]
 
 
 class Tx:
@@ -101,6 +118,7 @@ class Kernel:
         self._rules_q = None                           # rules' own thread, started by the first happening one answers
         self.rules_fired = []                          # the last rules that ran: (rule, happening n, what it said)
         self.turns = {}                                # agent id -> the turn it is working: {because, work, since}
+        self.names = {}                                # (actor, sign-in) -> {as= name: thing}: in memory, never the world
         from .kinds import Kinds
         from .bonds import Bonds
         self.kinds = Kinds(self)                       # kinds as needs, aspect spellings, promises (kinds.py)
@@ -1134,16 +1152,30 @@ class Kernel:
         out = {"ok": True, "text": "", "rows": [], "records": [], "made": []}
         texts = []
         handles = {}
+        kept = self.session_names(actor)
+        last = kept.new if kept is not None else None
         for i, s in enumerate(steps):
-            s = self.fill_handles(s, handles)
+            if L.parse(s).word not in ("help", "?"):         # help $today asks about the word, not today's date
+                s = self.fill_handles(s, handles)
+                # as= names from earlier lines of this sign-in, and $me $here $today $now $new; outside quotes (dk1368)
+                s = self.fill_names(s, {**self.plain_fills(actor, last), **(kept or {})})
             pressed = pressed_id = None
             try:
+                self.reserved_as(s)
                 s, pressed, pressed_id = self.pressed_line(actor, s)   # press <button>: its does= runs here, typed
                 r = self.step(actor, s, press=press if len(steps) == 1 else None, saw=saw, mode=mode)
                 if pressed:
                     r = dict(r, text=f"pressed {pressed}: {r.get('text', '')}")
                 self.keep_handle(s, r.get("made"), handles)
+                if r.get("made"):
+                    last = r["made"][-1]
+                if kept is not None:
+                    self.keep_handle(s, r.get("made"), kept)
+                    kept.new = last
             except Refused as exc:
+                unnamed = self.unfilled_names(s)
+                if unnamed:
+                    exc = Refused(f"{exc}; " + self.unnamed_why(unnamed, kept), kept=getattr(exc, "kept", None))
                 # a pressed button's refusal names the line it ran, so a receipt or `refusals` says which line failed
                 texts.append(f"refused: pressing {pressed} ran {s}: {exc}" if pressed else f"refused: {exc}")
                 if getattr(exc, "kept", None):
@@ -1192,13 +1224,81 @@ class Kernel:
         """`$name` -> the thing a step earlier in the same line or answer made with `as=name` (the desk's form)."""
         if not handles or "$" not in text:
             return text
-        return L.re.sub(r"\$([a-z][a-z0-9_]*)\b", lambda m: handles.get(m.group(1), m.group(0)), text)
+        if "new" in handles:                           # $new fills only where a thing goes, as the plain fills do
+            text = Kernel.fill_names(text, {"new": handles["new"]})
+        return L.re.sub(r"\$([a-z][a-z0-9_]*)\b",
+                        lambda m: m.group(0) if m.group(1) == "new" else handles.get(m.group(1), m.group(0)), text)
 
     @staticmethod
     def keep_handle(text, made, handles):
         name = L.parse(text).kv.get("as")
         if name and made:
             handles[name] = made[-1]
+        if made:
+            handles["new"] = made[-1]                  # $new: the last thing made by an earlier step
+
+    # the names the kernel fills itself, never an as= name: in any line ($me $here $today $now $new), and where a
+    # verb, a rule, the painter or a component lens runs ($target $this $by $item $carried $view $viewer). help $
+    SUPPLIED = frozenset({"me", "here", "today", "now", "new", "target", "this", "by", "item", "carried", "view",
+                          "viewer"})
+    SESSION_NAMES = 64                                 # a sign-in keeps its last 64 as= names; older ones are dropped
+
+    def plain_fills(self, actor, last=None):
+        """What `$me $here $today $now $new` say in a line: who is acting (an agent is itself), the place, the
+        kernel's date and time (UTC), and the last thing made earlier in this line or sign-in (`$new`)."""
+        now = self.now()
+        out = {"me": actor.id, "here": self.place, "today": now.date().isoformat(),
+               "now": now.strftime("%Y-%m-%dT%H:%M:%SZ")}
+        if last:
+            out["new"] = last
+        return out
+
+    def reserved_as(self, text):
+        name = L.parse(text).kv.get("as")
+        if name in self.SUPPLIED:
+            raise Refused(f"as={name}: ${name} is a fill-in the kernel supplies, so it can't name a thing; "
+                          f"choose another name (help $ lists them)")
+
+    def session_names(self, actor):
+        """-> the dict of as= names this actor's sign-in keeps, or None where none last (a rule's line, or a line run
+        inside another line). In memory only: a kernel restart forgets them, and nobody else's sign-in sees them."""
+        if getattr(self._local, "runs", 0) > 1 or getattr(self._local, "rule", None):
+            return None
+        return self.names.setdefault((actor.id, actor.session), _Names(self.SUPPLIED, self.SESSION_NAMES))
+
+    QUOTED = L.re.compile(r"\"(?:\\.|[^\"\\])*\"?|'(?:\\.|[^'\\])*'?")
+    NAME = L.re.compile(r"\$([a-z][a-z0-9_]*)\b")
+
+    @classmethod
+    def fill_names(cls, text, names):
+        """`$name` -> what an earlier line of this sign-in made with as=name, or a plain fill ($me …). Only where a
+        thing goes: never inside quoted text, so a verb's steps="... $card" or a note about $today keeps its words."""
+        if not names or "$" not in text:
+            return text
+        out, at = [], 0
+        for q in list(cls.QUOTED.finditer(text)) + [None]:
+            end = q.start() if q else len(text)
+            out.append(cls.NAME.sub(lambda m: names.get(m.group(1), m.group(0)), text[at:end]))
+            if q:
+                out.append(q.group(0))
+                at = q.end()
+        return "".join(out)
+
+    def unfilled_names(self, text):
+        """The `$name`s left in a line outside quotes, other than what a later part fills itself."""
+        bare = self.QUOTED.sub(" ", text or "")
+        return [n for n in dict.fromkeys(self.NAME.findall(bare)) if n == "new" or n not in self.SUPPLIED]
+
+    def unnamed_why(self, unnamed, kept):
+        if unnamed == ["new"]:
+            return "$new is the last thing made, and nothing was made yet in this line or sign-in"
+        unnamed = [n for n in unnamed if n != "new"]
+        said = ", ".join("$" + n for n in unnamed)
+        if kept is None:
+            return f"{said} names nothing here: a line run by a rule or inside another line has only its own as= names"
+        have = ", ".join("$" + n for n in kept) or "none yet"
+        return (f"{said} names nothing: no earlier line of this sign-in said as={unnamed[0]} (yours: {have}). "
+                f"as= names last for your sign-in until the kernel restarts; help $ lists every fill-in")
 
     def step(self, actor, text, press=None, saw=None, mode="do"):
         from .words import KERNEL
@@ -1337,10 +1437,11 @@ class Kernel:
         args = ([st.target] if st.target else []) + st.words.split()
         raw_steps = entry.get('steps_bound') or entry.get("steps") or ""
         # names a later part of the line fills itself: handles (as=card) and what the painter and rules supply
-        later = set(L.re.findall(r"\bas=([a-z][a-z0-9_]*)", raw_steps)) | {"today", "by", "carried", "target"}
+        later = set(L.re.findall(r"\bas=([a-z][a-z0-9_]*)", raw_steps)) | self.SUPPLIED
         unfilled = "\x00unfilled\x00"
+        plain = {k_: v for k_, v in self.plain_fills(actor).items() if k_ != "new"}   # $me $here $today $now
         free = " ".join(args).strip()
-        if free and not L.re.search(r"\$([1-9*]|target\b)", raw_steps):
+        if free and not L.re.search(r"\$([1-9*]|target\b|this\b)", raw_steps):
             # task.add "buy milk": free words where a verb has no place for them fill its first setting nobody gave
             first = next((n for n in L.re.findall(r"=\$([a-z][a-z0-9_]*)\b", raw_steps)
                           if n not in st.kv and n not in later), None)
@@ -1353,8 +1454,10 @@ class Kernel:
             import shlex
             def sub(m):
                 key = m[1]
-                if key == "target":
+                if key in ("target", "this"):            # $this: the old desk's word for the thing a verb is on
                     return st.target or (args[0] if args else "")
+                if key in plain and key not in st.kv:
+                    return plain[key]
                 if key == "*":
                     return " ".join(args)
                 if key.isdecimal():
@@ -1362,7 +1465,7 @@ class Kernel:
                 if key in st.kv:
                     return shlex.quote(st.kv[key])
                 return m[0] if key in later else unfilled
-            out = L.re.sub(r"\$(target\b|[1-9]|\*|[a-z][a-z0-9_]*\b)", sub, x)
+            out = L.re.sub(r"\$(target\b|this\b|[1-9]|\*|[a-z][a-z0-9_]*\b)", sub, x)
             # a key=$name nobody gave is left out, not stored as "$name" (and a set does not erase that fact)
             out = L.re.sub(r"\s*\b[a-z_][a-z0-9_.-]*=" + unfilled, "", out)
             return out.replace(unfilled, "")
@@ -1661,7 +1764,8 @@ class Kernel:
                 if not self.may_hear(actor.person, h) or not self._rule_hears(rid, r, h, actor):
                     continue
             by = "" if h.get("by") == "sealed" else str(h.get("for") or h.get("by") or "")
-            line = str(r.get('do_bound') or r.get("do") or "").replace("$target", h.get("target") or "").replace("$by", by)
+            line = L.re.sub(r"\$(target|item)\b", lambda m: h.get("target") or "",       # $item: the old desk's word
+                            str(r.get('do_bound') or r.get("do") or "")).replace("$by", by)
             resting = self._rule_rests(line)
             if resting:
                 self.rules_fired = (self.rules_fired + [(rid, h.get("n"), f"resting: {resting} is off")])[-50:]

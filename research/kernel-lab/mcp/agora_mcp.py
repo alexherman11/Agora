@@ -36,7 +36,8 @@ def route_of(line):
 
 def tools_list():
     batch = ("Each line runs on its own, in order: a refused line refuses only itself and the rest still run. "
-             "A line's as=<name> lets a later line say $<name> for the thing it made.")
+             "A line's as=<name> lets a later line say $<name> for the thing it made, in this call or a later one "
+             "(names last for the sign-in; help $ lists every $ fill-in).")
     schema = {"type": "object", "properties": {"line": {"type": "string", "minLength": 1}, "lines": LINES},
               "additionalProperties": False}
     return [{"name": name, "description": desc,

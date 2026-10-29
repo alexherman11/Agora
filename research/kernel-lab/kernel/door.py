@@ -13,6 +13,7 @@ research/community-app/site/SEAM.md). An `as` in the body is ignored.
 The shared secret comes from the environment (KERNEL_SHARED_SECRET), never from a file this code writes.
 """
 import argparse
+import hashlib
 import hmac
 import json
 import os
@@ -115,7 +116,10 @@ def make_handler(kernel, entry, secret):
             pid = kernel.accounts.get(who["account"])
             if pid is None:
                 return None, "this account has not joined the place yet"
-            return kernel.actor_for(pid, who.get("agent")), None
+            actor = kernel.actor_for(pid, who.get("agent"))
+            # as= names last for this sign-in (dk1368): keyed by a digest, so the token itself is never kept
+            actor.session = hashlib.sha256(token.encode()).hexdigest()[:16]
+            return actor, None
 
         def _raw(self, code, data, ctype, extra=()):
             self.send_response(code)
