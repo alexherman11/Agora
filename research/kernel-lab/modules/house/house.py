@@ -261,6 +261,12 @@ class Agent:
 
     def _event(self, ev):
         e = ev["e"]
+        source = ev.get("child")
+        if e in ("init", "exit") and source is not None and source is not self.child:
+            # A replaced process (stopped for quota, or restarted) reports late. Its exit must not drop the new one,
+            # or the new one runs on unseen and holds the conversation (JEFF, 28 Oct to 2 Nov 2026).
+            self.log("stale", {"e": e, "code": ev.get("code")})
+            return
         if e == "init":
             with self.lock:
                 self.state["session"] = ev["session"]

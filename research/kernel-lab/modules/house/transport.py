@@ -117,8 +117,9 @@ class Child:
             if ev.get("type") == "result":
                 self.codex_streamed = False
             for out in reduce(ev):
+                out["child"] = self                # whose event: a replaced process's late exit must not end its successor
                 self.events.put(out)
-        self.events.put({"e": "exit", "code": self.proc.wait()})
+        self.events.put({"e": "exit", "code": self.proc.wait(), "child": self})
 
     def stop(self):
         if self.alive():
@@ -126,7 +127,16 @@ class Child:
                 self.proc.stdin.close()
                 self.proc.wait(timeout=10)
             except Exception:                    # noqa: BLE001
-                self.proc.kill()
+                kill_tree(self.proc)
+
+
+def kill_tree(proc):
+    """End a process and what it started. On Windows the venv python.exe is a launcher whose child is the real
+    interpreter, so killing only the launcher left JEFF's codex resident running for five days (2 Nov 2026)."""
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True, creationflags=NO_WINDOW)
+    else:
+        proc.kill()
 
 
 def reduce(ev):
