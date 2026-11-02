@@ -21,7 +21,7 @@ export default {mount(api, s) {
 
   const click = async () => {
     unhover(true);
-    if (!n) { await K.ran(Data.act(x.line || `window.launch path=${x.exe}`)); return K.poke('windows'); }
+    if (!n) { await K.ran(Data.launch(x.line || `window.launch path=${JSON.stringify(x.exe)}`, x.exe)); return K.poke('windows'); }
     const st = dock().state;
     // the dock takes the focus when pressed, so the app in front a moment ago counts as in front (unless it is minimised)
     const f = x.wins.find((w) => w.focused) || x.wins.find((w) => w.key === st.lastFront && st.noFocus && w.state !== 'minimised');
@@ -31,7 +31,7 @@ export default {mount(api, s) {
   };
   const fresh = () => {
     if (x.launcher) return K.ran(Data.act(`${x.line} new=yes`));
-    if (x.exe) return K.ran(Data.act(`window.launch path=${x.exe}`));
+    if (x.exe) return K.ran(Data.launch(`window.launch path=${JSON.stringify(x.exe)}`, x.exe));
     if (x.wins[0] && x.wins[0].agora) return K.ran(Data.act(`window.open ${x.wins[0].shows} new=yes`));
     return null;
   };
