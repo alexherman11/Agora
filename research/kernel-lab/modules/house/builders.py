@@ -1008,8 +1008,8 @@ class Builders:
 and their answer is your next instruction. Ask them when something is unclear instead of guessing.
 Task: {state['title']} ({state['task']}). Task text: {task.get('text', '')}
 Acceptance: {task.get('acceptance', '') or 'what the task text asks for, working and tested'}
-You work only in this worktree, on this task. Read AGENTS.md first; its `read a6529 :3` line points at the
-archived old desk, so skip it (the rules it lists are current). Use the Agora tools (see, do, lines) to read the
+You work only in this worktree, on this task. Read AGENTS.md first, then Alex's live standing rules with the
+Agora tools (see `look dk838`). Use the Agora tools (see, do, lines) to read the
 world; never change credentials, security settings or providers, and never start another worker.
 No visible test windows (hidden fixtures only), no pushes, no merging to main, no deleting other people's work, no
 stopping Alex's programs. If something is denied, stop and say so; do not route around it.
