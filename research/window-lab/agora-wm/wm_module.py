@@ -30,7 +30,7 @@ HELP={
  'close':('do','<key>','Ask the window politely to close with WM_CLOSE; never kill a process.'),
  'pin':('do','<key>','Keep this window fixed. Screen state, kept by this window manager, never in the world.'),
  'unpin':('do','<key>','Let this pinned window move again. Screen state, never in the world.'),
- 'arrange':('do','','Re-solve the current layout, preserving already legal windows.'),
+ 'arrange':('do','[expect=<exe>]','Re-solve the layout; expect arms one bar-requested shared layout for a new executable window, for at most five seconds. Exclusive fullscreen is unsupported.'),
  'mode':('do','live|shadow|off','Shadow computes only; live needs rollout arming; off releases every saved placement.'),
  'leave-alone':('do','<app>','Treat this app as fixed obstacles. Undoable world intent.'),
  'manage':('do','<app>','Remove an app exclusion (undoable); in adopted mode also adopts its current windows (screen state, kept locally).'),
@@ -129,8 +129,8 @@ class WMModule:
         if word=='windows':
             with self.lock:return {'rows':self.manager.reading(),'text':f'{len(self.manager.rows)} windows; {self.manager.mode}'}
         if word in ('focus','minimise','restore','close'):
-            return self._request('action',word,target)
-        if word=='arrange':return self._request('arrange')
+            return self._request('action',word,target,kv.get('share')=='yes')
+        if word=='arrange':return self._request('arrange',kv.get('expect'))
         settings=self.read_intent(msg.get('use'));sid=settings['id'];saw={sid:settings['rev']}
         if word=='mode':
             mode=target
@@ -206,6 +206,9 @@ class WMModule:
                 try:
                     if op=='action':
                         value=manager.action(*args);answer.put({'external':args[0]=='close','text':f'wm.{args[0]}: '+('Windows refused focus' if value is False else 'requested')})
+                    elif args and args[0]:
+                        manager.request_share(expect=args[0])
+                        answer.put({'text':'shared layout awaits requested executable window (five seconds)'})
                     else:
                         manager.state=solve(manager.state,{'type':'arrange'}).state
                         answer.put({'text':'layout re-solved'})

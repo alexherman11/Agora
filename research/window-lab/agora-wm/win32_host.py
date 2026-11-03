@@ -177,6 +177,14 @@ class _MONITORINFO(C.Structure):
 
 
 u.MonitorFromWindow.restype=W.HMONITOR;u.MonitorFromWindow.argtypes=[W.HWND,W.DWORD]
+sig(u,'GetMonitorInfoW',W.BOOL,W.HMONITOR,C.POINTER(_MONITORINFO))
+
+
+def covers_monitor(hwnd):
+    r=rect(hwnd,False);mi=_MONITORINFO();mi.cbSize=C.sizeof(mi)
+    if not u.GetMonitorInfoW(u.MonitorFromWindow(hwnd,2),C.byref(mi)):return False
+    m=mi.rcMonitor
+    return r.x<=m.left and r.y<=m.top and r.right>=m.right and r.bottom>=m.bottom
 
 
 def _foreground_covers_monitor():
@@ -241,15 +249,20 @@ class Native:
             elif not style&0x00C00000 and not rule.get('manage') and not agora:why='frameless; no app rule'
             owned=bool(u.GetWindow(hwnd,4))   # GW_OWNER: a dialog or popup belongs to its owner, not the layout
             if not why and owned:why='owned dialog or popup'
-            preferred=[r.w,r.h]
-            if u.IsIconic(hwnd):
+            preferred=[r.w,r.h];normal=None
+            maximised=bool(u.IsZoomed(hwnd)) and not u.IsIconic(hwnd)
+            if u.IsIconic(hwnd) or maximised:
                 try:
-                    normal=self.placement(ref)['normal'];preferred=[normal[2]-normal[0],normal[3]-normal[1]]
+                    box=self.placement(ref)['normal'];preferred=[box[2]-box[0],box[3]-box[1]]
+                    normal=[box[0],box[1],*preferred]
                 except OSError:pass
+            screen_sized=not u.IsIconic(hwnd) and not maximised and covers_monitor(hwnd)
             rows.append({'key':ref.key,'app':app,'exe':ref.process['exe'],'icon':ref.process['exe'],
                 'agora':agora,'state':'minimised' if u.IsIconic(hwnd) else 'normal','focused':hwnd==front,
                 'rect':r.values(),'space':'primary','managed':not why,'why':why,'ref':ref,'_preferred':preferred,
-                'owned':owned,'maximised':bool(u.IsZoomed(hwnd)) and not u.IsIconic(hwnd)})
+                '_normal':normal,'owned':owned,'maximised':maximised,
+                'share_candidate':screen_sized and why=='frameless; no app rule',
+                'display_mode':'maximised' if maximised else 'screen-sized (exclusive unknown)' if screen_sized else 'windowed'})
             return True
         callback=ENUM(each);u.EnumWindows(callback,0)
         return rows
