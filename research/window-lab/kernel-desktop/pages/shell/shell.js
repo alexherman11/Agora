@@ -144,6 +144,7 @@ const Shell = (() => {
 
   // ------------------------------------------------------------------------------------------------ icons
   const AGORA_APPS = {
+    viewer: ["Viewer", "window.open viewer"],
     lines: ["Lines", "window.open lines"], help: ["Help", "window.open help"], board: ["Board", "window.open board"],
     taskboard: ["Task board", "window.open taskboard-components"], appearance: ["Appearance", "window.open appearance"],
     feed: ["Feed", "window.open feed"], thing: ["Thing", "window.open thing"], tasks: ["Running windows", "window.open tasks"],
@@ -719,7 +720,7 @@ const Shell = (() => {
         g.get(k).wins.push(w);
       }
       const apps = (S.settings.dock_apps || "lines,help,board,taskboard,appearance,feed").split(/[ ,]+/).filter(Boolean)
-        .filter((n) => AGORA_APPS[n] && (["lines", "help", "thing", "tasks"].includes(n) || S.lenses.has(n) || window.__fx));
+        .filter((n) => AGORA_APPS[n] && (["viewer", "lines", "help", "thing", "tasks"].includes(n) || S.lenses.has(n) || window.__fx));
       const pinned = [];
       for (const n of apps) pinned.push({ id: "app:" + n, app: AGORA_APPS[n][0], exe: "", icon: "agora:" + n, wins: [], line: AGORA_APPS[n][1], launcher: n, pin: { id: "" } });
       const launched = new Set(pinned.map((p) => p.line));

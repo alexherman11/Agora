@@ -116,6 +116,7 @@ def after_genesis(k, headless=False):
         steward = next((t for t in k.things("person") if k.is_steward(t)), None)
         have = {k.state.get(m, "name") for m in k.things("module")}
         new = [spec for spec in module_specs(headless) if spec["name"] not in have]
+        viewer_pin = not k.state.get(k.place, "viewer_installed")
         for m in k.things("module"):
             if k.state.get(m, "name") in ABOUT and steward and not k.state.get(m, "for"):
                 todo.append((m, "for", steward))
@@ -148,10 +149,16 @@ def after_genesis(k, headless=False):
                 widen.append((m, " ".join(more), spec.get("only")))
             if str(k.state.get(m, "asks") or "") != spec["grants"]:
                 todo.append((m, "asks", spec["grants"]))
-        if not todo and not new:
+        if not todo and not new and not viewer_pin:
             return _widen(k, steward, widen)
         tx = Tx(k)
         tx.part("install", None, "install")
+        if viewer_pin:
+            pin = tx.mint()
+            for a, v in (("kind", "button"), ("name", "viewer-launcher"), ("label", "Viewer"),
+                         ("bar", "taskbar"), ("does", "window.open viewer")):
+                tx.set(pin, a, v)
+            tx.set(k.place, "viewer_installed", True)
         for t, a, v in todo:
             tx.set(t, a, v)
         for spec in new:                     # a module this desktop gained after the world was founded, as genesis says it

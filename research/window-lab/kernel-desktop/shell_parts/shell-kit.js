@@ -73,6 +73,7 @@ const ShellKit = (() => {
 
   // ------------------------------------------------------------------------------------------------ icons
   const AGORA_APPS = {
+    viewer: ['Viewer', 'window.open viewer'],
     lines: ['Lines', 'window.open lines'], help: ['Help', 'window.open help'], board: ['Board', 'window.open board'],
     taskboard: ['Task board', 'window.open taskboard-components'], appearance: ['Appearance', 'window.open appearance'],
     feed: ['Feed', 'window.open feed'], thing: ['Thing', 'window.open thing'], tasks: ['Running windows', 'window.open tasks'],
