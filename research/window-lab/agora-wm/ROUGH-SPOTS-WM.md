@@ -72,3 +72,18 @@ Both restore routes wait for native geometry to settle before placement, using t
 existing restore acknowledgement. Regressions live in `test_adaptive.py`; the
 guarded, HWND-allowlisted `hidden_restore.py` exercises four native fixtures and
 repeated dock/external restore races. No live activation or real Spotify launch.
+
+## 2 November 2026 — policy handoff without geometry release (dk1706)
+
+Builder draft for independent review. Missing world words: **reload compatible
+WM policy while retaining its screen state and lease**, and **return to the
+previous policy generation**. `policy_reload.py`, `wm_module.py` and the strict
+read-only context in `win32_host.py` add wm.policy/reload/rollback using the
+existing WM thread and watchdog. Constructors, native safety and controller/
+engine/lease ABI are frozen. No process replacement or live activation occurred;
+the old live module lacks a receiver, so bootstrap remains blocked.
+
+`shell-kit.js` also retains plain focus for pinned dock entries; the landed
+share route rejected them. Focused fake-native/controller and dock-component
+checks are supplied for House execution. See `POLICY-RELOAD-dk1706.md` for
+refusals, rollback, exact guard rejection and remaining native acceptance.

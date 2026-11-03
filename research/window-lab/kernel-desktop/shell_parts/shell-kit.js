@@ -181,6 +181,7 @@ const ShellKit = (() => {
     },
     // actions: wm.* when the manager answers, the native shell otherwise
     focus(w) {
+      if (this.wmOK && w.state === 'pinned') return this.act(`wm.focus ${w.key}`);
       if (this.wmOK) return this.act(w.state === 'minimised' ? `wm.restore ${w.key} share=yes` : `wm.focus ${w.key} share=yes`);
       if (w.agora) return this.act(`window.focus ${w.agora}`);
       return this.act(`window.activate handle=${w.key}`);
