@@ -18,15 +18,16 @@ def output(id="ss1", **overrides):
                            hits=[dict(id=id, evidence="foreground silhouette")], **overrides))
 
 
-def test_semantic_can_discover_without_keyword_admission_and_filters_upload_distractor():
+def test_semantic_hard_filter_abstains_without_validated_provenance():
     query = "remove a background without uploading"
     good = row(search_processing="local", search_evidence="Synthetic reviewed manual")
     bad = dict(good, id="ss2", title=query, search_processing="cloud")
     records = S.descriptors([good, bad])
     assert not S.lexical(query, [records[0]])
     semantic = S.decode(output(), query, records)
-    result = S.merge(query, records, [good, bad], semantic)
-    assert [r["id"] for r in result["hits"]] == ["ss1"]
+    result = S.merge(query, records, [good, bad], semantic, confirmed={"local"})
+    assert result["hits"] == []
+    assert result["capabilities"] == "unverified"
 
 
 @pytest.mark.parametrize("mutation", [
@@ -38,8 +39,10 @@ def test_semantic_can_discover_without_keyword_admission_and_filters_upload_dist
 def test_revocation_and_staleness_after_inference_remove_result(mutation):
     r = row(search_processing="local", search_evidence="Synthetic manual")
     records = S.descriptors([r])
-    semantic = S.decode(output(), "without uploading", records)
-    assert not S.merge("without uploading", records, mutation(r), semantic)["hits"]
+    semantic = S.decode(json.dumps(dict(intent="tools", constraints=[],
+        hits=[dict(id="ss1", evidence="foreground silhouette")])), "isolate a subject", records)
+    assert S.merge("isolate a subject", records, [r], semantic, confirmed=set())["hits"]
+    assert not S.merge("isolate a subject", records, mutation(r), semantic, confirmed=set())["hits"]
 
 
 @pytest.mark.parametrize("raw", [
@@ -62,10 +65,10 @@ def test_unreviewed_prose_cannot_certify_local_processing():
                        S.decode(output(), "without uploading", records))["hits"]
 
 
-def test_download_week_requires_download_time_and_timezone():
+def test_download_metadata_is_unverified_even_with_nonempty_evidence():
     now = dt.datetime(2026, 11, 2, 20, tzinfo=dt.timezone.utc)
     r = row(search_evidence="Synthetic download ledger", downloaded_at="2026-10-29T18:00:00+00:00")
-    assert S.eligible(r, {"last_week"}, now)
+    assert not S.eligible(r, {"last_week"}, now)
     assert not S.eligible(dict(r, downloaded_at="2026-11-02T09:00:00+00:00"), {"last_week"}, now)
     assert not S.eligible(dict(r, downloaded_at="2026-10-29"), {"last_week"}, now)
     assert not S.eligible(dict(r, downloaded_at=""), {"last_week"}, now)

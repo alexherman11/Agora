@@ -2,6 +2,8 @@
 
 Draft completion increment, 3 November 2026. JEFF owns serial review, landing and activation. This file performs none of them.
 
+**SUPERSEDED activation proposal:** the current installer selects `lexical.js`, an evidence-only interim titled **Apps and World text search**, with `search` and no model grant. Follow `research/smart-search-lab/smart-search-corrections-2026-11-03.md` and exact `correction-manifest.json` digests. Its lens has no app gesture. Do not adopt/restart the model module for this interim. Semantic activation remains held; the parent is incomplete. Sections below preserve the earlier candidate's history, not current activation instructions.
+
 ## What exists
 
 One light search window. Enter paints exact lexical results first, then requests local semantic suggestions. **Exact words only** skips inference. Source filters are optional. Input is quoted as data and is never submitted as a command. Evidence and app clicks re-read the source and carry its revision fence to the ordinary window host. App actions are restricted to current enabled visible Agora widgets with matching visible lenses. Native pins have evidence only; search does not launch executable paths.

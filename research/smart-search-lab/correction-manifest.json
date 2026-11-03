@@ -1,0 +1,41 @@
+{
+  "version": "search-correction-2-interim-lexical",
+  "recorded_at_utc": "2026-11-03T05:46:05.127333+00:00",
+  "basis": "Developer-facing dk1740 only. Evaluator worktree and sealed holdout not read.",
+  "file_sha256": {
+    "research/kernel-lab/apps/smart-search/lexical.js": "1f2873c462e24d45989f7133cad32ddbe844e708dd4d56c2cea6a10227d7937c",
+    "research/kernel-lab/apps/smart-search/search.lens": "ed1ed2de5a6c7d83b06496b382a3c7e4d1bc8137629d24f4e8f001c7e9884f7a",
+    "research/kernel-lab/apps/smart-search/install.py": "f2e4d3aa77db3a098b1c2e22e51d2774871f0156360df1fa92756d7c464e9056",
+    "research/kernel-lab/modules/model/model.py": "dc84161ff0bf45046da6bb10f7816e550c53d086023542280bc79cfcbc9047c9",
+    "research/kernel-lab/modules/model/smart_search.py": "2005cb950063f55cf1e91ea14e0bcc6dff08da3f838f1289294f38f3c2dc8461",
+    "research/kernel-lab/modules/model/search_resources.py": "2baaab28eaeb6b8eb642a920f0545589330eb1a88346a1eda4aac958701e66da",
+    "research/kernel-lab/modules/model/test_smart_search.py": "4ce282ba7b6ec1e1f7c40edc243cfa04da8fa21319e17f2020e9b2f24d776f35",
+    "research/smart-search-lab/check_corrections.py": "19f6d478a5c7a3cc3e80fdae2dc471de2723ffa17cc97db04f50d57f720549ad",
+    "research/smart-search-lab/check_lexical_surface.mjs": "81f94b56859b3dd4c7e8cb053860c6e514d6aa743c7cee9b250805d4650868c5"
+  },
+  "component_review_sha256": "1f2873c462e24d45989f7133cad32ddbe844e708dd4d56c2cea6a10227d7937c",
+  "evidence_lens_text_sha256": "ed1ed2de5a6c7d83b06496b382a3c7e4d1bc8137629d24f4e8f001c7e9884f7a",
+  "generated_widget_code_sha256": "0e05c6ee58a3d11eeb3953d7065aec613c9f61e2f02ad09b0a44eb97ed3bd0f3",
+  "authored_facts_canonical_sha256": {
+    "component": "ab20250b7054fa3456329f92175e3ec70e16c0d5e38ec42ffd13a8074bca0eb6",
+    "lens": "57e2349b0e9d7e050a483c20713b225585a303dc89b5d541d20b5c28a0084f87",
+    "widget": "8608daa91eae45dc0c174d49d637dfdd7502b1274c1b196d944b50aa9f474fed",
+    "button": "4d17760942a8f20da3a9b4839aa2576a60c239ccb96ce469487f15208aa3db69"
+  },
+  "requested_separate_widget_grants": "window.surface rows look look-view history components help component-health component-action search window.open hear:make hear:set hear:forget hear:undo hear:component hear:component-action",
+  "entry": {
+    "label": "Apps and World text search",
+    "bar": "taskbar",
+    "icon": "search",
+    "does": "window.open smart-search"
+  },
+  "component_source": "lexical.js; historical search.js is not installed",
+  "contract_checks": {
+    "corrections": "Ran 11 tests in 0.006s; OK",
+    "lexical_surface": "LEXICAL SURFACE CONTRACTS: 12/12 passed (mock rows/actions; no browser or inference)"
+  },
+  "inference_calls": 0,
+  "semantic_activation": "HELD; parent incomplete",
+  "old_freeze": "Preserved unchanged as history; this new source requires independent review and a new semantic freeze before evaluation.",
+  "offline_authoring": "Captured installer arguments only; no live Door, authorship, review, grants or activation."
+}

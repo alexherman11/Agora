@@ -1,3 +1,2 @@
 root : smart-search
   on evidence do window.open thing $id
-  on app do window.open $app
