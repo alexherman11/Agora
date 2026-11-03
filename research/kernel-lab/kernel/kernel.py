@@ -18,7 +18,7 @@ from . import lines as L
 from .store import GONE, Log, h, canon
 
 FLOOR = {"look", "help", "undo", "off", "status"}     # stewards may always use these, whatever an entry says
-MAY_WORDS = {"anyone", "members", "leaders", "stewards", "maker", "nobody"}
+MAY_WORDS = {"anyone", "members", "leaders", "stewards", "maker", "lead", "nobody"}
 
 
 class Refused(Exception):
@@ -347,6 +347,14 @@ class Kernel:
             parents = self.groups_of(g)
             g = parents[0] if parents else None
         return out
+
+    def is_lead(self, person, target):
+        """The person a thing names as its lead (lead=<person id or name>). 3 Nov: a resident handed a card could not
+        change it, since it neither made it nor leads the place; a word whose may says `lead` lets its lead act on it."""
+        lead = str(self.state.get(target, "lead") or "").strip()
+        if not lead or not person:
+            return False
+        return lead == person or lead.casefold() == str(self.name(person) or "").strip().casefold()
 
     def is_leader(self, person, group):
         return any(self.state.get(g, f"member:{person}") == "leader" for g in self.up(group))
@@ -814,6 +822,8 @@ class Kernel:
             if tok == "maker" and target and (self.state.get(target, 'for') == person or self.state.get(target, "made_by") in (person,) + tuple(
                     a for a in self.things("agent") if self.state.get(a, "for") == person)):
                 return True
+            if tok == "lead" and target and self.is_lead(person, target):
+                return True
         return self._granted(person, word, group, depth)
 
     def _granted(self, who, word, group, depth=0):
@@ -851,7 +861,7 @@ class Kernel:
     def refusal_for(self, entry, group):
         may = entry.get("may") or "nobody"
         who = {"leaders": f"leaders of {self.name(group)}", "stewards": "stewards", "members": f"members of {self.name(group)}",
-               "maker": "whoever made it", "nobody": "no one", "anyone": "anyone here"}
+               "maker": "whoever made it", "lead": "its lead", "nobody": "no one", "anyone": "anyone here"}
         said = " or ".join(who.get(t.strip(), t) for t in may.split(" or "))
         return Refused(f"{entry['word']} is for {said}; help {entry['word']} says more")
 
