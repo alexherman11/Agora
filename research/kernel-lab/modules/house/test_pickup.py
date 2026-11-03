@@ -125,6 +125,22 @@ def test_workers_on_finished_cards_nag_nobody(manager):
     assert agent.woken == []
 
 
+def test_words_for_a_worker_whose_card_moved_on_are_dropped_not_looped(manager):
+    """3 Nov, live: a worker whose card claim had moved kept its words, so every JEFF turn end resumed it, it blocked,
+    the block woke JEFF, and round again (33 times). Now the words are dropped and the same block wakes nobody twice."""
+    s = state(manager, 'blocked'); s.update(pending=['carry on'], detail='task claim changed or is held')
+    manager.fixture_door.task['build_run'] = 'someone-elses-run'
+    agent = Agent(); agent.person = 'dk99'; manager.h.agents = {'dk99': agent}
+    with patch('builders.threading', SimpleNamespace(Thread=Mock())) as threads:
+        manager.owner_turn_ended('dk99')
+    threads.Thread.assert_not_called()
+    assert s['pending'] == [] and s['phase'] == 'blocked'
+    assert any(a['what'] == 'dropped' for a in s['activity'])
+    manager.outcome(s)
+    manager.outcome(s)
+    assert len([w for w in agent.woken if 'stopped (blocked)' in w[0]]) == 1
+
+
 def test_older_runs_say_what_they_were_cut_off_doing():
     def cut(*whats):
         return B.Builders.cut_phase(SimpleNamespace(), dict(activity=[dict(what=w) for w in whats]))

@@ -594,6 +594,11 @@ class Builders:
             text = (f"~ {name} ({task}) stopped ({phase}): {str(state.get('detail', ''))[:700]}\n~ You are in charge "
                     f"of it: tell it what to do (house.tell {task} <words>), review it again (house.review {task}), "
                     f"hand it on (house.hand {task} <name>), or tell JEFF in Shop talk if it needs Alex.")
+        said = [phase, str(state.get('detail', ''))[:300]]
+        if state.get('last_outcome') == said:
+            self.event(state, 'quiet', 'same outcome as last time; nobody woken again')
+            return                       # the same failure twice wakes nobody twice (the 3 Nov loop)
+        state['last_outcome'] = said
         self.stopped(state)
         self.wake_owner(state, text)
 
@@ -792,6 +797,19 @@ class Builders:
                     continue
                 if self.full(state.get('provider', 'codex')):
                     self.event(state, 'held', 'resident replied, but all workers of this kind are busy; it waits')
+                    continue
+                # 3 Nov, live: an old worker whose card had moved on kept its words; every turn end resumed it, it
+                # blocked at once (claim changed), the block woke JEFF, his turn ended... 33 times in an hour.
+                # Words for a worker whose card no longer holds it are dropped, never retried.
+                try:
+                    rows = self.h.m.see('look ' + state['task']).get('rows') or []
+                except Exception:                         # noqa: BLE001
+                    rows = []
+                card = rows[0] if rows else {}
+                if not card or card.get('build_run') != state['run'] or held(card) or self.card_done(state):
+                    dropped, state['pending'] = state.get('pending') or [], []
+                    self.event(state, 'dropped', 'its card no longer holds this worker (claim moved, held or done); '
+                               'not sent: ' + ' | '.join(dropped)[:500])
                     continue
                 self.reopen(state)
                 threading.Thread(target=self.guarded, args=(state, self.resume), daemon=True).start()
