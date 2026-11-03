@@ -119,6 +119,9 @@ KERNEL_ENTRIES = [
        help="say <chat> <words>: a line in a chat (rows chat lists them). @name calls that person; in a closed chat "
             "(made with with=\"Alex, JEFF\") a line with no @name speaks to everyone else in it. reply_to=<said line> "
             "answers one. Only the chat's people may say in a closed chat. undo takes your line back."),
+    _k("chat.receive", "do", "<id> text=<text> speaker=<name> external_id=<id>", "anyone", "yes",
+       help="chat.receive <chat> text=... speaker=... external_id=...: import one external line; only the "
+            "read-only chat's designated source module may use this. Duplicate ids do nothing; no local @name wakes."),
     _k("chat", "see", "<id> [limit=<n>] [since=<id>]", "anyone", "no",
        help="chat <chat> [limit=20] [since=<said line>]: its latest lines, oldest first, as you may see them. "
             "make kind=chat name=<name> makes an open chat; with=\"<names>\" makes one only those people see."),
@@ -1189,7 +1192,7 @@ from .readings import who, recent, kinds, on, press
 from .refusals import refusals, failed
 from .kinds import mark, words_for, alike_word, aspects_word, NOT_FITTED as NOT_FITTED_KINDS
 from .bonds import turn                  # the graph's readings (around, nearby, preview) are held (28 Oct)
-from .chat import say, chat as chat_word, closed_sees
+from .chat import say, receive as chat_receive, chat as chat_word, closed_sees
 from .store import GONE
 from .next_steps import change as task_change
 from painter.arrangement import component, look_view, components, component_card
@@ -1210,4 +1213,4 @@ KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant":
           "vote": vote, "role": role, "rows": rows, "find": rows, "search": search, "verb": verb,
           "who": who, "recent": recent, "kinds": kinds, "on": on, "press": press, "say": say, "chat": chat_word,
           "refusals": refusals, "failed": failed, "mark": mark, "actions": words_for, "turn": turn,
-          "alike": alike_word, "aspects": aspects_word}
+          "chat.receive": chat_receive, "alike": alike_word, "aspects": aspects_word}
