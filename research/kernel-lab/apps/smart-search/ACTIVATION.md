@@ -2,6 +2,8 @@
 
 Draft completion increment, 3 November 2026. JEFF owns serial review, landing and activation. This file performs none of them.
 
+**LEXICAL INTERIM REJECTED:** independent review dk1757 identified a field-private kernel search label leak. Current correction/re-review input is `research/smart-search-lab/search-projection-correction-2026-11-03.md` and `projection-review-manifest.json`, including the corrected kernel dependency. No activation/landing/grants/inference in this round. Generic House passed metadata does not approve feature behavior. Earlier activation proposals below are history until independent feature re-review passes.
+
 **SUPERSEDED activation proposal:** the current installer selects `lexical.js`, an evidence-only interim titled **Apps and World text search**, with `search` and no model grant. Follow `research/smart-search-lab/smart-search-corrections-2026-11-03.md` and exact `correction-manifest.json` digests. Its lens has no app gesture. Do not adopt/restart the model module for this interim. Semantic activation remains held; the parent is incomplete. Sections below preserve the earlier candidate's history, not current activation instructions.
 
 ## What exists
