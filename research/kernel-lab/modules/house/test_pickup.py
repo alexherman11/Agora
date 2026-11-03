@@ -158,6 +158,35 @@ def test_jeff_hands_a_worker_to_a_resident_who_is_in_charge_from_then_on(manager
     assert 'Sable is in charge of you' in sent['prompt'] and 'Add the empty case' in sent['prompt']
 
 
+def test_the_card_is_moved_by_whoever_may_set_it(manager):
+    """Live, 3 Nov: a resident may not set a card it did not make, so JEFF (who leads the desktop) moves it."""
+    s = state(manager, 'received'); s.update(chat='dk50', requester='dk60', requester_name='Rowan', task_owner='Rowan')
+    door = place(manager)
+    tried = []
+
+    class Session:
+        def __init__(self, person):
+            self.person, self.token = person, 'fixture'
+        def look(self, target):
+            return door.look(target)
+        def call(self, route, line, **kw):
+            if line.startswith('set '):
+                tried.append(self.person)
+                if self.person != 'dk827':
+                    raise RuntimeError('refused: set is for whoever made it or leaders')
+            return door.call(route, line, **kw)
+    manager.session = Session
+    sable = Agent(); sable.person = 'dk99'
+    manager.h.agents = {'dk99': sable}
+    out = manager.hand(dict(args=dict(target='dk1', words='Sable'), caller=dict(person='dk827', name='JEFF')))
+    assert out.get('external'), out
+    assert tried == ['dk827'] and door.task['who'] == 'Sable' and s['requester'] == 'dk99'
+    manager.h.agents['dk827'] = Agent()
+    s.update(requester='dk99', requester_name='Sable')
+    out = manager.hand(dict(args=dict(target='dk1', words='JEFF'), caller=dict(person='dk55', name='Rowan')))
+    assert 'only' in out['refused']                       # a stranger still may not
+
+
 def test_hand_refuses_strangers_unknown_names_and_running_workers(manager):
     s = state(manager, 'working'); s.update(requester='dk827', requester_name='JEFF')
     place(manager, dk55='member')

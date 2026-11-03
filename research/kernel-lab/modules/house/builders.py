@@ -690,8 +690,20 @@ class Builders:
         task = door.look(card)
         if not task:
             return {'refused': f'{to.name} cannot see the card {card}'}
+        # The card is rewritten by whoever may: the one handing it on (JEFF and Alex lead the desktop), else its old
+        # owner, else the new one (3 Nov: a resident may not set a card it did not make).
+        moved, why = False, ''
+        for person in dict.fromkeys(p for p in (caller.get('person'), state['requester'], to.person) if p):
+            try:
+                self.session(person).call('/do', f'set {card} who={q(to.name)} lead={q(to.name)}',
+                                          saw={card: int(task['rev'])})
+                moved = True
+                break
+            except Exception as exc:                  # noqa: BLE001  try the next who may
+                why = str(exc)
+        if not moved:
+            return {'refused': f'not handed: the card could not be given to {to.name}: {why[:300]}'}
         try:
-            door.call('/do', f'set {card} who={q(to.name)} lead={q(to.name)}', saw={card: int(task['rev'])})
             task = door.look(card)
             chat = door.call('/do', 'make kind=chat name=' + q(state['name']) + ' about=' + card + ' with=' + to.person,
                              press=state['run'] + '-chat-' + to.person)['made'][-1]
