@@ -429,6 +429,10 @@ class House:
         self.ready.set()
         for state in self.builders.states.values():
             BM.notify(self.builders, state)
+        try:
+            self.builders.wake_cut_off()
+        except Exception as exc:                          # noqa: BLE001  a help, never a reason not to start
+            print(f"house: cut-off wakes failed: {exc!r}", flush=True)
         self.task_changes()
         threading.Thread(target=self.ticker, daemon=True, name="house-live").start()
 
@@ -446,6 +450,79 @@ class House:
                 self.agents[p] = Agent(self, r)
         for p in [p for p in self.agents if p not in seen]:
             self.agents.pop(p).stop("its house-agent thing is gone")
+
+    snaps, snapping, snap_lock = {}, 0, threading.Lock()
+
+    def snap(self, msg):
+        """house.snap <thing> [from=<task>] | house.snap last (Alex, 3 Nov: residents check work visually, hidden, and
+        tell JEFF "done and looks good"). The picture takes longer than a word may (10 s), so it is taken in the
+        background; the asker is woken when it is ready, and `house.snap last` answers with it. The answer carries an
+        [image: <path>] line, which the MCP door adapter turns into a picture the agent sees."""
+        args, caller = msg.get("args") or {}, msg.get("caller") or {}
+        kv, person = dict(args.get("kv") or {}), caller.get("person")
+        target = str(args.get("target") or args.get("words") or "").strip().split(" ")[0]
+        if target == "last":
+            got = self.snaps.get(person)
+            if not got:
+                return {"text": "no picture yet: house.snap <thing> takes one"}
+            if got.get("error"):
+                return {"text": f"the picture of {got['label']} failed: {got['error']}"}
+            if not got.get("path"):
+                return {"text": f"still taking the picture of {got['label']}; you are woken when it is ready"}
+            # A Codex resident calls this from inside its exec script: the picture reaches it only if the script
+            # hands the image part on (snap subagent, 3 Nov: otherwise the base64 arrives as text).
+            return {"text": f"{got['label']}, taken hidden at {got['at']}. The picture is attached. (Inside exec, "
+                            f"pass it on: for (const c of r.content) if (c.type === 'image') image(c).)\n"
+                            f"[image: {got['path']}]"}
+        if not target:
+            return {"refused": "house.snap <thing> [from=<task>], or house.snap last"}
+        if not self.m.see("look " + target, use=msg.get("use")).get("rows"):
+            return {"refused": f"you cannot see {target}"}
+        card = kv.get("from") or kv.get("worker")
+        source = None
+        if card:
+            state = self.builders.states.get(card)
+            if not state or not state.get("tree") or not Path(state["tree"]).is_dir():
+                return {"refused": f"{card} has no worker worktree to show"}
+            if not self.m.see("look " + card, use=msg.get("use")).get("rows"):
+                return {"refused": f"you cannot see {card}"}
+            source = state["tree"]
+        try:
+            token = self.builders.session(person).token
+        except RuntimeError:
+            return {"refused": "you have no session the House can take a picture as"}
+        try:
+            w, h = (int(n) for n in str(kv.get("size") or "1280x800").lower().split("x"))
+            size = (max(320, min(w, 2560)), max(240, min(h, 1600)))
+        except ValueError:
+            return {"refused": "size=<width>x<height>, e.g. size=1280x800"}
+        with self.snap_lock:
+            if self.snapping >= 2:
+                return {"refused": "two pictures are being taken now; try again in a minute"}
+            self.snapping += 1
+        label = target + (f" from the worker on {card} (its unlanded code)" if card else "")
+        at = time.strftime("%Y%m%dT%H%M%S")
+        out = self.home / "snaps" / f"{at}-{target}{'-' + card if card else ''}.png"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        self.snaps[person] = dict(label=label, at=time.strftime("%H:%M"), path=None)
+
+        def go():
+            try:
+                import snap as S
+                S.snap(target, token, out, door=URL, source=source, world=self.world, size=size)
+                self.snaps[person].update(path=str(out))
+                text = f"~ Your picture of {label} is ready. See it: house.snap last"
+            except Exception as exc:                  # noqa: BLE001
+                self.snaps[person].update(error=str(exc)[:500])
+                text = f"~ The picture of {label} failed: {str(exc)[:500]}"
+            finally:
+                with self.snap_lock:
+                    self.snapping -= 1
+            agent = self.agents.get(person)
+            if agent is not None:
+                agent.wake(text)
+        threading.Thread(target=go, daemon=True).start()
+        return {"text": f"taking a hidden picture of {label}; you are woken when it is ready (house.snap last shows it)"}
 
     def restart(self, msg):
         """house.restart kernel|house (stewards; Alex, 28 Oct: JEFF must be able to unstick the system). The kernel
@@ -516,7 +593,14 @@ class House:
                if cfg.get("speaks", "text") == "text" else
                "Your words in a turn are your own thinking; say <chat> <words> is how anyone hears you. ")
             + "rows chat lists the chats; chat <chat> reads one.")
-        return own + (f"\n\n# Your soul ({cfg['soul']}, yours to keep)\n\n{soul}" if soul else "")
+        # Alex, 3 Nov: how work flows between JEFF, the residents and their workers is the world's, not the code's:
+        # a house-agent's guide=<thing> is read at each start, so it changes by editing that thing.
+        guide = ""
+        if cfg.get("guide"):
+            rows = self.m.see(f"look {cfg['guide']}").get("rows") or [{}]
+            guide = str(rows[0].get("text") or "").strip()
+        return own + (f"\n\n# How work flows here ({cfg['guide']})\n\n{guide}" if guide else "") \
+            + (f"\n\n# Your soul ({cfg['soul']}, yours to keep)\n\n{soul}" if soul else "")
 
     def next_steps(self, a):
         if a.cfg.get("next_steps") != "on":
@@ -701,6 +785,10 @@ class House:
             return self.builders.retry(msg)
         if word == "house.tell":
             return self.builders.tell(msg)
+        if word == "house.hand":
+            return self.builders.hand(msg)
+        if word == "house.snap":
+            return self.snap(msg)
         if word == "house.review":
             return self.builders.request_review(msg)
         if word == "house.land":
@@ -855,6 +943,15 @@ OFFER = [
              "with them in a new turn. Its owner is still woken at each turn end, and so is anyone else who told it. "
              "Landed or released work does not restart (house.build starts a new run); held cards, uncertain or "
              "recovery-needed workers, and work under review or landing are refused."},
+    {"word": "house.hand", "kind": "do", "needs": TASK_NEEDS, "takes": "<id> <name>", "undo": "external", "may": "members",
+     "help": "house.hand <task> <name>: give a card's worker, and the card, to another resident, who is in charge of it "
+             "from then on: woken at its turn ends, answers it with house.tell, reviews and lands it. Its owner, a "
+             "steward or Alex may hand it on; a worker mid-turn, mid-review or mid-landing is handed once it stops. "
+             "The new owner is woken with where it stands and its last words."},
+    {"word": "house.snap", "kind": "see", "takes": "<thing> [from=<task>] [size=<w>x<h>]", "may": "members",
+     "help": "house.snap <thing> [from=<task>]: a picture of a thing (a lens, an app, a chat, a card) the way it shows in "
+             "a window, taken hidden, never on Alex's screen. from=<task> shows a worker's unlanded code, in a hidden "
+             "copy of the world started from its worktree. Use it to check work looks right before saying it is done."},
     {"word": "house.work", "kind": "do", "takes": "<words> [with=claude|codex]", "undo": "external", "may": "members",
      "help": "house.work <what to do, in plain words> [with=claude|codex]: make a card for it and start a worker on it, in "
              "your charge. You are woken each time it finishes a turn (its words also go in its chat); answer it with "

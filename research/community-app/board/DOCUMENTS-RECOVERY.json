@@ -1,0 +1,35 @@
+{
+  "task": "dk1614",
+  "candidate": "30f97d32b0593df03444899bb612d79914773e71",
+  "evidence": "C:\\Users\\Alex\\Documents\\Codex\\2026-10-22\\task-3\\world-workers-oct27\\documents-published-admission-20261029.json",
+  "original_hashes": {
+    "research/community-app/board/DOCUMENTS-HANDOFF.md": "a502714b28b39a900550bf79eb7aec8052c6b0c4326de3be62defd24043c127d",
+    "research/community-app/board/documents.py": "11c03b19d622292eb7a50569bd9a7d1f761a942ab0241086d8daa22f1cfa891c",
+    "research/community-app/board/test_documents_ui.py": "dd3086e8c5b560de4d8d73dabe6a71578fa8b729539c5ca9a23f48c2f4c39672"
+  },
+  "original_verified": {
+    "research/community-app/board/DOCUMENTS-HANDOFF.md": true,
+    "research/community-app/board/documents.py": true,
+    "research/community-app/board/test_documents_ui.py": true
+  },
+  "final_source_sha256": {
+    "research/kernel-lab/kernel/kernel.py": "33c6f5144fce4703914c5d47ef186f9b37911dd0e51bd8bb7a2504f1716b8c65",
+    "research/kernel-lab/kernel/document_scope.py": "46759ba7a95950aec1531a241216cd39e4501da554595439da2fee82aa95e8df",
+    "research/kernel-lab/kernel/words.py": "949c44c971743ff734bd6a8e69789d132e5af9dab38f4ed45d668c8a806e7efd",
+    "research/kernel-lab/tests/test_shapes.py": "5d227d550a972608d445866546f9165ceac5cfc3b70d942aa78f3f4b3f804068",
+    "research/kernel-lab/tests/test_document_boundary.py": "eb40410132402f1dc8eb1d9defc872618a8d17730d461560b58a2df8802aa641",
+    "research/community-app/board/documents.py": "157513a9c02bc09dcc4da8736294f11446ed2d58fe942fd9b064bbd859d0183d",
+    "research/community-app/board/documents_install.py": "b095e5069f522f48469731e2f25d6b02597a8adaffca7ecf550d8e09b4b74411",
+    "research/community-app/board/files.py": "a61891d0022840c2f6233e999ff15d5d2f070d102ec507c7902197e937f81b55",
+    "research/community-app/board/test_documents.py": "4105a1fc5f613c4d47504bb849dc081b9793869dd7e1f84d6e5f53d4e9bbe06f",
+    "research/community-app/board/test_documents_ui.py": "6ce72c4db7d3495563f61ee9339ea14ba78fec0fc35bc3aca66022b546e24d10",
+    "research/community-app/board/documents.lens": "f5b8e1c2fb7722d8029ba3f6f100b7fa2dc85e9a378e7d1720d9fe23a167d254",
+    "research/community-app/board/documents.css": "e81d8ce49f3060778003c055bb6b5765ca9a5c13222ea48b55492336b556029a",
+    "research/community-app/board/document-components.js": "619cff821e176c43f16a3c4029add1ea453538d48f2651d5859e39832a77db75",
+    "research/community-app/board/DOCUMENTS-HANDOFF.md": "a502714b28b39a900550bf79eb7aec8052c6b0c4326de3be62defd24043c127d",
+    "research/community-app/board/DOCUMENTS-ROUGH-SPOTS.md": "a3416463f831303abec95de763a2b0891f666acdf79e81290a95b301c8df949f",
+    "research/community-app/board/DOCUMENTS-ISSUANCE.md": "f94ea1d14aa5c9dd6527368937884683d06cbb48a34888cff4f9b2326bd5b0e3",
+    "research/community-app/board/BOARD-ROUGH-SPOTS.md": "35b19c8891138c5f8de01a5729b897f6090c0f35f8fe7d6d38f852af8b5158fa"
+  },
+  "validation": "Memory-only test_document_boundary.py: 37 passed in 0.16s; persisted-world/UI tests not run; no denied fixture retries"
+}

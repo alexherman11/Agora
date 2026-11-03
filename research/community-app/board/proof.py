@@ -12,7 +12,6 @@ import json
 import secrets
 import statistics
 import sys
-import tempfile
 import threading
 import time
 import urllib.error
@@ -29,6 +28,7 @@ from install import install, modules
 from protocol import line, quote
 from kernel.kernel import Kernel
 from kernel.door import serve
+from kernel import scratch
 from test_skeleton import StandInEntry, post
 
 
@@ -76,7 +76,7 @@ def fixtures():
 
 class Proof:
     def __init__(self, model=False):
-        self.tmp = tempfile.TemporaryDirectory(prefix='agora-board-proof-', ignore_cleanup_errors=True)
+        self.tmp = scratch.TemporaryDirectory(prefix='agora-board-proof-', ignore_cleanup_errors=True)
         self.entry = StandInEntry(secrets.token_hex(16))
         self.k = Kernel(self.tmp.name, dict(tag='bd', name='Seabright board proof',
             steward=dict(account='alex', name='Alex'), invites_counted_by='kernel',

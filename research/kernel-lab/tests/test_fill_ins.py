@@ -3,7 +3,6 @@ work in any line, a $name nothing fills is refused saying why, and `help $` list
 worlds; one test goes through the real door and MCP adapter, hidden (no window)."""
 import shutil
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -11,6 +10,7 @@ LAB = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(LAB))
 from kernel.kernel import Kernel  # noqa: E402
 from kernel import helping  # noqa: E402
+from kernel import scratch  # noqa: E402
 
 GENESIS = {"tag": "fi", "name": "Fills", "steward": {"account": "alex", "name": "Alex"},
            "invites_counted_by": "kernel", "invites": [{"code": "x", "uses": 5}]}
@@ -18,7 +18,7 @@ GENESIS = {"tag": "fi", "name": "Fills", "steward": {"account": "alex", "name": 
 
 class FillIns(unittest.TestCase):
     def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix="kernel-fill-ins-")
+        self.dir = scratch.mkdtemp(prefix="kernel-fill-ins-")
         self.k = Kernel(self.dir, dict(GENESIS))
         self.alex = self.k.actor_for(self.k.accounts["alex"])
         self.alex.session = "s-alex-1"
@@ -161,7 +161,7 @@ class OverTheDoor(unittest.TestCase):
         sys.path.insert(0, str(LAB / "proof"))
         sys.path.insert(0, str(LAB / "mcp"))
         import byo_agent
-        self.folder = tempfile.TemporaryDirectory(prefix="fill-ins-wire-")
+        self.folder = scratch.TemporaryDirectory(prefix="fill-ins-wire-")
         self.place = byo_agent.Place(self.folder.name)
         self.client = byo_agent.MCP(self.place.url, self.place.agent_token)
 

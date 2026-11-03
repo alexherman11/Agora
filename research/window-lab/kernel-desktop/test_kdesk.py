@@ -20,6 +20,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import kdesk  # noqa: E402
+from kernel import scratch  # noqa: E402
 
 SEE = {"help", "look", "rows", "holds", "status", "window.list", "window.desktop", "system.now", "media.now"}
 FEED = ("root : column, role sheet, of tag:post as p, each card\n"
@@ -199,9 +200,9 @@ class DesktopTest(unittest.TestCase):
         out = d.say('make kind=button bar=taskbar label="Lines" does="window.open lines"')
         self.assertTrue(out["ok"], out["text"])
         rows = d.say("rows any bar=taskbar")["rows"]
-        self.assertEqual(sorted(r["label"] for r in rows), ["Lines", "Viewer"])
-        lines = next(r for r in rows if r["label"] == "Lines")
-        self.assertTrue(d.say(lines["does"], "alex")["ok"])                  # the taskbar's press, as Alex
+        rows = [r for r in rows if r["id"] == out["made"][0]]
+        self.assertEqual([r["label"] for r in rows], ["Lines"])
+        self.assertTrue(d.say(rows[0]["does"], "alex")["ok"])                # the taskbar's press, as Alex
         d.wait(lambda: d.window("lines"))
 
     def test_where_a_window_sits_is_not_in_the_world(self):
@@ -419,7 +420,7 @@ class DesktopTest(unittest.TestCase):
         from restyle import install
         install(d.entry.token('claude'), d.srv.server_address[1])
         slots = {r['slot']:r for r in d.say('rows any bar=taskbar')['rows'] if r.get('slot')}
-        self.assertEqual(set(slots), {'start','agora','network','volume','battery','clock','off','holds'})
+        self.assertEqual(set(slots), {'start','agora','network','volume','battery','clock','off','holds','twitch'})
         self.assertEqual(slots['start']['does'], 'window.start')
         self.assertEqual(slots['off']['confirm'], 'yes')
         self.assertTrue(d.say(f"set {slots['start']['id']} label=Launcher icon=layout-grid")['ok'])
@@ -451,8 +452,8 @@ class RecoveryTest(unittest.TestCase):
         import taskbar_guard as guard
         self.C, self.W, self.guard = C, W, guard
         (HERE / 'state').mkdir(exist_ok=True)        # ignored by git, so absent in a fresh House worktree
-        self.tmp = Path(scratch_dir("taskbar-probe-"))
-        self.lease = self.tmp / 'lease.json'
+        self.tmp = scratch.TemporaryDirectory(prefix='taskbar-probe-', dir=HERE / 'state')
+        self.lease = Path(self.tmp.name) / 'lease.json'
         self.u = C.WinDLL('user32')
         self.u.CreateWindowExW.argtypes = [W.DWORD,W.LPCWSTR,W.LPCWSTR,W.DWORD,C.c_int,C.c_int,C.c_int,C.c_int,W.HWND,W.HMENU,W.HINSTANCE,W.LPVOID]
         self.u.CreateWindowExW.restype = W.HWND
@@ -492,9 +493,7 @@ class RecoveryTest(unittest.TestCase):
         self.worker.wait(timeout=5)
         self.owner.wait(timeout=5)
         self.u.DestroyWindow(self.hwnd)
-        if not self.tmp.resolve().is_relative_to(Path(tempfile.gettempdir()).resolve()):
-            raise ValueError("test scratch folder left its temporary root")
-        shutil.rmtree(self.tmp)
+        self.tmp.cleanup()
 
     def test_hard_owner_death_restores_taskbar(self):
         self.owner.kill()

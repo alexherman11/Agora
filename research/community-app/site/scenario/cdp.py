@@ -16,12 +16,15 @@ import json
 import shutil
 import socket
 import subprocess
-import tempfile
+import sys
 import time
 import urllib.request
 from pathlib import Path
 
 import websockets
+
+sys.path.append(str(Path(__file__).resolve().parents[3] / "kernel-lab"))
+from kernel import scratch  # noqa: E402
 
 BROWSERS = [r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
             r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
@@ -41,7 +44,7 @@ class Browser:
         if exe is None:
             raise RuntimeError("no Edge or Chrome found")
         self.exe = exe
-        self.profile = tempfile.mkdtemp(prefix="entry-evening-browser-")
+        self.profile = scratch.mkdtemp(prefix="entry-evening-browser-")
         port = free_port()
         self.proc = subprocess.Popen(
             [exe, "--headless=new", f"--remote-debugging-port={port}", f"--user-data-dir={self.profile}",

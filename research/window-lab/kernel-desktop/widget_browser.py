@@ -10,7 +10,7 @@ from pathlib import Path
 import socket
 import struct
 import subprocess
-import tempfile
+import sys
 import time
 import urllib.request
 from urllib.parse import urlsplit, quote
@@ -19,6 +19,8 @@ from urllib.parse import urlsplit, quote
 
 
 HERE = Path(__file__).resolve().parent
+sys.path.append(str(HERE.parents[1] / "kernel-lab"))
+from kernel import scratch  # noqa: E402
 
 
 def _job_that_dies_with_us():
@@ -173,7 +175,7 @@ class Browser:
         self.host_key = host_key or os.environ.get('AGORA_WIDGET_HOST_KEY','')
 
     def __enter__(self):
-        self.tmp = tempfile.TemporaryDirectory(prefix='edge-kdesk-', dir=HERE / 'state',ignore_cleanup_errors=True)
+        self.tmp = scratch.TemporaryDirectory(prefix='edge-kdesk-', dir=HERE / 'state',ignore_cleanup_errors=True)
         chrome=Path('C:/Program Files/Google/Chrome/Application/chrome.exe')
         executable=str(chrome) if chrome.is_file() else r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
         private='--incognito' if chrome.is_file() else '--inprivate'

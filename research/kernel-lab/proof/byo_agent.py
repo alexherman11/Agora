@@ -10,7 +10,6 @@ import queue
 import secrets
 import subprocess
 import sys
-import tempfile
 import threading
 import urllib.request
 from pathlib import Path
@@ -22,6 +21,7 @@ from test_skeleton import StandInEntry, post  # noqa: E402
 from kernel.door import serve  # noqa: E402
 from kernel.kernel import Kernel  # noqa: E402
 from kernel.store import Log, canon  # noqa: E402
+from kernel import scratch  # noqa: E402
 
 ADAPTER = LAB / "mcp/agora_mcp.py"
 GUIDE = LAB / "guide/HOW-TO-BUILD-HERE.md"
@@ -408,7 +408,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path, default=LAB / "proof/evidence")
     args = parser.parse_args(argv)
-    with tempfile.TemporaryDirectory(prefix="byo-agent-") as folder:
+    with scratch.TemporaryDirectory(prefix="byo-agent-") as folder:
         evidence = run(folder, args.out)
     checks = evidence["checks"]
     print(f"{sum(c['ok'] for c in checks)} of {len(checks)} checks passed")

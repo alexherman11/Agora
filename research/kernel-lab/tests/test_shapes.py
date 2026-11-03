@@ -364,6 +364,119 @@ def test_classifying_never_widens_a_grant(world):
         k.reaches(pad, 'set', k.state.get(note, 'kind'), target=note, fields={'lane': 'Done'})
 
 
+def document_scope_world(world):
+    """Fixture-only authority, never a live grant or a running provider."""
+    from kernel.kernel import Actor
+    k, a, b = world
+    library = made(k, a, 'make kind=document-library name=Research')
+    other = made(k, a, 'make kind=document-library name=Other')
+    mid = k.module_named('pad')
+    say(k, a, f'grant {mid} words="make set" '
+              f'only="kind:document-folder,document-entry;library:{library}"')
+    say(k, a, f'grant {mid} words=look')
+    return k, a, b, library, other, Actor(mid, a.person, 'module', module=mid, caller=a)
+
+
+def test_document_library_scope_admits_metadata_and_preserves_ownership(world):
+    k, a, b, library, other, pad = document_scope_world(world)
+    folder = made(k, pad, f'make kind=document-folder name=Notes library={library} '
+                          f'parent={library} within={library}')
+    say(k, pad, f'look {folder}')
+    say(k, pad, f'set {folder} name=Minutes')
+    assert k.state.get(folder, 'visibility_of') == library
+    assert k.state.get(folder, 'for') == a.person
+    say(k, a, f'look {folder}')
+    say(k, a, f'grant {pad.module} words=set only="kind:document-folder;library:{other}"')
+    # A second matching grant must not donate fields or library membership.
+    say(k, pad, f'set {folder} library={other}', ok=False)
+    assert k.state.get(folder, 'library') == library
+
+
+@pytest.mark.parametrize('suffix', [
+    'sees=place', 'text=payload', 'in=missing', 'about=missing',
+    'allows.set=anyone', 'file=missing', 'unexpected=value',
+])
+def test_document_folder_scope_refuses_extra_creation_power(world, suffix):
+    k, a, b, library, other, pad = document_scope_world(world)
+    before = len(k.log.records)
+    say(k, pad, f'make kind=document-folder name=Notes library={library} '
+                f'parent={library} within={library} {suffix}', ok=False)
+    assert len(k.log.records) == before
+
+
+def test_document_scope_refuses_cross_library_cycles_and_uninherited_rows(world):
+    k, a, b, library, other, pad = document_scope_world(world)
+    folder = made(k, pad, f'make kind=document-folder name=Notes library={library} '
+                          f'parent={library} within={library}')
+    foreign = made(k, a, f'make kind=document-folder name=Foreign library={other} '
+                        f'parent={other} within={other}')
+    forged = made(k, a, f'make kind=document-folder name=Legacy library={library} parent={library}')
+    say(k, pad, f'look {folder}')
+    for change in (f'parent={foreign}', f'parent={folder}', f'parent={other}',
+                   f'library={other}', 'sees=place', 'text=payload'):
+        before = len(k.log.records)
+        say(k, pad, f'set {folder} {change}', ok=False)
+        assert len(k.log.records) == before
+    say(k, pad, f'look {forged}')
+    say(k, pad, f'set {forged} name=Changed', ok=False)
+    say(k, pad, f'make kind=document-folder name=NoInheritance library={library} parent={library}', ok=False)
+
+
+def test_document_scope_does_not_admit_posts_or_unseen_libraries(world):
+    k, a, b, library, other, pad = document_scope_world(world)
+    # Even a separate post grant must not bypass make's library restriction.
+    say(k, a, f'grant {pad.module} words=post')
+    say(k, pad, 'make kind=post text=Unexpected', ok=False)
+    # sees is kernel-kept (set refuses it), so the unseen library is made private from the start.
+    hidden = made(k, a, 'make kind=document-library name=Private sees=me')
+    say(k, a, f'grant {pad.module} words="make set" '
+              f'only="kind:document-folder,document-entry;library:{hidden}"')
+    pad.person = b.person
+    pad.caller = b
+    say(k, pad, f'make kind=document-folder name=Hidden library={hidden} '
+                f'parent={hidden} within={hidden}', ok=False)
+
+
+def test_document_scope_indexes_own_upload_but_never_mutates_file(world):
+    from kernel.blobs import receive
+    k, a, b, library, other, pad = document_scope_world(world)
+    file = receive(k, a, b'fixture text', name='notes.txt')['made'][0]
+    entry = made(k, pad, f'make kind=document-entry name=Notes file={file} '
+                         f'library={library} parent={library} within={library}')
+    assert k.state.get(entry, 'file') == file
+    assert k.state.get(file, 'attached_to') is None
+    say(k, pad, f'look {entry}')
+    say(k, pad, f'set {entry} file=missing', ok=False)
+    say(k, pad, f'look {file}')
+    say(k, pad, f'set {file} name=Changed', ok=False)
+    # Raw uploads, blobs and attachments remain outside metadata authority.
+    assert k.state.get(file, 'name') == 'notes.txt'
+    say(k, pad, f'make kind=document-entry name=Missing file=missing '
+                f'library={library} parent={library} within={library}', ok=False)
+
+
+def test_document_scope_refuses_hidden_parents_foreign_uploads_and_group_changes(world):
+    from kernel.blobs import receive
+    k, a, b, library, other, pad = document_scope_world(world)
+    hidden = made(k, a, f'make kind=document-folder name=Private library={library} '
+                        f'parent={library} within={library} sees=me')
+    foreign = receive(k, b, b'private', name='private.txt')['made'][0]
+    pad.person, pad.caller = b.person, b
+    say(k, pad, f'make kind=document-folder name=No library={library} '
+                f'parent={hidden} within={library}', ok=False)
+    pad.person, pad.caller = a.person, a
+    say(k, pad, f'make kind=document-entry name=No file={foreign} '
+                f'library={library} parent={library} within={library}', ok=False)
+    folder = made(k, pad, f'make kind=document-folder name=Notes library={library} '
+                          f'parent={library} within={library}')
+    group = made(k, a, 'group name=Elsewhere open=yes')
+    say(k, pad, f'look {folder}')
+    for edit in (f'within={other}', f'in={group}', f'visibility_of={other}'):
+        say(k, pad, f'set {folder} {edit}', ok=False)
+    assert k.groups_of(folder) == k.groups_of(library)
+    assert k.state.get(folder, 'visibility_of') == library
+
+
 def test_a_thing_you_cannot_see_is_never_fitted_or_named(world):
     k, a, b = world
     say(k, a, 'make kind=kind name=event needs="title start"')
