@@ -3,14 +3,13 @@ hears its maker, the maker's agents and the leaders of its group; `by=anyone` he
 act is heard only by `by=anyone`. Fresh temporary worlds; rules fire on the kernel's rule thread, so tests wait."""
 import shutil
 import sys
-import tempfile
 import time
 import unittest
-import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from kernel.kernel import Kernel, Actor  # noqa: E402
+from kernel import scratch  # noqa: E402
 
 GENESIS = {"tag": "rb", "name": "Rules", "steward": {"account": "alex", "name": "Alex"},
            "invites_counted_by": "kernel", "invites": [{"code": "x", "uses": 5}]}
@@ -27,8 +26,7 @@ def until(test, s=4.0):
 
 class RulesHear(unittest.TestCase):
     def setUp(self):
-        self.dir = Path(tempfile.gettempdir()) / ("kernel-rule-by-" + uuid.uuid4().hex)
-        self.dir.mkdir()
+        self.dir = scratch.mkdtemp(prefix="kernel-rule-by-")
         self.k = Kernel(self.dir, dict(GENESIS))
         self.alex = self.k.actor_for(self.k.accounts["alex"])
         self.pike = self.k.actor_for(self.k.join("pike", "Pike", invite="x")["person"])

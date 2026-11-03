@@ -76,6 +76,8 @@ def module_specs(headless=False):
          "grants": SYSTEM_GRANTS, "for": "steward"},
         {"name": "media", "run": [py, str(HERE / "kd_media.py")] + tail, "publishes": "media.*",
          "grants": MEDIA_GRANTS, "for": "steward"},
+        {"name": "twitch", "run": [str(VENV_PY), str(HERE / "kd_twitch.py")] + tail, "publishes": "twitch.*",
+         "grants": "rows chat.receive", "only": "kind:chat,said", "for": "steward"},
         {"name": "house", "run": [py, str(HERE.parents[1] / "kernel-lab/modules/house/house.py")],
          "publishes": "house.*", "grants": HOUSE_GRANTS, "for": "steward"},
         {"name": "theme", "run": [py, str(HERE.parents[1] / "kernel-lab/theme/theme_module.py")],
@@ -98,6 +100,7 @@ ABOUT = {"window": "the window host: it makes the Agora windows on this desktop 
          "system": "what this machine is doing (CPU, memory, network, volume, battery, the window in front), for the "
                    "bars' widgets and system.now",
          "media": "the media words (media.play, media.next, media.prev, media.now) through Windows' media session",
+         "twitch": "read-only anonymous Twitch chat; twitch.now reads connection state; off twitch disconnects",
          "summarize": "local task summaries with honest literal fallback; off summarize stops it",
          "house": "the house: runs the world's agents (JEFF first), wakes one only when someone addresses it (@name, "
                   "its closed chat such as the Conversation, a task given to it, house.wake); house.who says what each "
@@ -512,6 +515,8 @@ def start(world=DEFAULT_WORLD, port=8810, modules=True, headless=False, resident
     os.environ['AGORA_WIDGET_HOST_KEY'] = handler.widget_broker.guard_key
     os.environ["AGORA_KDESK_PORT"] = str(srv.server_address[1])     # the modules (children) read where the door is
     host = KM.Host(k, HERE)
+    if not modules:
+        k.modules = None             # fixture/setup acts must not start publishers implicitly
     if link and modules:
         # kept modules first: until each has its words back, a request would hear "window is not running".
         # Requests wait in the keeper's queue meanwhile.
@@ -522,6 +527,8 @@ def start(world=DEFAULT_WORLD, port=8810, modules=True, headless=False, resident
     if link:
         srv.window_origins.begin()
     threading.Thread(target=srv.serve_forever, daemon=True, name="door").start()
+    from twitch_chat import install as install_twitch
+    install_twitch(entry.token("alex"), srv.server_address[1])
     if modules and not link:
         host.reconcile()
     if modules and not headless:

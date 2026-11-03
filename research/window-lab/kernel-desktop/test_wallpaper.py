@@ -2,11 +2,14 @@
 second apply or a theme change cannot lose it, restore puts it back, and a Spotlight picture survives Windows rotating
 its cache file away."""
 import json
-import tempfile
+import sys
 import unittest
 from pathlib import Path
 
 import wallpaper
+
+sys.path.append(str(Path(__file__).resolve().parents[2] / "kernel-lab"))
+from kernel import scratch  # noqa: E402
 
 
 class PretendWindows:
@@ -24,7 +27,7 @@ class PretendWindows:
 
 class WallpaperOffSwitch(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = scratch.TemporaryDirectory()
         root = Path(self.tmp.name)
         self.saved = (wallpaper.STATE, wallpaper.BEFORE, wallpaper.OFF, wallpaper.current, wallpaper._set)
         wallpaper.STATE = root / "wallpaper"
