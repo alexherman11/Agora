@@ -6,7 +6,6 @@ trial world, headless modules: nothing appears on the screen and nothing touches
 import json
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 import unittest
@@ -17,11 +16,13 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import kdesk_keeper  # noqa: E402
+sys.path.append(str(HERE.parents[1] / "kernel-lab"))
+from kernel import scratch  # noqa: E402
 
 
 class Trial:
     def __init__(self):
-        self.dir = Path(tempfile.mkdtemp(prefix="keeper-test-"))
+        self.dir = Path(scratch.mkdtemp(prefix="keeper-test-"))
         self.info = self.dir / "keeper.json"
         self.proc = subprocess.Popen([sys.executable, str(HERE / "kdesk_keeper.py"), "--port", "0",
                                       "--world", str(self.dir / "world"), "--info", str(self.info),

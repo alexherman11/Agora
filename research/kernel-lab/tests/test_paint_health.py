@@ -6,7 +6,6 @@ viewer's own private preference; old paint-report things go in one steward act (
 import json
 import shutil
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -15,6 +14,7 @@ sys.path.insert(0, str(LAB))
 
 from kernel.kernel import Kernel, Tx          # noqa: E402
 from kernel.inpage import Principal            # noqa: E402
+from kernel import scratch  # noqa: E402
 
 
 def Q(text):
@@ -23,7 +23,7 @@ def Q(text):
 
 class PaintHealth(unittest.TestCase):
     def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix='paint-health-')
+        self.dir = scratch.mkdtemp(prefix='paint-health-')
         self.k = k = Kernel(self.dir, {'tag': 'ph', 'name': 'Paint health', 'steward': {'account': 'test:alex', 'name': 'Alex'}})
         self.alex = k.actor_for(k.accounts['test:alex'])
         self.member = k.join('test:maya', 'Maya', invite={'admitted': True})['person']

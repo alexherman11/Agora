@@ -23,6 +23,7 @@ sys.path[:0] = [str(LAB), str(LAB / 'tests')]
 from kernel.kernel import Kernel
 from kernel.door import serve
 from kernel.painter import STATIC
+from kernel import scratch
 from test_skeleton import StandInEntry, post
 from test_painter import FEED, quoted, walk
 from hosts.web.layout import leaves
@@ -31,7 +32,7 @@ from shoot import CHROME
 
 class World:
     def __init__(self):
-        self.temp = tempfile.TemporaryDirectory(prefix='web-host-')
+        self.temp = scratch.TemporaryDirectory(prefix='web-host-')
         self.secret = secrets.token_hex(16)
         self.entry = StandInEntry(self.secret)
         self.k = Kernel(self.temp.name, {'tag': 'sb', 'name': 'Seabright',
@@ -227,7 +228,7 @@ def run(out):
         print(f"{len(checks):02d} {'ok' if ok else 'FAIL'} {name} · {detail}", flush=True)
         assert ok, (name, detail)
     w = World()
-    profile = tempfile.mkdtemp(prefix='web-host-chrome-')
+    profile = scratch.mkdtemp(prefix='web-host-chrome-')
     proc = None
     try:
         exe = next(p for p in CHROME if Path(p).exists())

@@ -4,7 +4,6 @@ geocode runs with only its HTTP layer stubbed (the URLs are recorded); the groun
 import importlib.util
 import shutil
 import sys
-import tempfile
 import urllib.parse
 from pathlib import Path
 
@@ -13,6 +12,7 @@ import pytest
 LAB = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(LAB))
 from kernel.kernel import Kernel, Actor  # noqa: E402
+from kernel import scratch  # noqa: E402
 
 spec = importlib.util.spec_from_file_location("map_outside_under_test", LAB / "modules" / "map" / "map.py")
 M = importlib.util.module_from_spec(spec)
@@ -64,7 +64,7 @@ def world(monkeypatch):
     monkeypatch.setattr(M, "home_ground", lambda call, m, near=None: FakeGround())
     monkeypatch.setattr(M, "area", lambda lat, lon, radius=1500: FakeGround())
     M.geo_last[0] = 0
-    d = tempfile.mkdtemp(prefix="map-outside-")
+    d = scratch.mkdtemp(prefix="map-outside-")
     k = Kernel(d, {"tag": "dk", "name": "Seabright", "steward": {"account": "a", "name": "Alex"}})
     alex = k.accounts["a"]
     run = lambda line: k.run(Actor(alex, alex, "person"), line)

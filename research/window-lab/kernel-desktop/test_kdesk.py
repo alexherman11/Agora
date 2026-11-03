@@ -5,6 +5,7 @@ appears on the screen). Everything is said as lines over HTTP, as Alex's pages a
     C:/Projects/Agora4/.venv/Scripts/python.exe -m unittest test_kdesk -v        (from research/window-lab/kernel-desktop)
 """
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -19,6 +20,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import kdesk  # noqa: E402
+from kernel import scratch  # noqa: E402
 
 SEE = {"help", "look", "rows", "holds", "status", "window.list", "window.desktop", "system.now", "media.now"}
 FEED = ("root : column, role sheet, of tag:post as p, each card\n"
@@ -31,9 +33,24 @@ def quoted(text):
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
+def scratch_dir(prefix):
+    """A fresh folder for a test world. Not tempfile.mkdtemp: since Python 3.12.4 that makes an owner-only folder on
+    Windows (SYSTEM, Administrators, OWNER RIGHTS, nothing inherited), so a sandboxed House worker can't write inside it,
+    even in its own worktree. A plain mkdir inherits the folder's access. Point TMP at a writable place first."""
+    base = Path(tempfile.gettempdir())
+    for _ in range(100):
+        p = base / f"{prefix}{os.urandom(4).hex()}"
+        try:
+            p.mkdir(parents=True)
+            return str(p)
+        except FileExistsError:
+            continue
+    raise FileExistsError(f"no free scratch name under {base}")
+
+
 class Desk:
     def __init__(self):
-        self.dir = tempfile.mkdtemp(prefix="kdesk-test-")
+        self.dir = scratch_dir("kdesk-test-")
         self.k, self.srv, self.host, self.entry = kdesk.start(Path(self.dir) / "world", 0, headless=True)
         self.url = f"http://127.0.0.1:{self.srv.server_address[1]}"
         self.wait(lambda: "window.list" in self.say("help all", "alex")["text"] and
@@ -434,7 +451,7 @@ class RecoveryTest(unittest.TestCase):
         import taskbar_guard as guard
         self.C, self.W, self.guard = C, W, guard
         (HERE / 'state').mkdir(exist_ok=True)        # ignored by git, so absent in a fresh House worktree
-        self.tmp = tempfile.TemporaryDirectory(prefix='taskbar-probe-', dir=HERE / 'state')
+        self.tmp = scratch.TemporaryDirectory(prefix='taskbar-probe-', dir=HERE / 'state')
         self.lease = Path(self.tmp.name) / 'lease.json'
         self.u = C.WinDLL('user32')
         self.u.CreateWindowExW.argtypes = [W.DWORD,W.LPCWSTR,W.LPCWSTR,W.DWORD,C.c_int,C.c_int,C.c_int,C.c_int,W.HWND,W.HMENU,W.HINSTANCE,W.LPVOID]

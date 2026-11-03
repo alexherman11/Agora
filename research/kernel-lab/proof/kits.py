@@ -10,7 +10,6 @@ import secrets
 import shutil
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -22,6 +21,7 @@ sys.path[:0] = [str(PROOF), str(LAB), str(LAB / "tests")]
 import council_night as council
 from kernel.kernel import Kernel
 from kernel.door import serve
+from kernel import scratch
 from test_skeleton import StandInEntry, post
 from test_painter import quoted
 
@@ -33,7 +33,7 @@ class Community(council.Night):
     """Same HTTP actor helpers as Council night; a separate folder, tag and keep."""
     def __init__(self, out):
         self.out = out
-        self.dir = tempfile.mkdtemp(prefix="watsonville-kits-")
+        self.dir = scratch.mkdtemp(prefix="watsonville-kits-")
         self.secret = secrets.token_hex(16)
         self.entry = StandInEntry(self.secret)
         self.k = Kernel(self.dir, {"tag": "wt", "name": "Watsonville Tenants Union",
