@@ -958,8 +958,8 @@ class Kernel:
                           "text": str(text)[:500], "announced": True})
         return "ok"
 
-    def reaches(self, actor, word, kind, target=None, fields=()):
-        """Conjunctive grant limits: kind:, thing:, fields: (set/undo only).
+    def reaches(self, actor, word, kind, target=None, fields=(), group=None):
+        """Conjunctive grant limits: kind:, thing:, fields:, library:.
         Each matching grant must independently admit the whole write; never
         assemble a wider permission from pieces of separate grants.
         """
@@ -980,6 +980,11 @@ class Kernel:
                         return False
                 elif clause.startswith('fields:'):
                     if word not in ('set', 'undo') or not fields or not set(fields) <= set(clause[7:].split(',')):
+                        return False
+                elif clause.startswith('library:'):
+                    from .document_scope import admits
+                    if not isinstance(fields, dict) or not admits(
+                            self, actor, clause[8:], word, kind, target, fields, group):
                         return False
                 else:
                     return False

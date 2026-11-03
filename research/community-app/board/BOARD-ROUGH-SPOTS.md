@@ -49,3 +49,15 @@ Seen, not fixed: the `catch-up` verb (install.py, `steps='board.catch-up'`) does
 `catch-up in=<group>` silently answers for the whole board. Kernel line keys are lowercase only
 (`kernel/lines.py` KEY), so no component's camelCase setting (`weekStart`, `previewCount`) can be named in
 `personal-view`; lowercase settings (`view`, `label`) work.
+
+## Scoped Documents metadata admission (Codex, existing dk1614 follow-through)
+
+Missing world capability: a provider's make/set grant could limit kinds or
+existing thing ids/fields, but could not bind new folder/entry metadata to one
+document library. Source draft adds `only=...;library:<id>` admission in
+`kernel/document_scope.py`, called by `Kernel.reaches`, and passes the full make
+shape before any post delegation in `words.py`. The clause requires inherited
+library visibility, one matching group and metadata-only writes; unrelated file,
+policy and cross-library writes refuse. Regression cases are in `test_shapes.py`.
+No grants, root creation, live source publication, activation or migration.
+See DOCUMENTS-SCOPE-REVIEW.md for held resolver decisions and unexecuted tests.
