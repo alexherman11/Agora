@@ -1,6 +1,8 @@
 """The language changes Alex approved on 27 Oct 2026 (research/kernel-lab/terminal/lines-plainly.html, his answers in
 its decisions store). No desktop or live world."""
 import sys
+import tempfile
+import uuid
 from pathlib import Path
 
 import pytest
@@ -10,7 +12,9 @@ from kernel.kernel import Kernel
 
 
 @pytest.fixture
-def world(tmp_path):
+def world():
+    tmp_path = Path(tempfile.gettempdir()) / ("lines-plainly-" + uuid.uuid4().hex)
+    tmp_path.mkdir()
     k = Kernel(tmp_path / 'world', {'tag': 'lp', 'name': 'Plain', 'steward': {'account': 'alex', 'name': 'Alex'},
                'invites_counted_by': 'kernel', 'invites': [{'code': 'x', 'uses': 5}],
                'modules': [{'name': 'pad', 'run': ['none'], 'publishes': 'pad.*'}]})

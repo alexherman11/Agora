@@ -5,6 +5,9 @@ HIDDEN = {"done", "verified", "finished", "completed", "released", "cancelled",
           "trashed", "queued", "backlog", "later", "ready", "waiting", "paused"}
 RUNNING = {"working", "reviewing", "landing"}          # a builder's phase (house.who doing=) that is work in progress
 STUCK = {"blocked", "recovery-needed"}                 # a builder's phase that waits on someone
+WAITING = {"received": "Finished, waiting on its review", "reviewed": "Checks passed, waiting to land"}
+# Alex, 3 Nov: finished results sat for days because nothing listed them; a stopped worker's result is current work
+ORDER = {"Blocked": 0, "Waiting": 1, "Working": 2}
 
 
 def rows(module, agents, builders, use):
@@ -65,16 +68,22 @@ def rows(module, agents, builders, use):
         stuck = doing in STUCK
         blocked = bool(reason) or lane == "blocked" or status.startswith("blocked") or stuck
         running = doing in RUNNING
-        if not blocked and not running and not (lane == "now" and resident and not card.get("build_run")):
+        waiting = doing in WAITING and not blocked
+        if not blocked and not running and not waiting and not (lane == "now" and resident and not card.get("build_run")):
             continue
+        if waiting:
+            since = str(worker.get("awaiting") or worker.get("last_turn") or "")[:10]
+            reason = WAITING[doing] + (f" since {since}" if since else "")
         if stuck and not reason:
             reason = worker.get("error") or worker.get("now") or card.get("build_detail")
         resolver = card.get("blocker_owner") or card.get("resolver") or (
             (card.get("lead") or holder) if stuck else "")
+        if waiting:
+            resolver = worker.get("owner_name") or card.get("lead") or holder
         result.append(dict(id=card["id"], title=title(card),
                            owner=person(worker["name"] if same_run else holder, "Unassigned"),
-                           state="Blocked" if blocked else "Working",
-                           blocker=first(words(reason, "Blocker not recorded")) if blocked else "",
-                           resolver=person(resolver, "Resolver not recorded") if blocked else "",
+                           state="Blocked" if blocked else "Waiting" if waiting else "Working",
+                           blocker=first(words(reason, "Blocker not recorded")) if blocked or waiting else "",
+                           resolver=person(resolver, "Resolver not recorded") if blocked or waiting else "",
                            next_action=words(card.get("next_action")), detail=words(card.get("text"))))
-    return sorted(result, key=lambda r: (r["state"] != "Blocked", r["title"].casefold(), r["id"]))
+    return sorted(result, key=lambda r: (ORDER[r["state"]], r["title"].casefold(), r["id"]))

@@ -10,7 +10,6 @@ import json
 import secrets
 import shutil
 import sys
-import tempfile
 import threading
 import unittest
 import urllib.error
@@ -24,6 +23,7 @@ sys.path.insert(0, str(LAB))
 from kernel.door import serve                     # noqa: E402
 from kernel.kernel import Kernel, Refused, Actor   # noqa: E402
 from kernel.store import Log, BrokenLog, canon     # noqa: E402
+from kernel import scratch  # noqa: E402
 
 NODE = shutil.which("node")
 INVITE = "seabright-flyer-oct"
@@ -92,7 +92,7 @@ class Skeleton(unittest.TestCase):
     GRANTS = "look pin"
 
     def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix="kernel-test-")
+        self.dir = scratch.mkdtemp(prefix="kernel-test-")
         self.secret = secrets.token_hex(16)
         self.entry = StandInEntry(self.secret)
         # this world counts its own invites (the seam's later phase); the real-entry tests below use the first
@@ -541,7 +541,7 @@ class WithTheRealEntryService(unittest.TestCase):
         except Exception as exc:          # noqa: BLE001
             self.skipTest(f"the entry service could not be imported: {exc!r}")
         from wsgiref.simple_server import make_server, WSGIRequestHandler
-        self.tmp = tempfile.mkdtemp(prefix="kernel-entry-")
+        self.tmp = scratch.mkdtemp(prefix="kernel-entry-")
         self.secret = secrets.token_hex(16)
         env = {"SITE_MODE": "test", "SITE_DATA_DIR": str(Path(self.tmp, "entry")), "GOOGLE_STAND_IN": "off",
                "SITE_SECRET_KEY": secrets.token_hex(32), "KERNEL_SHARED_SECRET": self.secret,

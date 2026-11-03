@@ -8,16 +8,17 @@ window's own icon (hwnd:) works for at least one window.
 """
 import io
 import sys
-import tempfile
 import time
 import unittest
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+sys.path.append(str(HERE.parents[1] / "kernel-lab"))
+from kernel import scratch  # noqa: E402
 import os  # noqa: E402
 
-os.environ.setdefault("AGORA_ICON_CACHE", tempfile.mkdtemp(prefix="icons-", dir=str(HERE / "state")))
+os.environ.setdefault("AGORA_ICON_CACHE", scratch.mkdtemp(prefix="icons-", dir=str(HERE / "state")))
 import shell_icons as SI  # noqa: E402
 import native_shell  # noqa: E402
 from PIL import Image  # noqa: E402

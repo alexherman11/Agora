@@ -53,6 +53,7 @@ HEADLESS = "--headless" in sys.argv
 PORT = int(os.environ.get("AGORA_KDESK_PORT", "8810"))
 LENS_SIZE = (1180, 1500)        # a lens window's first size, in real pixels
 VIEWS = {"lines": ("Lines", (1500, 760)), "thing": ("Thing", (1000, 820)),
+         "viewer": ("Viewer", (1280, 900)),
          "help": ("Help", (1200, 1300)), "tasks": ("Running windows", (1100, 1000)),
          "taskbar": ("Agora taskbar", (0, 0))}
 
@@ -350,10 +351,10 @@ class GuiScreen(Screen):
     def open(self, wid, view, title, url, box, on_closed, on_shown, bar=False, tucked=False):
         s = scale()
         x, y, w, h = box
-        api = PageApi(self, wid)
+        api = None if view == "viewer" else PageApi(self, wid)
         glassy = view in SHELL_VIEWS and bar in ("top", "bottom")
         win = self.webview.create_window(title, url, js_api=api, x=int(x / s), y=int(y / s), width=max(200, int(w / s)),
-                                         height=max(30, int(h / s)), frameless=True, easy_drag=False, on_top=bool(bar) and bar != "layer", min_size=(120, 24),
+                                         height=max(30, int(h / s)), frameless=view != "viewer", easy_drag=False, on_top=bool(bar) and bar != "layer", min_size=(120, 24),
                                          background_color="#F6F3EC", text_select=True, hidden=True, transparent=glassy)
         rec = {"w": win, "hwnd": None, "view": view, "bar": bar}
         with self.lock:
@@ -375,6 +376,8 @@ class GuiScreen(Screen):
             on_shown()
 
         def loaded():
+            if view == "viewer":
+                return  # Viewer owns a separate native pane; the placeholder does not gate it.
             if rec["hwnd"] is None:
                 if rec.get("page_failed"):
                     return                                  # an error page is never shown; _bar_page tries again
@@ -427,6 +430,18 @@ class GuiScreen(Screen):
                 on_closed()
         win.events.loaded += loaded
         win.events.closed += closed
+        if view == "viewer":
+            import viewer
+            viewer.attach(win, f"http://127.0.0.1:{PORT}", self.module.token)
+            if tucked:
+                early = int(win.native.Handle.ToInt64())
+                user32.ShowWindow(early, 7)
+                rec["hwnd"] = early
+                user32.SetPropW(early, "Agora.Window." + wid, wt.HANDLE(1))
+                on_shown()
+            else:
+                win.show()
+                shown_once()
 
     def _make_bar(self, wid, hwnd, edge):
         view = (self.wins.get(wid) or {}).get("view")

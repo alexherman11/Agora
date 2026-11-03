@@ -32,7 +32,8 @@ class Call(M.Call):
 
     def see(self, line):
         out = self.k.run(self.actor, line, mode="see")
-        assert out["ok"], out
+        if not out["ok"]:
+            raise ValueError(out["text"])     # as map.py's Call does for a refused read (a hidden place)
         return out.get("rows", []), out.get("text", "")
 
 
@@ -63,8 +64,8 @@ def test_visible_place_links_become_board_pins_and_hidden_places_do_not(tmp_path
     alex = k.actor_for(k.accounts["alex"])
     bea = k.actor_for(k.join("bea", "Bea", invite="x")["person"])
 
-    def make(line):
-        out = k.run(alex, line)
+    def make(line, actor=alex):
+        out = k.run(actor, line)
         assert out["ok"], out
         return out["made"][0]
 
@@ -73,7 +74,9 @@ def test_visible_place_links_become_board_pins_and_hidden_places_do_not(tmp_path
     posts = [make(f'post text="Garden {kind}" post_kind={kind} place={place}')
              for kind in ("event", "ask", "offer", "discussion")]
     private_link = make(f'post text="Private place" place={secret}')
-    no_place = make('post text="No place"')
+    # Alex has used the ordinary five-post allowance. A second member supplies
+    # the no-place control without changing the production quota or visibility.
+    no_place = make('post text="No place"', actor=bea)
     call = Call(k, bea)
     rows, _ = call.see("rows post")
     def no_ground():

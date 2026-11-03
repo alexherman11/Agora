@@ -1663,7 +1663,7 @@
     // a6153: the scene's text is shown only in the inspector (#said); a page without it is not sent it (~400 KB and
     // ~25 ms of the home base's build at every press)
     const text = document.body.dataset.inspector === "on" ? "" : "&text=0";
-    const r = await (await fetch(`/api/scene?session=${encodeURIComponent(session)}&as=${who}&lens=${lens}${on}&view=painter&keys=${keys}${text}${have}`)).json();
+    const r = await (await fetch(`/api/scene?session=${encodeURIComponent(session)}&as=${who}&lens=${encodeURIComponent(lens)}${on}&view=painter&keys=${keys}${text}${have}`)).json();
     if (r.same) return;                          // deskd: nothing changed since the build this page has
     return paintAnswer(r, force);
   }
