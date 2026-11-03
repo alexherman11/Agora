@@ -7,6 +7,7 @@ import sys
 import threading
 import time
 from pathlib import Path
+import smart_search
 
 pending = {}
 output_lock = threading.Lock()
@@ -219,6 +220,8 @@ def plan(message, operation=None):
 
 
 def call(message):
+    if message['word'] == 'model.search':
+        return search(message)
     if message['word'] == 'model.preview':
         limit(message['use'], 'model.preview', message['caller']['person'])
         # The bridge must not bypass a steward disabling the canonical word.
@@ -234,6 +237,59 @@ def call(message):
         result = plan(message, op)
         return dict(rows=[result], text='Prepared quoted summary data; no facts written')
     return plan(message)
+
+
+def search(message):
+    """Read-only operation in the existing broker, with its existing grant/budget."""
+    use = message['use']
+    kv = (message.get('args') or {}).get('kv') or {}
+    query = str(kv.get('q') or '').strip()
+    if not query or len(query) > 1200:
+        raise ValueError('search needs 1–1200 characters')
+    mode = kv.get('mode', 'lexical')
+    if mode not in {'lexical', 'semantic', 'check'}:
+        raise ValueError('choose lexical, semantic or check')
+    rows = read(use, 'rows any')
+    records = smart_search.descriptors(rows)
+    if mode == 'check':
+        target = str(kv.get('id', ''))
+        row = next((r for r in rows if r['id'] == target and
+                    str(r.get('rev')) == str(kv.get('rev')) and not r.get('forgotten')), None)
+        if row is None or target not in {r['id'] for r in records}:
+            return dict(rows=[], text='This result changed or is no longer available. Search again.')
+        return dict(rows=[dict(id=target, rev=row['rev'],
+                              app=smart_search.app_target(row, rows))], text='Current visible result')
+    semantic, state = None, 'Exact lexical search'
+    # Select a deterministic bounded corpus, independent of lexical matches.
+    # Show the incomplete scope; never imply that this covers every world item.
+    scan = records[-smart_search.MAX_RECORDS:]
+    if mode == 'semantic':
+        limit(use, 'model.search', message['caller']['person'])
+        settings = read(use, 'rows model-settings name=model')
+        selected = str(settings[0].get('model') or MODEL) if settings else MODEL
+        # No prewarm or queue. Gate is read-only; unavailable inspection fails closed.
+        desktop = Path(__file__).resolve().parents[3] / 'window-lab/kernel-desktop'
+        sys.path.insert(0, str(desktop))
+        from gaming_gate import reasons
+        if reasons():
+            state = 'Semantic search deferred: desktop is busy; lexical results'
+        else:
+            try:
+                raw = generate(selected, smart_search.prompt(query, scan), tokens=256)
+                semantic = smart_search.decode(raw, query, scan)
+                state = 'Local semantic suggestions · ' + selected
+            except (OSError, ValueError, http.client.HTTPException, json.JSONDecodeError):
+                state = 'Semantic search unavailable or invalid; lexical results'
+        # Fresh caller-filtered data after inference. Revocations/changes cannot
+        # survive by virtue of having been present in the earlier prompt.
+        rows = read(use, 'rows any')
+    result = smart_search.merge(query, records, rows, semantic)
+    current = {r['id']: r for r in rows}
+    for hit in result['hits']:
+        hit['app'] = smart_search.app_target(current[hit['id']], rows)
+    result.update(state=state, semantic_scanned=len(scan) if semantic else 0,
+                  semantic_scope='Last 36 visible descriptors only; lexical covers visible text')
+    return dict(rows=[result], text=state)
 
 
 def answer(message):
@@ -257,6 +313,7 @@ def main():
             words = []
             for name, kind, takes, help_ in [
                 ('ask', 'see', '<question> [about=<thing>]', 'Answer a question with visible facts only; answer text is data.'),
+                ('search', 'see', 'q=<text> [mode=lexical|semantic|check]', 'Read-only local search. Lexical is free of inference; semantic shares broker lock and daily attempts. No web/mail/files connector.'),
                 ('summarize', 'do', '<id> [into=<field>] [words=<n>]', 'Write a short, labelled summary; default short, 12 words. Undo restores its facts. Offline: labelled trimmed description.'),
                 ('classify', 'do', '<id> options=<labels> [into=<field>]', 'Write exactly one allowed label; default topic. Invalid output refuses. Undo restores its facts.'),
                 ('status', 'see', '', 'Read selected, installed and actually loaded local models; plainly says when Ollama is down.'),
