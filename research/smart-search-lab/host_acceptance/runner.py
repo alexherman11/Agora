@@ -4,11 +4,13 @@ No host check has been run by the author. See CONTRACT.md before invoking.
 The receipt argument records external authorization; it does NOT grant authority.
 """
 import argparse
+import ast
 import hashlib
 import json
 import os
 from pathlib import Path
 import sys
+import threading
 import time
 
 HERE = Path(__file__).resolve().parent
@@ -28,13 +30,67 @@ def verify():
     return manifest
 
 
+def verify_harness():
+    """Exactly five named files, no dependency discovery or product imports."""
+    manifest = json.loads((HERE / "source-manifest.json").read_text(encoding="utf-8"))
+    for name in ("runner.py", "fixture.py", "freeze_source.py", "CONTRACT.md"):
+        path = HERE / name
+        key = path.relative_to(ROOT).as_posix()
+        if digest(path) != manifest["sha256"][key]:
+            raise RuntimeError("harness source drift: " + name)
+        if path.suffix == ".py":
+            ast.parse(path.read_text(encoding="utf-8"), filename=name)
+    return {"harness_files_verified": 5, "ast_files_parsed": 3,
+            "dependency_entries_verified": False, "host_checks_executed": False,
+            "manifest_sha256": digest(HERE / "source-manifest.json")}
+
+
+class AdmissionLatch:
+    """One-way failure state shared by all threads of one harness process."""
+    def __init__(self, on_loss=None):
+        self.lock = threading.RLock()
+        self.observations, self.failures = [], []
+        self.on_loss = on_loss
+        self.closed = False
+
+    def lose(self, boundary, detail):
+        with self.lock:
+            self.failures.append({"boundary": boundary, "detail": detail})
+            if self.on_loss:
+                self.on_loss(list(self.failures))
+
+    def read(self, reader, boundary, cleanup=False):
+        with self.lock:
+            if self.closed:
+                raise RuntimeError("fixture observations closed; no further host work")
+            if self.failures and not cleanup:
+                raise RuntimeError("admission permanently lost; no retry: " + boundary)
+            try:
+                observation = reader()
+            except Exception as exc:
+                observation = {"admitted": False, "reason": "unknown reader outcome",
+                               "error_type": type(exc).__name__}
+            self.observations.append({"boundary": boundary, "value": observation})
+            if not isinstance(observation, dict) or observation.get("admitted") is not True:
+                self.lose(boundary, observation)
+            if self.failures and not cleanup:
+                raise RuntimeError("admission permanently lost: " + boundary)
+            return observation
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--verify-source", action="store_true")
+    ap.add_argument("--verify-harness-source", action="store_true")
     ap.add_argument("--run", action="store_true")
     ap.add_argument("--authority-record")
     ap.add_argument("--attempt")
     args = ap.parse_args()
+    if args.verify_harness_source:
+        if args.run or args.verify_source:
+            ap.error("--verify-harness-source cannot be combined with other modes")
+        print(json.dumps(verify_harness()))
+        return 0
     manifest = verify()  # stdlib only; no admission read, import or filesystem mutation
     if args.verify_source and not args.run:
         print(json.dumps({"source_verified": len(manifest["sha256"]),
@@ -52,14 +108,20 @@ def main():
         ap.error("House must name AGORA_TMP explicitly inside this worktree; no default/fallback")
     sys.path.insert(0, str(ROOT / "research/text-desk-lab/notation"))
     import guard_context
-    observations = []
+    admission = AdmissionLatch()
+    child_loss_path = None
 
     def gate(boundary, cleanup=False):
-        observation = guard_context.read()  # unchanged fixed-path consumer
-        observations.append({"boundary": boundary, "value": observation})
-        if not cleanup and not observation.get("admitted"):
-            raise RuntimeError("admission refused at " + boundary + "; no retry")
-        return observation
+        # A child HTTP/module thread may lose admission after writing result.json.
+        # Its sticky receipt is checked again after owned job closure, when that
+        # family can no longer produce new observations.
+        if child_loss_path is not None:
+            try:
+                if child_loss_path.exists():
+                    admission.lose("child admission loss", json.loads(child_loss_path.read_text(encoding="utf-8")))
+            except (OSError, ValueError) as exc:
+                admission.lose("child admission outcome unknown", type(exc).__name__)
+        return admission.read(guard_context.read, boundary, cleanup=cleanup)
 
     gate("before sandbox import (import configures scratch)")
     sys.path.insert(0, str(ROOT / "research/window-lab"))
@@ -75,6 +137,7 @@ def main():
     guard = sb.Guard(name, "Apps and World text search")
     report = Path(tmp) / (name + "-source-harness.json")
     run_root = Path(tmp) / (name + "-fixture")
+    child_loss_path = run_root / "admission-lost.json"
     if run_root.exists() or report.exists():
         raise RuntimeError("fresh path required; no reuse")
     started = False
@@ -131,7 +194,10 @@ def main():
                            "foreground_available": bool(guard.first.get("foreground"))}
         gate("postflight")
         closed = result.get("job_after_off", {})
-        ok = (result.get("fixture", {}).get("ok") is True
+        ok = (not admission.failures
+              and result.get("fixture", {}).get("admission_failures") == []
+              and result.get("fixture", {}).get("admission_observations_closed") is True
+              and result.get("fixture", {}).get("ok") is True
               and result.get("cleanup", {}).get("ok") is True
               and closed.get("active") == 0 and closed.get("pids") == []
               and result.get("cleanup_receipt", {}).get("job_closure") == "proven empty"
@@ -141,7 +207,8 @@ def main():
         result["error"] = {"type": type(exc).__name__, "message": str(exc)}
         result["result"] = "FAIL/REFUSED; retain artifacts; no retry"
     finally:
-        result["guard_observations"] = observations
+        result["guard_observations"] = admission.observations
+        result["admission_failures"] = admission.failures
         # Receipt only; no profile traversal, deletion or admission publication.
         report.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(str(report))

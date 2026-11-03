@@ -22,7 +22,7 @@ from wsgiref.simple_server import make_server, WSGIRequestHandler
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 sys.path.insert(0, str(HERE))
-from runner import verify
+from runner import AdmissionLatch, verify
 
 
 def Q(value):
@@ -40,15 +40,22 @@ def main():
     require(work.is_relative_to(ROOT) and work.name.startswith("search-"), "fixture path")
     sys.path.insert(0, str(ROOT / "research/text-desk-lab/notation"))
     import guard_context
-    events = []
     deadline = time.monotonic() + 80
+    # This is an attempt-owned failure receipt, never admission publication.
+    # A partial/unreadable marker is UNKNOWN to the outer runner, never clear.
+    def persist_loss(failures):
+        (work / "admission-lost.json").write_text(json.dumps(failures), encoding="utf-8")
+
+    admission = AdmissionLatch(on_loss=persist_loss)
 
     def gate(boundary):
-        require(time.monotonic() < deadline, "80 second fixture deadline")
-        data = guard_context.read()
-        events.append({"boundary": boundary, "value": data})
-        if not data.get("admitted"):
-            raise RuntimeError("House admission refused: " + boundary)
+        with admission.lock:
+            if admission.closed:
+                raise RuntimeError("fixture observations closed; no further host work")
+            if time.monotonic() >= deadline:
+                admission.lose(boundary, "80 second gate deadline exceeded")
+                raise RuntimeError("80 second fixture gate deadline")
+            admission.read(guard_context.read, boundary)
 
     checks = []
     result = {"ok": False, "checks": checks, "kind": "unexecuted until authorized"}
@@ -70,6 +77,8 @@ def main():
     browser = None
     cdp = None
     host = None
+    auth_audit = {}
+    auth_lock = threading.Lock()
     # Guard wrappers delegate to the actual transport, not an emulated module.
     # Its autonomous offer/see/do messages need admission as well as HTTP.
     ProductionModuleProcess = module_transport.ModuleProcess
@@ -185,6 +194,20 @@ def main():
                 gate("host GET")
                 return super().do_GET()
 
+            def _actor(self):
+                # Observe the production resolver's actual return, without
+                # manufacturing actors or changing its identity/authorization.
+                actor, why = super()._actor()
+                trace = self.headers.get("X-Search-Fixture-Trace")
+                if trace:
+                    accounts = [] if actor is None else [
+                        account for account, person in k.accounts.items() if person == actor.person]
+                    with auth_lock:
+                        auth_audit.setdefault(trace, []).append(None if actor is None else {
+                            "principal": actor.id, "person": actor.person,
+                            "kind": actor.kind, "accounts": sorted(accounts)})
+                return actor, why
+
         class JoinHandler(make_handler(k, client, secret)):
             def do_POST(self):
                 gate("production join seam")
@@ -207,9 +230,36 @@ def main():
         server.RequestHandlerClass = Handler
         owner, viewer, other = [Door(origin, token) for token, _ in identities]
         viewer_id, other_id = [k.accounts[account] for _, account in identities[1:]]
+        owner_id = k.accounts[owner_account]
         check("unknown bearer rejected", request(origin + "/see", {"line": "rows any"}, "not-a-session")[0] == 401)
-        code, forged = request(origin + "/see", {"line": "who", "as": "Fixture owner"}, identities[1][0])
-        check("body identity cannot impersonate owner", code == 200 and forged.get("as") != "Fixture owner")
+
+        def authenticated(door, route, body):
+            trace = secrets.token_hex(16)
+            code, out = request(origin + route, body, door.token,
+                                {"X-Search-Fixture-Trace": trace})
+            with auth_lock:
+                resolved = auth_audit.pop(trace, [])
+            require(len(resolved) == 1 and resolved[0] is not None,
+                    "exactly one production authenticated principal resolution")
+            return code, out, resolved[0]
+
+        code, owner_identity, owner_principal = authenticated(owner, "/see", {"line": "who"})
+        check("canonical owner baseline", code == 200 and owner_identity.get("ok") is True
+              and owner_principal == {"principal": owner_id, "person": owner_id,
+                                      "kind": "person", "accounts": [owner_account]})
+        code, viewer_identity, viewer_principal = authenticated(viewer, "/see", {"line": "who"})
+        check("canonical viewer baseline", code == 200 and viewer_identity.get("ok") is True
+              and viewer_principal == {"principal": viewer_id, "person": viewer_id,
+                                       "kind": "person", "accounts": [identities[1][1]]}
+              and viewer_principal != owner_principal)
+        forged_identity = {"as": owner_id, "person": owner_id, "account": owner_account}
+        code, forged, forged_principal = authenticated(viewer, "/see",
+                                                       {"line": "who", **forged_identity})
+        check("body forgery retains canonical viewer identity", code == 200
+              and forged.get("ok") is True and forged_principal == viewer_principal
+              and forged_principal != owner_principal)
+        result["canonical_identity_baselines"] = {
+            "owner": owner_principal, "viewer": viewer_principal, "forged": forged_principal}
         gate("only headless window module reconcile")
         host = module_transport.Host(k, ROOT / "research/kernel-lab")
         host.reconcile()
@@ -240,6 +290,7 @@ def main():
         private = owner.say("make kind=note name=WHOLE_PRIVATE_SENTINEL text=visibilityneedle sees="
                             + Q("person:" + other_id))["made"][0]
         target = owner.say("make kind=note name=PublicEvidence text=clickneedle")["made"][0]
+        ui_revoked = owner.say("make kind=note name=UIRevocationEvidence text=uirevocationneedle")["made"][0]
         headers = {"X-Agora-Widget-Host": Handler.widget_broker.guard_key}
 
         def widget(door, action, body):
@@ -273,28 +324,59 @@ def main():
         def windows():
             return owner.rows("window")
 
+        def window_targets():
+            return {row["id"]: row.get("target") for row in windows()}
+
+        def created_window(before, after, wanted):
+            added = set(after) - set(before)
+            return (len(added) == 1 and not (set(before) - set(after))
+                    and all(after[wid] == target for wid, target in before.items())
+                    and after[next(iter(added))] == wanted)
+
+        def wait_for_window_delta(before, wanted):
+            current = window_targets()
+            return current if created_window(before, current, wanted) else None
+
+        # Owner-only operation has its own successful exact-effect baseline.
+        # Neither who display text nor a generic HTTP 200 is an identity oracle.
+        before_identity_action = window_targets()
+        command = "window.open thing " + target + " new=yes"
+        code, allowed, resolved = authenticated(owner, "/do", {"line": command})
+        after_identity_action = window_targets()
+        check("canonical owner can perform owner-only action", code == 200
+              and allowed.get("ok") is True and resolved == owner_principal
+              and created_window(before_identity_action, after_identity_action, target))
+        code, refused, resolved = authenticated(viewer, "/do",
+                                                {"line": command, **forged_identity})
+        check("forged viewer refused owner-only action", code == 200
+              and refused.get("ok") is False and resolved == viewer_principal
+              and window_targets() == after_identity_action)
+
         owner_open = widget(owner, "open", {"widget": ids["widget"]})
         require(owner_open.get("ok"), "owner module open")
         owner_instance = owner_open["instance"]
         # The real window provider is owner-only. Prove it can admit a fresh
         # action before interpreting a stale refusal as a revision check.
         fresh = owner.rows("note", name="PublicEvidence")[0]
+        before_fresh = window_targets()
         positive = module("window.open thing " + target + " new=yes", saw={target: fresh["rev"]},
                           door=owner, inst=owner_instance)
-        require(positive.get("ok"), "fresh owner evidence open baseline")
-        before = len(windows())
+        after_fresh = window_targets()
+        check("fresh owner evidence creates exact window delta",
+              positive.get("ok") is True and created_window(before_fresh, after_fresh, target))
+        result["fresh_action_window_delta"] = {wid: after_fresh[wid] for wid in set(after_fresh) - set(before_fresh)}
         old = owner.rows("note", name="PublicEvidence")[0]
         owner.say("look " + target)
         owner.say("set " + target + " text=clickneedle-updated")
         stale = module("window.open thing " + target + " new=yes", saw={target: old["rev"]},
                        door=owner, inst=owner_instance)
-        check("real window.open stale revision fence", not stale.get("ok")
+        check("real window.open stale revision fence", stale.get("ok") is False
               and any(word in str(stale).lower() for word in ("changed", "stale", "revision"))
-              and len(windows()) == before)
+              and window_targets() == after_fresh)
         for row in windows():
             owner.say("look " + row["id"])
             owner.say("window.close " + row["id"])
-        before = len(windows())
+        before = window_targets()
         # Own-lens health is a real broker/principal/kernel exercise with
         # explicitly synthetic health inputs, not proof of browser watchdog.
         second = owner.say("make kind=lens name=foreign-fixture painter=components text="
@@ -403,7 +485,7 @@ def main():
                             context), "real search completion")
 
         search("clickneedle")
-        check("real UI search Enter has no action", len(windows()) == before)
+        check("real UI search Enter has no action", window_targets() == before)
         check("real UI renders evidence", js("document.querySelector('.search-hit').textContent.includes('PublicEvidence')", context))
         # Freeze the displayed hit, then mutate its source using a second writer.
         owner.say("look " + target)
@@ -411,27 +493,73 @@ def main():
         js("document.querySelector('.search-hit button').click()", context)
         wait(lambda: js("document.querySelector('[role=status]').textContent.includes('changed')", context),
              "fresh click abstention")
-        check("real UI changed evidence abstains", len(windows()) == before)
+        check("real UI changed evidence abstains", window_targets() == before)
         search("clickneedle")
         js("document.querySelector('.search-hit button').click()", context)
-        wait(lambda: len(windows()) == before + 1, "real evidence click into headless window")
+        after_ui = wait(lambda: wait_for_window_delta(before, target),
+                        "real evidence click into headless window")
         check("real click opens only requested evidence",
-              any(w.get("target") == target for w in windows()))
-        search("visibilityneedle")
-        check("real UI revocation excludes evidence", not js("!!document.querySelector('.search-hit')", context))
-        # Grant revocation and off invalidate existing instances through the
-        # real broker. No restart or changed authorization is used to recover.
+              created_window(before, after_ui, target))
+        result["ui_action_window_delta"] = {wid: after_ui[wid] for wid in set(after_ui) - set(before)}
+        # Independent UI-only record: it was never revoked by the earlier
+        # module-only case. Keep its genuine rendered button/closure for the
+        # stale click, without fabricating a gesture or bypassing the UI.
+        search("uirevocationneedle")
+        exact = module('search "uirevocationneedle" limit=50', see=True,
+                       door=owner, inst=owner_instance)
+        check("UI revocation source exact visible baseline", exact.get("ok") is True
+              and [row["id"] for row in exact.get("rows", [])] == [ui_revoked])
+        check("real UI evidence visible before revocation", js(
+              "(()=>{const hits=[...document.querySelectorAll('.search-hit')];"
+              "if(hits.length!==1||hits[0].querySelector('h2 button')?.textContent!=='UIRevocationEvidence')return false;"
+              "globalThis.__searchRevocationButton=hits[0].querySelector('h2 button');"
+              "return __searchRevocationButton.isConnected})()", context) is True)
+        before_revoke_click = window_targets()
+        owner.say("look " + ui_revoked)
+        owner.say("set " + ui_revoked + " sees=" + Q("person:" + other_id))
+        js("globalThis.__searchRevocationButton.click()", context)
+        wait(lambda: js("document.querySelector('[role=status]').textContent.includes('no longer available')",
+                        context), "real stale revoked-evidence click refusal")
+        check("real UI revoked stale click has zero window delta", window_targets() == before_revoke_click)
+        search("uirevocationneedle")
+        refreshed = module('search "uirevocationneedle" limit=50', see=True,
+                           door=owner, inst=owner_instance)
+        check("real UI refreshed results exclude exact revoked evidence",
+              refreshed.get("ok") is True and refreshed.get("rows") == []
+              and js("document.querySelectorAll('.search-hit').length", context) == 0
+              and window_targets() == before_revoke_click)
+        # Stage an independent widget-off fixture BEFORE revoking the search
+        # widget's grant. Never restore/broaden the revoked grant to test off.
+        off_widget = owner.say("make kind=widget name=search-off-case component_lens=smart-search code="
+                               + Q(k.state.get(ids["widget"], "code")))["made"][0]
+        owner.say("look " + off_widget)
+        owner.say("widget " + off_widget + " grants=" + Q(installer.REQUIRED_GRANTS))
+        off_open = widget(other, "open", {"widget": off_widget})
+        require(off_open.get("ok") is True, "independent off-case open")
+        off_grants = owner.rows("grant", to=off_widget)
+        require(any(not g.get("revoked") for g in off_grants), "off-case live authorization")
+        # Revocation uses a different widget and its own positive baseline.
         final = widget(other, "open", {"widget": ids["widget"]})
         require(final.get("ok"), "final open")
+        revocation_baseline = module('search "clickneedle" limit=50', see=True,
+                                     door=other, inst=final["instance"])
+        check("grant revocation authorized baseline", revocation_baseline.get("ok") is True
+              and target in [r["id"] for r in revocation_baseline.get("rows", [])])
         grant = next(g for g in owner.rows("grant", to=ids["widget"]) if not g.get("revoked"))
         owner.say("look " + grant["id"])
         owner.say("set " + grant["id"] + " revoked=yes")
         denied = widget(other, "call", {"instance": final["instance"], "op": "see", "line": 'search "clickneedle"'})
-        check("module grant revocation effective", not denied.get("ok"))
-        owner.say("look " + ids["widget"])
-        owner.say("off " + ids["widget"])
-        check("widget off invalidates existing instance", not widget(other, "call",
-              {"instance": final["instance"], "op": "see", "line": "rows any"}).get("ok"))
+        check("module grant revocation effective", denied.get("ok") is False)
+        check("independent off-case grants still authorized",
+              owner.rows("grant", to=off_widget) == off_grants)
+        owner.say("look " + off_widget)
+        off_baseline = module('search "clickneedle" limit=50', see=True,
+                              door=other, inst=off_open["instance"])
+        check("widget off immediate authorized success baseline", off_baseline.get("ok") is True
+              and target in [r["id"] for r in off_baseline.get("rows", [])])
+        owner.say("off " + off_widget)
+        check("widget off invalidates existing instance", widget(other, "call",
+              {"instance": off_open["instance"], "op": "see", "line": 'search "clickneedle" limit=50'}).get("ok") is False)
         # Disable the synthetic entry session using the real service store;
         # cache_s=0 prevents a cache lifetime from hiding session revocation.
         gate("synthetic session revocation")
@@ -439,6 +567,10 @@ def main():
             conn.execute("UPDATE accounts SET disabled_at=? WHERE id=?", (time.time(), identities[2][1]))
         check("entry account revocation rejects existing bearer",
               request(origin + "/see", {"line": "rows any"}, other.token)[0] == 401)
+        gate("feature assertions complete")
+        with admission.lock:
+            require(not admission.failures, "no lost or unknown child admission")
+            admission.closed = True  # refuse new host work before publishing the final child outcome
         result.update(ok=True, kind="actual host assertions if executed; not semantic acceptance",
                       entry="production App/Service/Seam", identity="production EntryClient",
                       module="production Widgets/Principal; caller-narrowed",
@@ -450,7 +582,13 @@ def main():
     finally:
         # Host/thread/browser lifetime ends via the outer live Job only.
         # No subprocess kill, PID adoption, profile deletion or retry here.
-        result["guard_observations"] = events
+        with admission.lock:
+            admission.closed = True
+            result["guard_observations"] = list(admission.observations)
+            result["admission_failures"] = list(admission.failures)
+            result["admission_observations_closed"] = True
+            if admission.failures:
+                result["ok"] = False
         result["cleanup_authority"] = "outer live Job; closure must be independently observed"
         (work / "result.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
         # Preserve processes until the outer owner observes the result and
