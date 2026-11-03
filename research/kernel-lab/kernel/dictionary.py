@@ -50,7 +50,7 @@ def word_set(k, actor, st, entry, tx, group, saw=None):
     if 'help' in values and not values['help'].strip():
         raise Refused('a word with no help is not published')
     if 'may' in values and not all(x.strip() in MAY_WORDS for x in values['may'].split(' or ')):
-        raise Refused('may says anyone, members, leaders, stewards, maker or nobody, joined by or')
+        raise Refused('may says anyone, members, leaders, stewards, maker, lead or nobody, joined by or')
     if 'undo' in values and values['undo'] not in ('yes', 'no', 'external'):
         raise Refused('undo says yes, no or external')
     if 'sealed' in values and values['sealed'] not in ('yes', 'no'):
