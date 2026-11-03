@@ -100,7 +100,9 @@ def say(k, actor, st, entry, tx, group, saw=None):
         tx.set(t, "acts", str(st.kv["acts"])[:2000])     # what the speaker did around this line: small receipts
     a = st.kv.get("about")
     if a:
-        if k.shown(actor.person, a) is None:
+        # a line may be about what an earlier step of the same act made (a verb's `as=` handle): not yet in the world,
+        # but made by this speaker in this act (Ask, 3 Nov 2026: the request and Alex's line to JEFF are one act)
+        if a not in tx.made and k.shown(actor.person, a) is None:
             raise k.no_such(a)
         tx.set(t, "about", a)
     tx.set(t, "made_by", actor.id)

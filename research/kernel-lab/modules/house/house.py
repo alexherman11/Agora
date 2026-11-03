@@ -744,7 +744,19 @@ class House:
 
     def line_text(self, sid, row, chat):
         who = row.get("by_name") or row.get("speaker") or ""
-        return f"~ {who or 'someone'} in {self.chat_name(chat)} ({chat}, line {sid}): {row.get('text', '')}"
+        text = f"~ {who or 'someone'} in {self.chat_name(chat)} ({chat}, line {sid}): {row.get('text', '')}"
+        about = row.get("about")
+        if about:
+            # what the line is about, read with the House's sight: a right-click ask says where it was asked and on
+            # what (Ask reaches JEFF, 3 Nov 2026); anything else at least says its kind and id
+            seen = (self.m.see(f"look {about}").get("rows") or [{}])[0]
+            bits = [f"{seen.get('kind') or 'thing'} {about}"]
+            if seen.get("where"):
+                bits.append(f"asked at {seen['where']}")
+            if seen.get("about"):
+                bits.append(f"on {seen['about']}")
+            text += f" [about: {', '.join(bits)}]"
+        return text
 
     def card_signals(self, agent=None, cursor=0, notice=None):
         """Deliver durable addressed card notes through the ordinary inbox."""

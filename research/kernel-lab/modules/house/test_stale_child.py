@@ -77,3 +77,22 @@ def test_kill_tree_ends_the_real_interpreter_behind_a_launcher(tmp_path):
     if os.name == "nt":
         out = subprocess.run(["tasklist", "/FI", f"PID eq {real}", "/NH"], capture_output=True, text=True).stdout
         assert str(real) not in out
+
+
+class FakeMod:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def see(self, line):
+        t = line.split()[-1]
+        return {"rows": [self.rows[t]] if t in self.rows else []}
+
+
+def test_a_line_about_an_ask_says_where_it_was_asked():
+    h = H.House.__new__(H.House)
+    h.m = FakeMod({"dk9": {"kind": "ask-request", "where": "Why the agents stall · Writing", "about": "dk7"}})
+    h.chat_name = lambda c: "Conversation"
+    text = h.line_text("dk10", {"by_name": "Alex", "text": "edit in place", "about": "dk9"}, "dk1")
+    assert text.endswith("edit in place [about: ask-request dk9, asked at Why the agents stall · Writing, on dk7]")
+    plain = h.line_text("dk11", {"by_name": "Alex", "text": "yo"}, "dk1")
+    assert plain.endswith(": yo")
