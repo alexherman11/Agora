@@ -20,12 +20,17 @@ CATALOGUE = {
         dict(label=T(),labels=T(default='{}')), 'body label count meter claim', '', 'claim', 'Community board; inventory; volunteering',
         'Claim admission, once and closing are checked by the world.'),
     'file': ('media', 'Read a converted photo, document, table, event, media or downloadable file.',
-        dict(labels=T(default='{}'),content=T('json',{}),name=T(),owner=T('fact'),variant=T(default='content'),stamp=T(),page=T('number',1),pageTarget=T(),pageRequest=T('number',0)), 'body preview page alt download status', 'table', 'quote alt rsvp calendar',
+        dict(labels=T(default='{}'),content=T('json',{}),target=T('fact'),name=T(),owner=T('fact'),variant=T(default='content'),stamp=T(),page=T('number',1),pageTarget=T(),pageRequest=T('number',0)), 'body preview page alt download status', 'table', 'quote alt rsvp calendar',
         'Community board; file browser; reading room; photo gallery',
         'Permission-checked Blob transport; no credentials or network in components. PDF pages show extracted text when no renderer is installed.'),
     'field-list': ('content', 'Show a kind declaration\'s fields in authored order, including neighbour-made kinds.',
         dict(fields=T(),labels=T(default='{}'),stamp=T()), 'body label value', '', '', 'Community board; inventory; directory',
         'Fields are displayed as text, never evaluated.'),
+    'calendar': ('collections', 'A shared month and week calendar over any dated things: add an event, RSVP in one click, see who is coming.',
+        dict(label=T(default='Calendar'),month=T(),date=T(),view=T(default='month'),weekStart=T('number',0),placeField=T(default='location'),
+             openKey=T(),defaultTime=T(default='18:00'),labels=T(default='{}')),
+        'body heading grid event agenda', '', 'select add rsvp', 'Community events; meetings; club calendars; habit tracker',
+        'Children are the dated things (facts start, end, title, a place, text, going/maybe, coming, your_rsvp). Browser-local time. No recurrence or reminders; words come from the gestures arranged on it.'),
     'board': ('collections', 'Arrange lanes over shared tasks with quick add and filters.',
         dict(title=T(default='Task board'),subtitle=T(default='A clear mind, one thing at a time.'),
              eyebrow=T(default='A LITTLE SPACE FOR WHAT MATTERS'),hint=T(default='Add something worth doing…'),filter=T(default='all')),
@@ -60,7 +65,6 @@ for name,category,purpose,settings,uses,limits in [
     ('virtual-list','collections','Window a long collection in fixed-height rows.',dict(height=T('number',320),row_height=T('number',40)),'Logs; search results; long lists','Fixed-height rows; no automatic measurement of variable-height items.'),
     ('table','collections','Display and sort text cells in named columns.',dict(columns=T(default='Name|Status'),sortable=T('boolean',False),data=T('json',[{'Name':'Welcome','Status':'Ready'}])),'Spreadsheet-like table; worker dashboard; budget','No formulas, range editing or spreadsheet engine.'),
     ('tree','collections','Nested disclosure sections.',{},'File browser; tiling window manager','Supplied structure only; no filesystem provider.'),
-    ('calendar','collections','A month grid with date selection and arranged event parts.',dict(month=T(default='2026-10')),'Events calendar; habit tracker','No recurrence, time zones or scheduling backend.'),
     ('timeline','collections','Arrange ordered event parts across a row.',{},'Timeline; meeting agenda','No zoom or time scale engine.'),
     ('gallery','collections','Responsive grid of supplied media parts.',{},'Photo gallery; directory; video call grid','No cloud photo importer or WebRTC.'),
     ('map','collections','Plot local XY points on a labelled 2D surface.',dict(data=T('json',[{'x':50,'y':80},{'x':180,'y':90}]),width=T('number',320),height=T('number',180),caption=T()),'Seabright map; dashboards','No geographic tiles, projection, geocoding or routing.'),
@@ -85,6 +89,7 @@ def cards():
     for name,row in CATALOGUE.items():
         category,purpose,settings,parts,slots,gestures,uses,*limits=row
         example=f'root : {name}'
+        if name=='calendar': example='root : calendar, month 2026-11, date 2026-11-04'
         if name=='card': example='root : card, title "A small next step"'
         if name=='menu': example='root : card, title "Try the menu button"\n  actions : menu\n    on menu "Read my profile" do look $viewer.id'
         result.append(dict(name=name,category=category,purpose=purpose,settings=json.dumps(settings),

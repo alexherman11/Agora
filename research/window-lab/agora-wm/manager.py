@@ -23,7 +23,7 @@ def floating(row):
 
 
 def public_rows(rows,pins=()):
-    fields=('key','app','exe','icon','agora','state','focused','rect','space','managed','why')
+    fields=('key','app','exe','icon','agora','state','focused','rect','space','managed','why','display_mode')
     return [{**{k:row.get(k) for k in fields},
         'state':'pinned' if row['key'] in pins and row['state']!='minimised' else row['state']} for row in rows]
 
@@ -42,6 +42,7 @@ class Manager:
         self.theme={};self.theme_path=None;self.theme_stamp=None;self.gated=False;self.boot=True
         self.styled={};self.feel=Feel(scale=self._scale());self.gesture_ref=None;self.released=None
         self.logged=None;self.gate_cache=(None,-1.0)
+        self.share=None;self.borderless=set()
         if gate_fn is None:
             from win32_host import gate
             gate_fn=gate
@@ -86,6 +87,46 @@ class Manager:
         if reasons is None or now-at>=GATE_TTL:
             reasons=list(self.gate_fn());self.gate_cache=(reasons,now)
         return reasons
+
+    def layout_gates(self):
+        reasons=self.gated_now()
+        if not self.share:return reasons
+        # Only an explicit, bounded arrangement may pass the ordinary gaming
+        # gate. D3D/exclusive, presentation, lock and inspection failures stay
+        # closed. Win32 geometry cannot prove that a game is composited.
+        return [r for r in reasons if not (
+            r=='full-screen foreground application' or r=='notification gate 2'
+            or str(r).lower().endswith('.exe'))]
+
+    def request_share(self,key=None,expect=None):
+        """One bar request; never a standing exemption from the gaming gate."""
+        if self.mode!='live':raise PermissionError('shared layout requires live mode')
+        previous=self.share
+        self.share={'until':time.monotonic()+5,'keys':{r['key'] for r in self.rows},
+            'target':key,'expect':expect,'new':{r['key'] for r in self.rows},'ready':False}
+        self.gate_cache=(None,-1.0)
+        if self.layout_gates():
+            self.share=previous
+            raise PermissionError('exclusive fullscreen or unavailable desktop; shared layout is unsupported')
+        row=next((r for r in self.rows if r['key']==key),None)
+        if key and (not row or not self._shareable(row) or key in self.pins):
+            self.share=previous
+            raise PermissionError('requested window cannot join shared layout')
+        if not key and not expect:
+            self.share=previous
+            raise ValueError('shared arrangement needs a window or expected executable')
+        self._drop_gesture()
+        self.pending.clear()
+        self.boot=True
+
+    def _shareable(self,row):
+        candidate=(row.get('share_candidate') or row['key'] in self.borderless) and row.get('why')=='frameless; no app rule'
+        return not row.get('owned') and self._managed({**row,'managed':row['managed'] or candidate})
+
+    def _sharing(self):
+        if self.share and time.monotonic()>=self.share['until']:
+            self.share=None
+        return self.share
 
     def read_theme(self):
         if not self.theme_path:return
@@ -137,7 +178,16 @@ class Manager:
             self.changed.update(k for k,r in current.items() if self.actual.get(k)!=r)
             self.actual=deepcopy(current)
             return None
-        gates=self.gated_now()
+        sharing=self._sharing()
+        if sharing and sharing['expect'] and not sharing['ready']:
+            target=next((r for r in rows if r['key'] not in sharing['new']
+                and str(r['exe']).lower()==sharing['expect'].lower() and self._shareable(r)),None)
+            if target:
+                sharing['target']=target['key'];sharing['keys'].add(target['key'])
+        if sharing:
+            sharing['ready']=any(r['key']==sharing['target'] for r in rows)
+        gates=self.layout_gates()
+        if sharing and not sharing['ready']:gates=gates or ['waiting for requested window']
         if gates:
             self.gated=True
             if self.ghost:self.ghost.clear()
@@ -147,13 +197,25 @@ class Manager:
         resumed=self.gated;self.gated=False
         self.read_theme()
         everything={r['key'] for r in rows}
-        current={r['key']:r for r in rows if not floating(r)}
+        current={}
+        for row in rows:
+            key=row['key']
+            admitted=bool(sharing and key in sharing['keys'] and self._shareable(row) and key not in self.pins)
+            if floating(row) and not admitted:continue
+            if sharing and key not in sharing['keys']:continue
+            if admitted and row.get('share_candidate'):self.borderless.add(key)
+            current[key]={**row,'managed':True} if key in self.borderless and self._shareable(row) else row
+        self.borderless.intersection_update(everything)
         self.state.work=work
         if self.boot or resumed:
             # Starting/resuming uses actual geometry, never replays stale drag debt.
             self.state.windows={};self.state.displacement={}
             for i,row in enumerate(current.values()):
                 r=Rect(*row['rect']);pinned=row['key'] in self.pins
+                if sharing and row.get('maximised') and not pinned:
+                    normal=row.get('_normal')
+                    size=row.get('_preferred',(r.w,r.h))
+                    r=Rect(*normal) if normal else Rect(r.x,r.y,*size)
                 self.state.windows[row['key']]=Window(row['key'],tuple(row.get('_preferred',(r.w,r.h))),
                     rect=r,last_used=i if not row['focused'] else len(rows)+1,
                     managed=self._managed(row),pinned=pinned,home=r if pinned else None,minimised=row['state']=='minimised')
@@ -202,6 +264,18 @@ class Manager:
             if key in self.pins and not w.pinned:w.rect=r;w.pinned=True;w.home=r
             elif key not in self.pins:w.pinned=False;w.home=None
             pending=self.pending.get(key)
+            if old and old['state']=='minimised' and row['state']!='minimised' and w.minimised:
+                # A new external restore supersedes layout work, even inside
+                # its acknowledgement interval. Do not lose this transition or
+                # treat the successful restore as a refused minimise.
+                self.pending.pop(key,None);pending=None
+                self.state=solve(self.state,{'type':'restore','key':key}).state
+                w=self.state.windows[key]
+                if self.mode=='live':
+                    # IsIconic can clear before native frame geometry settles.
+                    # Use the same restore acknowledgement as apply().
+                    pending={'kind':'restore','rect':w.rect,'at':now}
+                    self.pending[key]=pending
             dragging=self.gesture is not None and self.gesture.key==key
             if w.pinned and old and old['rect']!=row['rect'] and not pending and not dragging and key!=self.released \
                     and row['state']!='minimised' and old['state']!='minimised':
@@ -231,8 +305,6 @@ class Manager:
                 if row['state']=='minimised' and not w.minimised:
                     if dragging:self._drop_gesture();dragging=False
                     self.state=solve(self.state,{'type':'minimise','key':key}).state
-                elif row['state']!='minimised' and w.minimised and old['state']=='minimised':
-                    self.state=solve(self.state,{'type':'restore','key':key}).state
             if dragging and self.gesture:
                 self._show(self.gesture.step(r,now*1000),r)
             elif old and old['rect']!=row['rect'] and not pending and not w.pinned and key!=self.released \
@@ -256,6 +328,10 @@ class Manager:
         elif self.mode=='live' and not self.gesture:
             self.apply(plan,current)
         self.actual=deepcopy({r['key']:r for r in rows})
+        if sharing and sharing['ready'] and not self.pending and all(
+                k not in plan.placements or (not r.get('maximised') and Rect(*r['rect'])==plan.placements[k])
+                for k,r in current.items()):
+            self.share=None
         return result
 
     def drag_tick(self,rect,now=None):
@@ -300,7 +376,7 @@ class Manager:
 
     def apply(self,plan,current):
         if not valid(plan.state):return  # impossible fixed geometry fails closed
-        if self.gated_now():return
+        if self.layout_gates():return
         self.lease.heartbeat()
         # Minimise before placement; never transiently move over another managed window.
         for key in plan.minimise:
@@ -331,16 +407,25 @@ class Manager:
             except (OSError,PermissionError):
                 self.failures[key]=3;self.state.windows[key].managed=False
 
-    def action(self,verb,key):
+    def action(self,verb,key,share=False):
         if self.mode!='live':raise PermissionError('native window actions require live mode')
-        if self.gate_fn():raise PermissionError('game/fullscreen gate is active')
+        if share and verb in ('focus','restore'):self.request_share(key=key)
+        elif self.gate_fn():raise PermissionError('game/fullscreen gate is active')
         row=next((r for r in self.rows if r['key']==key),None)
-        if not row or not self._managed(row):raise PermissionError('window is no longer manageable')
+        if not row or not (self._shareable(row) if share else self._managed(row)):
+            raise PermissionError('window is no longer manageable')
         if verb in ('minimise','restore') and key in self.pins:raise PermissionError('unpin before minimising/restoring')
-        if verb in ('minimise','restore'):
-            self.state=solve(self.state,{'type':'manual','key':key}).state
+        if verb in ('minimise','restore') and not share:
+            # The latest explicit intent supersedes layout work (or the
+            # opposite action). The native call alone leaves stale policy.
+            self.pending.pop(key,None)
+            self.state=solve(self.state,{'type':verb,'key':key}).state
         self.lease.heartbeat();self.lease.save(row['ref'])
-        return getattr(self.native,verb)(row['ref'])
+        result=getattr(self.native,verb)(row['ref'])
+        if share and verb=='restore':result=self.native.focus(row['ref'])
+        if verb in ('minimise','restore') and not share and key in self.state.windows:
+            self.pending[key]={'kind':verb,'rect':self.state.windows[key].rect,'at':time.monotonic()}
+        return result
 
     def reading(self):
         rows=public_rows(self.rows,self.pins)

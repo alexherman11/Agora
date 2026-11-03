@@ -31,7 +31,7 @@ LENSES = {'shell-top': 'Agora top bar', 'shell-dock': 'Agora dock'}
 # What the bars say. make/set/forget reach only shell-settings, kept buttons and ask requests (only=); window.native is
 # the narrow bridge to the bar's own window (window.native in kd_window.py).
 GRANTS = ('window.surface window.native rows look look-view help components component-health component-action ask '
-          'wm.windows wm.focus wm.minimise wm.restore wm.close wm.pin wm.unpin wm.leave-alone wm.manage wm.mode wm.space wm.title '
+          'wm.windows wm.focus wm.minimise wm.restore wm.arrange wm.close wm.pin wm.unpin wm.leave-alone wm.manage wm.mode wm.space wm.title '
           'window.list window.desktop window.activate window.launch window.open window.start window.settings window.focus window.close '
           'system.now media.now media.play media.next media.prev notice.clear make set forget off '
           'hear:make hear:set hear:forget hear:undo hear:component hear:component-action')

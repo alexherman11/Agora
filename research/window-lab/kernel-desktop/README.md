@@ -1,5 +1,91 @@
 > Written by Claude (PROOF a13428, epic a13308), 23 October 2026. Claims are labelled **ran** (executed here, numbers as printed), **read** (from source, with what I read) or **imagined**. Alex's words are in quotation marks.
 
+## Right-click anything: the shared menu (29 Oct, Claude, card dk1344)
+
+Alex: right-click anything in Agora and get a menu that fits it, with no per-view wiring. `pages/menu.js` is that
+menu, brought over from the old desk's `lens.js` menu (selection words, Copy, the ask box). Every widget window
+(`widget.html`) and the desktop's own pages (`frame.html` strip, `lines`, `help`, `thing`) load it; a view gets it by
+being opened, with no code of its own.
+
+- **How a widget window reaches it.** The frame's trusted bootstrap (`widget-host.js`) listens last for `contextmenu`
+  and says only where the press was, the words selected under it (kept from the press, as the old desk did), and the
+  thing the pressed part shows: `data-thing`, or the painter's `data-fact-id`, which every painted part already
+  carries. The host page reads that thing again **as the viewer** (`look`, `actions`), draws the menu over the frame
+  and runs a line only when the viewer presses an entry. The widget's own grants are never used or widened.
+- **What fits what.** Selected words: **Comment** (says into the Conversation: your words, the quote as `> `, and
+  `— from [[id|name]]`, `about=` the thing) and Copy. A Needs-you item (its `who` is you and it is not Done, as the Work
+  view's band says): **Delete** (`forget`; undo brings it back). Any thing: Look, Open in each lens that shows it, and
+  its own words from `actions <thing>` that need nothing more than the thing. No thing: the window's own words
+  (`actions <window>`). Always last: *Ask for a change…* (`ask`).
+- **Who keeps their own menu.** A view that calls `preventDefault` on its right-click (Writing, the task board cards)
+  keeps its menu. The painter's ask-only menu (`right_click=ask`) gives way to the shared one, which ends with the same
+  ask box. Shift+right-click, inputs and editable words keep the browser's. Shell bars, bar slots and overlays are left
+  out (their windows are shaped or see-through; shell components keep `api.ask`).
+- **Guard.** A frame chooses where its menu opens, so an entry takes no click in the menu's first 300 ms; the menu's
+  head always names the thing as the kernel says it, so a frame cannot dress one thing up as another.
+
+- **A window's own words.** `window.close` and `window.focus` now say `acts_on=window` (`kd_window.py`), so
+  `actions <window>` offers them and an empty spot's menu has them. Before, `actions` listed no word for a window.
+  The old desk's `examine` is `actions` here.
+- **Not covered.** Old-painter lens windows (`frame.html` → `/lens.html`) keep lens.js's own menu inside the lens; no
+  live window uses that path today (`window.list`, 29 Oct). The shell bars keep `api.ask`.
+
+**Ran 29 Oct:** `test_shared_menu.py` 7 passed: hidden browser, trial world, a lens made by the test with no menu code.
+Then (dk1476) 10 passed: a second fresh view of posts, opened as a desktop window, adds a button inside a post (the
+post's menu), Comment on a post's words (linked back, `about=` the post) and the window's own words.
+Evidence: [evidence/shared-menu-needs-you.png](evidence/shared-menu-needs-you.png).
+
+## After an edit: restart only what changed (28 Oct, Claude)
+
+Alex: "would be great in general if we could restart just parts of the code so we dont have to reload the whole
+desktop". Don't reach for `kdesk_off`/`kdesk_on` after every edit. Run:
+
+    C:/Projects/Agora4/.venv/Scripts/python.exe kd_reload.py [module ...] [--dry] [--full]
+
+It compares each running module's start time with its own source files and refreshes only what is stale:
+
+| You changed | What happens | What Alex sees |
+|---|---|---|
+| `pages/` html, js, css | `window.reload all` (pages are read from disk each load) | pages repaint in place |
+| a module's `.py` (window, wm, house, map, theme…) | `off <module>`, `on <module>` | only that module; `window` blinks every Agora window a few seconds |
+| `modproto.py` | every module | as above, for all |
+| `kernel-lab/kernel/`, `kdesk.py`, `keeper_link.py` | only the kernel restarts, through the keeper | nothing closes; pages are "away" for about a second |
+| `kdesk_keeper.py` | whole desktop, only with `--full` | everything closes and comes back |
+
+Name modules to leave someone else's half-done module alone (`kd_reload.py window`). `window.reload <window>` reloads
+one page by hand. **Ran 28 Oct:** `kd_reload.py window` restarted only the window module ("window: running again"),
+`window.reload all` → "12 windows reloaded", `--dry` afterwards → "nothing is stale", `--full` restarted everything.
+
+## The keeper (28 Oct, Claude; design approved by Alex)
+
+Design page: https://claude.ai/artifact/8AeCzyWnJZkn1jBbQX1BLf. `kdesk_on.py` now starts `kdesk_keeper.py`, which
+holds the listening ports (8810 and one per window) and the module processes, and runs `kdesk.py` as its child.
+A kernel restart (`kdesk_keeper.py --restart-kernel`, or `kd_reload.py` after a kernel edit) closes no window:
+
+- the old kernel stops accepting and gets a second to finish; new requests wait in the ports' queues; the next
+  kernel gets the same sockets (`socket.share`), re-attaches each module before it answers, and the keeper replays
+  each module's words and holds (`keeper_link.py`, `kdesk.py` start);
+- a kernel that dies by itself is started again (after 1, 2, 5, then 10 s); modules and windows stay;
+- a module's own line while no kernel runs is refused ("the kernel is restarting"); a module whose greeting changed
+  (grants, owner) is restarted alone;
+- off is unchanged: `kdesk_off.py` ends the keeper's tree; modules sit in its kill-on-close job.
+- A start with `--resident-manifest`/`--manager-manifest` runs the kernel directly, as before (installs once).
+- Without `AGORA_KEEPER` (tests, trial worlds) `kdesk.start` behaves exactly as it did.
+
+**Ran 28 Oct:** `test_keeper.py` 6 passed (trial world, headless): 10 restarts with the same module pids, ports and
+holds; a request sent while no kernel was connected waited 0.8-1.2 s and was answered; 42 requests through 3
+restarts, 0 failed; a window kept its page port; two hard kernel kills, modules stayed; killing the keeper ended
+everything. Live, on Alex's desktop: a kernel restart with 3 threads of requests running, 582 requests, 0 failed,
+the same 12 window handles, modules and 13 ports. `test_kdesk.py`, `test_desk_follows_source.py`: 32 passed.
+
+**Not tested:** holds on the live desktop (it has none right now; the trial's `window.overlay` hold was replayed);
+a kernel that fails on import while the keeper runs (it would retry with back-off; not exercised);
+`--resident-manifest` through the new `kdesk_on`.
+
+Rough spots (source, with the missing world-level word): `kdesk_keeper.py`, `keeper_link.py`, hooks in `kdesk.py`
+`start`/`main`. Missing: a kernel that can hand itself over. Today the kernel owns its ports and children, so
+outliving it took a process above it; a kernel word for "restart me" would be the world-level door to it.
+
 # Window stream connection pools — builder update, 24 October 2026
 
 Codex, for Claude's review/commit. **No changes to `research/kernel-lab/kernel/` or shared `lens.js`; no git state changed.**

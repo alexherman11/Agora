@@ -56,6 +56,9 @@ def find_claude():
 def clean_env(compact_at="400k", fake=None):
     """The child inherits nothing of a launcher's Claude session (house.py clean_env), and compacts at compact_at."""
     env = {k: v for k, v in os.environ.items() if not k.upper().startswith("CLAUDE")}
+    # 28 Oct: a review's hidden desktop tests started a kernel with the live keeper's AGORA_KEEPER, joined the live
+    # keeper and knocked Alex's kernel off it. Nothing the House starts may reach the live keeper.
+    env.pop("AGORA_KEEPER", None)
     env["CLAUDE_CODE_DISABLE_AUTO_MEMORY"] = "1"
     if str(compact_at).lower() != "off":
         env["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = str(compact_at)
@@ -114,8 +117,9 @@ class Child:
             if ev.get("type") == "result":
                 self.codex_streamed = False
             for out in reduce(ev):
+                out["child"] = self                # whose event: a replaced process's late exit must not end its successor
                 self.events.put(out)
-        self.events.put({"e": "exit", "code": self.proc.wait()})
+        self.events.put({"e": "exit", "code": self.proc.wait(), "child": self})
 
     def stop(self):
         if self.alive():
@@ -123,7 +127,16 @@ class Child:
                 self.proc.stdin.close()
                 self.proc.wait(timeout=10)
             except Exception:                    # noqa: BLE001
-                self.proc.kill()
+                kill_tree(self.proc)
+
+
+def kill_tree(proc):
+    """End a process and what it started. On Windows the venv python.exe is a launcher whose child is the real
+    interpreter, so killing only the launcher left JEFF's codex resident running for five days (2 Nov 2026)."""
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True, creationflags=NO_WINDOW)
+    else:
+        proc.kill()
 
 
 def reduce(ev):

@@ -6,20 +6,20 @@
   "days": 14,
   "timings": {
     "board.feed": {
-      "median_ms": 23.29,
-      "max_ms": 37.67
+      "median_ms": 70.11,
+      "max_ms": 91.76
     },
     "catch-up": {
-      "median_ms": 19.93,
-      "max_ms": 22.52
+      "median_ms": 67.53,
+      "max_ms": 97.15
     },
     "board.search q=council": {
-      "median_ms": 38.46,
-      "max_ms": 47.78
+      "median_ms": 119.29,
+      "max_ms": 143.15
     }
   },
   "pdf_preview": "no installed PDF renderer",
-  "model": "local model \u00b7 qwen3.5:9b: The board has decided to speak at the council meeting scheduled for November 4th at City Hall, with a decision made on October 22nd. Residents are advised to sign up before 7 pm, and the clerk confirmed the signup time today.",
+  "model": "the local model is not running",
   "model_attempts": 1,
   "live_desktop_touched": false
 }

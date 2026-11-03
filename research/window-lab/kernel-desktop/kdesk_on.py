@@ -28,13 +28,23 @@ def answering(port=PORT):
 
 
 def start():
-    if answering():
+    sys.path.insert(0, str(HERE))
+    from kdesk_keeper import ask
+    if answering() or ask("status"):
         return "already running"
     (HERE / "state").mkdir(exist_ok=True)
     log = HERE / "state" / "kdesk.log"
     # pythonw: no console window at all (a `cmd /c` start showed a black console on Alex's screen, 23 Oct 19:04);
     # kdesk writes its own log
-    line = f'"{PYW}" "{HERE / "kdesk.py"}" --port {PORT} --log "{log}"'
+    once = "--resident-manifest" in sys.argv or "--manager-manifest" in sys.argv
+    if once:
+        # a manifest installs once: that start runs the kernel directly, as before, not under a keeper that would
+        # pass it to every restart
+        line = f'"{PYW}" "{HERE / "kdesk.py"}" --port {PORT} --log "{log}"'
+    else:
+        # 28 Oct: the keeper holds the ports and modules; the kernel is its child and restarts alone (kd_reload)
+        line = (f'"{PYW}" "{HERE / "kdesk_keeper.py"}" --port {PORT} --log "{HERE / "state" / "keeper.log"}"'
+                f' --kernel-log "{log}"')
     if "--resident-manifest" in sys.argv:          # a reviewed resident move, this start only (agents/SABLE-MOVE.md)
         line += f' --resident-manifest "{Path(sys.argv[sys.argv.index("--resident-manifest") + 1]).resolve()}"'
     if "--manager-manifest" in sys.argv:           # approved fresh manager, distinct from resident migration

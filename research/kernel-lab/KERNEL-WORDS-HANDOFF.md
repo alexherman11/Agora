@@ -77,6 +77,21 @@ Builder, 24 October 2026. Scope: `research/kernel-lab/` only. No git state chang
     - **Left as they are, with reasons:**
       - **M5:** a module acting on its own counts as its installer, or Alex's window rules never fire. Alex should confirm.
       - **M8:** the derived `contacts` field isn't named in `outside_not`; only the map reads the marks today, and it sends `location` alone.
+- **Kinds all the way down, 29 Oct** (Alex approved in the session; design in `research/kinds-lab/kinds-all-the-way-down.md`):
+  - `kinds.py`: a need may say its part's kind (`start:time`, `likes:upvote`), parsed into `Need.kind`; `Kinds.met` checks it. Value kinds are the bottom: the kernel's `BASE` (text number time yes-no link person thing), or a declared `value=`. Kinds take `aliases=` (synonyms); `decl` and `fits` read them.
+  - `kinds.py`: `aspect_kind` and `parts_of` say what each aspect is a part of; a word whose `acts_on` is a value kind reaches anything with such a part (`_lacks`), and `check_word` returns the part (`part=` chooses among several).
+  - `kernel.py` `guard`: sets `part=` on the line, so a verb reads `$part` and a module `kv.part`.
+  - `words.py`: `rows <value kind>` lists things by their parts; two see words, **`alike`** and **`aspects`**; `make kind=kind` says which kinds are made of the same parts (`alike_note`).
+  - `kits.py`: kinds carry `value` and `aliases`, checked at `validate` and `take`.
+  - Tests: `tests/test_parts.py` (16). Two `test_shapes.py` examples of an unreadable shape used `start:time`, now readable; they use `start@time`.
+  - Missing words: **a part's kind**, **a value kind**, **a kind's synonym**, and the readings **`alike`** and **`aspects`**. Still missing (found against the Seabright board): **optional typed parts** on a kind (board.py's `fields=`), and **computed parts** (an upvote count over sealed likes).
+  - **Later, 29 Oct (Alex: "Yes, go ahead" with clearing loose aspects):**
+    - `kinds.py`: **`has=`** on a kind gives optional typed parts (`has="priority:number when:time"`). They're never part of fitting, they're inherited through `extends`, and `aspect_kind`, `alike` and `users` read them. A part may be one of the kernel's own kinds (said, group, widget) without declaring it.
+    - `kinds.py` `aspects`: aspects said by one thing only (a setting's knobs) and aspects the kernel computes for the reader (sealed like counts) are counted apart, and the rest are ranked by use. On the live copy that's 89 shared aspects, not 160. **`aspects suggest`** proposes parts from values: all times, numbers, links, yes/no, people, or pointing at one kind; long prose is text. It lists judgment calls: stage-like words, people written as names, hashes, lists, two aspects that always agree. It ends with the exact `set <kind> has=` line.
+    - `words.py` `set`: a value that isn't its part's kind is still set, and the reply says so ("high isn't a number: still set").
+    - Tests: `test_parts.py`, 19 in all.
+    - Missing words: **an optional part**, and **the suggestion** itself. Still missing: **list parts** (a chat's `with`, a card's `blocks`).
+    - `kinds.py` `alike`: kinds that share only text parts aren't offered as the same (live: `charter` matched `soul` on where they came from). `_suggest` checks for hashes before prose. Test: `test_kinds_sharing_only_prose_are_not_the_same`. Live since the second kernel restart, 29 Oct.
 - `kernel/kernel.py`: missing **external effect metadata admission**. Offers already accepted `undo=external`; do calls now honor that declaration even without an answer flag. Existing entries remain steward-owned and are not overwritten by re-offer. The exact media declarations/adoption boundary are in [NEEDS-FROM-DESKTOP.md](NEEDS-FROM-DESKTOP.md).
 
 ## Authored files

@@ -1,5 +1,19 @@
 # Work
 
+> Builder update for dk1332, 28 October 2026. The current source supersedes the layout and proof described in the historical record below. It has not been installed live or visually accepted by Alex.
+
+Work now shows one list of **current cards** from `house.active`: working cards held by a resident in Now, cards with a matching running/reviewing/landing worker, and blocked cards with their reason and resolver. The card's lane/status wins over old build reports. Done, verified, finished, queued, paused and released work hides. A retained worker must match the current run and builder; received, reviewed and landed phases alone do not keep a card visible.
+
+Each card appears once, on one calm line. Names open bounded details. Missing blocker information is stated explicitly. Overflow uses Previous/Next pages sized to the window; the page and details do not scroll. Colours come from the viewer's theme tokens. Installation updates the app and its reading grant without changing JEFF's chat or deleting old styles.
+
+**Verification:** `modules/house/test_work_overview.py` covers card transitions, stale runs, resident claims, blockers, names and unavailable readings. `proof.py` is the independent hidden desktop/browser proof for current rendering, details, disappearance, pagination and responsive sizing. The sandboxed worker did not run that proof or retry denied fixtures; see the worktree's BUILD-RESULT.md for exactly what ran.
+
+**Activation:** the House must load the updated House module (new `house.active` reading) and run the Work installer before the live app can use it. No activation was performed by this worker.
+
+**Rough spot:** the missing world word was a current-card work projection. `house.active` supplies it; Work no longer infers current work from the builder's last phase. The new `work-overview` and `work-line` components supply bounded pages and one-line named card details. General component `band` and `console` remain available to other lenses.
+
+## Historical record — previous layout and checks
+
 > Builder record by Claude, 27 Oct 2026. Alex: "Also bring forward a worker monitoring page as well that used to exist", and on the design page: "a coder terminal style interface where i can see worker progress (basically a really good overview of all the work being done), where i can click in and view more closely or chat with workers directly."
 
 One window, `window.open work`, in the dock as **Work**. Brought forward from the old desk's home-work and home-board panels (`old-desk/`), in the component painter's style (`painter=components`, like the Task board).

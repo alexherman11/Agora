@@ -24,7 +24,9 @@ def install(say, see):
     for definition in data['channels']:
         gid = say(line('group', name=definition['name'], open='yes'))['made'][0]
         ids['channels'][definition['name']] = gid
-        say(line('make', kind='board-channel', group=gid, title=definition['name']))
+        # opens names the channel's own view (calendar, …); the board lens arranges a part for it.
+        say(line('make', kind='board-channel', group=gid, title=definition['name'],
+                 **{k: definition[k] for k in ('opens', 'opens_label') if k in definition}))
         for word, limit, may in [('post', definition['posts_per_day'], definition['post_may']),
                                   ('reply', definition['replies_per_day'], 'members')]:
             eid = say(line('dictionary-copy', base_post, word=word, **{'in': gid}))['made'][0]

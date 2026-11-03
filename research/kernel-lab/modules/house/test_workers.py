@@ -10,7 +10,7 @@ import builders as B
 
 class Agent:
     def __init__(self, busy=False):
-        self.busy, self.woken = busy, []
+        self.busy, self.woken, self.name, self.inbox = busy, [], 'Sable', []
     def wake(self, text, chat=None, record=None):
         self.woken.append((text, chat))
 
@@ -71,17 +71,23 @@ def test_a_finished_turn_goes_to_the_chat_and_wakes_the_resident_there(manager):
     said = [w for w in manager.fixture_door.writes if w[1].startswith('say dk50 ')]
     assert said and 'the dock unpins now' in said[0][1]
     text, chat = agent.woken[0]
-    assert chat == 'dk50' and 'the dock unpins now' in text and 'house.review dk1' in text
+    assert chat is None and 'the dock unpins now' in text and 'house.tell dk1' in text and 'house.review dk1' in text
 
 
 def test_what_the_resident_says_during_its_turn_starts_the_worker_after_it(manager):
     s = state(manager); s['chat'] = 'dk50'
     agent = Agent(busy=True); manager.h.agents = {'dk99': agent}
-    manager.session = lambda person: manager.fixture_door
-    manager.h.m.see = lambda line, *a, **k: dict(rows=[dict(chat='dk50', made_by='dk99', text='Now add a test')]) \
-        if line.startswith('look dk60') else dict(rows=[dict(manager.fixture_door.task)])
+    door = manager.fixture_door
+    real = door.call
+    # the worker's chat is closed to the House: only the resident's own session reads the line
+    door.call = lambda route, line, **kw: dict(ok=True, rows=[dict(chat='dk50', made_by='dk99', text='Now add a test')]) \
+        if line == 'look dk60' else real(route, line, **kw)
+    manager.session = lambda person: door
+    manager.h.m.see = lambda line, *a, **k: dict(rows=[]) if line.startswith('look dk60') else dict(rows=[dict(door.task)])
     with patch('builders.threading', SimpleNamespace(Thread=Mock())) as threads:
-        manager.hear(dict(word='say', said='dk60'))
+        manager.hear(dict(word='say', said='dk61', by_id='dk77'))      # someone else's line is never read
+        assert not any(w[1] == 'look dk61' for w in door.writes)
+        manager.hear(dict(word='say', said='dk60', by_id='dk99'))
         assert s['pending'] == ['Now add a test'] and s['phase'] == 'received'
         threads.Thread.assert_not_called()
         manager.owner_turn_ended('dk99')
@@ -125,3 +131,143 @@ def test_a_claude_worker_runs_the_claude_cli_in_its_worktree(manager, tmp_path):
     assert 'Bash(git push:*)' in cmd[cmd.index('--disallowedTools') + 1]
     assert str(seen['cwd']) == str(tmp_path) and s['session'] == 'abc' and s['phase'] == 'received'
     assert any('All done' in w[1] for w in manager.fixture_door.writes if w[1].startswith('say dk50'))
+
+
+def test_titles_end_on_a_whole_word():
+    title = B.short('Write WORKERS.md, a one page guide for residents on running workers', 50)
+    assert title.endswith('…') and not title[:-1].endswith(('on r', ' r')) and len(title) <= 50
+    assert B.short('a b c d e f g h i j k l m n o p', 10) == 'a b c d…'
+    assert B.short('short', 10) == 'short'
+
+
+def test_a_steward_may_unstick_anyones_worker_and_others_may_not(manager):
+    s = state(manager)                                   # requested by dk99
+    manager.session = lambda person: manager.fixture_door
+    task_row = dict(manager.fixture_door.task)
+    manager.h.m.see = lambda line, *a, **k: (dict(rows=[dict(id='dk1000', kind='place')]) if line == 'rows place' else
+        dict(rows=[{'kind': 'place', 'member:dk827': 'leader', 'member:dk55': 'member'}]) if line == 'look dk1000' else
+        dict(rows=[task_row]))
+    jeff = dict(args=dict(target='dk1', words='carry on'), caller=dict(person='dk827', name='JEFF'))
+    other = dict(args=dict(target='dk1', words='carry on'), caller=dict(person='dk55', name='Someone'))
+    assert 'refused' in manager.tell(other)
+    with patch('builders.threading', SimpleNamespace(Thread=Mock())):
+        assert manager.tell(jeff).get('external')
+    assert any(a['what'] == 'steward' for a in s['activity'])
+
+
+def test_nothing_the_house_starts_can_reach_the_live_keeper(monkeypatch):
+    monkeypatch.setenv('AGORA_KEEPER', '1234 secret')
+    assert 'AGORA_KEEPER' not in B.T.clean_env()
+    assert 'AGORA_KEEPER' not in B.T.clean_env('off')
+
+
+# ---- dk1491 (Alex, dk1489): ownership is for being woken, not a lock on talking to a worker
+def place(manager, **members):
+    """A world where dk827 (JEFF) leads the place, plus any other members; the task card is the door's."""
+    door = manager.fixture_door
+    manager.session = lambda person: door
+    manager.h.m.see = lambda line, *a, **k: (dict(rows=[dict(id='dk1000', kind='place')]) if line == 'rows place' else
+        dict(rows=[{'kind': 'place', 'member:dk827': 'leader', **{'member:' + p: r for p, r in members.items()}}])
+        if line == 'look dk1000' else dict(rows=[dict(door.task)]))
+    return door
+
+
+def told(person, name, words='carry on'):
+    return dict(args=dict(target='dk1', words=words), caller=dict(person=person, name=name))
+
+
+def test_a_steward_who_is_not_the_owner_tells_and_both_hear_the_reply(manager):
+    s = state(manager); s['chat'] = 'dk50'; s['requester_name'] = 'Sable'; s['session'] = 'abc'
+    place(manager)
+    owner, jeff = Agent(), Agent(); jeff.name = 'JEFF'
+    manager.h.agents = {'dk99': owner, 'dk827': jeff}
+    with patch('builders.threading', SimpleNamespace(Thread=Mock())) as threads:
+        out = manager.tell(told('dk827', 'JEFF', 'Add a test for the empty case'))
+    assert out.get('external') and 'so are you' in out['text'] and threads.Thread.call_count == 1
+    assert s['phase'] == 'preparing' and s['pending'][0].startswith('From JEFF (steward; Sable stays in charge): Add a test')
+    assert s['requester'] == 'dk99'                                   # ownership did not move
+    with manager.lock:
+        manager.take_pending(s)                                       # the words reach the worker...
+    manager.report_turn(s, 'Added it; 4 passed.')                      # ...and its turn ends
+    assert 'Added it' in owner.woken[0][0] and 'also followed words from JEFF' in owner.woken[0][0]
+    assert 'Added it' in jeff.woken[0][0] and 'Sable is woken too' in jeff.woken[0][0]
+    manager.report_turn(s, 'Next turn, nobody else spoke.')
+    assert len(jeff.woken) == 1 and len(owner.woken) == 2              # the teller hears only the turn it asked for
+
+
+def test_the_cards_lead_may_tell_and_a_member_without_authority_may_not(manager):
+    s = state(manager, 'working')
+    door = place(manager, dk55='member', dk56='member')
+    door.task['lead'] = 'Rowan'
+    assert 'refused' in manager.tell(told('dk55', 'Someone'))
+    assert 'refused' in manager.tell(told('dk56', ''))                 # no name never matches a lead
+    assert not s.get('pending') and not s.get('told_by')
+    out = manager.tell(told('dk56', 'rowan', 'use the new name'))
+    assert out.get('external') and s['pending'] == ['From rowan (lead; your owner stays in charge): use the new name']
+    assert any(a['what'] == 'lead' for a in s['activity'])
+
+
+def test_alex_may_tell_any_worker(manager):
+    s = state(manager, 'working'); s['requester'] = 'dk77'
+    place(manager)
+    out = manager.tell(told('dk99', 'Alex'))                          # dk99 is the desktop:alex account's person
+    assert out.get('external') and s['pending'][0].startswith('From Alex (Alex;')
+
+
+def test_tell_resumes_a_blocked_builder_in_its_worktree(manager):
+    s = state(manager, 'blocked'); s['detail'] = 'worker self-proof BUILD-RESULT.md is missing'; s['session'] = 'abc'
+    place(manager)
+    with patch('builders.threading', SimpleNamespace(Thread=Mock())) as threads:
+        out = manager.tell(told('dk827', 'JEFF', 'Write BUILD-RESULT.md'))
+    assert out.get('external') and 'was blocked' in out['text'], out
+    assert s['phase'] == 'preparing' and threads.Thread.call_count == 1
+    assert threads.Thread.call_args.kwargs['args'] == (s, manager.resume)
+    assert any(a['what'] == 'reopened' and 'BUILD-RESULT.md is missing' in a['text'] for a in s['activity'])
+    sent = {}
+    manager.run_worker = lambda st, prompt: sent.update(prompt=prompt, tree=st['tree'], session=st['session'])
+    manager.resume(s)
+    assert 'Write BUILD-RESULT.md' in sent['prompt'] and sent['session'] == 'abc' and sent['tree'] == str(manager.repo)
+    assert s['pending'] == [] and s['tellers'][0]['person'] == 'dk827'
+
+
+def test_a_reviewed_builder_resumes_and_its_old_review_no_longer_stands(manager):
+    s = state(manager, 'reviewed'); s.update(review_base='m1', candidate='c1', checks=[dict(returncode=0)], session='abc')
+    manager.session = lambda person: manager.fixture_door
+    with patch('builders.threading', SimpleNamespace(Thread=Mock())):
+        assert manager.tell(dict(msg(), args=dict(target='dk1', words='one more fix'))).get('external')
+    assert 'candidate' not in s and 'review_base' not in s and 'checks' not in s
+    assert s['earlier_reviews'][0]['candidate'] == 'c1' and s['earlier_reviews'][0]['phase'] == 'reviewed'
+    assert 'refused' in manager.land(msg())                            # nothing reviewed stands until review runs again
+
+
+def test_a_builder_that_never_started_resumes_with_its_whole_task(manager):
+    s = state(manager, 'blocked'); s['pending'] = ['go']               # no model thread yet, but a worktree
+    manager.session = lambda person: manager.fixture_door
+    sent = {}
+    manager.run_worker = lambda st, prompt: sent.update(prompt=prompt)
+    manager.resume(s)
+    assert sent['prompt'].startswith('You are Codex fixture') and sent['prompt'].rstrip().endswith('go')
+
+
+@pytest.mark.parametrize('phase', ['landed', 'released', 'uncertain', 'recovery-needed', 'reviewing', 'landing'])
+def test_tell_does_not_restart_finished_unsure_or_busy_work(manager, phase):
+    s = state(manager, phase)
+    manager.session = lambda person: manager.fixture_door
+    with patch('builders.threading', SimpleNamespace(Thread=Mock())) as threads:
+        assert 'refused' in manager.tell(dict(msg(), args=dict(target='dk1', words='more')))
+    threads.Thread.assert_not_called()
+    assert s['phase'] == phase and not s.get('pending')
+
+
+def test_a_builder_blocked_before_its_worktree_points_to_retry(manager):
+    s = state(manager, 'blocked'); s.pop('tree')
+    manager.session = lambda person: manager.fixture_door
+    assert 'house.retry' in manager.tell(dict(msg(), args=dict(target='dk1', words='more')))['refused']
+
+
+def test_a_held_card_still_refuses_even_a_steward(manager):
+    s = state(manager, 'blocked')
+    door = place(manager)
+    door.task['paused'] = 'yes'
+    assert 'refused' in manager.tell(told('dk827', 'JEFF'))
+    assert s['phase'] == 'blocked' and not s.get('told_by')

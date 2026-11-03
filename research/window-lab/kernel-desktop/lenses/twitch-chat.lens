@@ -1,0 +1,28 @@
+window : column
+  share 1
+  role tw.page
+  head : row
+    role tw.top
+    title : text "Twitch chat"
+      role tw.name
+      share 1
+    note : text "Read-only"
+      role tw.hint
+  feed : column
+    share 1
+    scroll end
+    role tw.feed
+    of tag:said,prop:chat=$CHAT as s
+    clamp last 150
+    each message
+  foot : text "Messages arrive here while Twitch is connected."
+    role tw.hint
+message : row
+  role tw.msg
+  who : text "$s.speaker"
+    role tw.name
+  body : text "$s.text"
+    role tw.words
+    share 1
+  at : text "$s.made_local"
+    role tw.when

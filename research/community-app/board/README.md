@@ -64,12 +64,13 @@ later-edit fence. See words make no records.
 | `forget <post> reason=…` | Existing hide plus reason; `forgotten` reads a notice without hidden text; undo restores descendants/files |
 | `board.report <post> reason=…` / `board.queue` | Report visible only to the post's group leaders |
 | `board.personal <post> action=hide|mute|bookmark|follow` | Private mark shared with your agents; undo removes it |
-| `board.seen` / `catch-up` | Private last-seen marker; decisions/events/answers/busy/followed replies since it; plain data |
+| `board.seen [in=<group>]` / `board.catch-up [in=<group>]` | Private last-seen markers, one for the board and one per channel (`in=`); since the later of the two: new conversations by others, decisions/events/answers/busy/followed replies, each with `at` (when it became new) and, for busy threads, `first` (the oldest unseen reply); plain data. The `catch-up` verb drops `in=`; use `board.catch-up` for a channel |
 | `board.feed [order=<ordering>] [in=<group>]` | Caller-visible threads with why_here, seats and immutable times |
 | `new`, `top-this-week`, `needs-answers`, `happening-soon` | Copyable see verb notes over feed orderings |
 | `board.why-here <post>` | Pin leader, upvote count, reply count, answer/outcome |
 | `board.search q=… [in=… kind=… person=… since=… before=…]` | Visible post/reply text and extracted document pages |
 | `board.calendar <event>` | UTF-8, escaped/folded RFC 5545 text, filename and MIME for a calendar download |
+| `board.events [in=<group>] [around=<date>] [weeks=N]` | Dated threads near a day, soonest first, with going/maybe counts, who is coming by name and your RSVP; the calendar view's reading |
 | `board.badges` | Real names, steward/group leader badges, agents as `agent for <person>` |
 | `history <thing>` | Existing filtered record trail, including edits, claims and undo; sealed rows hide authorship |
 

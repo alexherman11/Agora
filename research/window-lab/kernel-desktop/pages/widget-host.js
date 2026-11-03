@@ -22,7 +22,7 @@
   const native = {paint:null, hits:[]};
   // A failure here, outside any line, is said to the kernel so it lands in `refusals` (kd.js KD.failed, card dk939).
   // A line the kernel refused is kept there already, so those errors are marked kept and not said again.
-  let partName='';
+  let partName='',widgetId='';
   const failed=(why,line)=>{try{window.KD&&KD.failed&&KD.failed(why,line,shell?shell.page+'-bar':(partName||q.get('widget')||'widget'))}catch{}};
   const post = async (action, data={}) => {
     const r = await fetch('/desk/widget/'+action,{method:'POST',headers:{'Content-Type':'application/json'},
@@ -45,7 +45,7 @@
   };
   const send = data => frame?.contentWindow.postMessage(data,'*');
   const bootstrap = `(() => {
-    const pending=new Map(), listeners=new Map();let n=0, setup;
+    const pending=new Map(), listeners=new Map();let n=0, setup, menuOn=false;
     // The theme this window wears. The host sends a new one whenever it changes; CSS variables repaint everything at once.
     function applyTheme(t){let s=document.getElementById('ag-theme');if(!s){s=document.createElement('style');s.id='ag-theme';document.head.append(s)}
       if(s.textContent!==t.css)s.textContent=t.css;
@@ -54,7 +54,7 @@
     const ready=new Promise(r=>setup=r);
     function call(op,data={}){return new Promise((resolve,reject)=>{const id=++n;pending.set(id,{resolve,reject});parent.postMessage({agora:1,id,op,...data},'*')})}
     addEventListener('message',e=>{if(e.source!==parent||e.data?.agora!==1)return;const m=e.data;
-      if(m.init){setup(Object.freeze(m.init));return}
+      if(m.init){menuOn=m.menu===true;setup(Object.freeze(m.init));return}
       if(m.theme){applyTheme(m.theme);return}
       if(m.ping){parent.postMessage({agora:1,op:'widget-pong'},'*');return}
       if(m.event){for(const fn of listeners.get(m.event.word)||[])try{fn(m.event)}catch{};return}
@@ -70,6 +70,38 @@
       hitAreas:rects=>call('hits',{rects}),paintArea:rect=>call('paint',{rect}),
       native:(name,...args)=>call('native',{name,args})};
     Object.defineProperty(window,'agora',{value:Object.freeze(api),writable:false,configurable:false});
+    // The shared right-click menu (card dk1344, pages/menu.js): every view inherits it with no wiring. This frame only
+    // says where the press was, the words selected under it and the thing the pressed part shows (data-thing, or the
+    // painter's data-fact-id); the trusted page reads that thing again as the viewer and draws the menu. A view that
+    // draws its own menu (preventDefault) keeps it; the painter's ask-only menu (right_click=ask) gives way to this one,
+    // which ends with the same ask box. Shift, inputs and editable words keep the browser's menu.
+    let pressed=null,askOnly=false;
+    // menuOn: the host draws the shared menu here (not in a shell bar, whose components keep their own ask menu)
+    const shut=()=>{if(menuOn)parent.postMessage({agora:1,op:'context-close'},'*')};
+    addEventListener('pointerdown',e=>{
+      if(e.button!==2){shut();return}
+      const s=getSelection();pressed=s&&s.rangeCount&&!s.isCollapsed?s.getRangeAt(0).cloneRange():null;
+    },true);
+    addEventListener('keydown',e=>{if(e.key==='Escape')shut()},true);
+    addEventListener('contextmenu',()=>{askOnly=false},true);
+    addEventListener('agora-menu',e=>{if(e.detail&&e.detail.open)askOnly=true});
+    const near=(range,x,y)=>{if(!range)return false;for(const r of range.getClientRects())if(x>=r.left-3&&x<=r.right+3&&y>=r.top-3&&y<=r.bottom+3)return true;return false};
+    addEventListener('contextmenu',e=>{
+      const t=e.target instanceof Element?e.target:null;
+      if(!menuOn||e.shiftKey||!t||t.closest('input,textarea,select,[contenteditable]:not([contenteditable=false])'))return;
+      if(e.defaultPrevented&&!askOnly)return;
+      if(askOnly)for(const n of document.querySelectorAll('.menu.ask-menu'))n.remove();
+      e.preventDefault();
+      const s=getSelection(),now=s&&s.rangeCount&&!s.isCollapsed?s.getRangeAt(0):null;
+      const range=near(pressed,e.clientX,e.clientY)?pressed:near(now,e.clientX,e.clientY)?now:null;pressed=null;
+      const from=range?(range.startContainer.nodeType===1?range.startContainer:range.startContainer.parentElement):t;
+      const holder=(from&&from.closest('[data-thing],[data-fact-id]'))||t.closest('[data-thing],[data-fact-id]');
+      const part=t.closest('[data-path]');
+      parent.postMessage({agora:1,op:'context',x:e.clientX,y:e.clientY,quote:range?String(range).slice(0,2000):'',
+        thing:holder?(holder.dataset.thing||holder.dataset.factId||''):'',
+        label:holder?(holder.dataset.label||holder.dataset.factTitle||holder.dataset.factName||''):'',
+        where:part?part.dataset.path:''},'*');
+    });
   })();`;
   const csp = "default-src 'none'; connect-src 'none'; script-src 'unsafe-inline' blob:; style-src 'unsafe-inline'; img-src data: blob:; font-src 'none'; media-src blob:; object-src 'none'; frame-src 'none'; worker-src blob:; base-uri 'none'; form-action 'none'";
   const rect = r => {
@@ -81,6 +113,15 @@
     if(stopped||!frame||e.source!==frame.contentWindow||e.data?.agora!==1)return;
     const {id,op}=e.data;
     if(op==='widget-pong'){lastPong=performance.now();return}
+    // the shared right-click menu (pages/menu.js): the frame says where and what; this page reads it as the viewer
+    if(op==='context-close'){window.AgoraMenu&&AgoraMenu.close();return}
+    if(op==='context'){
+      if(shell||!window.AgoraMenu)return;
+      const d=e.data,r=frame.getBoundingClientRect(),n=v=>Number.isFinite(+v)?+v:0,text=v=>String(v??'').slice(0,2000);
+      AgoraMenu.open({x:r.left+n(d.x),y:r.top+n(d.y),thing:text(d.thing).slice(0,40),quote:text(d.quote),label:text(d.label).slice(0,160),
+        where:[partName,text(d.where).slice(0,200)].filter(Boolean).join(' · '),about:widgetId,window:q.get('win')||''});
+      return;
+    }
     if(op==='component-phase'){
       const path=String(e.data.path||'').slice(0,500);
       if(e.data.end)phases.delete(path);
@@ -324,7 +365,7 @@
   async function start(){
     forgive();
     const data=await post('open',{widget:(shell&&shell.widget)||q.get('widget')});if(!data.ok)throw Error(data.text);
-    instance=data.instance;code=data.code;partName=String(data.name||'');
+    instance=data.instance;code=data.code;partName=String(data.name||'');widgetId=String(data.widget||'');if(window.AgoraMenu)AgoraMenu.about=widgetId;
     componentView=!!data.component_lens;
     nativeGranted=!!data.native;
     if(shell&&!nativeGranted)throw Error('The '+(data.name||'bar')+' widget holds no window.native grant');
@@ -342,7 +383,7 @@
     frame.srcdoc=`<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><style id="ag-theme">${String(data.theme.css||'').replace(/<\/style/gi,'<\\/style')}</style><style>html,body{margin:0;min-height:100%;font-family:${data.theme.font};color:${data.theme.ink}}*{box-sizing:border-box}</style>${shell?'<style>html,body{background:transparent!important}:root{color-scheme:normal!important}</style>':''}<script>${safe(bootstrap)}<\/script><script type="module">${safe(data.code)}<\/script>`;
     // a window opened on a thing (window.open <lens> <thing>) hands its lens the thing as $view.target
     const target=/^[a-z]{1,8}\d+$/.test(q.get('target')||'')?q.get('target'):'';
-    frame.onload=()=>send({agora:1,init:{widget:data.widget,name:data.name,surface:data.surface,theme:data.theme,target}});
+    frame.onload=()=>send({agora:1,init:{widget:data.widget,name:data.name,surface:data.surface,theme:data.theme,target},menu:!shell&&!q.get('slot')&&data.surface==='window'});
     surface.replaceChildren(frame);poll();
   }
   // The page's theme changed (theme-live.js): the window inside wears it too, without a reload.

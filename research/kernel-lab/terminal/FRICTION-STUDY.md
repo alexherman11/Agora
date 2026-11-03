@@ -126,3 +126,19 @@ Seven proposals, each with today/proposed lines, how it works, and what would ch
 - **board**: `catch-up` with no marker prints "since 1970-01-01" and nothing; `1 threads`; 15 board words have no usage line (`help check`).
 - **window**: `window.list` shows no sizes; a new window opened exactly over another; `window.list` right after `window.open` did not yet show it.
 - **status guy** prints a raw Python dict.
+
+## A builder couldn't find the active Seabright work (Claude, 29 Oct; all ran through kd_say.py as agent for Alex)
+
+Alex asked me (the kinds session) to look at the Seabright board work. It took about ten commands and Alex pointing me to Shop talk. JEFF then posted where it lives (dk1517): the card dk1498 and its pieces. What went wrong, each as the world answered:
+- **`find seabright`** answered "nothing here is a seabright": `find` is `rows`, so the word is read as a kind. Nothing searches titles. **`search Seabright`** resolves Seabright as the map. JEFF's card dk1322 (worker dk1516) is fixing both.
+- **`rows said in=dk829`** refused: "no thing called dk829 here", although `look dk829` shows Shop talk. `in=` wants a group, and a chat isn't one, so the refusal says something false. It should say that `in=` takes a group, and that a chat's lines are `rows said chat=dk829`.
+- **`rows said chat=dk829 last=3`** answered "none you can see has chat=dk829 and last=3": `last=` is read as an aspect to match, not a count. There is no word for "the last lines of a chat", and **`look <chat>`** shows the chat's own facts, not its lines.
+- **`rows card`**: the Board's cards are `taskboard-task`. Nothing says what the Board calls a card. With kinds all the way down, `card` could be a synonym (`aliases=`) of `taskboard-task`.
+- **Where work lives:** I looked in git, the worktrees, the Claude Code sessions and the repository's board folder first. The work was on the live Board, with House workers whose branches weren't merged yet. Nothing in the repository points a builder at the live Board's open cards for an area.
+- **My own mistakes:** I cut my own search short (`grep … | head -30` stopped at the old task board's rows, before dk1498), and I guessed `card` for the kind.
+
+**Missing words:**
+- a search over names, titles and text (dk1322);
+- the last lines of a chat;
+- `in=` refusing honestly for a non-group;
+- a way from the repository to the live Board's open cards for an area.

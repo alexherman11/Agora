@@ -52,7 +52,7 @@ live = None
 geo_cache = {}
 geo_lock = threading.Lock()
 geo_last = [0.0]
-KEEP = ("kind", "title", "name", "label", "start", "end", "location", "place", "at", "path", "metres", "minutes",
+KEEP = ("kind", "post_kind", "thread", "title", "name", "label", "start", "end", "location", "place", "at", "path", "metres", "minutes",
         "stops", "mode", "streets", "color", "icon", "by", "who", "done", "seats", "osm", "tags", "ring", "approx",
         "ref", "class", "type", "about", "text", "made", "number", "street")
 SHOWS_START = ("rows ", "board.", "map.near ", "map.find ")

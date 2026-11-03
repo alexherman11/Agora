@@ -1,9 +1,9 @@
 {
   "channels": [
     {"name": "Announcements", "post_may": "leaders", "posts_per_day": 4, "replies_per_day": 30},
-    {"name": "Meetings & events", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30},
-    {"name": "Research & documents", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30},
-    {"name": "Asks & offers", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30},
+    {"name": "Meetings & events", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30, "opens": "calendar", "opens_label": "Calendar"},
+    {"name": "Research & documents", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30, "opens": "documents", "opens_label": "Documents"},
+    {"name": "Asks & offers", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30, "opens": "asks", "opens_label": "Asks & offers"},
     {"name": "Neighbours", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30},
     {"name": "Off-topic", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30}
   ],
@@ -11,7 +11,7 @@
     {"name": "discussion", "fields": ""},
     {"name": "question", "fields": ""},
     {"name": "announcement", "fields": "until", "leaders_only": "yes"},
-    {"name": "event", "fields": "start end location seats closes place", "required": "start seats"},
+    {"name": "event", "fields": "start end location seats closes place", "required": "start seats", "defaults": "{\"seats\": \"500\"}"},
     {"name": "poll", "fields": "options closes", "required": "options closes"},
     {"name": "ask", "fields": "seats closes", "required": "seats"},
     {"name": "offer", "fields": "seats closes", "required": "seats"},

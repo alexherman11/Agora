@@ -95,3 +95,21 @@ The activity acknowledgment is scripted evidence, not a claim that the live
 JEFF model has picked up a card. After activation, observe a normal task-only
 event and inspect JEFF's activity before calling that acceptance verified.
 No live model trial was run by this worker.
+
+## Rough spots: a replaced process ended its successor (2 Nov 2026)
+
+*Claude (builder), 2 Nov 2026.* JEFF answered nothing from 28 Oct 22:50 to 2 Nov. At the quota switch the House stopped
+his Claude process and started Codex (pid 156312); the Claude process's exit event arrived a second later and cleared
+`self.child`, so the new Codex process ran on unseen and held thread 01a18634. Each later line started another Codex,
+refused with "thread ... already has an active writer" (25 times in his transcript). Also, `Child.stop` killed only the
+venv launcher, which leaves the real interpreter running on Windows.
+
+Source fix (ran: `test_stale_child.py` 4 passed; house tests 146 passed; live: stuck tree ended, `kd_reload.py house`,
+`house.wake` delivered Alex's three lines and JEFF answered in the Conversation, dk1609-1610): events carry their
+`child`, and `init`/`exit` from a replaced child are logged as `stale` and ignored; `stop` ends the whole tree
+(`transport.kill_tree`).
+
+The missing world-level word: **a house-agent's process as something the world can read** (running since, which
+conversation it holds, how its last start ended). The House showed only `doing=error` with "its process ended (1)", so
+five days of the same refusal looked like one quiet error. Lines Alex sent during the outage were consumed by the failed
+starts (the cursor moved past them); they were re-delivered by hand with `house.wake`.

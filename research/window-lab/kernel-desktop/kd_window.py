@@ -53,6 +53,7 @@ HEADLESS = "--headless" in sys.argv
 PORT = int(os.environ.get("AGORA_KDESK_PORT", "8810"))
 LENS_SIZE = (1180, 1500)        # a lens window's first size, in real pixels
 VIEWS = {"lines": ("Lines", (1500, 760)), "thing": ("Thing", (1000, 820)),
+         "viewer": ("Viewer", (1280, 900)),
          "help": ("Help", (1200, 1300)), "tasks": ("Running windows", (1100, 1000)),
          "taskbar": ("Agora taskbar", (0, 0))}
 
@@ -270,6 +271,10 @@ class MemScreen(Screen):
     def close(self, wid):
         self.wins.pop(wid, None)
 
+    def reload(self, wid):
+        if wid in self.wins:
+            self.wins[wid]["reloads"] = self.wins[wid].get("reloads", 0) + 1
+
     def place(self, wid, box):
         if wid in self.wins:
             self.wins[wid]["box"] = box
@@ -304,6 +309,22 @@ class MemScreen(Screen):
         return (0, 0, 3840, 2088 - BAR_H)
 
 
+def _page_visible(win):
+    """Make a window's WebView2 page visible even though WinForms never showed the window (it was shown by Win32)."""
+    def make():
+        from System.Reflection import BindingFlags
+        view = win.native.browser.webview
+        field = view.GetType().GetField("_coreWebView2Controller", BindingFlags.NonPublic | BindingFlags.Instance)
+        controller = field.GetValue(view) if field else None
+        if controller is not None:
+            controller.IsVisible = True
+    try:
+        from System import Func, Type
+        win.native.Invoke(Func[Type](make))
+    except Exception as exc:                            # noqa: BLE001  the window still opens; it may restore blank
+        log(f"page visible: {exc!r}")
+
+
 class GuiScreen(Screen):
     def __init__(self, module):
         import webview
@@ -318,7 +339,9 @@ class GuiScreen(Screen):
     def start(self, then):
         import widget_guard
         import window_profiles
+        import window_transparency
         window_profiles.install()
+        window_transparency.install()
         widget_guard.install()
         # pywebview needs a window before start: a hidden one that holds the loop and shows nothing
         self.anchor = self.webview.create_window("Agora window host", html="<html></html>", hidden=True,
@@ -328,14 +351,16 @@ class GuiScreen(Screen):
     def open(self, wid, view, title, url, box, on_closed, on_shown, bar=False, tucked=False):
         s = scale()
         x, y, w, h = box
-        api = PageApi(self, wid)
+        api = None if view == "viewer" else PageApi(self, wid)
+        glassy = view in SHELL_VIEWS and bar in ("top", "bottom")
         win = self.webview.create_window(title, url, js_api=api, x=int(x / s), y=int(y / s), width=max(200, int(w / s)),
-                                         height=max(30, int(h / s)), frameless=True, easy_drag=False, on_top=bool(bar) and bar != "layer", min_size=(120, 24),
-                                         background_color="#F6F3EC", text_select=True, hidden=True,
-                                         transparent=view in SHELL_VIEWS and bar in ("top", "bottom"))
+                                         height=max(30, int(h / s)), frameless=view != "viewer", easy_drag=False, on_top=bool(bar) and bar != "layer", min_size=(120, 24),
+                                         background_color="#F6F3EC", text_select=True, hidden=True, transparent=glassy)
         rec = {"w": win, "hwnd": None, "view": view, "bar": bar}
         with self.lock:
             self.wins[wid] = rec
+        if glassy:
+            win.agora_navigated = lambda ok: self._bar_page(wid, url, ok)   # window_transparency
 
         def shown_once():
             try:
@@ -351,7 +376,11 @@ class GuiScreen(Screen):
             on_shown()
 
         def loaded():
+            if view == "viewer":
+                return  # Viewer owns a separate native pane; the placeholder does not gate it.
             if rec["hwnd"] is None:
+                if rec.get("page_failed"):
+                    return                                  # an error page is never shown; _bar_page tries again
                 if bar and bar != "layer":
                     # A bar is a tool window before it is ever visible. 27 Oct: shown first, it was for a moment a
                     # visible frameless Agora window, the window manager took the dock for a tile and moved it.
@@ -359,6 +388,11 @@ class GuiScreen(Screen):
                         early = int(win.native.Handle.ToInt64())
                         ex = user32.GetWindowLongPtrW(early, GWL_EXSTYLE)
                         user32.SetWindowLongPtrW(early, GWL_EXSTYLE, (ex | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW)
+                        if glassy:
+                            # dk1136: on glass before it is ever visible. Off glass, the transparent page drew the
+                            # whole window white (3840x840, 2340x690) for the moment between this show and _make_bar.
+                            import shell_native
+                            shell_native.glass(early)
                     except Exception:
                         pass
                 if tucked and not bar:
@@ -370,6 +404,9 @@ class GuiScreen(Screen):
                         user32.SetPropW(early, "Agora.Window." + wid, wt.HANDLE(1))
                         user32.SetWindowPos(early, None, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE)
                         user32.ShowWindow(early, 7)             # SW_SHOWMINNOACTIVE: on the taskbar, tucked, not active
+                        # 28 Oct: shown past WinForms, the form still thinks it is hidden, so WebView2 keeps the page
+                        # hidden and the window restores as a blank cream box (JEFF chat, Writing, map). Tell the page.
+                        _page_visible(win)
                         rec["hwnd"] = early
                         on_shown()
                         return
@@ -393,6 +430,18 @@ class GuiScreen(Screen):
                 on_closed()
         win.events.loaded += loaded
         win.events.closed += closed
+        if view == "viewer":
+            import viewer
+            viewer.attach(win, f"http://127.0.0.1:{PORT}", self.module.token)
+            if tucked:
+                early = int(win.native.Handle.ToInt64())
+                user32.ShowWindow(early, 7)
+                rec["hwnd"] = early
+                user32.SetPropW(early, "Agora.Window." + wid, wt.HANDLE(1))
+                on_shown()
+            else:
+                win.show()
+                shown_once()
 
     def _make_bar(self, wid, hwnd, edge):
         view = (self.wins.get(wid) or {}).get("view")
@@ -416,7 +465,7 @@ class GuiScreen(Screen):
             import shell_native
             shell_native.glass(hwnd)
             placed = shell_native.bar_placer(view, hwnd, lambda h: user32.ShowWindow(h, SW_SHOWNOACTIVATE), scale,
-                                             lambda: self.bar_hidden.get(wid))
+                                             lambda: not self._bar_may_show(wid))
             height = shell_native.initial_reserve(view, scale())
         self.bar_hidden[wid] = False
         try:
@@ -443,10 +492,47 @@ class GuiScreen(Screen):
                 self.bar_hidden[wid] = full
                 if full:
                     user32.ShowWindow(hwnd, SW_HIDE)
-                else:
+                elif self._bar_may_show(wid):
                     user32.ShowWindow(hwnd, SW_SHOWNOACTIVATE)
                     user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE)
             time.sleep(0.5)
+
+    def _bar_may_show(self, wid):
+        rec = self.wins.get(wid) or {}
+        return not self.bar_hidden.get(wid) and not rec.get("page_failed")
+
+    def _bar_page(self, wid, url, ok):
+        """A see-through bar's navigation ended (window_transparency; GUI thread). WebView2's error page is opaque and
+        DWM does not clip it to the region, so a bar on one would be a big white block (dk1136): hidden, and its page
+        tried again until it comes. A page that arrives shows the bar again (unless a game is full screen)."""
+        rec = self.wins.get(wid)
+        if not rec:
+            return
+        failed, rec["page_failed"] = rec.get("page_failed"), not ok
+        hwnd = rec["hwnd"]
+        if not ok:
+            if hwnd:
+                user32.ShowWindow(hwnd, SW_HIDE)
+            if not failed:
+                log(f"window {wid}: its page did not load; hidden, trying again every 5 s")
+
+            def again():
+                time.sleep(5)
+                if self.wins.get(wid) is rec and rec.get("page_failed") and wid not in self.closing:
+                    try:
+                        # Not Window.load_url (it waits for `shown`, which a bar WinForms never showed never sets), nor
+                        # the control's Source (it ignores the URL it already holds, the failed one): Navigate itself.
+                        from System import Func, Type
+                        form = rec["w"].native
+                        rec["w"].events.loaded.clear()
+                        form.Invoke(Func[Type](lambda: form.browser.webview.CoreWebView2.Navigate(url)))
+                    except Exception as exc:            # noqa: BLE001  the next failure, if any, tries again
+                        log(f"window {wid}: trying its page again: {exc!r}")
+            threading.Thread(target=again, daemon=True, name="bar-page-again").start()
+        elif failed:
+            log(f"window {wid}: its page loaded")
+            if hwnd and wid in self.bars and self._bar_may_show(wid):
+                user32.ShowWindow(hwnd, SW_SHOWNOACTIVATE)
 
     def close(self, wid):
         with self.lock:
@@ -455,6 +541,13 @@ class GuiScreen(Screen):
                 self.closing.add(wid)
         if rec:
             rec["w"].destroy()
+
+    def reload(self, wid):
+        """The page again from disk, in the same window: same place, same tuck, nothing closes."""
+        rec = self.wins.get(wid)
+        if rec:
+            # run_js may wait for an answer the reloading page never gives: let it wait on its own thread
+            threading.Thread(target=lambda: rec["w"].run_js("location.reload()"), daemon=True).start()
 
     def place(self, wid, box):
         rec = self.wins.get(wid)
@@ -722,10 +815,14 @@ class WindowHost:
             {"word": "window.move", "kind": "do", "takes": "<id> [to=<spot>] [at=<x,y>] [size=<w,h>]", "may": "anyone",
              "help": f"window.move <window> to=<spot> | at=x,y [size=w,h]: put a window somewhere ({spots}). Changes "
                      f"the screen only (where a window sits is not in the world), so nothing is recorded."},
-            {"word": "window.close", "kind": "do", "takes": "<id>", "may": "anyone",
+            {"word": "window.close", "kind": "do", "takes": "<id>", "may": "anyone", "acts_on": "window",
              "help": "window.close <window>: close it. Its window thing goes from the world; undo opens it again where "
                      "it was."},
-            {"word": "window.focus", "kind": "do", "takes": "<id>", "may": "anyone",
+            {"word": "window.reload", "kind": "do", "takes": "[<id>] [all]", "may": "anyone",
+             "help": "window.reload <window> | all: load its page again from disk, in place (nothing closes or moves). "
+                     "After editing pages/ (html, js, css) this is all it takes. Changes the screen only, so nothing "
+                     "is recorded."},
+            {"word": "window.focus", "kind": "do", "takes": "<id>", "may": "anyone", "acts_on": "window",
              "help": "window.focus <window>: bring it forward, or tuck it away if it is in front already (what a "
                      "taskbar button does). Changes the screen only, so nothing is recorded."},
             {"word": "window.opened", "kind": "hear", "takes": "<id>", "may": "anyone",
@@ -945,12 +1042,20 @@ class WindowHost:
                     + (f" widget={widget['id']}" if widget else "")
                     + (f" edge={edge}" if edge else ""))
             return {"lines": [line], "saw": {}}
-        if word in ("window.move", "window.close", "window.focus"):
+        if word == "window.reload" and (target or (words[0] if words else "")).lower() == "all":
+            ids = [w for w in list(self.screen.wins)]
+            for wid in ids:
+                self.screen.reload(wid)
+            return {"text": f"{len(ids)} windows reloaded"}
+        if word in ("window.move", "window.close", "window.focus", "window.reload"):
             row = self.row_for(target, use)
             if row is None:
                 return {"refused": f"{target or 'that'} is not one of the windows open here; window.list shows them"}
             if word == "window.focus":
                 return {"text": f"{row.get('name')}: {self.screen.focus(row['id'])}"}
+            if word == "window.reload":
+                self.screen.reload(row["id"])
+                return {"text": f"{row.get('name')} reloaded"}
             if word == "window.close":
                 return {"lines": [f"forget {row['id']}"], "saw": {row["id"]: row["rev"]}}
             if row.get("edge"):

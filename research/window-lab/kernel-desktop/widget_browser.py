@@ -10,7 +10,7 @@ from pathlib import Path
 import socket
 import struct
 import subprocess
-import tempfile
+import sys
 import time
 import urllib.request
 from urllib.parse import urlsplit, quote
@@ -19,6 +19,69 @@ from urllib.parse import urlsplit, quote
 
 
 HERE = Path(__file__).resolve().parent
+sys.path.append(str(HERE.parents[1] / "kernel-lab"))
+from kernel import scratch  # noqa: E402
+
+
+def _job_that_dies_with_us():
+    """A Windows job whose processes end when this process ends, however it ends.
+    28 Oct: 42 headless Chromes (452 processes, ~11.8 GB) outlived the tests and widget hosts that
+    started them, because only __exit__ closed them and a killed or failed owner never reaches it."""
+    import ctypes
+    from ctypes import wintypes as wt
+
+    class LIMIT(ctypes.Structure):
+        _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
+                    ("LimitFlags", wt.DWORD), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                    ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wt.DWORD),
+                    ("Affinity", ctypes.c_size_t), ("PriorityClass", wt.DWORD), ("SchedulingClass", wt.DWORD)]
+
+    class IO(ctypes.Structure):
+        _fields_ = [(n, ctypes.c_uint64) for n in ("r", "w", "o", "rb", "wb", "ob")]
+
+    class EXTENDED(ctypes.Structure):
+        _fields_ = [("Basic", LIMIT), ("Io", IO), ("ProcessMemoryLimit", ctypes.c_size_t),
+                    ("JobMemoryLimit", ctypes.c_size_t), ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                    ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+    k = ctypes.WinDLL("kernel32", use_last_error=True)
+    k.CreateJobObjectW.restype = wt.HANDLE
+    k.CreateJobObjectW.argtypes = [ctypes.c_void_p, wt.LPCWSTR]
+    k.SetInformationJobObject.argtypes = [wt.HANDLE, ctypes.c_int, ctypes.c_void_p, wt.DWORD]
+    job = k.CreateJobObjectW(None, None)
+    info = EXTENDED()
+    info.Basic.LimitFlags = 0x2000                       # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    if not job or not k.SetInformationJobObject(job, 9, ctypes.byref(info), ctypes.sizeof(info)):
+        return None
+    return job                                          # never closed by hand: the handle closes when we exit
+
+
+_JOB = None
+
+
+def _hold(process):
+    """Put a just-started browser in the job; its children follow it in."""
+    global _JOB
+    import ctypes
+    from ctypes import wintypes as wt
+    try:
+        if _JOB is None:
+            _JOB = _job_that_dies_with_us()
+        if _JOB:
+            k = ctypes.WinDLL("kernel32", use_last_error=True)
+            k.AssignProcessToJobObject.argtypes = [wt.HANDLE, wt.HANDLE]
+            k.AssignProcessToJobObject(_JOB, wt.HANDLE(int(process._handle)))
+    except Exception:                                   # noqa: BLE001  cleanup is a courtesy; the browser still runs
+        pass
+
+
+def _resume(process):
+    """Start a browser created suspended (Popen keeps no thread handle, so resume the whole process)."""
+    import ctypes
+    from ctypes import wintypes as wt
+    nt = ctypes.WinDLL("ntdll")
+    nt.NtResumeProcess.argtypes = [wt.HANDLE]
+    nt.NtResumeProcess(wt.HANDLE(int(process._handle)))
 
 
 class CDP:
@@ -102,13 +165,17 @@ class CDP:
 
 
 class Browser:
+    # Routes the trusted host page may also reach, beyond the widget door. Empty for the overlay host; a hidden test of
+    # the shared right-click menu (test_shared_menu.py) sets ('/see', '/do'), as a desktop window's page has them.
+    also_allow = ()
+
     def __init__(self, url=None, host_key=None, test_flags=()):
         self.test_flags = list(test_flags)
         self.allowed_origin = (urlsplit(url).scheme + '://' + urlsplit(url).netloc) if url else None
         self.host_key = host_key or os.environ.get('AGORA_WIDGET_HOST_KEY','')
 
     def __enter__(self):
-        self.tmp = tempfile.TemporaryDirectory(prefix='edge-kdesk-', dir=HERE / 'state',ignore_cleanup_errors=True)
+        self.tmp = scratch.TemporaryDirectory(prefix='edge-kdesk-', dir=HERE / 'state',ignore_cleanup_errors=True)
         chrome=Path('C:/Program Files/Google/Chrome/Application/chrome.exe')
         executable=str(chrome) if chrome.is_file() else r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
         private='--incognito' if chrome.is_file() else '--inprivate'
@@ -116,7 +183,9 @@ class Browser:
             '--headless=new', private, '--disable-gpu', '--no-first-run', '--no-default-browser-check',
             '--remote-debugging-port=0', '--remote-allow-origins=*', '--disable-background-networking',
             '--user-data-dir=' + self.tmp.name, *self.test_flags, 'about:blank'], stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL, creationflags=0x08000000)
+            stderr=subprocess.DEVNULL, creationflags=0x08000004)    # no window, and suspended until it is in the job
+        _hold(self.process)
+        _resume(self.process)
         active = Path(self.tmp.name) / 'DevToolsActivePort'
         end = time.monotonic() + 20
         port=None
@@ -150,7 +219,7 @@ class Browser:
                 p = event['params']
                 url = urlsplit(p['request']['url'])
                 local = url.scheme + '://' + url.netloc == self.allowed_origin
-                path_ok = url.path in ('/desk/widget.html', '/desk/kd.css', '/desk/kd.js', '/desk/widget-host.js', '/dev/signin', '/desk/theme.css', '/desk/theme.json', '/desk/theme-live.js') or url.path.startswith('/desk/widget/') or (
+                path_ok = url.path in ('/desk/widget.html', '/desk/kd.css', '/desk/kd.js', '/desk/widget-host.js', '/dev/signin', '/desk/theme.css', '/desk/theme.json', '/desk/theme-live.js', '/desk/menu.js', *self.also_allow) or url.path.startswith('/desk/widget/') or (
                     p['request'].get('method') == 'GET' and __import__('re').fullmatch(r'/files/[a-zA-Z]+\d+',url.path))
                 if p.get('frameId') == main and local and path_ok:
                     headers=dict(p['request'].get('headers') or {})

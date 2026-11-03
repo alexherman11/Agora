@@ -3,7 +3,6 @@ import importlib.util
 import json
 import shutil
 import sys
-import tempfile
 import threading
 import uuid
 from pathlib import Path
@@ -16,6 +15,7 @@ LAB = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(LAB))
 from kernel.kernel import Kernel
 from kernel.next_steps import basis, packet, rows
+from kernel import scratch
 
 
 @pytest.fixture
@@ -24,7 +24,7 @@ def world():
         "steward": {"account": "alex", "name": "Alex"},
         "invites_counted_by": "kernel", "invites": [{"code": "x", "uses": 5}]}
     try:
-        fixture = Path(tempfile.mkdtemp(prefix="jeff-continuity-"))
+        fixture = Path(scratch.mkdtemp(prefix="jeff-continuity-"))
         cleanup_parent = fixture.resolve().parent
         k = Kernel(fixture, genesis)
     except PermissionError:

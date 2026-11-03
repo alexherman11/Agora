@@ -1,0 +1,257 @@
+{
+  "checks": [
+    {
+      "check": "install_ui brings opens=calendar onto an installed channel",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "install_ui brings the event kind default seats",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "The board lens inherits the shared right-click ask menu",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "The calendar is a reviewed component card in the gallery",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Before choosing, the board shows conversations",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Meetings & events opens a month calendar, not the feed",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "The month is the board clock's month, today marked",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "The toolbar offers Calendar | Conversations, Calendar pressed",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow empty-month 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow add-form 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "The form made one event thing: title, when, where, notes, in the channel",
+      "ok": true,
+      "detail": {
+        "start": "2026-10-24T17:00:00Z",
+        "expected": "2026-10-24T17:00:00Z"
+      }
+    },
+    {
+      "check": "The event shows on its day and the day is selected",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "The agenda shows when, where and notes",
+      "ok": true,
+      "detail": "10 am\u201312:30 pm"
+    },
+    {
+      "check": "Bea RSVPs going in one click (a board-rsvp thing, one seat)",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Bea's Going shows pressed and her chip is marked",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow bea-going 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Alex sees who is coming by name",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No ids in what the calendar shows",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Week view: seven days, the event on Saturday 24 with RSVP",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow week 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Next week steps seven days",
+      "ok": true,
+      "detail": "Oct 25 \u2013 31, 2026"
+    },
+    {
+      "check": "Open conversation shows the event's thread beside the calendar",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow conversation 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Right-click on the calendar opens the shared menu with Ask for a change",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Light theme: day, event and header backgrounds are light",
+      "ok": true,
+      "detail": [
+        0.98346431372549,
+        0.9999999999999999,
+        0.98346431372549
+      ]
+    },
+    {
+      "check": "Conversations shows the channel's posts, including the event",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Neighbours has no opens fact, so no calendar and no switch",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow phone-month 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "An end before the start is explained and nothing is posted",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No 'new since' header on All conversations",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Nothing new in Meetings & events: no header there",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Neighbours, with two new posts, shows the header",
+      "ok": true,
+      "detail": "2 new since Thursday"
+    },
+    {
+      "check": "No horizontal overflow new-since 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Clicking it lands on the oldest unseen post",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow new-since-jump 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Mark all seen in a channel hides the header and clears that channel only",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "personal-view on the calendar part is accepted",
+      "ok": true,
+      "detail": "ok make bd230 [r267] \u00b7 a view-preference"
+    },
+    {
+      "check": "Bea's own calendar now opens on the week",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Alex's calendar is unchanged (personal means just Bea)",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "personal-style on the calendar is accepted",
+      "ok": true,
+      "detail": "ok make bd231 [r268] \u00b7 a part-style\n~ no other part-style has target=calendar (they say tokens); no other part-style has background=; no other part-style has personal=: still made, as you said"
+    },
+    {
+      "check": "Bea's calendar takes her own colour; Alex's does not",
+      "ok": true,
+      "detail": {
+        "before": [
+          "rgba(0, 0, 0, 0)",
+          "rgba(0, 0, 0, 0)"
+        ],
+        "bea": "rgb(255, 246, 216)",
+        "alex": "rgba(0, 0, 0, 0)"
+      }
+    },
+    {
+      "check": "personal-style reaches the new-since header part too",
+      "ok": true,
+      "detail": "ok make bd232 [r269] \u00b7 a part-style\n~ no other part-style has target=board-catchup (they say calendar or tokens); no other part-style has background=#eef6ff (they say #fff4d6): still made, as you said"
+    },
+    {
+      "check": "No horizontal overflow personal-week 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No uncaught script errors in either browser",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "check": "Gallery shows the calendar card and its live example: November 2026, 4 Nov selected, no add or RSVP without gestures",
+      "ok": true,
+      "detail": null
+    }
+  ],
+  "screenshots": [
+    "evidence\\calendar\\empty-month-1440.png",
+    "evidence\\calendar\\add-form-1440.png",
+    "evidence\\calendar\\bea-going-1440.png",
+    "evidence\\calendar\\week-1440.png",
+    "evidence\\calendar\\conversation-1440.png",
+    "evidence\\calendar\\phone-month-390.png",
+    "evidence\\calendar\\new-since-1440.png",
+    "evidence\\calendar\\new-since-jump-1440.png",
+    "evidence\\calendar\\personal-week-1440.png",
+    "evidence\\calendar\\gallery-example-900.png"
+  ],
+  "hidden": true,
+  "live_touched": false
+}

@@ -1,7 +1,10 @@
 """A stdio MCP door adapter. Standard library only; no world or identity of its own.
 
 Three tools: see and do take one line or a list of lines; lines takes a list and sends each line to /see or /do by
-its first word. In a list each line is its own call, so a refused line refuses only itself (27 Oct, MOVING-IN D2)."""
+its first word. In a list each line is its own call, so a refused line refuses only itself (27 Oct, MOVING-IN D2).
+An answer whose text names a picture, `[image: <path>]` (house.snap), also carries it as an MCP image block, when the
+file is a PNG in a `snaps` folder under the desktop's state folder (3 Nov)."""
+import base64
 import json
 import os
 import re
@@ -9,6 +12,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
 VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 BOOTSTRAP = ("Join with your person's agent session. Start with see: help, then help rows, rows guide, "
@@ -23,6 +27,13 @@ SEE = {"look", "l", "help", "?", "rows", "find", "holds", "status", "who", "rece
        "window.list", "window.desktop", "system.now", "media.now"}
 MAX_LINES = 50
 HANDLE = re.compile(r"\$([a-z][a-z0-9_]*)\b")
+# A word's answer may name a picture it took (house.snap: modules/house/snap.py) with a line `[image: <path>]`. The
+# kernel passes only text, so this adapter reads the file and adds it as an MCP image block after the text, only from
+# a folder named `snaps` under the desktop's state folder, and only a PNG of at most IMAGE_CAP bytes.
+IMAGE = re.compile(r"\[image: ([^\]\r\n]+)\]")
+SNAP_ROOT = Path(__file__).resolve().parents[2] / "window-lab" / "kernel-desktop" / "state"
+IMAGE_CAP = 4 * 1024 * 1024
+MAX_IMAGES = 4
 LINES = {"type": "array", "minItems": 1, "maxItems": MAX_LINES, "items": {"type": "string", "minLength": 1}}
 
 
@@ -36,7 +47,8 @@ def route_of(line):
 
 def tools_list():
     batch = ("Each line runs on its own, in order: a refused line refuses only itself and the rest still run. "
-             "A line's as=<name> lets a later line say $<name> for the thing it made.")
+             "A line's as=<name> lets a later line say $<name> for the thing it made, in this call or a later one "
+             "(names last for the sign-in; help $ lists every $ fill-in).")
     schema = {"type": "object", "properties": {"line": {"type": "string", "minLength": 1}, "lines": LINES},
               "additionalProperties": False}
     return [{"name": name, "description": desc,
@@ -50,6 +62,70 @@ def tools_list():
                 ("lines", "A list of lines, each sent to /see or /do by its first word (look, help, rows, recent, "
                           "who, history and the other readings go to /see; everything else to /do), so one call "
                           "can read and act. " + batch))]
+
+
+def _strings(obj):
+    if isinstance(obj, str):
+        yield obj
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            yield from _strings(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            yield from _strings(v)
+
+
+def image_block(raw):
+    """A path named in an answer -> (an MCP image block, or None; a short note). Only a PNG of at most IMAGE_CAP bytes
+    whose real path (links and .. resolved) is in a folder named `snaps` under SNAP_ROOT."""
+    name = Path(raw).name or "image"
+    try:
+        path = Path(raw)
+        if not path.is_absolute():
+            return None, f"not attached: {name} (not a full path)"
+        real = path.resolve(strict=True)
+        rel = real.relative_to(SNAP_ROOT.resolve())
+        if not any(part.lower() == "snaps" for part in rel.parts[:-1]) or not real.is_file():
+            raise ValueError
+    except (OSError, RuntimeError):
+        return None, f"not attached: {name} (missing)"
+    except ValueError:
+        return None, f"not attached: {name} (outside the snaps folder)"
+    if real.suffix.lower() != ".png":
+        return None, f"not attached: {name} (not a PNG)"
+    if real.stat().st_size > IMAGE_CAP:
+        return None, f"not attached: {name} (too large)"
+    data = real.read_bytes()
+    if not data.startswith(b"\x89PNG\r\n\x1a\n") or len(data) > IMAGE_CAP:
+        return None, f"not attached: {name} (not a PNG)"
+    return {"type": "image", "data": base64.b64encode(data).decode("ascii"), "mimeType": "image/png"}, f"attached: {name}"
+
+
+def images_in(body):
+    """Every `[image: <path>]` in an answer's text -> (image blocks, notes); nothing when it names none."""
+    blocks, notes, seen = [], [], set()
+    for text in _strings(body):
+        for m in IMAGE.finditer(text):
+            raw = m.group(1).strip()
+            if raw in seen:
+                continue
+            seen.add(raw)
+            if len(blocks) >= MAX_IMAGES:
+                notes.append(f"not attached: {Path(raw).name} ({MAX_IMAGES} images at most in one answer)")
+                continue
+            block, note = image_block(raw)
+            notes.append(note)
+            if block:
+                blocks.append(block)
+    return blocks, notes
+
+
+def reply(body, is_error):
+    """A tool result: the answer as JSON text, then any pictures it names (and, in the text, which were attached)."""
+    blocks, notes = images_in(body)
+    if notes:
+        body = {**body, "images": notes}
+    return {"content": [{"type": "text", "text": json.dumps(body, ensure_ascii=False)}, *blocks], "isError": is_error}
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -99,8 +175,7 @@ class Door:
 
     def call(self, name, line):
         out = self.post(name, line)
-        return {"content": [{"type": "text", "text": json.dumps(out, ensure_ascii=False)}],
-                "isError": out.get("ok") is not True}
+        return reply(out, out.get("ok") is not True)
 
     def batch(self, name, lines):
         """Each line its own call, in order; a refusal stops nothing. `as=<name>` handles carry to later lines."""
@@ -116,8 +191,7 @@ class Door:
                 handles[m.group(1)] = out["made"][-1]
         ok = sum(1 for r in receipts if r.get("ok") is True)
         body = {"ok": ok == len(receipts), "ran": len(receipts), "refused": len(receipts) - ok, "receipts": receipts}
-        return {"content": [{"type": "text", "text": json.dumps(body, ensure_ascii=False)}],
-                "isError": ok == 0}
+        return reply(body, ok == 0)
 
 
 class ProtocolError(Exception):

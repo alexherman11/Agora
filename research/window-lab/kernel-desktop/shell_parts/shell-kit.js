@@ -73,6 +73,7 @@ const ShellKit = (() => {
 
   // ------------------------------------------------------------------------------------------------ icons
   const AGORA_APPS = {
+    viewer: ['Viewer', 'window.open viewer'],
     lines: ['Lines', 'window.open lines'], help: ['Help', 'window.open help'], board: ['Board', 'window.open board'],
     taskboard: ['Task board', 'window.open taskboard-components'], appearance: ['Appearance', 'window.open appearance'],
     feed: ['Feed', 'window.open feed'], thing: ['Thing', 'window.open thing'], tasks: ['Running windows', 'window.open tasks'],
@@ -181,9 +182,16 @@ const ShellKit = (() => {
     },
     // actions: wm.* when the manager answers, the native shell otherwise
     focus(w) {
+      if (this.wmOK) return this.act(w.state === 'minimised' ? `wm.restore ${w.key} share=yes` : `wm.focus ${w.key} share=yes`);
       if (w.agora) return this.act(`window.focus ${w.agora}`);
-      if (this.wmOK) return this.act(w.state === 'minimised' ? `wm.restore ${w.key}` : `wm.focus ${w.key}`);
       return this.act(`window.activate handle=${w.key}`);
+    },
+    async launch(line, exe) {
+      if (this.wmOK && exe && /^window\.launch\s/.test(line) && /\.exe$/i.test(exe)) {
+        const ready = await this.act(`wm.arrange expect=${JSON.stringify(exe)}`);
+        if (refused(ready)) return ready;
+      }
+      return this.act(line);
     },
     minimise(w) {
       if (w.agora) return this.act(`window.focus ${w.agora}`);          // focus on the front window tucks it away
