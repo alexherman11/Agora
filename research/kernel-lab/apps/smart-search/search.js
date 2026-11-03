@@ -11,7 +11,7 @@ body:has(.smart-search){background:#f6f8f5!important;color:#233c34!important}
 .search-actions{display:flex;gap:10px}.search-status{min-height:24px}
 `,mount(api){
   const {P}=api,D=api.draft;
-  let closed=false,serial=0;
+  let closed=false,serial=0,generation=0;
   const el=(tag,attrs,...kids)=>P.node(tag,attrs,...kids);
   const root=api.part('body','main',{class:'smart-search'});
   const input=el('input',{type:'search',placeholder:'What are you looking for?','aria-label':'Search everything',maxlength:'1200',value:D.query||''});
@@ -22,7 +22,7 @@ body:has(.smart-search){background:#f6f8f5!important;color:#233c34!important}
   const coverage=el('p',{class:'search-coverage'},'Apps · known Agora entries and pins | World · visible text | Files, Email, Web · not connected');
   const results=el('section',{'aria-label':'Search results'});
   const submit=el('button',{type:'submit'},'Search');
-  const semantic=el('button',{type:'button'},'Understand locally');
+  const exact=el('button',{type:'button'},'Exact words only');
   const form=el('form',{},input,submit);
   const Q=api.Q;
   const read=async(mode,q,extra='')=>{
@@ -37,10 +37,10 @@ body:has(.smart-search){background:#f6f8f5!important;color:#233c34!important}
       if(!current){status.textContent='This result changed or is no longer available. Search again.';return;}
       if(app){
         if(!/^[a-z][a-z0-9_-]{0,79}$/.test(current.app||''))return;
-        await api.fire('app',{app:current.app});
+        await api.fire('app',{app:current.app,saw:{[hit.id]:hit.rev}});
       }else{
         if(!/^[a-z]{2,4}\d+$/.test(current.id||''))return;
-        await api.fire('evidence',{id:current.id});
+        await api.fire('evidence',{id:current.id,saw:{[hit.id]:hit.rev}});
       }
     }catch(e){status.textContent=String(e.message||e);}
   };
@@ -64,21 +64,28 @@ body:has(.smart-search){background:#f6f8f5!important;color:#233c34!important}
   const search=async(mode)=>{
     const query=input.value.trim();D.query=input.value;D.source=filter.value;
     if(!query)return;
-    const ticket=++serial;results.replaceChildren();
-    status.textContent=mode==='semantic'?'Checking with the local model…':'Searching visible text…';
-    submit.disabled=semantic.disabled=true;
+    const ticket=++generation;results.replaceChildren();
+    status.textContent='Searching visible text…';
+    submit.disabled=exact.disabled=true;
     try{
-      const rows=await read(mode,query);
-      if(!closed&&ticket<=serial&&input.value.trim()===query)draw(rows[0]||{state:'Search unavailable',hits:[]});
-    }catch(e){if(!closed)status.textContent=String(e.message||e);}
-    finally{if(!closed)submit.disabled=semantic.disabled=false;}
+      const current=()=>!closed&&ticket===generation&&input.value.trim()===query;
+      const rows=await read('lexical',query);
+      if(!current())return;
+      draw(rows[0]||{state:'Search unavailable',hits:[]});
+      if(mode==='semantic'){
+        status.textContent+=' · Understanding locally…';
+        const understood=await read('semantic',query);
+        if(current())draw(understood[0]||{state:'Local understanding unavailable; exact results shown',hits:rows[0]?.hits||[]});
+      }
+    }catch(e){if(!closed&&ticket===generation)status.textContent=String(e.message||e);}
+    finally{if(!closed&&ticket===generation)submit.disabled=exact.disabled=false;}
   };
-  form.onsubmit=e=>{e.preventDefault();search('lexical');};
-  semantic.onclick=()=>search('semantic');
-  input.oninput=()=>{D.query=input.value;};
+  form.onsubmit=e=>{e.preventDefault();search('semantic');};
+  exact.onclick=()=>search('lexical');
+  input.oninput=()=>{D.query=input.value;++generation;results.replaceChildren();submit.disabled=exact.disabled=false;};
   filter.onchange=()=>{D.source=filter.value;search('lexical');};
   root.append(el('h1',{},'Search everything'),el('p',{},'Find tools and discussions. Searches stay on this computer.'),
-    form,el('div',{class:'search-options'},filter,semantic),coverage,status,results);
+    form,el('div',{class:'search-options'},filter,exact),coverage,status,results);
   api.cleanup(()=>{closed=true;});
   return root;
 }};

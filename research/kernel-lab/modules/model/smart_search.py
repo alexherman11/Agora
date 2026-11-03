@@ -6,7 +6,7 @@ The host supplies capability facts independently of prose and model output.
 import datetime as dt
 import json
 import re
-from zoneinfo import ZoneInfo
+from search_time import pacific_date
 
 VERSION = "search-slice-1"
 MAX_RECORDS = 36
@@ -46,6 +46,22 @@ def lexical(query, records):
     hits = [r for r in records if terms and all(
         t in (r["title"] + " " + r["text"]).casefold() for t in terms)]
     return sorted(hits, key=lambda r: (query.casefold() not in r["title"].casefold(), r["id"]))
+
+
+def select_scan(records):
+    """No lexical preselection. Reserve app coverage, then recent world text."""
+    apps = [r for r in records if r["source"] == "Apps"][-12:]
+    world = [r for r in records if r["source"] == "World"]
+    selected = []
+    for r in apps + list(reversed(world)):
+        if len(selected) >= MAX_RECORDS:
+            break
+        candidate = selected + [r]
+        data = json.dumps([{"id": x["id"], "text": x["title"] + ": " + x["text"]}
+                           for x in candidate], ensure_ascii=False)
+        if len(data) <= MAX_CONTEXT:
+            selected.append(r)
+    return selected
 
 
 def prompt(query, records):
@@ -128,10 +144,10 @@ def eligible(row, constraints, now):
             downloaded = dt.datetime.fromisoformat(row.get("downloaded_at", ""))
             if downloaded.tzinfo is None:
                 return False
-            local = now.astimezone(ZoneInfo("America/Los_Angeles"))
-            end = local.date() - dt.timedelta(days=local.weekday())
+            local = pacific_date(now)
+            end = local - dt.timedelta(days=local.weekday())
             start = end - dt.timedelta(days=7)
-            if not start <= downloaded.astimezone(local.tzinfo).date() < end:
+            if not start <= pacific_date(downloaded) < end:
                 return False
         except (ValueError, TypeError):
             return False
@@ -151,7 +167,8 @@ def merge(query, records, current_rows, semantic=None, now=None):
     exact = [dict(r, match="lexical", evidence=r["title"]) for r in lexical(query, records)]
     found, seen = [], set()
     for r in hits + exact:
-        if r["id"] in seen or fresh.get(r["id"]) != {k: r[k] for k in fresh.get(r["id"], {})}:
+        snapshot = {k: r[k] for k in ("id", "rev", "kind", "title", "text", "source")}
+        if r["id"] in seen or fresh.get(r["id"]) != snapshot:
             continue
         if not eligible(facts[r["id"]], constraints, now):
             continue

@@ -262,7 +262,7 @@ def search(message):
     semantic, state = None, 'Exact lexical search'
     # Select a deterministic bounded corpus, independent of lexical matches.
     # Show the incomplete scope; never imply that this covers every world item.
-    scan = records[-smart_search.MAX_RECORDS:]
+    scan = smart_search.select_scan(records)
     if mode == 'semantic':
         limit(use, 'model.search', message['caller']['person'])
         settings = read(use, 'rows model-settings name=model')
@@ -275,9 +275,14 @@ def search(message):
             state = 'Semantic search deferred: desktop is busy; lexical results'
         else:
             try:
-                raw = generate(selected, smart_search.prompt(query, scan), tokens=256)
-                semantic = smart_search.decode(raw, query, scan)
-                state = 'Local semantic suggestions · ' + selected
+                from search_resources import reason
+                held = reason(selected, local('/api/ps', timeout=.5))
+                if held:
+                    state = 'Semantic search deferred: ' + held + '; lexical results'
+                else:
+                    raw = generate(selected, smart_search.prompt(query, scan), tokens=256)
+                    semantic = smart_search.decode(raw, query, scan)
+                    state = 'Local semantic suggestions · ' + selected
             except (OSError, ValueError, http.client.HTTPException, json.JSONDecodeError):
                 state = 'Semantic search unavailable or invalid; lexical results'
         # Fresh caller-filtered data after inference. Revocations/changes cannot
@@ -288,7 +293,8 @@ def search(message):
     for hit in result['hits']:
         hit['app'] = smart_search.app_target(current[hit['id']], rows)
     result.update(state=state, semantic_scanned=len(scan) if semantic else 0,
-                  semantic_scope='Last 36 visible descriptors only; lexical covers visible text')
+                  semantic_scope=f'Semantic scope: up to 12 known app entries and recent World text, '
+                                 f'{len(scan)} of {len(records)} descriptors; lexical covers visible text')
     return dict(rows=[result], text=state)
 
 
