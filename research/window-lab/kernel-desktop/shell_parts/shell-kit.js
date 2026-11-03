@@ -78,6 +78,7 @@ const ShellKit = (() => {
     feed: ['Feed', 'window.open feed'], thing: ['Thing', 'window.open thing'], tasks: ['Running windows', 'window.open tasks'],
     work: ['Work', 'window.open work'],          // who is at work and what is moving (kernel-lab/apps/work, 27 Oct)
     writing: ['Writing', 'window.open writing'], // documents and plans to review (kernel-lab/apps/writing, 27 Oct)
+    music: ['Music', 'window.open music'],
   };
   const DOCK_APPS = 'lines,help,board,taskboard,appearance,feed';
   const appOf = (name) => {
