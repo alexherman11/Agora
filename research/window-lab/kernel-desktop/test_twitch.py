@@ -125,13 +125,19 @@ class TwitchTests(unittest.TestCase):
             self.assertEqual(sock.sent[3:], ["JOIN #dr_bizzlebop", "PONG :tmi.twitch.tv"])
             self.assertFalse(any(x.startswith("PRIVMSG") for x in sock.sent))
 
-    def test_denied_import_stops_and_does_not_continue_frame(self):
+    def test_denied_import_ends_the_session_and_does_not_continue_frame(self):
         calls = []
         self.t.m.do = lambda line: calls.append(line) or {"ok": False}
         line = "@id=a;display-name=A :a!a@a PRIVMSG #dr_bizzlebop :hey"
         self.assertFalse(self.t.receive_frame(Socket(), line + "\r\n" + line, self.chat, "dr_bizzlebop"))
-        self.assertTrue(self.t.denied)
+        self.assertFalse(self.t.denied)          # reconnects later; a kernel restart must not leave Twitch off
         self.assertEqual(len(calls), 1)
+
+    def test_refused_chat_read_waits_instead_of_stopping(self):
+        self.t.m.see = lambda line: {"ok": False}
+        self.assertIsNone(self.t.config())
+        self.assertFalse(self.t.denied)
+        self.assertIn("retrying", self.t.state)
 
     def test_installer_preserves_edits_and_unpinned_button_and_paints(self):
         lens = self.runline("rows lens name=twitch-chat")["rows"][0]["id"]

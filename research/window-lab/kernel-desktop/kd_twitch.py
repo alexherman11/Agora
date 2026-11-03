@@ -60,8 +60,8 @@ class Twitch:
     def config(self):
         r = self.m.see("rows chat name=twitch")
         if not r.get("ok", True):
-            self.denied = True
-            self.state = "stopped: chat reading refused"
+            # Not a lasting stop: a kernel restart refuses reads for a moment (3 Nov: Twitch stayed off after one).
+            self.state = "waiting: chat reading refused; retrying"
             return None
         rows = [c for c in r.get("rows", []) if c.get("source") == self.m.hello.get("id")
                 and c.get("read_only") == "yes"]
@@ -86,9 +86,10 @@ class Twitch:
             if item:
                 out = self.m.do(f"chat.receive {chat} " + " ".join(f"{k}={q(v)}" for k, v in item.items()))
                 if not out.get("ok", False):
-                    # Denial and uncertain delivery both stop; never retry the act.
-                    self.denied = True
-                    self.state = "stopped: import refused or unconfirmed"
+                    # Drop the rest of this frame and reconnect later with back-off. Lines carry their Twitch id and
+                    # chat.receive skips ids it has, so a later delivery can't double a line. A kernel restart
+                    # refuses for a moment, and a lasting stop then left Twitch off until someone restarted it.
+                    self.state = "reconnecting: import refused or unconfirmed"
                     return False
         return True
 
