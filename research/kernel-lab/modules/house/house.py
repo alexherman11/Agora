@@ -189,16 +189,22 @@ class Agent:
         self.house.publish()
 
     # ---- waking
-    def wake(self, text, chat=None, record=None):
+    def wake(self, text, chat=None, record=None, card_notes=None, first_record=None):
         """Something addressed to it. Said now if it is free, else at the end of its turn. Never blocks."""
         with self.lock:
-            self.inbox.append({"text": text, "chat": chat, "record": record, "at": time.time()})
+            item = {"text": text, "chat": chat, "record": record, "at": time.time()}
+            if first_record is not None:
+                item["first_record"] = first_record
+            if card_notes:
+                item["card_signal_notes"] = list(card_notes)
+            self.inbox.append(item)
             # the cursor moves when a line is said to the model, not when it is queued (`_begin`), so a restart with
             # lines waiting finds them again in catch-up (security review round 2: queued chats were lost)
             if not self.busy:
                 self._begin()
 
     def _begin(self):
+        self.house.refresh_card_signals(self)
         if self.cfg.get("want", "awake") == "asleep" or not self.inbox:
             return
         try:
@@ -233,10 +239,15 @@ class Agent:
                      "receipts": [], "line": None, "woken_by": items[-1]["text"].splitlines()[0][:160]}
         if self.child.send(text):
             self.busy = True
+            signals = {n for i in items for n in i.get("card_signal_notes", [])}
+            if signals:
+                self.state["card_signals_seen"] = sorted(set(self.state.get("card_signals_seen", [])) | signals)
             sent = [int(i["record"]) for i in items if i.get("record")]
             if sent:
                 # at least once, never lost: past what was said, but not past a line still waiting in another chat
-                waiting = [int(i["record"]) for i in self.inbox if i.get("record")]
+                # A catch-up packet spans several records: protect its oldest
+                # line, even when its newest line follows the delivered note.
+                waiting = [int(i.get("first_record") or i["record"]) for i in self.inbox if i.get("record")]
                 upto = min(max(sent), min(waiting) - 1) if waiting else max(sent)
                 self.state["cursor"] = max(int(self.state.get("cursor", 0)), upto)
                 self.save()
@@ -626,9 +637,23 @@ class House:
 
     # ---- catching up
     def catch_up(self, a):
+        # Queue the whole durable backlog before any wake advances the shared
+        # chat cursor. A crash between card and chat catch-up must not lose chat.
+        with a.lock:
+            busy = a.busy
+            a.busy = True
+            try:
+                self._catch_up(a)
+            finally:
+                a.busy = busy
+            if not busy and a.inbox:
+                a._begin()
+
+    def _catch_up(self, a):
         """Lines addressed to it while the house was away (past its cursor), as one wake."""
         cursor = int(a.state.get("cursor", 0))
         got = []
+        self.card_signals(a, cursor=cursor)
         for r in self.m.see("rows said").get("rows") or []:
             rev = int(r.get("rev") or 0)
             if rev > cursor and a.person in str(r.get("to") or "").split() and r.get("made_by") != a.person \
@@ -643,7 +668,7 @@ class House:
         for chat, lines in by_chat.items():
             text = "~ for you while the house was away:\n" + "\n".join(
                 self.line_text(r.get("id"), dict(r, by_name=r.get("by")), r.get("chat")) for _, r in lines)
-            a.wake(text, chat=chat, record=lines[-1][0])
+            a.wake(text, chat=chat, record=lines[-1][0], first_record=lines[0][0])
 
     def chat_name(self, c):
         if c not in self.chat_names:
@@ -651,7 +676,7 @@ class House:
             self.chat_names[c] = rows[0].get("name") or c
         return self.chat_names[c]
 
-    def sees_line(self, a, sid, chat):
+    def line_for(self, a, sid):
         """Whether this agent may see a said line now, asked through its own door: covers closed chats, group-held
         chats, sees_when, and people who left (security review M3, 28 Oct: catch-up read with the house's sight).
         Without a door session for it, no: an agent with no session can't take a turn anyway, and the house's own
@@ -664,12 +689,15 @@ class House:
                 tok = None
             door = Door(tok) if tok else None
         if door is None or not sid:
-            return False
+            return None
         try:
             out = door.post("/see", f"look {sid}")
         except Exception:                             # noqa: BLE001  a door that won't answer hands nothing on
-            return False
-        return bool(out.get("ok", True) and out.get("rows"))
+            return None
+        return (out.get("rows") or [None])[0] if out.get("ok", True) else None
+
+    def sees_line(self, a, sid, chat):
+        return self.line_for(a, sid) is not None
 
     def in_chat(self, person, c):
         """Whether a closed chat (with=) holds this person; an open chat holds anyone. The house reads with its own
@@ -718,12 +746,85 @@ class House:
         who = row.get("by_name") or row.get("speaker") or ""
         return f"~ {who or 'someone'} in {self.chat_name(chat)} ({chat}, line {sid}): {row.get('text', '')}"
 
+    def card_signals(self, agent=None, cursor=0, notice=None):
+        """Deliver durable addressed card notes through the ordinary inbox."""
+        revision = None
+        if notice:
+            found = self.m.see("look " + notice).get("rows") or []
+            if not found or not found[0].get("card_signal"):
+                return
+            revision = int(found[0].get("rev") or 0)
+        rows = self.m.see("rows taskboard-event").get("rows") or []
+        packets = {}
+        for row in rows:
+            if not row.get("card_signal"):
+                continue
+            record = int(row.get("rev") or 0)
+            if revision is not None and record != revision:
+                continue
+            for who in str(row.get("to") or "").split():
+                a = self.agents.get(who)
+                if a is None or (agent is not None and a is not agent):
+                    continue
+                if row["id"] in a.state.get("card_signals_seen", []) or any(
+                    row["id"] in item.get("card_signal_notes", []) for item in a.inbox
+                ):
+                    continue
+                current = self.line_for(a, row["id"])
+                if not current or not current.get("text") or not current.get("about"):
+                    continue
+                # Source visibility can narrow after the note was written.
+                if not self.sees_line(a, row.get("source"), None):
+                    continue
+                packets.setdefault((who, record), []).append(dict(current, id=row["id"]))
+        for (who, record), notes in sorted(packets.items(), key=lambda item: item[0][1]):
+            a = self.agents[who]
+            with a.lock:
+                queued = {sid for item in a.inbox for sid in item.get("card_signal_notes", [])}
+                seen = set(a.state.get("card_signals_seen", []))
+                notes = [r for r in notes if r["id"] not in queued | seen]
+                if notes:
+                    a.wake(self.card_signal_text(notes), record=record, card_notes=[r["id"] for r in notes])
+
+    @staticmethod
+    def card_signal_text(notes):
+        return "\n".join(f"~ {r['text']} (card {r['about']}; note {r['id']})" for r in notes)
+
+    def refresh_card_signals(self, a):
+        """Re-read queued notes at delivery: undo/privacy changes may remove part of a packet."""
+        if not any(i.get("card_signal_notes") for i in a.inbox):
+            return
+        kept = []
+        for item in a.inbox:
+            if not item.get("card_signal_notes"):
+                kept.append(item)
+                continue
+            notes = []
+            for sid in item["card_signal_notes"]:
+                row = self.line_for(a, sid)
+                if row and row.get("text") and row.get("about") and self.sees_line(a, row.get("source"), None):
+                    notes.append(dict(row, id=sid))
+            if notes:
+                kept.append(dict(item, text=self.card_signal_text(notes),
+                                 card_signal_notes=[r["id"] for r in notes]))
+        a.inbox[:] = kept
+
+    def retract_card_signals(self):
+        """Undo removes undelivered inbox entries too; a delivered wake is historical."""
+        for a in self.agents.values():
+            with a.lock:
+                self.refresh_card_signals(a)
+
     # ---- hearing
     def happen(self, msg):
         if not self.ready.wait(15):
             return
         word = msg.get("word")
         self.builders.hear(msg)
+        if word == "undo":
+            self.retract_card_signals()
+        if word == "make" and msg.get("target"):
+            self.card_signals(notice=msg["target"])
         if word in MESSAGE_WORDS and msg.get("said"):
             to = [p for p in msg.get("to") or [] if p in self.agents and p != msg.get("by_id")]
             if not to:

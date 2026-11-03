@@ -21,6 +21,11 @@ def _k(word, kind, takes, may, undo, help, **more):
 from hosts.web.layout import HELP as PANE_HELP, panes, arrange
 
 KERNEL_ENTRIES = [
+    _k("task.signal", "do", "<id> mode=<waiting|notify|reporter> event=<landed|done>",
+       "members", "yes",
+       help="task.signal <card> mode=waiting|notify|reporter event=landed|done: "
+            "write deduplicated addressed card notes for world rules; undo removes them. "
+            "No execution or completion permission is granted."),
     *[_k("task." + action, "do", "<id> " + takes, "members", "yes", help=help_,
          bound="task-" + action, aliases="task-" + action)
       for action, takes, help_ in [
@@ -1205,10 +1210,12 @@ from .bonds import turn                  # the graph's readings (around, nearby,
 from .chat import say, receive as chat_receive, chat as chat_word, closed_sees
 from .store import GONE
 from .next_steps import change as task_change
+from .card_signals import signal as card_signal
 from painter.arrangement import component, look_view, components, component_card
 from painter.health import component_health, component_action, personal_view, personal_style, paint_clear
 
 KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant": grant, "widget": widget, "describe": describe,
+          "task.signal": card_signal,
           **{"task-" + action: task_change for action in ("next", "revise", "review", "verify", "followup")},
           'upload': upload, 'attach': attach, 'file-result': file_result, 'file-read': file_read,
           'dictionary-copy': dictionary_copy, 'group': group_word, 'clock': clock, 'forgotten': forgotten,
