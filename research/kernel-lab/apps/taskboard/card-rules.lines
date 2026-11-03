@@ -1,0 +1,6 @@
+verb task.land-notices steps="task.signal $target mode=waiting event=landed; task.signal $target mode=notify event=landed; task.signal $target mode=reporter event=landed" help="Deliver the landing rules after asynchronous publication records build=landed; deduplicated with house.land."
+rule name="Cards waiting on a landing" by=anyone on=house.land do="task.signal $target mode=waiting event=landed"
+rule name="Cards waiting on completion" by=anyone on=task.done do="task.signal $target mode=waiting event=done"
+rule name="Call the landing recipient" by=anyone on=house.land do="task.signal $target mode=notify event=landed"
+rule name="Tell the fix reporter" by=anyone on=house.land do="task.signal $target mode=reporter event=landed"
+rule name="Deliver asynchronous publication notes" by=anyone on=set do="task.land-notices $target"

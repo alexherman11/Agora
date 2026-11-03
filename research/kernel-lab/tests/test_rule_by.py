@@ -6,6 +6,7 @@ import sys
 import tempfile
 import time
 import unittest
+import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -26,7 +27,8 @@ def until(test, s=4.0):
 
 class RulesHear(unittest.TestCase):
     def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix="kernel-rule-by-")
+        self.dir = Path(tempfile.gettempdir()) / ("kernel-rule-by-" + uuid.uuid4().hex)
+        self.dir.mkdir()
         self.k = Kernel(self.dir, dict(GENESIS))
         self.alex = self.k.actor_for(self.k.accounts["alex"])
         self.pike = self.k.actor_for(self.k.join("pike", "Pike", invite="x")["person"])

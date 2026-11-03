@@ -23,18 +23,10 @@ def world():
     genesis = {"tag": "ns", "name": "Continuity",
         "steward": {"account": "alex", "name": "Alex"},
         "invites_counted_by": "kernel", "invites": [{"code": "x", "uses": 5}]}
-    try:
-        fixture = Path(tempfile.mkdtemp(prefix="jeff-continuity-"))
-        cleanup_parent = fixture.resolve().parent
-        k = Kernel(fixture, genesis)
-    except PermissionError:
-        # Some managed Windows workers can create a temp directory but cannot
-        # use it. Leave that denied path alone; use only the authorized fallback.
-        cleanup_parent = Path(__file__).resolve().parents[3] / ".continuity-fixtures"
-        cleanup_parent.mkdir(exist_ok=True)
-        fixture = cleanup_parent / ("world-" + uuid.uuid4().hex)
-        fixture.mkdir()
-        k = Kernel(fixture, genesis)
+    cleanup_parent = Path(tempfile.gettempdir()).resolve()
+    fixture = cleanup_parent / ("jeff-continuity-" + uuid.uuid4().hex)
+    fixture.mkdir()
+    k = Kernel(fixture, genesis)
     try:
         a = k.actor_for(k.accounts["alex"])
         j = k.actor_for(k.join("jeff", "JEFF", invite="x")["person"])
