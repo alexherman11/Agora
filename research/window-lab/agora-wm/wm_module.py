@@ -17,6 +17,7 @@ import time
 import uuid
 from engine import Rect,solve
 from manager import Manager,DEFAULTS
+from policy_reload import PolicyStatus,REFUSAL
 
 HERE=Path(__file__).resolve().parent
 sys.path.insert(0,str(HERE.parent/'kernel-desktop'))
@@ -24,7 +25,7 @@ from modproto import Module,log
 
 HELP={
  'windows':('see','','Current windows: app, exe/icon reference, state, focus and geometry; never titles.'),
- 'policy':('see','','Loaded in-process policy hash and retained rollback hash; no source loading or activation.'),
+ 'policy':('see','','Startup imported policy code snapshot, scoped to Manager/Native and their local module functions; hot reload is unavailable.'),
  'focus':('do','<key>','Ask Windows to focus a current manageable window; foreground lock may refuse.'),
  'minimise':('do','<key>','Really minimise a manageable unpinned window; never cloak.'),
  'restore':('do','<key>','Restore a manageable window and place it without overlap.'),
@@ -32,8 +33,8 @@ HELP={
  'pin':('do','<key>','Keep this window fixed. Screen state, kept by this window manager, never in the world.'),
  'unpin':('do','<key>','Let this pinned window move again. Screen state, never in the world.'),
  'arrange':('do','[expect=<exe>]','Re-solve the layout; expect arms one bar-requested shared layout for a new executable window, for at most five seconds. Exclusive fullscreen is unsupported.'),
- 'reload':('do','sha256=<reviewed digest>','Steward only: load ABI-compatible WM policy in place; retain lease, claims and geometry. Refuses busy/gaming state. Does not bootstrap an old receiver.'),
- 'rollback':('do','sha256=<previous digest>','Steward only: return to the retained policy generation without releasing geometry; requires settled safe desktop. Does not undo later user actions.'),
+ 'reload':('do','sha256=<reviewed digest>','Unavailable: refuses before source/native/lease operations. Existing watchdog cannot guarantee a bounded live handoff.'),
+ 'rollback':('do','sha256=<previous digest>','Unavailable: no retained code generation; requires a separately authorized WM lifecycle, with geometry/claim release.'),
  'mode':('do','live|shadow|off','Shadow computes only; live needs rollout arming; off releases every saved placement.'),
  'leave-alone':('do','<app>','Treat this app as fixed obstacles. Undoable world intent.'),
  'manage':('do','<app>','Remove an app exclusion (undoable); in adopted mode also adopts its current windows (screen state, kept locally).'),
@@ -85,8 +86,9 @@ class WMModule:
             self.manager=Manager(Native(),self.home,allow_live=self.allow_live)
             import manager as manager_module
             import win32_host as native_module
-            from policy_reload import PolicyReload
-            self.policy_reload=PolicyReload(self,manager_module,native_module)
+            # Before intent_loop can arm live: no fingerprint work on the
+            # lease-owning tick or request path.
+            self.policy_reload=PolicyStatus(manager_module,native_module)
         self.manager.theme_path=self.theme_native or self.home.parent/'theme'/'theme-native.json'
         threading.Thread(target=self.intent_loop,daemon=True).start()
 
@@ -124,12 +126,7 @@ class WMModule:
         elif before:log(f'wm {topic}: clear')
 
     def _request(self,op,*args):
-        answer=queue.Queue()
-        if op=='policy':
-            with self.lock:
-                if not self.requests.empty():return {'refused':'WM has queued actions; policy handoff not queued'}
-                self.requests.put((op,args,answer))
-        else:self.requests.put((op,args,answer))
+        answer=queue.Queue();self.requests.put((op,args,answer))
         try:return answer.get(timeout=4)
         except queue.Empty:return {'refused':'window manager did not answer'}
 
@@ -142,15 +139,12 @@ class WMModule:
         if word=='windows':
             with self.lock:return {'rows':self.manager.reading(),'text':f'{len(self.manager.rows)} windows; {self.manager.mode}'}
         if word=='policy':
-            with self.lock:
-                r=self.policy_reload
-                return {'rows':[{'sha256':r.loaded,'rollback_sha256':r.previous[-1] if r.previous else None}]
-                        if r else [],'text':'in-process policy receiver' if r else 'policy reload unavailable on this WM'}
+            r=self.policy_reload
+            return r.reading() if r else {'rows':[],'text':'imported policy snapshot unavailable'}
         if word in ('reload','rollback'):
             if caller.get('person') not in self.stewards:
                 return {'refused':'WM policy handoff requires a desktop steward'}
-            if not self.policy_reload:return {'refused':'policy reload unavailable on this WM'}
-            return self._request('policy',kv.get('sha256'),word=='rollback',time.monotonic()+2)
+            return {'refused':REFUSAL}
         if word in ('focus','minimise','restore','close'):
             return self._request('action',word,target,kv.get('share')=='yes')
         if word=='arrange':return self._request('arrange',kv.get('expect'))
@@ -198,22 +192,6 @@ class WMModule:
         with self.lock:
             manager=self.manager
             if not manager:return
-            if self.policy_reload:
-                try:self.policy_reload.bind()
-                except Exception as exc:
-                    self.say('policy','WM policy thread refused: '+str(exc))
-                    return
-            try:first=self.requests.get_nowait()
-            except queue.Empty:first=None
-            if first and first[0]=='policy':
-                # Before settings, normal heartbeat recovery or ingest: a
-                # refused handoff must not fall through to switch/off/release.
-                _,args,answer=first
-                try:
-                    if feed:self.backlog+=feed.drain()
-                    answer.put(self.policy_reload.apply(args[0],args[2],rollback=args[1]))
-                except Exception as exc:answer.put({'refused':str(exc)})
-                return
             if self.latest:
                 settings,pins=self.latest;self.latest=None
                 try:
@@ -240,16 +218,10 @@ class WMModule:
                     manager.switch('off');self.held=self.lease_reason()=='panic'
                     self.say('lease','wm lease ended: '+str(self.lease_reason()))
             while True:
-                if first:
-                    op,args,answer=first;first=None
-                else:
-                    try:op,args,answer=self.requests.get_nowait()
-                    except queue.Empty:break
+                try:op,args,answer=self.requests.get_nowait()
+                except queue.Empty:break
                 try:
-                    if op=='policy':
-                        answer.put({'refused':'policy handoff must be the first and only queued operation'})
-                        return
-                    elif op=='action':
+                    if op=='action':
                         value=manager.action(*args);answer.put({'external':args[0]=='close','text':f'wm.{args[0]}: '+('Windows refused focus' if value is False else 'requested')})
                     elif args and args[0]:
                         manager.request_share(expect=args[0])
@@ -257,9 +229,7 @@ class WMModule:
                     else:
                         manager.state=solve(manager.state,{'type':'arrange'}).state
                         answer.put({'text':'layout re-solved'})
-                except Exception as exc:
-                    answer.put({'refused':str(exc)})
-                    if op=='policy':return
+                except Exception as exc:answer.put({'refused':str(exc)})
             if self.headless:work=Rect(0,0,3840,2160);rows=[];events=[]
             else:
                 events=self.backlog+(feed.drain() if feed else []);self.backlog=[]

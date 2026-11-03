@@ -172,26 +172,6 @@ def gate():
     return reasons
 
 
-def reload_context():
-    """Strict lifecycle admission, without the user-click fullscreen exception."""
-    state=C.c_int()
-    if shell.SHQueryUserNotificationState(C.byref(state))!=0 or state.value!=5:
-        raise PermissionError('reload requires known idle notification state 5')
-    sig(u,'OpenInputDesktop',W.HANDLE,W.DWORD,W.BOOL,W.DWORD)
-    sig(u,'GetUserObjectInformationW',W.BOOL,W.HANDLE,C.c_int,C.c_void_p,W.DWORD,C.POINTER(W.DWORD))
-    sig(u,'CloseDesktop',W.BOOL,W.HANDLE)
-    desktop=u.OpenInputDesktop(0,False,1)
-    if not desktop:raise PermissionError('reload input desktop unavailable')
-    try:
-        name=C.create_unicode_buffer(256);needed=W.DWORD()
-        if not u.GetUserObjectInformationW(desktop,2,name,C.sizeof(name),C.byref(needed)) or name.value!='Default':
-            raise PermissionError('reload requires Default input desktop')
-    finally:u.CloseDesktop(desktop)
-    hwnd=u.GetForegroundWindow();ref=reference(hwnd) if hwnd else None
-    if not ref:raise PermissionError('reload foreground identity unavailable')
-    return {'foreground':ref.record(),'input_desktop':name.value,'notification_state':state.value}
-
-
 class _MONITORINFO(C.Structure):
     _fields_=[('cbSize',W.DWORD),('rcMonitor',W.RECT),('rcWork',W.RECT),('dwFlags',W.DWORD)]
 

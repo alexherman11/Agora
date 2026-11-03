@@ -1,4 +1,131 @@
-# WM policy handoff — source draft for independent House review
+# Current resolution: no supported live policy replacement
+
+This section supersedes the earlier design preserved below. House generic
+review passed `7a7c49e22c0af99a8f8ffb57374bdd59d8a2fea7`; this worktree contains
+uncommitted corrections to that commit. No source has been activated.
+
+## Imported-code provenance
+
+`policy_reload.py` now contains read-only `PolicyStatus`, not a loader.
+At startup, before the intent thread can arm live, it snapshots actual
+`__code__` objects of Manager/Native direct methods and local top-level functions
+in manager/win32_host. Canonical structural hashes include bytecode, arguments,
+constants (including nested code), names, flags, line/exception tables and
+qualified names. Only checkout filenames are excluded. No source is read.
+
+`wm.policy` returns `runtime_code_sha256`, the per-symbol `code_manifest`,
+Python cache tag and optimization level. It does not return a disk-source
+hash under a loaded-code label. `compiled_manifest` compiles House-supplied
+reviewed bytes without execution, for an independent per-symbol comparison:
+
+```python
+from pathlib import Path
+from policy_reload import compiled_manifest
+expected = compiled_manifest({
+    n: Path(n).read_bytes() for n in ('manager.py', 'win32_host.py')
+})
+# House compares expected exactly with wm.policy rows[0].code_manifest.
+```
+
+Use the same pinned Python build and optimization. This is explicitly a
+startup snapshot of the declared function/method scope, not an attestation of
+globals, defaults, imports, DLLs, other classes, or the entire running process.
+It does not claim continued integrity after external monkeypatching.
+
+## Watchdog stall finding
+
+The existing three-second watchdog has no reservation/handoff protocol.
+Heartbeat calls between operations cannot bound a blocked filesystem or OS
+call. A helper keepalive would weaken the existing recovery rule by keeping a
+stalled manager alive. Timeouts cannot cancel arbitrary Python/Win32 execution
+safely. Neither approach is authorized here.
+
+The correction removes source reads, compilation, native admission/enumeration,
+lease calls, class swapping, rollback state and request scheduling from the
+reload path. Both reload/rollback refuse immediately, including with a valid
+reviewed hash. No policy request enters the owner-thread queue, waits on its
+lock, or runs on tick. The ordinary controller tick/request/lifecycle logic
+and watchdog retain their landed fullscreen behavior. The strict helper added
+only for reload is removed from win32_host; native safety is otherwise unchanged.
+
+This resolves the added stall hazard by removing the unsafe operation. It
+does not claim to eliminate the pre-existing watchdog recovery behavior or
+provide a replacement mechanism that preserves claims across process exit.
+
+## Exact lifecycle exception needed, not granted or executed
+
+There is no safe hot bootstrap in the old running WM and no supported
+arrangement/claim-preserving restart. JEFF's prohibition on off/on and geometry
+release remains in force. The minimal available lifecycle is **one WM-only
+off/on**, requiring a separate explicit authorization that includes its effects:
+
+> Authorize JEFF, as kernel-world steward, to perform one `off wm`, verify the
+> old WM manager has exited and its existing watchdog has completed
+> identity/cookie-checked lease release, then one `on wm` against independently
+> reviewed source. Authorize WM process termination (including the existing
+> host's two-second stop fallback), temporary WM grant revocation/restoration,
+> release of saved geometry/styles/claim cookies and fresh live lease/claims.
+> Accept that current window geometry may change. No app/window-host/kernel
+> restart, app closure, draft reload, settings rewrite or retry is included.
+
+The target is WM module `dk532`, desktop owner Alex `dk2`; JEFF `dk827` is the
+steward/resolver. The existing world words are `off wm` and `on wm` (confirmed
+by read-only help). `Host.reconcile` starts absent/dead modules only;
+`ModuleProcess.stop` sends off then may kill the WM manager after two seconds.
+WM's finally block calls `Manager.switch('off')`; watchdog release restores
+saved placements/styles only where identity and cookie still match. Release
+failure can leave entries/claims unresolved. A fresh manager reuses its existing
+home/screen.json pins/adoption and standing world settings, but does not retain
+the old in-memory layout, pending intent or lease. Normal live startup can
+rearrange windows; exact preservation is not promised.
+
+Before such an exception can be exercised, House must independently review
+the new source, supply fresh unchanged-policy admission and complete guarded
+hidden feature checks. House must also establish the actual `run` target is
+the reviewed source; a branch commit or a changed path does not establish this.
+After off, do not on until old-process exit and complete lease release are
+independently confirmed. On timeout, denial, incomplete release or mismatch:
+stop and report; no retry, manual claim clearing, recovery script or alternate
+termination. If that geometry/claim exception is unacceptable, activation waits
+for a separately permitted lifecycle opportunity. The worker executes neither.
+
+## Current focused checks and remaining blockers
+
+Ran pinned Python `-B -m unittest -v test_policy_reload`:
+**Ran 8 tests in 0.024s, OK**. These use source/in-memory fixtures: imported objects
+versus independent compilation (including actually imported Manager and native
+code objects without native initialization), changed source/nested code, method replacement,
+no source/native access, snapshot immutability, principal checks and immediate
+reload/rollback refusal with no queue/lock/manager/lease work. No temp directories,
+native initialization, guarded fixtures or denied-operation retries. An earlier
+production fixture check failed because compiling extracted definitions changed
+Python's import-aware optimization; the corrected fixture retains the whole
+module compiler context. That was a fixture failure, not a denied operation.
+
+For independent House execution from agora-wm:
+
+```text
+C:\Projects\Agora4\.venv\Scripts\python.exe -B -m unittest -v test_policy_reload test_fullscreen_delivery
+```
+
+Also execute existing `check_dock_delivery.mjs` using an approved installed Node
+runtime. The existing focused fullscreen/controller and seven shipped dock
+click cases remain supplied but unrun by this worker. No installation.
+
+Still blocked: independently reviewed new source, kernel House-owned admission
+repair (exact rejection in world note `dk1716`/`r3702` and historical section),
+guarded hidden dock/native maximized/borderless and remembered-bounds proof,
+explicit lifecycle exception or permitted opportunity, narrow shell activation
+and owner outcome. Generic review of the earlier commit is not acceptance.
+Exclusive fullscreen remains unsupported. No publication or activation is
+recommended from these source-only checks.
+
+---
+
+# Superseded design: WM policy handoff draft
+
+Everything below is retained as historical design/evidence. Its reload commands,
+API, tests and claims describe the rejected earlier draft, not current source.
 
 JEFF authorized this delivery repair on the existing task. Nothing here has
 been activated. Do not off/on WM, release geometry, retry the guard, or restart

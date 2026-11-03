@@ -2,7 +2,9 @@
 
 Follow-up: JEFF authorized source-only delivery repair, with no off/on, guard
 retry or activation. See [WM policy handoff](POLICY-RELOAD-dk1706.md) for the
-new receiver design, tests and bootstrap limit. The observations and rejected
+current refusal-only resolution, tests and exact lifecycle exception needed.
+The earlier reload design was withdrawn after provenance/stall review; there
+is no supported live replacement path. The observations and rejected
 admission below remain historical evidence; they have not been sampled again.
 
 Builder handoff, 2 November 2026 Pacific / 3 November UTC.

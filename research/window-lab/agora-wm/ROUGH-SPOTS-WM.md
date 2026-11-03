@@ -87,3 +87,16 @@ the old live module lacks a receiver, so bootstrap remains blocked.
 share route rejected them. Focused fake-native/controller and dock-component
 checks are supplied for House execution. See `POLICY-RELOAD-dk1706.md` for
 refusals, rollback, exact guard rejection and remaining native acceptance.
+
+## 2 November 2026 — review correction: live replacement is unavailable
+
+Supersedes the preceding handoff design. The missing world capability cannot
+be provided safely by the existing watchdog lifecycle within current bounds.
+Removed live staging/class swapping and its native helper. wm.reload/rollback
+now refuse before source/native/lease/queue work; wm.policy reports scoped
+imported code objects instead of relabeling disk bytes as loaded code.
+The ordinary WM runtime/native safety/watchdog is retained. Memory-only
+provenance/refusal checks passed (8 tests); focused fullscreen/native acceptance
+remains separate and unrun. POLICY-RELOAD-dk1706.md records the exact WM-only
+lifecycle exception and geometry/claim effects that JEFF would need separately
+authorized; no such operation occurred.
