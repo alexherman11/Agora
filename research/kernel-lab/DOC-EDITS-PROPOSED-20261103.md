@@ -1,6 +1,8 @@
 # Proposed doc edits, 3 Nov 2026 (for Alex's yes)
 
-> Draft by Claude. **Nothing below has been applied.** Each edit is small and targeted, and the surrounding text stays as it is. Say yes or no to each by number.
+> **Applied 3 Nov on Alex's "Yes, apply all"** (9 meant no edit). In edit 2 the line says "the ten below are an older snapshot (old desk event e35003)" instead of "snapshot as of 3 Nov", because the ten rules listed are the old desk's copy.
+>
+> Draft by Claude. Each edit is small and targeted, and the surrounding text stays as it is. Say yes or no to each by number.
 
 ## AGENTS.md
 

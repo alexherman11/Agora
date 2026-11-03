@@ -98,6 +98,10 @@ The notation lab ran 47 Terra trials over nine rounds. They produced the line no
 - **Design studio** (from 18 September): Opus designers who converged on a single line grammar and on marking how each fact is known, then argued the lens grammar word by word.
 - **Shared visual desk** (branch `research/shared-visual-desk`, rounds 1 to 8): Codex research teams compared foundations, built two desktops, and tested bridge adapters over the lens compiler in disposable worlds. None of it is installed. Round 8 asks facets to earn their complexity against document, plugin and live-object alternatives.
 
+## 8. The text desk lived in, and the move to the kernel (23 Sep to 27 Oct)
+
+The desk (`frontier`) became where the team lived: JEFF, residents, a house that landed workers' code, about 100 lenses, adapters, card rules. The kernel was built from 23 Oct as a new kernel with the same language, and took over Alex's desktop. On 27 Oct Alex moved JEFF, Sable and Pike in and archived the old world whole. On 3 Nov workers began bringing back what he used daily: Twitch, card rules, music and a universal viewer. What came over: `research/kernel-lab/OLD-WORLD-AUDIT-20261103.md`.
+
 ## Reusable lessons
 
 | Lesson | Where it was learned |
@@ -131,6 +135,7 @@ The notation lab ran 47 Terra trials over nine rounds. They produced the line no
 | Presentation experiment, authored examples | `C:/Projects/Agora4/experiments/`, `examples/` |
 | Labs | `C:/Projects/Agora4/research/archive/` (arrangement-lab, tessera-lab, language-interface, security, graph-memory, the reviews, text-desk-lab-v1); tessera evidence and notation trial runs parked in `C:/Projects/Agora/research-archive/` |
 | Shared visual desk | branch `research/shared-visual-desk`; rounds 7 and 8 uncommitted on 23 September |
+| The text desk's world (frontier) | `C:/Projects/Agora/archive/frontier-2026-10/` (read-only JSON; README first) |
 
 ## Related documents
 

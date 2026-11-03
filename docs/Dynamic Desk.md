@@ -226,6 +226,8 @@ The desk's organization should be preserved so when you return it looks the same
 
 ## Rooms
 
+> *3 Nov:* the text desk's rooms, corners and Lounge were abandoned on 27 Oct; shared spaces between people continue in communities.
+
 *Added 13 Oct 2026: drafted by Claude from Alex's words of 10 to 12 Oct, revised and approved by Alex.*
 
 A room is a space several people are in at once, over the same objects. Each person sees it through their own arrangement and follows the others until they choose to change something; from then on that difference is theirs. A few things are marked shared, and changes to those reach everyone. A stream is a room with one person most others follow, and the video is only one way of looking into it.
