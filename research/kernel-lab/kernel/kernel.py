@@ -414,7 +414,11 @@ class Kernel:
         word's shape first (kinds.py: what its code reads), then the thing's own allows. test."""
         first = st.target or (st.words.split() or [""])[0]   # a word taking only words may still be given a thing
         if first and L.ID.fullmatch(str(first)):
-            self.kinds.check_word(actor, entry, first)
+            part = self.kinds.check_word(actor, entry, first, part=st.kv.get("part"))
+            if part:
+                # a word on a value kind reached the thing through a part (its likes, an upvote): the verb reads
+                # $part, a module kv.part (kinds-all-the-way-down.md)
+                st.kv = dict(st.kv, part=part)
         ref = self.state.get(st.target, "allows." + (entry.get("bound") or entry["word"]))
         if ref and not self.predicate(actor.person, ref, st.target, st.kv.get("answer", "")):
             raise Refused(self.state.get(st.target, "refusal", "That does not fit yet. Please try again."))

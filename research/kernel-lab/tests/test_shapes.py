@@ -426,12 +426,13 @@ def test_a_shape_this_kernel_cannot_read_reaches_nothing(world):
     k, a, b = world
     board, meeting, talk, task = events(k, a)
     say(k, a, 'verb ping needs=title steps="set $1 pinged=yes" help="ping <thing>: ping it"')
-    k.state.things[k.find_entry('ping')]['needs'] = 'start:time'          # as a newer world's kit would carry it
+    k.state.things[k.find_entry('ping')]['needs'] = 'start@time'          # as a newer world's kit would carry it
+    # (start:time was the example until 29 Oct, when typed parts made it readable: kinds-all-the-way-down.md)
     out = say(k, a, f'ping {board}', ok=False)
     assert "can't be read by this kernel" in out['text'] and k.state.get(board, 'pinged') is None
     assert 'ping' not in say(k, a, f'actions {board}')['text'].split()
     # a kind it can't read admits nothing by its shape: only things whose own kind it is
-    k.state.things[kind_decl(k, 'meeting')]['needs'] = 'place:point'
+    k.state.things[kind_decl(k, 'meeting')]['needs'] = 'place@point'
     k.kinds._seen = -1
     assert [r['id'] for r in say(k, a, 'rows meeting')['rows']] == [meeting]
 
@@ -442,7 +443,7 @@ def test_a_kit_with_a_shape_this_kernel_cannot_read_is_refused():
         return {'version': 1, 'source': '0' * 24, 'group': 'sh1', 'kernel': {},
                 'definitions': [{'id': 'sh900', 'facts': facts}]}
     with pytest.raises(Refused, match="can't read"):
-        validate(kit({'kind': 'kind', 'name': 'happening', 'needs': 'start:time'}))
+        validate(kit({'kind': 'kind', 'name': 'happening', 'needs': 'start@time'}))
     with pytest.raises(Refused, match="isn't a kind name"):
         validate(kit({'kind': 'kind', 'name': 'happening', 'extends': 'Event!'}))
     validate(kit({'kind': 'kind', 'name': 'happening', 'needs': 'title start|begins'}))

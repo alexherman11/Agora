@@ -205,6 +205,15 @@ KERNEL_ENTRIES = [
     _k("mark", "do", "<id> <kind>", "maker or leaders", "yes",
        help="mark <thing> <kind>: set a kind's markers (a game needs run and game=yes: mark sets game=yes) on a thing "
             "that has the kind's other needs, or say what it lacks. It is a set: undo takes it back."),
+    _k("alike", "see", "<kind>", "anyone", "no",
+       help="alike <kind>: the kinds here made of the same parts, closest first: what they share, what only they have, "
+            "and which extends which. Read it before naming a kind, so the same thing isn't made twice: if it's the "
+            "same, aliases= on the one that's here names it; if it has notably more, extends= it."),
+    _k("aspects", "see", "[loose]", "anyone", "no",
+       help="aspects [loose]: every aspect on things you can see, as a part of which kind (likes is an upvote, start a "
+            "time) or loose, with how many things say it. Many things sharing a loose aspect is a kind nobody has named. "
+            "A kind gives its parts kinds: needs=\"start:time likes:upvote\"; a value kind ends in one: name=upvote "
+            "value=number (the kernel's are text number time yes-no link person thing)."),
     _k("actions", "see", "<id>", "anyone", "no",
        help="actions <thing>: what you can do with it: every word whose shape it has (what the word's code reads, from "
             "acts_on=<kind> and needs=), grouped by kind, most specific first; then the lenses that show it."),
@@ -701,7 +710,8 @@ def make(k, actor, st, entry, tx, group, saw=None):
     elif not public:
         tx.set(t, "sees", f"group:{group}")
     return {"text": f"ok make {t} [r?] · a{'n' if kind[0] in 'aeiou' else ''} {kind}" + (f" in {k.name(group)}" if group != k.place else "")
-                    + _make_notes(k, actor, kind, kv)}
+                    + _make_notes(k, actor, kind, kv)
+                    + (k.kinds.alike_note(actor, kv, group) if kind == "kind" else "")}
 
 
 def _make_notes(k, actor, kind, kv):
@@ -720,7 +730,8 @@ def _make_notes(k, actor, kind, kv):
                                      f"in look and rows (kinds lists the kinds there are)")
     notes = []
     for key, v in kv.items():
-        if key in ("title", "name", "text", "label", "about") or v == "" or (kind == "kind" and key in ("needs", "extends")):
+        if key in ("title", "name", "text", "label", "about") or v == "" or (
+                kind == "kind" and key in ("needs", "extends", "value", "aliases", "has")):
             continue
         said = {str(a.get(key)) for a in others if a.get(key) not in (None, "")}
         if not said:
@@ -751,6 +762,12 @@ def set_(k, actor, st, entry, tx, group, saw=None):
     for key, v in st.kv.items():
         if key in ("in", "as") or v == "":
             continue
+        # a part with a kind (has="priority:number"): a value that isn't one is still set, and said (P7: said, never
+        # refused), so a thing doesn't drift back into loose
+        after_row = dict(seen_as, **{x: y for x, y in st.kv.items() if x not in ("in", "as")})
+        pk, how = k.kinds.aspect_kind(after_row, key, (k.groups_of(t) or [k.place])[0])
+        if pk is None and how and "isn't" in how and seen_as.get("kind") != "kind":
+            spelled.append(f"\n~ {how}: still set, as you said")
         other = k.kinds.spelled_otherwise(seen_as, key, (k.groups_of(t) or [k.place])[0])
         if other:
             spelled.append(f"\n~ {seen_as.get('title') or k.name(t)} also says {other[0]}, which {'an' if other[1][:1] in 'aeiou' else 'a'} {other[1]} reads as "
@@ -912,6 +929,9 @@ def rows(k, actor, st, entry, tx, group, saw=None):
     # a kind with a shape, or one another kind extends, also lists what has that shape (kinds.py), read under the
     # kind's names (start for a thing that says starts); exact=yes lists only things whose own kind is that word
     fitted = kind != "any" and not exact and k.kinds.is_open(kind, group)
+    # a value kind lists what has one as a part: rows upvote lists everything with an upvote (kinds all the way down)
+    by_part = kind != "any" and not exact and k.kinds.is_value(kind, group)
+    fitted = fitted or by_part
     rows = []
     for t in (list(k.state.things) if kind == "any" or fitted else k.things(kind)):
         if t == "world":
@@ -920,6 +940,9 @@ def rows(k, actor, st, entry, tx, group, saw=None):
         if a is None:
             continue
         why = k.kinds.fits(a, kind, group) if fitted else None
+        if not why and by_part and a.get("kind") not in NOT_FITTED_KINDS:
+            ps = k.kinds.parts_of(a, kind, (k.groups_of(t) or [group])[0])
+            why = f"its {', '.join(ps)} {'is' if len(ps) == 1 else 'are'} {'an' if kind[:1] in 'aeiou' else 'a'} {kind}" if ps else None
         if fitted and not why:
             continue
         if fitted:
@@ -1164,7 +1187,7 @@ from .blobs import upload, attach, file_result, file_read
 from .world_words import dictionary_copy, group_word, clock, forgotten
 from .readings import who, recent, kinds, on, press
 from .refusals import refusals, failed
-from .kinds import mark, words_for
+from .kinds import mark, words_for, alike_word, aspects_word, NOT_FITTED as NOT_FITTED_KINDS
 from .bonds import turn                  # the graph's readings (around, nearby, preview) are held (28 Oct)
 from .chat import say, chat as chat_word, closed_sees
 from .store import GONE
@@ -1186,4 +1209,5 @@ KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant":
           "status": status, "make": make, "set": set_, "forget": forget, "holds": holds, "claim": claim,
           "vote": vote, "role": role, "rows": rows, "find": rows, "search": search, "verb": verb,
           "who": who, "recent": recent, "kinds": kinds, "on": on, "press": press, "say": say, "chat": chat_word,
-          "refusals": refusals, "failed": failed, "mark": mark, "actions": words_for, "turn": turn}
+          "refusals": refusals, "failed": failed, "mark": mark, "actions": words_for, "turn": turn,
+          "alike": alike_word, "aspects": aspects_word}
