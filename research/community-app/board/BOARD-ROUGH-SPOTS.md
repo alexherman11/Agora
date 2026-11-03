@@ -61,3 +61,15 @@ library visibility, one matching group and metadata-only writes; unrelated file,
 policy and cross-library writes refuse. Regression cases are in `test_shapes.py`.
 No grants, root creation, live source publication, activation or migration.
 See DOCUMENTS-SCOPE-REVIEW.md for held resolver decisions and unexecuted tests.
+
+## Documents outer call and provider read selection (dk1614)
+
+Missing world capability: `grant ... only=library:<id>` did not constrain an
+outer Documents word or the rows a provider received while answering it.
+`Kernel.module_word/module_see` now enforce a per-call library context, using
+`document_scope.selection/read_rows`; atomic answer admission retains that
+selection. Grant scope matching checks location/issuer and bound aliases.
+Recovered exact dk1561 source adds inherited metadata creation and restores
+provider word offers. No installer permission expansion or live publication.
+Memory checks passed; persisted-world and UI review remain held. See
+DOCUMENTS-ISSUANCE.md for exact principals, clauses, evidence and resolvers.

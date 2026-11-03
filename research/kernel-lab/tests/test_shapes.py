@@ -453,6 +453,28 @@ def test_document_scope_indexes_own_upload_but_never_mutates_file(world):
                 f'library={library} parent={library} within={library}', ok=False)
 
 
+def test_document_scope_refuses_hidden_parents_foreign_uploads_and_group_changes(world):
+    from kernel.blobs import receive
+    k, a, b, library, other, pad = document_scope_world(world)
+    hidden = made(k, a, f'make kind=document-folder name=Private library={library} '
+                        f'parent={library} within={library} sees=me')
+    foreign = receive(k, b, b'private', name='private.txt')['made'][0]
+    pad.person, pad.caller = b.person, b
+    say(k, pad, f'make kind=document-folder name=No library={library} '
+                f'parent={hidden} within={library}', ok=False)
+    pad.person, pad.caller = a.person, a
+    say(k, pad, f'make kind=document-entry name=No file={foreign} '
+                f'library={library} parent={library} within={library}', ok=False)
+    folder = made(k, pad, f'make kind=document-folder name=Notes library={library} '
+                          f'parent={library} within={library}')
+    group = made(k, a, 'group name=Elsewhere open=yes')
+    say(k, pad, f'look {folder}')
+    for edit in (f'within={other}', f'in={group}', f'visibility_of={other}'):
+        say(k, pad, f'set {folder} {edit}', ok=False)
+    assert k.groups_of(folder) == k.groups_of(library)
+    assert k.state.get(folder, 'visibility_of') == library
+
+
 def test_a_thing_you_cannot_see_is_never_fitted_or_named(world):
     k, a, b = world
     say(k, a, 'make kind=kind name=event needs="title start"')
