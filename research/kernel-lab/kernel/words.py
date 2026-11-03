@@ -101,6 +101,10 @@ KERNEL_ENTRIES = [
     _k("grant", "do", "<id> words=<words> [only=<narrowing>]", "stewards", "yes",
        help="grant <module or widget> words=\"<words>\" [only=kind:<kind>]: give something already installed one "
             "more grant, as its own act. only=\"thing:<id>;fields:hat,coat\" limits set and undo to those facts. "
+            "only=\"kind:document-folder,document-entry;library:<id>\" limits make/set to inherited metadata "
+            "in one visible library: named folders/entries only, name/parent changes only, no cross-library moves. "
+            "On files.browse/folder/store/rename/move, only=\"library:<id>\" checks the complete outer "
+            "selection and limits the provider's per-call rows readings to that library. "
             "holds and look show it; undo or off takes it back."),
     _k("counts", "see", "<id>", "anyone", "no",
        help="counts <board>: anonymous totals of active uses of its count_word, grouped by count_bucket. "
@@ -528,7 +532,8 @@ def undo(k, actor, st, entry, tx, group, saw=None):
         facts = [f for part in r["parts"] for f in part["facts"]]
         for target in {f[0] for f in facts}:
             k.reaches(actor, 'undo', k.state.get(target, 'kind'), target=target,
-                      fields=[f[1] for f in facts if f[0] == target])
+                      fields=[f[1] for f in facts if f[0] == target],
+                      group=(k.groups_of(target) or [k.place])[0])
         for f in reversed(facts):
             t, a = f[0], f[1]
             v = f[3] if len(f) > 3 else None
@@ -646,6 +651,12 @@ def make(k, actor, st, entry, tx, group, saw=None):
         raise Refused("make needs kind=<a plain word>: make kind=button name=Feed")
     if kind in RESERVED_KINDS:
         raise Refused(f"a {kind} is made by the kernel, not by make")
+    write_values = dict(st.kv)
+    if st.words and "text" not in write_values:
+        write_values["text"] = st.words
+    # Check before make's post compatibility path too: it must not bypass a
+    # metadata-only grant by delegating to post.
+    k.reaches(actor, "make", kind, fields=write_values, group=group)
     if kind == 'post':
         # Keep make kind=post compatible, while applying the same scoped post
         # policy and rate limit. Its post part counts inside this make act.
@@ -663,7 +674,6 @@ def make(k, actor, st, entry, tx, group, saw=None):
             {a: v for a, v in st.kv.items() if a != 'kind'}, st.words), e, tx, group, saw)
     if kind == 'file-settings' and not k.is_steward(actor.person):
         raise Refused('file-settings belongs to stewards')
-    k.reaches(actor, "make", kind)
     if sees is not None and sees not in SEES_SAID:
         raise Refused("sees= says me, leaders, group or place: who besides the kernel may see it")
     closed = None
@@ -748,7 +758,7 @@ def set_(k, actor, st, entry, tx, group, saw=None):
     t = st.target
     if k.state.get(t, 'kind') == 'file-settings' and not k.is_steward(actor.person):
         raise Refused('file-settings belongs to stewards')
-    k.reaches(actor, "set", k.state.get(t, "kind"), target=t, fields=st.kv)
+    k.reaches(actor, "set", k.state.get(t, "kind"), target=t, fields=st.kv, group=group)
     if k.state.get(t, "kind") == "said":
         from .chat import said_set
         said_set(k, actor, t, st.kv)                    # its speaker's acts only (chat.py)
@@ -825,7 +835,7 @@ def set_(k, actor, st, entry, tx, group, saw=None):
 
 def forget(k, actor, st, entry, tx, group, saw=None):
     t = st.target
-    k.reaches(actor, "forget", k.state.get(t, "kind"))
+    k.reaches(actor, "forget", k.state.get(t, "kind"), target=t, group=group)
     if k.state.get(t, "kind") in RESERVED_KINDS:
         raise Refused(f"{t} is a {k.state.get(t, 'kind')}, which forget does not take")
     tx.set(t, "forgotten", actor.person)

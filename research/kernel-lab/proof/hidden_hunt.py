@@ -32,6 +32,7 @@ from test_skeleton import StandInEntry, post  # noqa: E402
 from test_painter import quoted  # noqa: E402
 from kernel.door import serve  # noqa: E402
 from kernel.kernel import Kernel  # noqa: E402
+from kernel import scratch  # noqa: E402
 
 KIDS = ["Ada", "Ben", "Cleo", "Dev", "Eli", "Faye", "Gus", "Hana", "Ike", "June", "Kai", "Luz"]
 PARENTS = ["Rowan", "Maya", "Jo"]
@@ -121,7 +122,7 @@ class Builder:
 
 class Hunt:
     def __init__(self):
-        self.dir = tempfile.mkdtemp(prefix="hidden-hunt-")
+        self.dir = scratch.mkdtemp(prefix="hidden-hunt-")
         self.secret = secrets.token_hex(16)
         self.entry = StandInEntry(self.secret)
         genesis = {"tag": "hh", "name": "Seabright", "steward": {"account": "google:alex", "name": "Alex"},
@@ -252,7 +253,7 @@ def shots(hunt, built, out):
     exe = next((p for p in CHROME if Path(p).exists()), None)
     if not exe:
         raise RuntimeError("no headless Chrome or Edge installed")
-    profile = tempfile.mkdtemp(prefix="hunt-chrome-")
+    profile = scratch.mkdtemp(prefix="hunt-chrome-")
     proc = subprocess.Popen([exe, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
                              f"--user-data-dir={profile}", "--remote-debugging-port=0", "about:blank"],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,

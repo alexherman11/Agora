@@ -1,5 +1,5 @@
 export default {mount(api,s){
-  const {P}=api,L=api.label,f={...api.facts,name:s.name||api.facts.name},root=api.part('body','section',{class:'nb-file','aria-label':f.name||L('attachment','Attachment')}),status=api.part('status','p',{class:'nb-meta',role:'status'},L('loading','Opening attachment…'));
+  const {P}=api,L=api.label,f={...api.facts,id:s.target||api.facts.id,name:s.name||api.facts.name},root=api.part('body','section',{class:'nb-file','aria-label':f.name||L('attachment','Attachment')}),status=api.part('status','p',{class:'nb-meta',role:'status'},L('loading','Opening attachment…'));
   const heading=P.node('h3',{},f.name||f.title||L('attachment','Attachment'));root.append(heading,status);
   if(!f.id){status.textContent=L('empty','Choose an uploaded file to read or preview it.');return root}
   const download=async()=>{try{await api.download(f.id)}catch(e){status.textContent=String(e.message||e)}};

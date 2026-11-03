@@ -2,7 +2,6 @@
 happening carries whom it calls, a refused line in a batch refuses only itself. Never calls a model."""
 import shutil
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -10,13 +9,14 @@ LAB = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(LAB))
 
 from kernel.kernel import Kernel, Actor  # noqa: E402
+from kernel import scratch  # noqa: E402
 
 GENESIS = {"tag": "dk", "name": "Alex's desktop", "steward": {"account": "desktop:alex", "name": "Alex"}}
 
 
 class Chats(unittest.TestCase):
     def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix="kernel-chat-")
+        self.dir = scratch.mkdtemp(prefix="kernel-chat-")
         self.k = Kernel(self.dir, dict(GENESIS))
         self.alex = self.k.accounts["desktop:alex"]
         self.jeff = self.k.join("desktop:jeff", "JEFF", invite={"admitted": "steward"})["person"]
@@ -129,7 +129,7 @@ class RulesRunAsTheirMaker(unittest.TestCase):
     member. What a rule does is its maker's to change; a leader may switch it off or forget it."""
 
     def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix="kernel-rule-")
+        self.dir = scratch.mkdtemp(prefix="kernel-rule-")
         self.k = Kernel(self.dir, dict(GENESIS))
         self.alex = self.k.accounts["desktop:alex"]
         self.pike = self.k.join("desktop:pike", "Pike", invite={"admitted": "member"})["person"]
@@ -183,7 +183,7 @@ class RefusalRows(unittest.TestCase):
     redacted, the rows weren't), and a reason quoting a name showed whenever the line named a thing, not an id."""
 
     def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix="kernel-refusals-")
+        self.dir = scratch.mkdtemp(prefix="kernel-refusals-")
         self.k = Kernel(self.dir, dict(GENESIS))
         self.alex = self.k.accounts["desktop:alex"]
         self.jeff = self.k.join("desktop:jeff", "JEFF", invite={"admitted": "steward"})["person"]
@@ -255,7 +255,7 @@ class RefusalRows(unittest.TestCase):
 
 class SharedNames(unittest.TestCase):
     def test_a_closed_chat_never_picks_one_of_two_people_with_a_name(self):
-        d = tempfile.mkdtemp(prefix="kernel-names-")
+        d = scratch.mkdtemp(prefix="kernel-names-")
         try:
             k = Kernel(d, dict(GENESIS))
             alex = k.accounts["desktop:alex"]
@@ -273,7 +273,7 @@ class SharedNames(unittest.TestCase):
 
 class Replies(unittest.TestCase):
     def test_a_reply_goes_in_the_chat_of_the_line_it_answers(self):
-        d = tempfile.mkdtemp(prefix="kernel-reply-")
+        d = scratch.mkdtemp(prefix="kernel-reply-")
         try:
             k = Kernel(d, dict(GENESIS))
             alex = k.accounts["desktop:alex"]

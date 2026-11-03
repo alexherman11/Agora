@@ -1,7 +1,6 @@
 """The neighbour story and the adapter's public wire contract. Never calls a model."""
 import json
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -10,11 +9,12 @@ sys.path.insert(0, str(LAB / "proof"))
 sys.path.insert(0, str(LAB / "mcp"))
 import byo_agent  # noqa: E402
 import agora_mcp  # noqa: E402
+from kernel import scratch  # noqa: E402
 
 
 class BYOStory(unittest.TestCase):
     def test_the_neighbour_builds_and_lends_over_real_mcp(self):
-        with tempfile.TemporaryDirectory(prefix="byo-evidence-") as out:
+        with scratch.TemporaryDirectory(prefix="byo-evidence-") as out:
             self.assertEqual(byo_agent.main(["--out", out]), 0)
             evidence = json.loads((Path(out) / "byo-agent.json").read_text(encoding="utf-8"))
             self.assertTrue(evidence["complete"])
@@ -32,7 +32,7 @@ class BYOStory(unittest.TestCase):
 
 class MCPWire(unittest.TestCase):
     def setUp(self):
-        self.folder = tempfile.TemporaryDirectory(prefix="byo-wire-")
+        self.folder = scratch.TemporaryDirectory(prefix="byo-wire-")
         self.place = byo_agent.Place(self.folder.name)
         self.client = byo_agent.MCP(self.place.url, self.place.agent_token)
 

@@ -20,6 +20,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import kdesk  # noqa: E402
+from kernel import scratch  # noqa: E402
 
 SEE = {"help", "look", "rows", "holds", "status", "window.list", "window.desktop", "system.now", "media.now"}
 FEED = ("root : column, role sheet, of tag:post as p, each card\n"
@@ -451,7 +452,7 @@ class RecoveryTest(unittest.TestCase):
         import taskbar_guard as guard
         self.C, self.W, self.guard = C, W, guard
         (HERE / 'state').mkdir(exist_ok=True)        # ignored by git, so absent in a fresh House worktree
-        self.tmp = tempfile.TemporaryDirectory(prefix='taskbar-probe-', dir=HERE / 'state')
+        self.tmp = scratch.TemporaryDirectory(prefix='taskbar-probe-', dir=HERE / 'state')
         self.lease = Path(self.tmp.name) / 'lease.json'
         self.u = C.WinDLL('user32')
         self.u.CreateWindowExW.argtypes = [W.DWORD,W.LPCWSTR,W.LPCWSTR,W.DWORD,C.c_int,C.c_int,C.c_int,C.c_int,W.HWND,W.HMENU,W.HINSTANCE,W.LPVOID]

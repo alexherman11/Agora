@@ -11,13 +11,13 @@ from pathlib import Path
 import socket
 import struct
 import subprocess
-import tempfile
 import time
 import urllib.request
 from urllib.parse import urlsplit, quote
 
 from test_kdesk import Desk
 from restyle import install
+from kernel import scratch
 
 HERE = Path(__file__).resolve().parent
 
@@ -92,7 +92,7 @@ class CDP:
 
 class Browser:
     def __enter__(self):
-        self.tmp = tempfile.TemporaryDirectory(prefix='edge-kdesk-', dir=HERE / 'state')
+        self.tmp = scratch.TemporaryDirectory(prefix='edge-kdesk-', dir=HERE / 'state')
         self.process = subprocess.Popen([r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe',
             '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
             '--remote-debugging-port=0', '--remote-allow-origins=*', '--disable-background-networking',

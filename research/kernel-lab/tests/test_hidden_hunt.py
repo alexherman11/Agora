@@ -4,7 +4,6 @@ import json
 import secrets
 import shutil
 import sys
-import tempfile
 import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
@@ -18,12 +17,13 @@ from test_skeleton import StandInEntry, post  # noqa: E402
 from test_painter import quoted  # noqa: E402
 from kernel.door import serve  # noqa: E402
 from kernel.kernel import Kernel, Tx  # noqa: E402
+from kernel import scratch  # noqa: E402
 import hidden_hunt  # noqa: E402
 
 
 class ReaderConditions(unittest.TestCase):
     def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix="reader-conditions-")
+        self.dir = scratch.mkdtemp(prefix="reader-conditions-")
         self.entry = StandInEntry(secrets.token_hex(16))
         self.k = Kernel(self.dir, {"tag": "rc", "name": "Workshop", "steward": {"account": "a", "name": "Ari"},
                                   "invites_counted_by": "kernel", "invites": [{"code": "x", "uses": 5}],
@@ -145,7 +145,7 @@ class ReaderConditions(unittest.TestCase):
 
 class HiddenHunt(unittest.TestCase):
     def test_the_block_plays_together(self):
-        with tempfile.TemporaryDirectory(prefix="hunt-evidence-") as out:
+        with scratch.TemporaryDirectory(prefix="hunt-evidence-") as out:
             self.assertEqual(hidden_hunt.main(["--out", out]), 0)
 
 

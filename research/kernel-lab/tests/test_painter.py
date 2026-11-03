@@ -7,7 +7,6 @@ import json
 import os
 import secrets
 import sys
-import tempfile
 import threading
 import time
 import unittest
@@ -22,6 +21,7 @@ from test_skeleton import StandInEntry, post        # noqa: E402
 from kernel.door import serve                        # noqa: E402
 from kernel.kernel import Kernel                     # noqa: E402
 from kernel.painter import NOTATION                  # noqa: E402
+from kernel import scratch  # noqa: E402
 
 FEED = ("root : column, role sheet, of tag:post as p, each card\n"
         "card : column, role card\n"
@@ -47,7 +47,7 @@ def walk(n):
 class Painter(unittest.TestCase):
     def setUp(self):
         self.t0 = time.time()
-        self.dir = tempfile.mkdtemp(prefix="kernel-paint-")
+        self.dir = scratch.mkdtemp(prefix="kernel-paint-")
         self.secret = secrets.token_hex(16)
         self.entry = StandInEntry(self.secret)
         self.k = Kernel(self.dir, {"tag": "sb", "name": "Seabright", "invites_counted_by": "kernel",
