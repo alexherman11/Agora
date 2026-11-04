@@ -154,6 +154,8 @@ class CardRules(unittest.TestCase):
         self.say(f"set {source} build=landed")
         self.settle()
         self.assertEqual(len(self.notes()), 1)
+        # the wording is the rule's, and a ; inside its quotes stays in the wording
+        self.assertEqual(self.k.state.get(self.notes()[0], "text"), "Dependency has landed; your next step is due.")
         self.say(f"look {source}")
         self.say(f"set {source} build_detail=bookkeeping")
         self.settle()
