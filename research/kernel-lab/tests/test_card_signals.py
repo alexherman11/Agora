@@ -101,7 +101,9 @@ class CardRules(unittest.TestCase):
 
     def test_without_a_route_the_kernel_routes_nobody(self):
         # Who an asked card reaches is the world's rule (route=alex_ask:JEFF in card-rules.lines), not the kernel's.
-        self.assertNotIn("JEFF", (LAB / "kernel/card_signals.py").read_text(encoding="utf-8"))
+        code = (LAB / "kernel/card_signals.py").read_text(encoding="utf-8")
+        for said in ("JEFF", "alex_ask", "Unblocked", "module_named", "Please check"):
+            self.assertNotIn(said, code)          # who hears and what it says are the rule's (card-rules.lines)
         source = self.card()
         dependent = self.card(waiting_on=source, alex_ask="original-ask", owner="Worker")
         self.say(f"task.signal {source} mode=waiting event=done")
@@ -110,7 +112,9 @@ class CardRules(unittest.TestCase):
         self.say(f"task.signal {source} mode=waiting event=done")
         note = self.k.state.things[self.notes()[0]]
         self.assertEqual((note["about"], note["to"]), (dependent, self.w.person))
+        self.assertEqual(note["text"], "Dependency")         # no text= in the rule: the title alone, no wording
         self.assertFalse(self.k.run(self.a, f"task.signal {source} mode=waiting event=done route=alex_ask")["ok"])
+        self.assertFalse(self.k.run(self.a, f"task.signal {source} mode=waiting event=done cc=Nobody")["ok"])
 
     def test_notify_on_land_and_reporter_once(self):
         source = self.card(notify_on_land="Worker", reporter="JEFF")

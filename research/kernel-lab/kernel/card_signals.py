@@ -8,8 +8,10 @@ Board. Names already here are debt (research/source-edits/SOURCE-AUDIT-KERNEL.md
 Card-rule vocabulary, not a scheduler. Notes and their deduplication undo together.
 
 Who a note reaches is the card's (owner, lead, who; notify_on_land; reporter), unless the rule says otherwise:
-route=<field>:<person> sends a card that carries <field> to that person instead (4 Nov: which field and which person
-are the world's, in its card rules; before, a person's name and a field were written here). The kernel names no one."""
+route=<field>:<person> sends a card that carries <field> to that person instead; cc=<person> may also read every note
+(only where they see the card and its source); text="... {title} ..." is the note's wording, {title} the source card's
+title as its recipient sees it (unseen="..." when they may not see it). All three are the world's, in its card rules (4 Nov; before, a person's name, a field,
+one module's person and English sentences were written here). The kernel names no one and says nothing."""
 from .kernel import Refused
 from .next_steps import KINDS, person
 
@@ -20,7 +22,13 @@ def signal(k, actor, st, entry, tx, group, saw=None):
     mode = st.kv.get("mode")
     event = st.kv.get("event")
     if mode not in ("waiting", "notify", "reporter") or event not in ("landed", "done"):
-        raise Refused("task.signal <card> mode=waiting|notify|reporter event=landed|done [route=<field>:<person>]")
+        raise Refused("task.signal <card> mode=waiting|notify|reporter event=landed|done [route=<field>:<person>] "
+                      "[cc=<person>] [text=\"... {title} ...\"] [unseen=<words>]")
+    template = " ".join(str(st.kv.get("text") or "{title}").split())[:500]
+    unseen = " ".join(str(st.kv.get("unseen") or "…").split())[:80]     # {title} when the recipient may not see it
+    cc = person(k, st.kv.get("cc")) if st.kv.get("cc") else None
+    if st.kv.get("cc") and not cc:
+        raise Refused(f"cc={st.kv.get('cc')}: no such person here")
     route_field, _, route_to = str(st.kv.get("route") or "").partition(":")
     if st.kv.get("route") and not (route_field and route_to):
         raise Refused("route=<field>:<person>: a card that carries <field> reaches that person instead")
@@ -72,23 +80,17 @@ def signal(k, actor, st, entry, tx, group, saw=None):
         # delivered. The rule maker can have wider sight than the recipient.
         visible_source = k.shown(recipient, source)
         title = next((card[field] for field in ("title", "name")
-                      if card.get(field) and card.get(field) == visible_source.get(field)), "the dependency")
+                      if card.get(field) and card.get(field) == visible_source.get(field)), unseen)
         key = f"{mode}:{source}:{target}:{recipient}"
         if key in keys:
             continue
         keys.add(key)
         k.reaches(actor, entry["word"], "taskboard-event", target=target)
-        text = (f"Unblocked: {title} has landed" if event == "landed" else f"Unblocked: {title} is done")
-        if mode == "notify":
-            text = f"{title} has landed; your next step is due."
-        elif mode == "reporter":
-            text = f"A fix for what you found has landed: {title}. Please check it."
+        text = template.replace("{title}", str(title))
         note = tx.mint()
         readers = {recipient, actor.person}
-        house = k.module_named("house")
-        sponsor = k.state.get(house, "for") if house else None
-        if sponsor and k.shown(sponsor, target) is not None and k.shown(sponsor, source) is not None:
-            readers.add(sponsor)
+        if cc and k.shown(cc, target) is not None and k.shown(cc, source) is not None:
+            readers.add(cc)
         # One happening per note; existing hear:make admission and the House
         # inbox deliver it. No new module grants or execution authority.
         tx.part("make", note, "card rule note")
