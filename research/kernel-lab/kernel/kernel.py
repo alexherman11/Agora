@@ -1310,6 +1310,28 @@ class Kernel:
     NAME = L.re.compile(r"\$([a-z][a-z0-9_]*)\b")
 
     @classmethod
+    def fill_text(cls, text, names, facts, read):
+        """The same $ names in prose, plus $.fact and $[[thing|label]].fact.
+
+        Unlike a command, quoted prose is still prose. Substitute once: values
+        are data, never another template or a line to execute. `read` must use
+        the caller's ordinary visibility fence. Missing fills fail explicitly.
+        """
+        field = r"[A-Za-z_][A-Za-z0-9_-]*"
+        pattern = L.re.compile(
+            r"\$\[\[([^\]\n]+)\]\]\.(" + field + r")|\$\.(" + field + r")|" + cls.NAME.pattern)
+
+        def fill(match):
+            target, prop, local, name = match.groups()
+            values = read(target.split("|", 1)[0]) if target else facts if local else names
+            key = prop or local or name
+            if key not in values:
+                raise ValueError("unfilled " + match.group(0))
+            return str(values[key])
+
+        return pattern.sub(fill, text)
+
+    @classmethod
     def fill_names(cls, text, names):
         """`$name` -> what an earlier line of this sign-in made with as=name, or a plain fill ($me …). Only where a
         thing goes: never inside quoted text, so a verb's steps="... $card" or a note about $today keeps its words."""

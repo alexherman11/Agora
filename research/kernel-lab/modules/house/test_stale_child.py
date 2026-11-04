@@ -84,6 +84,8 @@ class FakeMod:
         self.rows = rows
 
     def see(self, line):
+        if line == 'look "Agent Book"':
+            return {"rows": [{"text": (H.HERE / "fixtures/agent-book.md").read_text(encoding="utf-8")}]}
         t = line.split()[-1]
         return {"rows": [self.rows[t]] if t in self.rows else []}
 

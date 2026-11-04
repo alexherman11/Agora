@@ -15,6 +15,8 @@ import json
 import urllib.request
 from pathlib import Path
 
+from messages import message
+
 
 def reading(url, token, line):
     req = urllib.request.Request(url.rstrip("/") + "/see", json.dumps({"line": line}).encode(),
@@ -37,14 +39,18 @@ def task_context(url, token, agent):
     cfg = rows[0]
     if cfg.get("next_steps") != "on" or not cfg.get("person"):
         return ""
-    return reading(url, token, f"rows nextsteps:{cfg['person']}").get("text", "")
+    return message(lambda line: reading(url, token, line), "Task list header", person=cfg["person"]) + "\n" \
+        + reading(url, token, f"rows nextsteps:{cfg['person']}").get("text", "")
 
 
 def context(url, token_file, charter, agent=None):
     try:
-        text = read(url, Path(token_file).read_text(encoding="utf-8").strip(), charter)
-        text = ("## Alex's standing rules (read again after the compaction; look " + str(charter) + " is the live one)\n\n"
-                + text) if text else f"charter: not read: {charter} is empty; tell JEFF."
+        token = Path(token_file).read_text(encoding="utf-8").strip()
+        text = read(url, token, charter)
+        if not text:
+            raise ValueError("empty charter")
+        text = message(lambda line: reading(url, token, line), "After a compaction", charter=charter) \
+            + "\n\n" + text
     except Exception as exc:                          # noqa: BLE001  the compaction must go on
         text = f"charter: not read after the compaction ({type(exc).__name__}); look {charter} reads it."
     if agent:

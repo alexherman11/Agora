@@ -55,6 +55,7 @@ sys.path.insert(0, str(HERE.parents[2] / "text-desk-lab" / "notation"))
 from modproto import Module, log            # noqa: E402
 import transport as T                        # noqa: E402
 import manager as BM                         # noqa: E402
+from messages import message
 import work_overview                         # noqa: E402
 
 try:
@@ -73,10 +74,6 @@ MESSAGE_WORDS = ("say",)
 
 def now_s():
     return time.strftime("%Y-%m-%dT%H:%M:%S")
-
-
-def it_is():
-    return time.strftime("%a %d %b, %H:%M")
 
 
 class Door:
@@ -259,7 +256,7 @@ class Agent:
         context = self.house.next_steps(self)
         if context:
             parts.append(context)
-        parts.append(f"~ it is {it_is()}")
+        parts.append(self.house.message("The time"))
         parts += [i["text"] for i in items]
         text = "\n\n".join(parts)
         self.turn = {"chat": chats[-1] if chats else None, "woken": min(i["at"] for i in items), "first": None,
@@ -317,7 +314,7 @@ class Agent:
                 # Claude's read-only hook reinjects within this turn. The shared
                 # continuation also covers transports without a SessionStart hook.
                 if self.cfg.get("next_steps") == "on":
-                    self.wake("~ the conversation was compacted; reconcile your current next steps.")
+                    self.wake(self.house.message("After a compaction", charter=self.cfg.get("charter", "")))
         elif e == "text":
             self._spoke(ev["text"])
         elif e == "tool":
@@ -550,10 +547,10 @@ class House:
                 import snap as S
                 S.snap(target, token, out, door=URL, source=source, world=self.world, size=size)
                 self.snaps[person].update(path=str(out))
-                text = f"~ Your picture of {label} is ready. See it: house.snap last"
+                text = self.message("A picture is ready", label=label)
             except Exception as exc:                  # noqa: BLE001
                 self.snaps[person].update(error=str(exc)[:500])
-                text = f"~ The picture of {label} failed: {str(exc)[:500]}"
+                text = self.message("A picture failed", label=label, detail=str(exc)[:500])
             finally:
                 with self.snap_lock:
                     self.snapping -= 1
@@ -608,11 +605,11 @@ class House:
 
     def charter_text(self, cid):
         if not cid:
-            return "charter: none named on your house-agent thing; tell Alex."
+            return self.message("No standing rules named")
         rows = self.m.see(f"look {cid}").get("rows") or [{}]
         text = str(rows[0].get("text") or "").strip()
-        return ("## Alex's standing rules (look " + cid + " is the live one)\n\n" + text) if text else \
-            f"charter: not read: {cid} is empty or gone; tell Alex."
+        return (self.message("Standing rules header", charter=cid) + "\n\n" + text) if text else \
+            self.message("Standing rules unavailable", charter=cid)
 
     def system_text(self, a):
         """An agent's system prompt: its own prompt=<thing> (written by Alex), then the standing rules (charter=)."""
@@ -623,40 +620,32 @@ class House:
         own = str(rows[0].get("text") or "").strip()
         return (own + "\n\n" + charter) if own else charter
 
+    def message(self, heading, **facts):
+        return message(self.m.see, heading, **facts)
+
     def welcome(self, a):
         cfg = a.cfg
         soul = ""
         if cfg.get("soul"):
             rows = self.m.see(f"look {cfg['soul']}").get("rows") or [{}]
             soul = str(rows[0].get("text") or "").strip()
-        own = cfg.get("welcome") or (
-            f"You are {a.name} ({a.person}), a person in Alex's desktop world (the kernel, Lines). Nothing here runs on "
-            "a timer: you are woken when someone addresses you, and each message from the house says what reached "
-            "you. Your tools are see, do and lines; each takes Lines (help, rows guide and help <word> teach them); "
-            "lines takes a list and routes each line, and a refused line refuses only itself. "
-            + ("Each block of your words in a turn is said, as you, into the chat that woke you the moment you write "
-               "it, with your tool calls as small receipts under it, so write to the person, briefly, like texting; "
-               "use say <chat> only to speak somewhere else. Woken by no chat (a task, house.wake), your words go to "
-               "your own activity record, not to any chat. "
-               if cfg.get("speaks", "text") == "text" else
-               "Your words in a turn are your own thinking; say <chat> <words> is how anyone hears you. ")
-            + "rows chat lists the chats; chat <chat> reads one.")
+        own = self.message("Welcome", name=a.name, person=a.person)
         # Alex, 3 Nov: how work flows between JEFF, the residents and their workers is the world's, not the code's:
         # a house-agent's guide=<thing> is read at each start, so it changes by editing that thing.
         guide = ""
         if cfg.get("guide"):
             rows = self.m.see(f"look {cfg['guide']}").get("rows") or [{}]
             guide = str(rows[0].get("text") or "").strip()
-        return own + (f"\n\n# How work flows here ({cfg['guide']})\n\n{guide}" if guide else "") \
-            + (f"\n\n# Your soul ({cfg['soul']}, yours to keep)\n\n{soul}" if soul else "")
+        return own + ("\n\n" + self.message("Work guide header", guide=cfg["guide"]) + "\n\n" + guide if guide else "") \
+            + ("\n\n" + self.message("Soul header", soul=cfg["soul"]) + "\n\n" + soul if soul else "")
 
     def next_steps(self, a):
         if a.cfg.get("next_steps") != "on":
             return ""
         out = a.door.post("/see", f"rows nextsteps:{a.person}")
         if not out.get("ok"):
-            return "Next steps unavailable; read rows nextsteps:" + a.person + " before continuing task work."
-        return out.get("text", "")
+            return self.message("Task list unavailable", person=a.person)
+        return self.message("Task list header", person=a.person) + "\n" + out.get("text", "")
 
     def task_changes(self):
         """Event-driven reread, through each resident's own visibility fence."""
@@ -670,7 +659,7 @@ class House:
                 fresh = a.state.get("welcome_due") and not a.busy
                 if context and (fresh or context != a.state.get("next_steps_context")) and context != a.state.get("next_steps_queued"):
                     a.state["next_steps_queued"] = context
-                    a.wake("~ your task projection changed; reconcile current next actions.")
+                    a.wake(self.message("Their task list changed (JEFF only)"))
 
     # ---- catching up
     def catch_up(self, a):
@@ -703,8 +692,8 @@ class House:
         for rev, r in got:                                   # one wake per chat, oldest chat first (security review H1)
             by_chat.setdefault(r.get("chat"), []).append((rev, r))
         for chat, lines in by_chat.items():
-            text = "~ for you while the house was away:\n" + "\n".join(
-                self.line_text(r.get("id"), dict(r, by_name=r.get("by")), r.get("chat")) for _, r in lines)
+            text = "\n".join(self.line_text(r.get("id"), dict(r, by_name=r.get("by")), chat,
+                               heading="Lines that waited while the House was down") for _, r in lines)
             a.wake(text, chat=chat, record=lines[-1][0], first_record=lines[0][0])
 
     def chat_name(self, c):
@@ -736,36 +725,6 @@ class House:
     def sees_line(self, a, sid, chat):
         return self.line_for(a, sid) is not None
 
-    def in_chat(self, person, c):
-        """Whether a closed chat (with=) holds this person; an open chat holds anyone. The house reads with its own
-        wide sight, so catch-up checks the chat's people before handing a line on (card dk1245; the kernel keeps
-        `to` inside the chat for new lines, this guards older records). Read fresh: a chat's people can change."""
-        if not c:
-            return True
-        rows = self.m.see(f"look {c}").get("rows") or []
-        if not rows:
-            return False                     # a chat the house can't read: hand nothing on (fail closed)
-        people = str(rows[0].get("with") or "").split()
-        return not people or person in people
-
-    def context(self, said, row, who):
-        """What a line is bound up with, and who is working near the agent, for its wake (kernel around and nearby;
-        research/kinds-lab/fresh-kinds-and-bonds.md). HELD 28 Oct with the graph work: around and nearby left the
-        dictionary (privacy leaks, round 5), and these lines pasted others' titles raw into a wake. Not called."""
-        out = []
-        try:
-            got = self.m.see(f"around {said} toward=strongest limit=8")
-            skip = {said, row.get("chat"), who, row.get("made_by"), row.get("for")}
-            near = [x for x in got.get("rows") or [] if x.get("id") not in skip
-                    and x.get("kind") not in ("person", "agent", "place", "group", "chat")][:4]
-            out += [f"~ around this: {x['name']} ({x['id']}, {x['kind']}): {x['why']}" for x in near]
-            busy = self.m.see(f"nearby {who}").get("rows") or []
-            out += [f"~ nearby: {x['who']} {x['how']}: {x['name']} ({x['id']}), {x['minutes_ago']} min ago"
-                    for x in busy[:3]]
-        except Exception as exc:                     # noqa: BLE001  context is a help, never a reason not to wake
-            log(f"house: no context for {said}: {exc!r}")
-        return ("\n" + "\n".join(out)) if out else ""
-
     def mark_turn(self, a, record):
         """Tell the kernel what an agent's acts now answer (kernel `turn`), so the log says why; done at its end."""
         who = a.cfg.get("person")
@@ -779,20 +738,21 @@ class House:
         except Exception as exc:                     # noqa: BLE001
             log(f"house: {line} failed: {exc!r}")
 
-    def line_text(self, sid, row, chat):
+    def line_text(self, sid, row, chat, heading="A line said to them"):
         who = row.get("by_name") or row.get("speaker") or ""
-        text = f"~ {who or 'someone'} in {self.chat_name(chat)} ({chat}, line {sid}): {row.get('text', '')}"
+        text = self.message(heading, by=who, chat=self.chat_name(chat), chat_id=chat,
+                            line=sid, text=row.get("text", ""))
         about = row.get("about")
         if about:
             # what the line is about, read with the House's sight: a right-click ask says where it was asked and on
             # what (Ask reaches JEFF, 3 Nov 2026); anything else at least says its kind and id
             seen = (self.m.see(f"look {about}").get("rows") or [{}])[0]
-            bits = [f"{seen.get('kind') or 'thing'} {about}"]
+            bits = [self.message("About target", kind=seen.get("kind") or "thing", target=about)]
             if seen.get("where"):
-                bits.append(f"asked at {seen['where']}")
+                bits.append(self.message("About where it was asked", where=seen["where"]))
             if seen.get("about"):
-                bits.append(f"on {seen['about']}")
-            text += f" [about: {', '.join(bits)}]"
+                bits.append(self.message("About what it was on", target=seen["about"]))
+            text += " " + self.message("Line about annotation", details=", ".join(bits))
         return text
 
     def card_signals(self, agent=None, cursor=0, notice=None):
@@ -835,9 +795,9 @@ class House:
                 if notes:
                     a.wake(self.card_signal_text(notes), record=record, card_notes=[r["id"] for r in notes])
 
-    @staticmethod
-    def card_signal_text(notes):
-        return "\n".join(f"~ {r['text']} (card {r['about']}; note {r['id']})" for r in notes)
+    def card_signal_text(self, notes):
+        return "\n".join(self.message("A card note addressed to them", text=r["text"],
+                                      card=r["about"], note=r["id"]) for r in notes)
 
     def refresh_card_signals(self, a):
         """Re-read queued notes at delivery: undo/privacy changes may remove part of a packet."""
@@ -915,8 +875,11 @@ class House:
             if r.get("kind") in TASK_KINDS:
                 for a in self.agents.values():
                     if a.cfg.get("wake_policy") != "addressed" and a.cfg.get("next_steps") != "on" and str(r.get("who", "")).casefold() == a.name.casefold():
-                        a.wake(f"~ {msg.get('by') or 'someone'} gave you a task: {r.get('title') or target} ({target}); "
-                               f"look {target}", record=msg.get("record"))
+                        a.wake(self.message("Their task list changed (JEFF only)",
+                                            by=msg.get("by", ""), title=r.get("title", ""),
+                                            card=target) + "\n" + json.dumps(
+                                                {"card": target, "title": r.get("title", ""), "by": msg.get("by", "")},
+                                                ensure_ascii=False), record=msg.get("record"))
 
     # ---- words
     def call(self, msg):
@@ -982,7 +945,7 @@ class House:
         if word == "house.wake":
             by = (msg.get("caller") or {}).get("name") or "someone"
             words = (args.get("words") or "").strip()
-            a.wake(f"~ {by} woke you (house.wake)" + (f": {words}" if words else ""))
+            a.wake(self.message("Someone woke them", by=by, words=words))
             return {"text": f"{a.name} is {'woken' if a.busy else 'told'}; it answers in its own time", "external": True}
         if word == "house.stop":
             caller = (msg.get("caller") or {}).get("person")

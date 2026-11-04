@@ -161,10 +161,7 @@ def rows(k, actor, ref, now=None):
 
 def packet(items, ref):
     """The old bounded packet: whole rows, eight at most, under 6,000 chars."""
-    lines = ["Next steps (canonical tasks; priority is authored, not inferred from activity).",
-             "Receipt is not review; worker completion is not parent verification. Wake is not permission.",
-             "Reconcile new instructions with goal/acceptance/next_action. Review evidence before claiming done.",
-             "Held/unknown work requires its stated resolver; do not retry unknown effects. No automatic project start."]
+    lines = []  # Message headers belong to the caller's live document.
     shown = 0
     for r in items[:8]:
         def short(f, n=150):

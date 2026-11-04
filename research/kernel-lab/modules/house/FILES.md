@@ -4,6 +4,8 @@ What each file in `research/kernel-lab/modules/house/` does, read from the code 
 
 ## Code
 
+- **`messages.py`**: reads the live Agent Book by heading whenever a message is built. The generic reader is `kernel/text_templates.py`; it uses `Kernel.fill_text`, alongside the existing `$` names. No source template or section cache.
+
 - **`house.py`**: the module itself. It runs the world's agents (people with a `house-agent` thing). It wakes an agent only when someone addresses it, keeps a durable cursor per agent, and posts the agent's words and tool receipts into the chat that woke it. It answers the words `house.who`, `house.wake`, `house.stop`, `house.activity` and `house.log`, and hands `house.build`, `work`, `house.retry`, `house.tell`, `house.review`, `house.land` and `house.manage` on to the builders. It also does the next-steps (continuity) wakes. Entry point: `main()`.
 - **`transport.py`**: one long-lived model process per agent. It builds the command line for Claude (`claude -p`, stream-json) and for Codex, writes the MCP config that gives the agent its own see/do/lines door session, and reduces each process's output stream to a few events (`init`, `text`, `tool`, `toolresult`, `compacted`, `result`, `exit`).
 - **`builders.py`**: coding workers. `Builders` claims a task card, makes a git worktree, starts a Claude or Codex worker in it under the requester's existing agent session, and takes it through asked → preparing → working → reviewing → landing. Claude and Codex each have their own pool of workers (four of each by default, set in `house-settings`); when a pool is full, new workers and follow-ups queue and start by themselves (`start_queued`). It also handles follow-ups said in the worker's chat, `house.stop` and `house.release` for a worker, and `house.land` in one step: checks, landing onto main without overwriting other people's uncommitted edits, then switching the change on (`activate`). A worker whose card moved on or finished ends as released; one a restart cut off recently carries on by itself.
@@ -22,6 +24,8 @@ What each file in `research/kernel-lab/modules/house/` does, read from the code 
 - **`test_workers.py`**: resident workers: separate Claude and Codex pools, `work` making a card and starting a worker, turns going to the worker's chat, the turn limit, the Claude CLI running in the worktree.
 
 ## Notes and records
+
+- **`MESSAGES.md`**: the heading and fill-in contract, missing-section behavior, and hidden evidence for the Agent Book migration.
 
 - **`BUILDERS.md`**: the 27 October design and implementation note for `task.build` / `house.build`.
 - **`CONTINUITY.md`**: the task-continuity port (next-steps wakes) onto the kernel.

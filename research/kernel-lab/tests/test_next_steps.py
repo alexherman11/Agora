@@ -1,6 +1,7 @@
 """Hidden in-process worlds; no model, desktop, credentials, or archived cards."""
 import importlib.util
 import json
+import shlex
 import shutil
 import sys
 import threading
@@ -37,6 +38,9 @@ def world():
         k = Kernel(fixture, genesis)
     try:
         a = k.actor_for(k.accounts["alex"])
+        book = (LAB / "modules/house/fixtures/agent-book.md").read_text(encoding="utf-8")
+        made = k.run(a, 'make kind=document title="Agent Book" text=' + shlex.quote(book))
+        assert made["ok"], made
         j = k.actor_for(k.join("jeff", "JEFF", invite="x")["person"])
         w = k.actor_for(k.join("worker", "Worker", invite="x")["person"])
         yield k, a, j, w
@@ -137,6 +141,7 @@ def load_house():
 
 def resident(k, j, mod):
     h = mod.House.__new__(mod.House)
+    h.m = SimpleNamespace(see=lambda line: k.run(j, line, mode="see"))
     h.publish = Mock()
     h.welcome = Mock(return_value="Soul and welcome")
     a = mod.Agent.__new__(mod.Agent)

@@ -111,7 +111,7 @@ def test_the_house_start_tells_each_owner_once_about_cut_off_workers(manager):
     manager.wake_cut_off()
     manager.wake_cut_off()
     assert len(agent.woken) == 1 and 'cut these older workers off' in agent.woken[0][0]
-    assert 'house.tell dk1' in agent.woken[0][0] and s.get('awaiting')
+    assert 'Codex fixture (dk1)' in agent.woken[0][0] and s.get('awaiting')
 
 
 def test_a_worker_cut_off_a_little_while_ago_carries_on_by_itself(manager):
@@ -121,7 +121,7 @@ def test_a_worker_cut_off_a_little_while_ago_carries_on_by_itself(manager):
     with patch('builders.threading', SimpleNamespace(Thread=Mock())) as threads:
         manager.wake_cut_off()
     assert agent.woken == [] and threads.Thread.call_count == 1 and s['phase'] == 'preparing'
-    assert 'Carry on with your task.' in s['pending']
+    assert s['resume_note'] == {"heading": "When a restart cut it off"}
 
 
 def test_workers_on_finished_cards_nag_nobody(manager):

@@ -362,6 +362,8 @@ FILL_IN_WORDS = {"fill-in", "fill-ins", "fillin", "fillins", "fills", "blanks", 
 # every $ fill-in the kernel and its painter fill: (fill, where it works, what it says, how long it lasts). Kept beside
 # Kernel.SUPPLIED and verb_note's fill; a new fill-in gets a row here (dk1368).
 FILL_INS = (
+    ("$.<fact>", "prose templates", "a supplied fact of the thing the message is about", "one rendering"),
+    ("$[[thing|label]].<fact>", "prose templates", "a visible fact read from another thing; label is optional", "one rendering"),
     ("$<name>", "any line", "the thing a line made with as=<name>", "this sign-in, until the kernel restarts"),
     ("$new", "any line, verb steps", "the last thing made by an earlier line or step", "this sign-in"),
     ("$me", "any line, verb steps", "who is acting (an agent is itself)", "the line"),
@@ -384,7 +386,9 @@ FILL_INS_NOT_HERE = ("not carried from the old desk: $reach, $house, $session, $
 def fill_ins_page(k, actor, w):
     """help $: every $ fill-in, where it works, and the as= names this sign-in holds now."""
     lines = ["$ fill-ins: words starting with $ that are filled when the line runs. They fill where a thing goes, "
-             "never inside quoted text, so a note about $today keeps its words."]
+             "never inside quoted text, so a note about $today keeps its words. "
+             "Prose templates fill quoted text too, once only; values are data. "
+             "$now and $today also work in prose; a missing fact names the gap."]
     width = max(len(f) for f, *_ in FILL_INS)
     lines += [f"  {f.ljust(width)}  {says}; {where}; lasts {lasts}" for f, where, says, lasts in FILL_INS]
     names = k.names.get((actor.id, actor.session)) or {}

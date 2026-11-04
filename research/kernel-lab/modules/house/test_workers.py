@@ -181,9 +181,10 @@ def place(manager, **members):
     """A world where dk827 (JEFF) leads the place, plus any other members; the task card is the door's."""
     door = manager.fixture_door
     manager.session = lambda person: door
+    previous = manager.h.m.see
     manager.h.m.see = lambda line, *a, **k: (dict(rows=[dict(id='dk1000', kind='place')]) if line == 'rows place' else
         dict(rows=[{'kind': 'place', 'member:dk827': 'leader', **{'member:' + p: r for p, r in members.items()}}])
-        if line == 'look dk1000' else dict(rows=[dict(door.task)]))
+        if line == 'look dk1000' else previous(line, *a, **k))
     return door
 
 
@@ -204,7 +205,7 @@ def test_a_steward_who_is_not_the_owner_tells_and_both_hear_the_reply(manager):
     with manager.lock:
         manager.take_pending(s)                                       # the words reach the worker...
     manager.report_turn(s, 'Added it; 4 passed.')                      # ...and its turn ends
-    assert 'Added it' in owner.woken[0][0] and 'also followed words from JEFF' in owner.woken[0][0]
+    assert 'Added it' in owner.woken[0][0] and 'You are in charge of this worker' in owner.woken[0][0]
     assert 'Added it' in jeff.woken[0][0] and 'Sable is woken too' in jeff.woken[0][0]
     manager.report_turn(s, 'Next turn, nobody else spoke.')
     assert len(jeff.woken) == 1 and len(owner.woken) == 2              # the teller hears only the turn it asked for
@@ -227,6 +228,52 @@ def test_alex_may_tell_any_worker(manager):
     place(manager)
     out = manager.tell(told('dk99', 'Alex'))                          # dk99 is the desktop:alex account's person
     assert out.get('external') and s['pending'][0].startswith('From Alex (Alex;')
+
+
+def test_attribution_reads_current_heading_and_names_a_missing_one(manager):
+    s = state(manager, 'working')
+    s['requester_name'] = 'Sable'
+    place(manager)
+    previous = manager.h.m.see
+    book = ''
+    manager.h.m.see = lambda line, **kw: (
+        dict(rows=[dict(text=book)]) if line == 'look "Agent Book"' else previous(line, **kw))
+    for version in ('Before', 'After'):
+        book = f'### Follow-up from another person\n{version} $.name / $.role / $.owner / $.words'
+        assert manager.tell(told('dk827', 'JEFF', 'Correction')).get('external')
+        assert s['pending'][-1] == f'{version} JEFF / steward / Sable / Correction'
+    book = '### Renamed\nOther'
+    assert manager.tell(told('dk827', 'JEFF')).get('external')
+    assert 'Agent Book / Follow-up from another person (missing or empty heading)' in s['pending'][-1]
+
+
+def test_wordless_worker_renders_current_book_at_turn_end(manager, tmp_path):
+    s = state(manager, 'preparing')
+    s.update(chat='dk50', tree=str(tmp_path))
+    manager.session = lambda person: manager.fixture_door
+    manager.report_turn = Mock()
+    previous = manager.h.m.see
+    book = ''
+    manager.h.m.see = lambda line, **kw: (
+        dict(rows=[dict(text=book)]) if line == 'look "Agent Book"' else previous(line, **kw))
+
+    class Child:
+        def __init__(self, cmd, cwd, env, events, log, stderr=None):
+            self.events, self.proc = events, SimpleNamespace(pid=1)
+        def send(self, text):
+            self.events.put(dict(e='result', ok=True))
+            return True
+        def stop(self):
+            pass
+
+    with patch.object(B.T, 'Child', Child):
+        for version in ('Before', 'After'):
+            book = f'### Worker ended without words\n{version} silent $.name'
+            manager.run_worker(s, 'fixture')
+            assert manager.report_turn.call_args.args[1] == f'{version} silent Codex fixture'
+        book = '### Renamed\nOther'
+        manager.run_worker(s, 'fixture')
+        assert 'Agent Book / Worker ended without words (missing or empty heading)' in manager.report_turn.call_args.args[1]
 
 
 def test_tell_resumes_a_blocked_builder_in_its_worktree(manager):
@@ -261,7 +308,7 @@ def test_a_builder_that_never_started_resumes_with_its_whole_task(manager):
     sent = {}
     manager.run_worker = lambda st, prompt: sent.update(prompt=prompt)
     manager.resume(s)
-    assert sent['prompt'].startswith('You are Codex fixture') and sent['prompt'].rstrip().endswith('go')
+    assert 'You are Codex fixture' in sent['prompt'] and sent['prompt'].rstrip().endswith('go')
 
 
 @pytest.mark.parametrize('phase', ['landed', 'released', 'uncertain', 'recovery-needed', 'reviewing', 'landing'])

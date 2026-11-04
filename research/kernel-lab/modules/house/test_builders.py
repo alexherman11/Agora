@@ -34,7 +34,9 @@ def manager(tmp_path):
     (world/'keep/accounts.json').write_text(json.dumps({'desktop:alex':'dk99','desktop:other':'dk98'}))
     (world/'keep/sessions.json').write_text(json.dumps({'fixture-token':{'account':'desktop:alex','agent':'claude'}}))
     door=WorldDoor()
-    m=SimpleNamespace(see=lambda *a,**k:dict(rows=[dict(door.task)]),happen=lambda *a:None)
+    book=(HERE/'fixtures/agent-book.md').read_text(encoding='utf-8')
+    m=SimpleNamespace(see=lambda line,**k:dict(rows=[dict(text=book) if line == 'look "Agent Book"' else dict(door.task)]),
+                      happen=lambda *a:None)
     h=SimpleNamespace(home=home,world=world,m=m,builder_url='http://127.0.0.1:1')
     b=B.Builders(h,tmp_path/'repo'); b.fixture_door=door
     return b
@@ -140,7 +142,7 @@ def test_a_changed_card_goes_to_the_worker_instead_of_stopping_it(manager):
     s=state(manager);s['basis']={'text':'original'};manager.session=lambda _:manager.fixture_door
     manager.fixture_door.task['text']='corrected acceptance'
     manager.assert_owned(s)                       # 4 Nov: no block; the new card is its next instruction
-    assert 'corrected acceptance' in s['resume_note'] and s['basis']['text']=='corrected acceptance'
+    assert s['resume_note']['facts']['text']=='corrected acceptance' and s['basis']['text']=='corrected acceptance'
     m=msg();m['args']['words']='Use the corrected acceptance.'
     with patch.object(B.threading.Thread,'start') as launch:
         assert manager.tell(m).get('external')
@@ -334,6 +336,7 @@ def test_real_kernel_claim_fence_and_git_lifecycle(tmp_path, monkeypatch):
     """Real kernel transactions, House-created git worktree, independent subprocess
     proof and publication; only the model boundary is scripted. No live world."""
     import time
+    monkeypatch.setattr(B.T, 'PY', Path(sys.executable))
     sys.path.insert(0,str(B.T.REPO/'research/kernel-lab'))
     from kernel.kernel import Kernel
     home=tmp_path/'world/modules/house';home.mkdir(parents=True)

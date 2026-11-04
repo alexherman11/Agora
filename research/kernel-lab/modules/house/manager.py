@@ -147,10 +147,7 @@ def notify(builders, state):
     builders._manager_notifications = notified
     if state.get('manager_seen_receipt') == receipt or notified.get(state['task']) == receipt:
         return
-    agent.wake('~ Your builder has a receipt for '+state.get('title',state['task'])+' ('+state['task']+'): '
-               +state['phase']+'. Read house.manage '+state['task']+' action=report and its current card. '
-               'Received is not reviewed; landed is not activated or verified. Continue only this approved task, '
-               'respect holds and corrections, coordinate activation with JEFF in Shop talk.')
+    agent.wake(builders.message("Rowan's builder receipt (Rowan only, the older path)", state))
     # Delivery is only an in-process suppression. A restart re-wakes any receipt
     # the owner has not actually read through action=report.
     notified[state['task']] = receipt
