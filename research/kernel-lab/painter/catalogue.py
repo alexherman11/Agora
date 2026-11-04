@@ -1,4 +1,9 @@
-"""First-party cards: data for discovery, installation and the live gallery."""
+"""EDITING THE PAINTER (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+The painter's vocabulary (formats, handles, scopes, parts) is shared by every app. Add to it only what any lens could
+use, documented where lens authors read it (ARRANGEMENT.md); never a handle, format or branch for one app. If one app
+needs something, the general form of it is the change.
+
+First-party cards: data for discovery, installation and the live gallery."""
 import json
 
 

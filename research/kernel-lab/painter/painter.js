@@ -1,3 +1,8 @@
+// EDITING THE PAINTER (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+// The painter's vocabulary (formats, handles, scopes, parts) is shared by every app. Add to it only what any lens could
+// use, documented where lens authors read it (ARRANGEMENT.md); never a handle, format or branch for one app. If one app
+// needs something, the general form of it is the change.
+//
 // Trusted arrangement runtime; component code supplies pixels, never the reading.
 // The entire painter uses the existing guarded widget surface and bridge.
 const {widget, target} = await agora.ready;

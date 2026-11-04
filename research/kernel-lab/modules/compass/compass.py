@@ -1,4 +1,10 @@
-"""A reviewed loopback compass host. Persistent configuration and points are world things.
+"""EDITING A MODULE (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+A module is a seam to something outside the kernel (a model provider, git, Twitch, the media session, a map server) and
+turns it into world facts and words. What the world does with them (who is told, when, in what words, how it looks)
+belongs in rules, lenses and this module's settings thing, read at each use. Names (JEFF, Alex), ids (dk...), models,
+counts, timeouts and message text in this file are debt: move them to settings when you touch them, and never add more.
+
+A reviewed loopback compass host. Persistent configuration and points are world things.
 
 The browser owns the actual orientation/motion sensors. This process owns their
 word-layer leases and serves a page; off kills the host and all its leases. It

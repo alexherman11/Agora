@@ -1,4 +1,11 @@
-"""The store: a plain, append-only log of records, each holding the facts one act made (SHAPE section 1).
+"""EDITING THE KERNEL (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+The kernel changes only to give every world a general capability: a word, a check, a kind of fact any app, module or
+person can use. It never names its tenants: no app, module, person, kind or field name appears in this code except the
+kernel's own (word, rule, kind, grant, person, ...). If your change needs `if kind == "..."`, a person's name or one app's
+field, stop: the missing piece is a general word (a kind's policy, a rule step, a reading). Build that, or put it on the
+Board. Names already here are debt (research/source-edits/SOURCE-AUDIT-KERNEL.md lists them); take them out when you can.
+
+The store: a plain, append-only log of records, each holding the facts one act made (SHAPE section 1).
 
 A fact is [thing, aspect, hash of the value before, value]; a fact of length 3 says the aspect is gone. The facts are the
 truth; a record's `words` are testimony and are never parsed on replay. Records chain: each holds the digest of the one

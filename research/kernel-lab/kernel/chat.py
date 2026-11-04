@@ -1,4 +1,11 @@
-"""Chats: a kind of thing people talk in, and the `say` word (MOVING-IN D4, Alex 27 Oct: "A kind, chat is a great idea").
+"""EDITING THE KERNEL (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+The kernel changes only to give every world a general capability: a word, a check, a kind of fact any app, module or
+person can use. It never names its tenants: no app, module, person, kind or field name appears in this code except the
+kernel's own (word, rule, kind, grant, person, ...). If your change needs `if kind == "..."`, a person's name or one app's
+field, stop: the missing piece is a general word (a kind's policy, a rule step, a reading). Build that, or put it on the
+Board. Names already here are debt (research/source-edits/SOURCE-AUDIT-KERNEL.md lists them); take them out when you can.
+
+Chats: a kind of thing people talk in, and the `say` word (MOVING-IN D4, Alex 27 Oct: "A kind, chat is a great idea").
 
     make kind=chat name="Shop talk"                       an open chat: the place sees it, anyone in it may say
     make kind=chat name=Conversation with="Alex, JEFF"    a closed chat: only those people see it and say in it

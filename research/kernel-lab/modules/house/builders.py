@@ -1,4 +1,10 @@
-"""Kernel House builders. No Frontier queue and no credentials or grants minted here.
+"""EDITING A MODULE (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+A module is a seam to something outside the kernel (a model provider, git, Twitch, the media session, a map server) and
+turns it into world facts and words. What the world does with them (who is told, when, in what words, how it looks)
+belongs in rules, lenses and this module's settings thing, read at each use. Names (JEFF, Alex), ids (dk...), models,
+counts, timeouts and message text in this file are debt: move them to settings when you touch them, and never add more.
+
+Kernel House builders. No Frontier queue and no credentials or grants minted here.
 
 Calls return a durable request promptly. A builder uses the requester's existing
 agent session, just as residents use their own door sessions (MOVING-IN D3).

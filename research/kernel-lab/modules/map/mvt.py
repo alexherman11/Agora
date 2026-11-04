@@ -1,4 +1,10 @@
-"""A small Mapbox Vector Tile (MVT 2.1) reader: protobuf by hand, no packages.
+"""EDITING A MODULE (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+A module is a seam to something outside the kernel (a model provider, git, Twitch, the media session, a map server) and
+turns it into world facts and words. What the world does with them (who is told, when, in what words, how it looks)
+belongs in rules, lenses and this module's settings thing, read at each use. Names (JEFF, Alex), ids (dk...), models,
+counts, timeouts and message text in this file are debt: move them to settings when you touch them, and never add more.
+
+A small Mapbox Vector Tile (MVT 2.1) reader: protobuf by hand, no packages.
 
 decode(data, layers=None) -> {layer name: (extent, [Feature])}. A Feature is (type, props, geometry) where type is
 1 point, 2 line, 3 polygon, and geometry is in tile units (y grows downward):

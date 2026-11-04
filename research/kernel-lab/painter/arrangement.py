@@ -1,4 +1,9 @@
-"""Data-only arrangement compiler. No component JavaScript runs to describe a view."""
+"""EDITING THE PAINTER (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+The painter's vocabulary (formats, handles, scopes, parts) is shared by every app. Add to it only what any lens could
+use, documented where lens authors read it (ARRANGEMENT.md); never a handle, format or branch for one app. If one app
+needs something, the general form of it is the change.
+
+Data-only arrangement compiler. No component JavaScript runs to describe a view."""
 import hashlib
 import json
 import re

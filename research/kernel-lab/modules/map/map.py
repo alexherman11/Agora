@@ -1,4 +1,10 @@
-"""The map module: words that read the live ground (tiles.py) and the placed things of the world.
+"""EDITING A MODULE (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+A module is a seam to something outside the kernel (a model provider, git, Twitch, the media session, a map server) and
+turns it into world facts and words. What the world does with them (who is told, when, in what words, how it looks)
+belongs in rules, lenses and this module's settings thing, read at each use. Names (JEFF, Alex), ids (dk...), models,
+counts, timeouts and message text in this file are debt: move them to settings when you touch them, and never add more.
+
+The map module: words that read the live ground (tiles.py) and the placed things of the world.
 
 A map is a world thing (`kind=map`): a name, a `centre=lat,lon` it opens at, and the lens that shows it. Its ground is
 the live tiles (OpenStreetMap through OpenFreeMap, buildings through Overture), fetched only where someone looks and

@@ -1,4 +1,11 @@
-"""Admission checks for a proposed library-limited metadata grant.
+"""EDITING THE KERNEL (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+The kernel changes only to give every world a general capability: a word, a check, a kind of fact any app, module or
+person can use. It never names its tenants: no app, module, person, kind or field name appears in this code except the
+kernel's own (word, rule, kind, grant, person, ...). If your change needs `if kind == "..."`, a person's name or one app's
+field, stop: the missing piece is a general word (a kind's policy, a rule step, a reading). Build that, or put it on the
+Board. Names already here are debt (research/source-edits/SOURCE-AUDIT-KERNEL.md lists them); take them out when you can.
+
+Admission checks for a proposed library-limited metadata grant.
 
 No grants are created here. A library: clause permits only folder/entry metadata,
 never library creation, uploaded file mutation, attachment, or generic writes.

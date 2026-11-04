@@ -1,4 +1,11 @@
-"""The feel of a drag or a resize: dead zone, dwell before a neighbour gives way, swap or slide, eased ghosts,
+"""EDITING THE DESKTOP HOST (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+This file is a seam between the world and Windows: it turns world facts into screen effects and screen events into world
+facts, through small words. It holds no preferences and no content. Which apps, what a button opens, sizes, names, ids and
+who may do what live in settings things it reads (shell-settings, wm-settings). It does not seed the world at start
+(people, chats, pins). New behaviour is a rule over the words offered here. Before writing a Windows or browser helper,
+use the shared one (gaming_gate for full-screen and desktop tests, widget_browser for hidden pages) instead of a copy.
+
+The feel of a drag or a resize: dead zone, dwell before a neighbour gives way, swap or slide, eased ghosts,
 settling back, snapping, shared edges and the landing. Pure and deterministic: time in ms is an input; nothing here
 reads a clock, the screen or the world. The design and its numbers are in WM.md, "Feel".
 
