@@ -21,7 +21,7 @@ from painter.install import upsert, widget_source, taskboard, Q, app  # noqa: E4
 
 LENS = 'writing'
 GRANTS = ('window.surface rows look look-view history components help component-health component-action file-read '
-          'make set forget undo say ask hear:make hear:set hear:forget hear:undo hear:say hear:component hear:component-action')
+          'make set forget undo say ask hear:make hear:set hear:forget hear:undo hear:say hear:component hear:component-action hear:view')
 VIEW = {'open': '', 'back': '', 'fresh': ''}
 
 KINDS = {

@@ -86,7 +86,7 @@ def activate(door,name,title):
     mid=upsert(door,'widget',name,title=title,style='bars',component_lens=name,code=widget_source())
     grants=('window.surface rows look look-view history components help component-health component-action task-add task-move task-assign task-done '
             'task-note task-priority task-colour task-note-colour task-note-style task-filter task-rename task-edit task-text task-remove summarize.* make set forget undo '
-            'hear:make hear:set hear:forget hear:undo hear:component hear:component-action hear:task-*')
+            'hear:make hear:set hear:forget hear:undo hear:component hear:component-action hear:view hear:task-*')
     current=door.rows('widget',name=name)[0]
     matching=any(g.get('words')==grants and not g.get('revoked') for g in door.rows('grant',to=mid))
     if not current.get('on') or not matching:

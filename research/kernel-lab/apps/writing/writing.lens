@@ -4,8 +4,11 @@
 # plan=waiting|answered, and verdict= once Alex makes his call. A comment is kind=comment about=<document> quote=<its words>.
 # What is open is this window's own view ($view.open, $view.back). Every press below says the line it runs.
 root : writing-shell, title "Writing"
+  sizes narrow 0, middle 1080, wide 1460
   on new do make kind=document title="Untitled" collection=notes text=""
   rail : doc-rail, hint "Find a document"
+    panel left, icon sidebar, label "Documents", width 292
+    shut when narrow middle
     watch reading:"rows document"
     watch reading:"rows note"
     plans : doc-shelf, label "Plans", open yes
@@ -38,7 +41,7 @@ root : writing-shell, title "Writing"
 rail-row : doc-row, look row
 home-card : doc-row, look card
 home-line : doc-row, look list
-page-view : doc-page
+page-view : doc-page, measure 780
   watch reading:"rows document"
   watch reading:"rows note"
   on edit do set $d.id text=$value
@@ -51,6 +54,8 @@ page-view : doc-page
   on new do make kind=document title=$title collection=notes text=""
   on forget do forget $d.id
   comments : column, of tag:comment, prop:about=$d.id as c, each comment-view
+    panel right, icon comment, label "Comments", width 300
+    shut when narrow
 comment-view : doc-comment, doctext $d.text, doctitle $d.title
   on reply do make kind=comment about=$d.id reply_to=$c.id text=$value
   on resolve do set $c.id resolved=yes

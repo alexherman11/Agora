@@ -164,7 +164,12 @@ mark.wr-mark.wr-hot{background:color-mix(in srgb,var(--ag-warn,#e0a040) 55%,tran
 .wr-below .wr-row{padding-left:12px}
 /* margin */
 .wr-margin{position:sticky;top:0;display:flex;flex-direction:column;gap:10px;padding-top:6px}
+.wr-page:has(>.wr-margin[data-shut]),.wr-page:has(>.wr-margin[data-over]){grid-template-columns:minmax(0,1fr)}
+.wr-margin[data-over]{padding:14px 16px 24px}
+.wr-shell:has(>.wr-railbox[data-shut]),.wr-shell:has(>.wr-railbox[data-over]){grid-template-columns:minmax(0,1fr)}
+.wr-railbox[data-over]{border-right:0}
 .wr-margin-head{display:flex;align-items:center;gap:8px;font:650 11.5px/1 var(--ag-font-ui,inherit);letter-spacing:.12em;text-transform:uppercase;color:var(--ag-ink-muted,#7b847f);padding:6px 2px}
+
 .wr-hint{font-size:12.5px;color:var(--ag-ink-muted,#7b847f);line-height:1.5;padding:10px 12px;border-radius:12px;border:1px dashed var(--ag-border,#e2dfd6)}
 .wr-c{display:flex;flex-direction:column;gap:7px;padding:12px 13px;border-radius:14px;background:var(--ag-raised,#fff);border:1px solid var(--ag-border,#e2dfd6);font-size:13.5px;line-height:1.5;transition:box-shadow .15s,border-color .15s}
 .wr-c.wr-hot{border-color:var(--ag-warn,#e0a040);box-shadow:0 0 0 3px color-mix(in srgb,var(--ag-warn,#e0a040) 22%,transparent)}
@@ -202,7 +207,7 @@ mark.wr-mark.wr-hot{background:color-mix(in srgb,var(--ag-warn,#e0a040) 55%,tran
 .wr-pop-row{display:flex;align-items:center;gap:6px}
 .wr-pop-row small{color:var(--ag-ink-muted,#7b847f);font-size:11.5px;margin-right:auto}
 .wr-pop code{font:11.5px/1.4 var(--ag-font-mono,monospace);color:var(--ag-ink-muted,#7b847f);overflow-wrap:anywhere}
-@media (max-width:980px){.wr-page{grid-template-columns:minmax(0,1fr);padding:20px 18px 60px}.wr-margin{position:static}.wr-sheet{padding:24px 22px}}
+@media (max-width:980px){.wr-page{padding:20px 18px 60px}.wr-sheet{padding:24px 22px}}
 @media (prefers-reduced-motion:reduce){.wr-card,.wr-chev,.wr-c,mark.wr-mark{transition:none}}
 `;
 
@@ -428,13 +433,14 @@ function mountShell(api,s){
   // window.open writing <document> starts on that document (the window's $view.target), once
   if(view.target&&window.wrSeeded!==view.target){window.wrSeeded=view.target;queueMicrotask(()=>api.select({open:view.target,back:view.open||''}))}
   const back=view.back&&view.back!==view.open;
-  const top=wrEl('header',{class:'wr-top'},wrEl('div',{class:'wr-brand'},wrEl('i',{},'✎'),s.title||'Writing'));
+  const top=wrEl('header',{class:'wr-top'},...api.panelButtons('left'),wrEl('div',{class:'wr-brand'},wrEl('i',{},'✎'),s.title||'Writing'));
   if(back)top.append(wrEl('button',{type:'button',class:'wr-btn','aria-label':'Back to the document before',title:'Back (Alt+←)',on:{click:()=>api.select({open:view.back,back:view.open})}},wrIcon('back'),'Back'));
   if(view.open)top.append(wrEl('button',{type:'button',class:'wr-btn wr-quiet',on:{click:()=>api.select({open:'',back:view.open})}},'Home'));
-  top.append(wrEl('span',{class:'wr-space'}));
+  top.append(wrEl('span',{class:'wr-space'}),...api.panelButtons('right'));
   if(wrHasGesture(api,'new'))top.append(wrEl('button',{type:'button',class:'wr-btn wr-primary',title:wrLineOf(api,'new'),on:{click:async()=>{
     try{const id=wrMade(await wrFire(api,'new',{}));if(id)api.select({open:id,back:api.view().open||'',fresh:id})}catch{}}}},wrIcon('plus'),'New document'));
-  const railbox=wrEl('aside',{class:'wr-railbox','aria-label':'Documents'}),deskbox=wrEl('main',{class:'wr-deskbox'});
+  // the rail's box is the frame that opens and shuts when the rail is a panel (the lens's `panel left`)
+  const railbox=wrEl('aside',{class:'wr-railbox','aria-label':'Documents','data-panel-frame':''}),deskbox=wrEl('main',{class:'wr-deskbox'});
   for(const child of api.children)(child.name==='rail'||child.component==='doc-rail'?railbox:deskbox).append(api.render(child));
   root.append(top,railbox,deskbox);
   const keys=e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();document.querySelector('.wr-find input')?.focus()}
@@ -550,7 +556,10 @@ function mountPage(api,s){
   const readonly=!!d.file_source,text=String(d.text||''),lines=text.split('\n'),plan=wrPlanState(d)||(d.collection==='plans'?'waiting':'');
   if(!D.docs)D.docs=[];
   const desk=wrEl('div',{class:'wr-desk'}),root=api.part('body','article',{class:'wr-page','aria-label':wrTitle(d)});desk.append(root);
-  const paper=wrEl('div',{class:'wr-paper'}),margin=wrEl('aside',{class:'wr-margin','aria-label':'Comments'});root.append(paper,margin);
+  // the margin is the frame of this page's panel (the lens's `panel right` on its comments): shut, it has no width
+  const panelName=api.children.find(c=>c.panel)?.name||'';
+  const margin=wrEl('aside',{class:'wr-margin','aria-label':'Comments','data-panel-frame':panelName}),paper=wrEl('div',{class:'wr-paper'});root.append(paper,margin);
+  if(/^\d{3,4}$/.test(String(s.measure||'')))root.style.setProperty('--wr-measure',s.measure+'px');
   const rev=()=>api.latest().saw?.[id]??d.rev;
   const sayRefusal=e=>String(e?.message||e).split('\n')[0];
 
@@ -623,6 +632,7 @@ function mountPage(api,s){
       for(const b of md.querySelectorAll(':scope>.wr-block')){const mk=wrMarkQuote(b,f.quote,f.id);if(mk){mk.addEventListener('click',e=>{e.stopPropagation();hot(f.id,true)});break}}}
   }
   function hot(cid,scroll){for(const n of desk.querySelectorAll('.wr-hot'))n.classList.remove('wr-hot');
+    if(scroll&&panelName&&!api.panelOpen(panelName))api.panel(panelName,true);   // a comment's words were clicked: show it
     const card=margin.querySelector('[data-comment-card="'+cid+'"]');const mk=md.querySelector('mark[data-comment="'+cid+'"]');
     card?.classList.add('wr-hot');for(const m of md.querySelectorAll('mark[data-comment="'+cid+'"]'))m.classList.add('wr-hot');
     if(scroll)(card&&scroll==='card'?card:mk||card)?.scrollIntoView({block:'center',behavior:'smooth'})}

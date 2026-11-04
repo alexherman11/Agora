@@ -356,3 +356,50 @@ is a happening without publishing private error text to other viewers. Observed
 paint data is separate from the projected plan and does not cause repaint loops.
 Unreviewed bytes execute only in quarantine. Neither path adds an independent
 world capability per nested piece: gestures use the existing guarded bridge.
+
+## Panels and sizes (4 Nov 2026)
+
+Alex asked for side panels that shut to nothing from icons in the window's top bar, like Claude desktop, and for each
+app to say what it does at different window widths. Three lens words do it:
+
+```
+root : writing-shell, title "Writing"
+  sizes narrow 0, middle 1080, wide 1460
+  rail : doc-rail
+    panel left, icon sidebar, label "Documents", width 292
+    shut when narrow middle
+page-view : doc-page, measure 780
+  comments : column, of tag:comment, prop:about=$d.id as c, each comment-view
+    panel right, icon comment, label "Comments", width 300
+    shut when narrow
+```
+
+- **`sizes <name> <from px>, ...`** goes on the root. It names the window's widths. The current name is `$view.size`, so any
+  part can read it (`only when $view.size = wide`). The painter re-reads the plan when the window crosses a size.
+- **`panel left|right, icon <name>, label "<words>", width <px>`** goes on any part. The part becomes a side panel,
+  either open or shut, and shut means no width at all. Its button goes in the top bar, on its side. Icons come from
+  `P.icon`: sidebar, sidebar-right, comment, list, outline, info, files, chat and people.
+- **`shut when <sizes>`** or **`shut when <condition>`** is the layout's wish. It takes size names, or a condition in
+  `only when`'s form (`shut when $view.open = ""`). When the wish starts, the panel shuts. When it ends, a panel the
+  layout shut opens again, but a panel you shut stays shut. A panel you open while the layout wants it shut lies over
+  the page, and a click on the page or Escape shuts it again.
+
+Which panels are open is the window's own view, `$view.<panel>` = `open|shut`. It is screen state (Alex, 26 Oct): sent
+with each reading and kept in the kernel's memory, never recorded. From Lines:
+- `look-view writing` shows what your running window shows now (`window: ... rail=shut, size=narrow` and `panels: ...`).
+- `view writing comments=open` changes it. Only the person it is said by (or their agent) is told.
+- A lasting choice is a preference: `make kind=view-preference sees=me lens=writing view.comments=shut`.
+- A rule that runs `view` can open panels when something happens.
+
+For component authors:
+- `api.panelButtons('left'|'right')` returns the buttons, for a component that draws its own top bar. Any panel whose
+  button is placed nowhere gets one floating at that top corner.
+- `api.panelOpen(name)` and `api.panel(name, open)` read and set a panel, for example to show comments when their
+  words are clicked.
+- If a component holds a panel inside a container of its own, it marks that container `data-panel-frame` (empty for
+  the panel inside it, or `="<panel name>"`). The container is then what opens and shuts.
+- The painter puts `data-panel=<side>` on the frame always, `data-shut` while it is shut and `data-over` while it lies
+  over the page. A grid gives up the frame's column with `:has()`. Writing does it like this:
+  `.wr-page:has(>.wr-margin[data-shut]){grid-template-columns:minmax(0,1fr)}`.
+
+This replaced the 40px fold strip (`fold <label>`, `P.fold`) from earlier the same day, which was never committed.

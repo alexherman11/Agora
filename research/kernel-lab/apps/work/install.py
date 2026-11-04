@@ -28,7 +28,7 @@ Q = board.quote
 
 # the painter's own words first (as the Task board's widget holds them: painter/install.py activate), then Work's
 GRANTS = ("window.surface rows look look-view history components help component-health component-action undo "
-          "hear:make hear:set hear:forget hear:undo hear:component hear:component-action "
+          "hear:make hear:set hear:forget hear:undo hear:component hear:component-action hear:view "
           "house.active house.who house.activity house.log chat say set hear:say hear:house.doing hear:task-*")
 
 
