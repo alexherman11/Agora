@@ -25,7 +25,6 @@ import shutil
 import statistics
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 import urllib.request
@@ -42,6 +41,7 @@ from test_skeleton import StandInEntry, post        # noqa: E402
 from test_painter import quoted, walk                # noqa: E402
 from kernel.door import serve                        # noqa: E402
 from kernel.kernel import Kernel                     # noqa: E402
+from kernel import scratch  # noqa: E402
 
 NODE = shutil.which("node")
 PY = sys.executable
@@ -68,7 +68,7 @@ class Clock:
 class Night:
     def __init__(self, out):
         self.out = out
-        self.dir = tempfile.mkdtemp(prefix="council-night-")
+        self.dir = scratch.mkdtemp(prefix="council-night-")
         self.secret = secrets.token_hex(16)
         self.entry = StandInEntry(self.secret)
         self.clock = Clock("2026-10-28T20:00Z")                      # 1 pm in Seabright

@@ -1,0 +1,16 @@
+font sans = Segoe UI, system-ui, sans-serif
+token paper = #F7F5FB
+token ink = #1F1A2B
+token soft = ink at 65%
+token gap = 8
+token ramp = 1.14
+token text = sans 15/1.45
+token twpurple = #6441A5
+role tw.page : on paper, ink, text, pad gap x2, between gap
+role tw.top : between gap, align center
+role tw.feed : pad right gap /2
+role tw.msg : text down, pad gap /4, pad left gap /2, pad right gap /2
+role tw.name : text down strong, twpurple, pad right gap
+role tw.words : text down, ink
+role tw.when : text down, soft, pad left gap
+role tw.hint : text down, soft

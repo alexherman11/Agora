@@ -10,7 +10,6 @@ import json
 import secrets
 import shutil
 import sys
-import tempfile
 import threading
 import unittest
 import urllib.error
@@ -24,6 +23,7 @@ sys.path.insert(0, str(LAB))
 from kernel.door import serve                     # noqa: E402
 from kernel.kernel import Kernel, Refused, Actor   # noqa: E402
 from kernel.store import Log, BrokenLog, canon     # noqa: E402
+from kernel import scratch  # noqa: E402
 
 NODE = shutil.which("node")
 INVITE = "seabright-flyer-oct"
@@ -92,7 +92,7 @@ class Skeleton(unittest.TestCase):
     GRANTS = "look pin"
 
     def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix="kernel-test-")
+        self.dir = scratch.mkdtemp(prefix="kernel-test-")
         self.secret = secrets.token_hex(16)
         self.entry = StandInEntry(self.secret)
         # this world counts its own invites (the seam's later phase); the real-entry tests below use the first
@@ -192,6 +192,22 @@ class Skeleton(unittest.TestCase):
         self.assertEqual(len(out["records"]), 1)
         self.assertIn("pinned by Alex", self.ok(self.maya, f"look {p}", path="/see")["text"])
         self.assertIn("already pinned", self.ok(self.alex, f"pin {p}")["text"])
+        self.replays()
+
+    def test_a_thing_s_lead_may_change_it_once_the_word_allows_its_lead(self):
+        """3 Nov: a resident handed a card (lead=<it>) could not change it: it neither made it nor leads the place.
+        A word whose may says `lead` lets a thing's lead act on that thing, and only that thing."""
+        card = self.ok(self.alex, "make kind=note title=Repair lead=Bea")["made"][0]
+        other = self.ok(self.alex, "make kind=note title=Other")["made"][0]
+        self.refused(self.bea, f"look {card}; set {card} lane=Done", "set is for whoever made it or leaders")
+        self.ok(self.alex, 'look set; word-set set may="maker or lead or leaders"')
+        self.ok(self.bea, f"look {card}; set {card} lane=Done")
+        self.refused(self.bea, f"look {other}; set {other} lane=Done", "set is for whoever made it or its lead or leaders")
+        self.refused(self.maya, f"look {card}; set {card} lane=Now", "its lead")
+        bea = self.person("email:bea@example.org")
+        self.ok(self.alex, f"look {card}; set {card} lead={bea}")          # by person id as well as by name
+        self.ok(self.bea, f"look {card}; set {card} lane=Now")
+        self.refused(self.alex, 'look set; word-set set may="maker or boss"', "maker, lead or nobody")
         self.replays()
 
     def test_like_is_sealed_and_once_each(self):
@@ -541,7 +557,7 @@ class WithTheRealEntryService(unittest.TestCase):
         except Exception as exc:          # noqa: BLE001
             self.skipTest(f"the entry service could not be imported: {exc!r}")
         from wsgiref.simple_server import make_server, WSGIRequestHandler
-        self.tmp = tempfile.mkdtemp(prefix="kernel-entry-")
+        self.tmp = scratch.mkdtemp(prefix="kernel-entry-")
         self.secret = secrets.token_hex(16)
         env = {"SITE_MODE": "test", "SITE_DATA_DIR": str(Path(self.tmp, "entry")), "GOOGLE_STAND_IN": "off",
                "SITE_SECRET_KEY": secrets.token_hex(32), "KERNEL_SHARED_SECRET": self.secret,

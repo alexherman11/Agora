@@ -21,7 +21,11 @@ def _probe():
         meetings = ids['channels']['Meetings & events']
         channel = next(r for r in f.see('Alex', 'rows board-channel')['rows'] if r['group'] == meetings)
         f.check('Meetings & events says it opens a calendar', channel.get('opens') == 'calendar' and channel.get('opens_label') == 'Calendar')
-        f.check('other channels keep their conversations', all(not r.get('opens') for r in f.see('Alex', 'rows board-channel')['rows'] if r['group'] != meetings))
+        # Asks & offers and Research & documents open their own views too (dk1498); the rest keep conversations.
+        views = {r['title']: r.get('opens') for r in f.see('Alex', 'rows board-channel')['rows'] if r['group'] != meetings}
+        f.check('other channels keep their conversations',
+                views.pop('Asks & offers', None) == 'asks' and views.pop('Research & documents', None) == 'documents'
+                and not any(views.values()))
 
         # Exactly the line the lens gesture makes: no seats and no separate text.
         made = f.say('Alex', line('board.post', post_kind='event', **{'in': meetings}, title='Garden workday',

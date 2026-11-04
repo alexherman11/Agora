@@ -6,10 +6,10 @@ import json
 from pathlib import Path
 import shutil
 import sys
-import tempfile
 import time
 
 HERE=Path(__file__).resolve().parent;LAB=HERE.parents[1];sys.path.insert(0,str(LAB))
+from kernel import scratch
 from painter.freeze import verify,FROZEN
 from painter.install import taskboard,Q
 from painter.fresh_agent import run as fresh,ROOT
@@ -27,7 +27,7 @@ class Copy:
         # compiler must still match; a later painter JS repair is not imported.
         compiler='research/kernel-lab/painter/arrangement.py'
         assert hashlib.sha256((ROOT/compiler).read_bytes()).hexdigest()==manifest['sha256'][compiler]
-        self.d=Desk.__new__(Desk);self.d.dir=tempfile.mkdtemp(prefix='painter-tweak-')
+        self.d=Desk.__new__(Desk);self.d.dir=scratch.mkdtemp(prefix='painter-tweak-')
         world=Path(self.d.dir)/'world';shutil.copytree(FROZEN,world)
         self.d.k,self.d.srv,self.d.host,self.d.entry=kdesk.start(world,0,headless=True)
         self.d.url=f'http://127.0.0.1:{self.d.srv.server_address[1]}'

@@ -30,7 +30,6 @@ import secrets
 import shutil
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 import urllib.error
@@ -49,6 +48,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import qr_read  # noqa: E402
 from cdp import NO_WINDOW, Browser, free_port  # noqa: E402
+from kernel import scratch  # noqa: E402
 
 from agora_entry.__main__ import ThreadingServer  # noqa: E402
 from agora_entry.config import Config  # noqa: E402
@@ -309,7 +309,7 @@ def bot(app: App, code: str, ips: list[str], stop: threading.Event, tally: dict)
 # -- the evening -----------------------------------------------------------
 
 async def evening() -> None:
-    tmp = Path(tempfile.mkdtemp(prefix="entry-evening-"))
+    tmp = Path(scratch.mkdtemp(prefix="entry-evening-"))
     if OUT.exists():
         shutil.rmtree(OUT)
     OUT.mkdir(parents=True)

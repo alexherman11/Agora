@@ -8,13 +8,13 @@ import importlib.util
 import json
 import secrets
 import sys
-import tempfile
 import threading
 import time
 from pathlib import Path
 
 LAB = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(LAB), str(LAB/'tests'), str(LAB/'apps/taskboard'), str(LAB/'modules/model')]
+from kernel import scratch  # noqa: E402
 
 
 def worker():
@@ -54,7 +54,7 @@ def run():
         print(f'{len(checks)+1:02d} {"ok" if yes else "FAIL"} {name} {detail}', flush=True)
         checks.append(dict(check=name, ok=bool(yes), detail=detail))
         assert yes, (name, detail)
-    with tempfile.TemporaryDirectory(prefix='agora-local-model-', ignore_cleanup_errors=True) as folder:
+    with scratch.TemporaryDirectory(prefix='agora-local-model-', ignore_cleanup_errors=True) as folder:
         entry = StandInEntry(secrets.token_hex(16))
         ms = specs()
         ms[0]['run'] = [ms[0]['run'][0], str(Path(__file__).resolve()), '--worker']

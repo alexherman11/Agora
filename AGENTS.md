@@ -2,23 +2,23 @@
 
 <!-- agora:standing-rules:begin -->
 ## Alex's standing rules
-Read the live charter first: `read a6529 :3`. Single source in the world; snapshot as of event e12574.
+Read the live charter first: `look dk838` on the desktop (8810). Single source in the world; the ten below are an older snapshot (old desk event e35003).
 Generated; never hand-edit this block. First ten rules in charter order:
-- Nothing that waits on Alex may ask him to type a command or start something. Run it, or make it one click. (17 Oct)
-- Never show him ids (a5143). Show what a thing is called, and make every name clickable. (16 Oct)
-- Reply like texting: few words, no big blocks. (15 Oct)
-- No black on black: the home screen wants a light theme with nice colours. (20 Oct)
-- Nothing scrolls on the HUD; no replaying decorative animation; only the pomodoro ring moves. (16 Oct)
-- The Conversation is only Alex and JEFF. Agents coordinate in Shop talk. No tests or checks in the Conversation. (16 Oct)
-- No visible test windows or interactive tests on his screen, ever; they take his focus and keys. Use the sandbox (hidden desktop, with its guard). (16 Oct)
-- Nothing may wake his computer from sleep. (15 Oct)
-- Ask first before: ending a program, changing settings, installing, sending as him, spending, deleting. Never his passwords or card, never security settings, never anything while he is in a game. (15 Oct)
-- A worker's tool permissions come from JEFF, narrow, per card. Alex's word through JEFF carries his authority. (16 Oct)
+- Never ask Alex to type or start something: run it or make it one click. (17 Oct)
+- Show clickable names, never ids. (16 Oct)
+- Lenses open in their own windows, not Viewer, except in the browser. (21 Oct)
+- Text briefly, like texting. (15 Oct)
+- Light home screen, nice colours; no black on black. (20 Oct)
+- Nothing scrolls on HUD; only the pomodoro ring moves. (16 Oct)
+- Conversation is Alex and JEFF only. Agents coordinate in Shop talk; no tests in Conversation. (16 Oct)
+- Highlighting only selects; right-click Comment quotes selection into Conversation. (21 Oct)
+- Right-click actions fit targets: text → Comment; Needs Me items → Delete. (21 Oct)
+- No visible test windows; use guarded hidden sandbox. (16 Oct)
 <!-- agora:standing-rules:end -->
 
 Agora is a personal computing environment shared by one person, Alex, and a persistent agent, JEFF. It is built on one substrate wherever possible, so that anything on a computer can be represented, viewed, changed and extended in the same way. Read [Agora](docs/Agora.md) for the vision. It is the larger goal everything here works toward.
 
-Right now Agora is a **text desk**: a world of things, surfaces and lenses that people and agents enter and change through a small text language. It lives in `research/text-desk-lab/notation/`. The desk is both the prototype we are building and the place the team lives and works.
+Right now Agora is Alex's **desktop**: the kernel (`research/kernel-lab/`), served on 8810 by `research/window-lab/kernel-desktop/`, changed through Lines. It is both the prototype we are building and the place the team lives and works. The old text desk (`research/text-desk-lab/notation/`) was archived on 27 Oct; its world is kept read-only at `C:/Projects/Agora/archive/frontier-2026-10/`.
 
 **Where it is going (Alex, 12 Oct 2026): the desk is slowly migrating into Alex's actual Windows desktop.** Agora-native apps appear as real windows, a window manager arranges them, and one supervisor holds a shared object space that native apps speak through and other programs publish into. Agents will increasingly act on the PC itself, not only inside the desk.
 
@@ -35,9 +35,13 @@ Two kinds of agent work here, and everything else in this file applies to both.
 
 **Alex directs the project.** He checks the work, steers the direction, and decides what enters the design documents.
 
+**One shared throughline.** All code, documentation, research and worker commissions converge on `main` in the canonical checkout, `C:/Projects/Agora4`. Temporary branches and worker worktrees serve that shared project; accepted changes merge back there. Keep the current implementation, its documentation and its evidence together so the next person or worker continues from one common state.
+
 **Alex is the gate for new designs.** A new design or a big idea comes to him first, as an interactive and visual explanation he can question and revise with you. Once he understands and approves it, you build it under your own authority. Everything else is pre-approved: code, testing, exploration, ideation, changing the desk, fixing friction, work under existing Dynamic Desk and Agora ideas, editing documentation.
 
 **Epics, stories, tasks.** The Board holds all three. Agents take and manage stories and epics, and may manage tasks too. In general the agents who hold them do not code: they use the natural language interface to manage implementation, testing and research. Their job is to hold identity and explore ideas, not to think about code.
+
+Every card has a level (Alex, 3 Nov): 1 easy board commands, done directly; 2 workers working with desk agents; 3 Alex and an agent working together, which waits for him.
 
 You are here to help build the larger vision, and that means more than finishing a task:
 
@@ -60,7 +64,7 @@ You are here to help build the larger vision, and that means more than finishing
 - Desk hygiene:
   - If you see something outdated or incorrect, don't just leave it uncorrected. You have to work together to take care of the space, like you share the same kitchen.
   - Never read `sessions/*.pickle` files directly, and never grep exported logs (they dump whole transcripts).
-  - Private experiments go in your own world (`<world>-<your name>`) or a fork of the shared one (`worktree fork <name>` in the desk). Don't touch other people's.
+  - Private experiments go in a separate desktop world (`kdesk.py --world <dir> --port <n>`), never your live one. Don't touch other people's.
 
 ## Where things live
 
@@ -77,7 +81,7 @@ You are here to help build the larger vision, and that means more than finishing
 
 ## Practical rules
 
-- **Git.** Work by hand happens in one checkout, `C:/Projects/Agora4`, on `main`. Workers get their own git worktree from the house and land through it; don't make worktrees or clones yourself, and if a tool offers a worktree mode, choose local. A `research/<lab>-<topic>` branch is the exception, only when an experiment changes `src/` in a way that may not survive: keep one at a time, merge it back with `--no-ff`, then delete it. Alex decides when to push.
+- **Git.** The single integration destination is `main` in `C:/Projects/Agora4`. Work by hand happens in that checkout. Workers may use temporary git worktrees managed by the house; their accepted changes land through the house into that same `main`. Keep worker branches current with `main`, resolve integration conflicts, and verify the combined result before calling a change integrated. Don't make worktrees or clones yourself, and if a tool offers a worktree mode, choose local. A `research/<lab>-<topic>` branch is the exception, only when an experiment changes `src/` in a way that may not survive: keep one at a time, merge it back into `main` with `--no-ff`, then delete it. Record the findings of experiments whose code is not kept in the shared documentation. Alex decides when to push.
 - **Ask Alex first** before anything irreversible or costly: live model trials, deleting things, external effects, any change to a design document's status, and anything that changes his PC outside this repository that he can't easily undo. New designs go through the gate above. Everything else, just do and report on the board.
 - **Source and world.** Someone else's change must never need an edit to Alex's source. Behaviour belongs in the world (lenses, styles, verbs, rules, kinds). What needs source goes through the repository, reviewed, never live. Log each source edit as a Rough spots note naming the world-level word that was missing.
 - **Acting on the PC.** Say what will appear on Alex's screen before it appears, but don't wait on his approval to test. Give everything an off switch, and stay off kernel drivers, code injection and anything that can stop his other programs or games from running.

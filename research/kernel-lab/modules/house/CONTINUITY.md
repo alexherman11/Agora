@@ -113,3 +113,22 @@ The missing world-level word: **a house-agent's process as something the world c
 conversation it holds, how its last start ended). The House showed only `doing=error` with "its process ended (1)", so
 five days of the same refusal looked like one quiet error. Lines Alex sent during the outage were consumed by the failed
 starts (the cursor moved past them); they were re-delivered by hand with `house.wake`.
+
+## Rough spots: Ask reached nobody after the old desk closed (3 Nov 2026)
+
+*Claude (builder), 3 Nov 2026, Alex: "Yes, fix both" (Ask goes to JEFF; JEFF finishes a check in the same turn and tells
+him in the Conversation).* The right-click `ask` verb only made an `ask-request`; `research/window-lab/agora-chat/ask_relay.py`
+carried it to the old desk's Conversation on door 8794, which was archived 27 Oct. Since then five asks waited (read:
+`rows ask-request`, four still `status=open`). On 3 Nov a Claude session found one by chance and passed it to JEFF in
+Shop talk; JEFF answered there, and Alex, in the Conversation, heard nothing.
+
+The change is in the world: the old `ask` is hidden and a new verb says Alex's words as his own line in the Conversation
+(`say <Conversation> text=$text about=$ask`), so the House wakes JEFF and Alex sees it. Two small source edits made that
+possible: `say` accepts `about=` something its own act just made (kernel/chat.py), and the House's line to an agent names
+what a line is about, with an ask's `where` (house.py `line_text`). Ran: tests/test_ask_reaches_jeff.py 3 passed,
+test_stale_child.py 5 passed, kernel tests 374 passed (two failures also fail or pass alone without this change:
+test_new_manager launcher options, a flaky test_web_host).
+
+Missing world-level words: **a way to change a verb's steps** (word.set refuses "Implementation cannot be edited", so a
+fix means hide and remake), and **a relay as a world thing**: the ask's destination lived in a script outside the world,
+so when that script's desk went away nothing said the asks were going nowhere.

@@ -21,6 +21,11 @@ def _k(word, kind, takes, may, undo, help, **more):
 from hosts.web.layout import HELP as PANE_HELP, panes, arrange
 
 KERNEL_ENTRIES = [
+    _k("task.signal", "do", "<id> mode=<waiting|notify|reporter> event=<landed|done>",
+       "members", "yes",
+       help="task.signal <card> mode=waiting|notify|reporter event=landed|done: "
+            "write deduplicated addressed card notes for world rules; undo removes them. "
+            "No execution or completion permission is granted."),
     *[_k("task." + action, "do", "<id> " + takes, "members", "yes", help=help_,
          bound="task-" + action, aliases="task-" + action)
       for action, takes, help_ in [
@@ -101,6 +106,10 @@ KERNEL_ENTRIES = [
     _k("grant", "do", "<id> words=<words> [only=<narrowing>]", "stewards", "yes",
        help="grant <module or widget> words=\"<words>\" [only=kind:<kind>]: give something already installed one "
             "more grant, as its own act. only=\"thing:<id>;fields:hat,coat\" limits set and undo to those facts. "
+            "only=\"kind:document-folder,document-entry;library:<id>\" limits make/set to inherited metadata "
+            "in one visible library: named folders/entries only, name/parent changes only, no cross-library moves. "
+            "On files.browse/folder/store/rename/move, only=\"library:<id>\" checks the complete outer "
+            "selection and limits the provider's per-call rows readings to that library. "
             "holds and look show it; undo or off takes it back."),
     _k("counts", "see", "<id>", "anyone", "no",
        help="counts <board>: anonymous totals of active uses of its count_word, grouped by count_bucket. "
@@ -119,6 +128,9 @@ KERNEL_ENTRIES = [
        help="say <chat> <words>: a line in a chat (rows chat lists them). @name calls that person; in a closed chat "
             "(made with with=\"Alex, JEFF\") a line with no @name speaks to everyone else in it. reply_to=<said line> "
             "answers one. Only the chat's people may say in a closed chat. undo takes your line back."),
+    _k("chat.receive", "do", "<id> text=<text> speaker=<name> external_id=<id>", "anyone", "yes",
+       help="chat.receive <chat> text=... speaker=... external_id=...: import one external line; only the "
+            "read-only chat's designated source module may use this. Duplicate ids do nothing; no local @name wakes."),
     _k("chat", "see", "<id> [limit=<n>] [since=<id>]", "anyone", "no",
        help="chat <chat> [limit=20] [since=<said line>]: its latest lines, oldest first, as you may see them. "
             "make kind=chat name=<name> makes an open chat; with=\"<names>\" makes one only those people see."),
@@ -205,6 +217,15 @@ KERNEL_ENTRIES = [
     _k("mark", "do", "<id> <kind>", "maker or leaders", "yes",
        help="mark <thing> <kind>: set a kind's markers (a game needs run and game=yes: mark sets game=yes) on a thing "
             "that has the kind's other needs, or say what it lacks. It is a set: undo takes it back."),
+    _k("alike", "see", "<kind>", "anyone", "no",
+       help="alike <kind>: the kinds here made of the same parts, closest first: what they share, what only they have, "
+            "and which extends which. Read it before naming a kind, so the same thing isn't made twice: if it's the "
+            "same, aliases= on the one that's here names it; if it has notably more, extends= it."),
+    _k("aspects", "see", "[loose]", "anyone", "no",
+       help="aspects [loose]: every aspect on things you can see, as a part of which kind (likes is an upvote, start a "
+            "time) or loose, with how many things say it. Many things sharing a loose aspect is a kind nobody has named. "
+            "A kind gives its parts kinds: needs=\"start:time likes:upvote\"; a value kind ends in one: name=upvote "
+            "value=number (the kernel's are text number time yes-no link person thing)."),
     _k("actions", "see", "<id>", "anyone", "no",
        help="actions <thing>: what you can do with it: every word whose shape it has (what the word's code reads, from "
             "acts_on=<kind> and needs=), grouped by kind, most specific first; then the lenses that show it."),
@@ -516,7 +537,8 @@ def undo(k, actor, st, entry, tx, group, saw=None):
         facts = [f for part in r["parts"] for f in part["facts"]]
         for target in {f[0] for f in facts}:
             k.reaches(actor, 'undo', k.state.get(target, 'kind'), target=target,
-                      fields=[f[1] for f in facts if f[0] == target])
+                      fields=[f[1] for f in facts if f[0] == target],
+                      group=(k.groups_of(target) or [k.place])[0])
         for f in reversed(facts):
             t, a = f[0], f[1]
             v = f[3] if len(f) > 3 else None
@@ -634,6 +656,12 @@ def make(k, actor, st, entry, tx, group, saw=None):
         raise Refused("make needs kind=<a plain word>: make kind=button name=Feed")
     if kind in RESERVED_KINDS:
         raise Refused(f"a {kind} is made by the kernel, not by make")
+    write_values = dict(st.kv)
+    if st.words and "text" not in write_values:
+        write_values["text"] = st.words
+    # Check before make's post compatibility path too: it must not bypass a
+    # metadata-only grant by delegating to post.
+    k.reaches(actor, "make", kind, fields=write_values, group=group)
     if kind == 'post':
         # Keep make kind=post compatible, while applying the same scoped post
         # policy and rate limit. Its post part counts inside this make act.
@@ -651,7 +679,6 @@ def make(k, actor, st, entry, tx, group, saw=None):
             {a: v for a, v in st.kv.items() if a != 'kind'}, st.words), e, tx, group, saw)
     if kind == 'file-settings' and not k.is_steward(actor.person):
         raise Refused('file-settings belongs to stewards')
-    k.reaches(actor, "make", kind)
     if sees is not None and sees not in SEES_SAID:
         raise Refused("sees= says me, leaders, group or place: who besides the kernel may see it")
     closed = None
@@ -701,7 +728,8 @@ def make(k, actor, st, entry, tx, group, saw=None):
     elif not public:
         tx.set(t, "sees", f"group:{group}")
     return {"text": f"ok make {t} [r?] · a{'n' if kind[0] in 'aeiou' else ''} {kind}" + (f" in {k.name(group)}" if group != k.place else "")
-                    + _make_notes(k, actor, kind, kv)}
+                    + _make_notes(k, actor, kind, kv)
+                    + (k.kinds.alike_note(actor, kv, group) if kind == "kind" else "")}
 
 
 def _make_notes(k, actor, kind, kv):
@@ -720,7 +748,8 @@ def _make_notes(k, actor, kind, kv):
                                      f"in look and rows (kinds lists the kinds there are)")
     notes = []
     for key, v in kv.items():
-        if key in ("title", "name", "text", "label", "about") or v == "" or (kind == "kind" and key in ("needs", "extends")):
+        if key in ("title", "name", "text", "label", "about") or v == "" or (
+                kind == "kind" and key in ("needs", "extends", "value", "aliases", "has")):
             continue
         said = {str(a.get(key)) for a in others if a.get(key) not in (None, "")}
         if not said:
@@ -734,7 +763,7 @@ def set_(k, actor, st, entry, tx, group, saw=None):
     t = st.target
     if k.state.get(t, 'kind') == 'file-settings' and not k.is_steward(actor.person):
         raise Refused('file-settings belongs to stewards')
-    k.reaches(actor, "set", k.state.get(t, "kind"), target=t, fields=st.kv)
+    k.reaches(actor, "set", k.state.get(t, "kind"), target=t, fields=st.kv, group=group)
     if k.state.get(t, "kind") == "said":
         from .chat import said_set
         said_set(k, actor, t, st.kv)                    # its speaker's acts only (chat.py)
@@ -751,6 +780,12 @@ def set_(k, actor, st, entry, tx, group, saw=None):
     for key, v in st.kv.items():
         if key in ("in", "as") or v == "":
             continue
+        # a part with a kind (has="priority:number"): a value that isn't one is still set, and said (P7: said, never
+        # refused), so a thing doesn't drift back into loose
+        after_row = dict(seen_as, **{x: y for x, y in st.kv.items() if x not in ("in", "as")})
+        pk, how = k.kinds.aspect_kind(after_row, key, (k.groups_of(t) or [k.place])[0])
+        if pk is None and how and "isn't" in how and seen_as.get("kind") != "kind":
+            spelled.append(f"\n~ {how}: still set, as you said")
         other = k.kinds.spelled_otherwise(seen_as, key, (k.groups_of(t) or [k.place])[0])
         if other:
             spelled.append(f"\n~ {seen_as.get('title') or k.name(t)} also says {other[0]}, which {'an' if other[1][:1] in 'aeiou' else 'a'} {other[1]} reads as "
@@ -805,7 +840,7 @@ def set_(k, actor, st, entry, tx, group, saw=None):
 
 def forget(k, actor, st, entry, tx, group, saw=None):
     t = st.target
-    k.reaches(actor, "forget", k.state.get(t, "kind"))
+    k.reaches(actor, "forget", k.state.get(t, "kind"), target=t, group=group)
     if k.state.get(t, "kind") in RESERVED_KINDS:
         raise Refused(f"{t} is a {k.state.get(t, 'kind')}, which forget does not take")
     tx.set(t, "forgotten", actor.person)
@@ -912,6 +947,9 @@ def rows(k, actor, st, entry, tx, group, saw=None):
     # a kind with a shape, or one another kind extends, also lists what has that shape (kinds.py), read under the
     # kind's names (start for a thing that says starts); exact=yes lists only things whose own kind is that word
     fitted = kind != "any" and not exact and k.kinds.is_open(kind, group)
+    # a value kind lists what has one as a part: rows upvote lists everything with an upvote (kinds all the way down)
+    by_part = kind != "any" and not exact and k.kinds.is_value(kind, group)
+    fitted = fitted or by_part
     rows = []
     for t in (list(k.state.things) if kind == "any" or fitted else k.things(kind)):
         if t == "world":
@@ -920,6 +958,9 @@ def rows(k, actor, st, entry, tx, group, saw=None):
         if a is None:
             continue
         why = k.kinds.fits(a, kind, group) if fitted else None
+        if not why and by_part and a.get("kind") not in NOT_FITTED_KINDS:
+            ps = k.kinds.parts_of(a, kind, (k.groups_of(t) or [group])[0])
+            why = f"its {', '.join(ps)} {'is' if len(ps) == 1 else 'are'} {'an' if kind[:1] in 'aeiou' else 'a'} {kind}" if ps else None
         if fitted and not why:
             continue
         if fitted:
@@ -1164,15 +1205,17 @@ from .blobs import upload, attach, file_result, file_read
 from .world_words import dictionary_copy, group_word, clock, forgotten
 from .readings import who, recent, kinds, on, press
 from .refusals import refusals, failed
-from .kinds import mark, words_for
+from .kinds import mark, words_for, alike_word, aspects_word, NOT_FITTED as NOT_FITTED_KINDS
 from .bonds import turn                  # the graph's readings (around, nearby, preview) are held (28 Oct)
-from .chat import say, chat as chat_word, closed_sees
+from .chat import say, receive as chat_receive, chat as chat_word, closed_sees
 from .store import GONE
 from .next_steps import change as task_change
+from .card_signals import signal as card_signal
 from painter.arrangement import component, look_view, components, component_card
 from painter.health import component_health, component_action, personal_view, personal_style, paint_clear
 
 KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant": grant, "widget": widget, "describe": describe,
+          "task.signal": card_signal,
           **{"task-" + action: task_change for action in ("next", "revise", "review", "verify", "followup")},
           'upload': upload, 'attach': attach, 'file-result': file_result, 'file-read': file_read,
           'dictionary-copy': dictionary_copy, 'group': group_word, 'clock': clock, 'forgotten': forgotten,
@@ -1186,4 +1229,5 @@ KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant":
           "status": status, "make": make, "set": set_, "forget": forget, "holds": holds, "claim": claim,
           "vote": vote, "role": role, "rows": rows, "find": rows, "search": search, "verb": verb,
           "who": who, "recent": recent, "kinds": kinds, "on": on, "press": press, "say": say, "chat": chat_word,
-          "refusals": refusals, "failed": failed, "mark": mark, "actions": words_for, "turn": turn}
+          "refusals": refusals, "failed": failed, "mark": mark, "actions": words_for, "turn": turn,
+          "chat.receive": chat_receive, "alike": alike_word, "aspects": aspects_word}

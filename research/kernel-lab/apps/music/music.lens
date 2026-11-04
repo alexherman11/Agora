@@ -1,0 +1,10 @@
+# The session owns time: no clock, seek simulation or progress animation.
+root : music-panel
+  playing : column, of reading:"media.now" as m, each song
+song : music-song, title $m.title, artist $m.artist, album $m.album, player $m.player, art $m.art, playing $m.playing, position $m.position, duration $m.duration, can $m.can, shuffle $m.shuffle, repeat $m.repeat
+  on pause do media.pause
+  on resume do media.resume
+  on next do media.next
+  on prev do media.prev
+  on shuffle do media.shuffle
+  on repeat do media.repeat

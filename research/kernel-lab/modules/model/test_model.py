@@ -1,10 +1,13 @@
 """Adversarial output and transport contracts; real caller isolation is in local_model.py."""
 import json
-import tempfile
+import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 import model as M
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from kernel import scratch  # noqa: E402
 
 
 class ModelContracts(unittest.TestCase):
@@ -53,7 +56,7 @@ class ModelContracts(unittest.TestCase):
                     M.call(self.message('model.classify',options='a b'))
 
     def test_rate_attempts_persist_and_follow_dictionary(self):
-        with tempfile.TemporaryDirectory() as folder,patch.object(M,'home',Path(folder)),patch.object(M,'usage',{}),patch.object(M,'read',return_value=[dict(id='lm7',**{'from':'module:model'},once='at most 1 per day per person')]):
+        with scratch.TemporaryDirectory() as folder,patch.object(M,'home',Path(folder)),patch.object(M,'usage',{}),patch.object(M,'read',return_value=[dict(id='lm7',**{'from':'module:model'},once='at most 1 per day per person')]):
             M.limit('test','model.ask','lm2')
             stored=json.loads((Path(folder)/'usage.json').read_text())
             with patch.object(M,'usage',stored),self.assertRaisesRegex(ValueError,'limit reached'):

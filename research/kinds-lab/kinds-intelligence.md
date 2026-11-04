@@ -6,6 +6,7 @@
 >
 > JEFF answered in Shop talk (dk1313, §1.4b). Draft 0 is in [[kinds-intelligence-draft-0]]. Not approved, not built.
 > - **Alex's direction (his words, 28 Oct):** "the system should hold all the kinds, things coming into the system can declare what kinds they support, and it is the job of the system to handle duplicates in the on system dictionary. That is why there has to be an intelligence layer to support multiple kinds. It is literally essential for agora to function."
+> - **Alex again, 29 Oct (his words), before answering §3:** "kinds to be managed by the system they are on, things can bring in their kinds and words when they enter the system, and its the job of intelligent agents to manage how they interoperate". He wants to talk the design through first. Note by Claude: this goes further than draft 1, which keeps agents to proposing and has none in v1.
 > - **Labels:** **read** (code or source), **ran** (numbers as printed), **imagined** (design).
 
 ## 0. What the reviews changed, in one list

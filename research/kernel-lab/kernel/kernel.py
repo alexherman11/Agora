@@ -18,7 +18,7 @@ from . import lines as L
 from .store import GONE, Log, h, canon
 
 FLOOR = {"look", "help", "undo", "off", "status"}     # stewards may always use these, whatever an entry says
-MAY_WORDS = {"anyone", "members", "leaders", "stewards", "maker", "nobody"}
+MAY_WORDS = {"anyone", "members", "leaders", "stewards", "maker", "lead", "nobody"}
 
 
 class Refused(Exception):
@@ -348,6 +348,14 @@ class Kernel:
             g = parents[0] if parents else None
         return out
 
+    def is_lead(self, person, target):
+        """The person a thing names as its lead (lead=<person id or name>). 3 Nov: a resident handed a card could not
+        change it, since it neither made it nor leads the place; a word whose may says `lead` lets its lead act on it."""
+        lead = str(self.state.get(target, "lead") or "").strip()
+        if not lead or not person:
+            return False
+        return lead == person or lead.casefold() == str(self.name(person) or "").strip().casefold()
+
     def is_leader(self, person, group):
         return any(self.state.get(g, f"member:{person}") == "leader" for g in self.up(group))
 
@@ -414,7 +422,11 @@ class Kernel:
         word's shape first (kinds.py: what its code reads), then the thing's own allows. test."""
         first = st.target or (st.words.split() or [""])[0]   # a word taking only words may still be given a thing
         if first and L.ID.fullmatch(str(first)):
-            self.kinds.check_word(actor, entry, first)
+            part = self.kinds.check_word(actor, entry, first, part=st.kv.get("part"))
+            if part:
+                # a word on a value kind reached the thing through a part (its likes, an upvote): the verb reads
+                # $part, a module kv.part (kinds-all-the-way-down.md)
+                st.kv = dict(st.kv, part=part)
         ref = self.state.get(st.target, "allows." + (entry.get("bound") or entry["word"]))
         if ref and not self.predicate(actor.person, ref, st.target, st.kv.get("answer", "")):
             raise Refused(self.state.get(st.target, "refusal", "That does not fit yet. Please try again."))
@@ -810,6 +822,8 @@ class Kernel:
             if tok == "maker" and target and (self.state.get(target, 'for') == person or self.state.get(target, "made_by") in (person,) + tuple(
                     a for a in self.things("agent") if self.state.get(a, "for") == person)):
                 return True
+            if tok == "lead" and target and self.is_lead(person, target):
+                return True
         return self._granted(person, word, group, depth)
 
     def _granted(self, who, word, group, depth=0):
@@ -847,7 +861,7 @@ class Kernel:
     def refusal_for(self, entry, group):
         may = entry.get("may") or "nobody"
         who = {"leaders": f"leaders of {self.name(group)}", "stewards": "stewards", "members": f"members of {self.name(group)}",
-               "maker": "whoever made it", "nobody": "no one", "anyone": "anyone here"}
+               "maker": "whoever made it", "lead": "its lead", "nobody": "no one", "anyone": "anyone here"}
         said = " or ".join(who.get(t.strip(), t) for t in may.split(" or "))
         return Refused(f"{entry['word']} is for {said}; help {entry['word']} says more")
 
@@ -958,14 +972,25 @@ class Kernel:
                           "text": str(text)[:500], "announced": True})
         return "ok"
 
-    def reaches(self, actor, word, kind, target=None, fields=()):
-        """Conjunctive grant limits: kind:, thing:, fields: (set/undo only).
+    def scope_grants(self, actor, word, group):
+        """Only grants whose location and issuer still authorize this use."""
+        eid = self.find_entry(word, group)
+        entry = self.entry(eid) if eid else {}
+        names = {word, entry.get("word"), entry.get("bound")} | set(str(entry.get("aliases") or "").split())
+        return [g for g in self._grants_to(actor.module)
+                if any(self._matches(self.state.get(g, "words"), n) for n in names if n)
+                and self.state.get(g, "where") in self.up(group)
+                and self.state.get(g, "by") and eid
+                and self._may_person(self.state.get(g, "by"), entry, None, group, 1)]
+
+    def reaches(self, actor, word, kind, target=None, fields=(), group=None):
+        """Conjunctive grant limits: kind:, thing:, fields:, library:.
         Each matching grant must independently admit the whole write; never
         assemble a wider permission from pieces of separate grants.
         """
         if actor.kind != "module":
             return
-        fits = [g for g in self._grants_to(actor.module) if self._matches(self.state.get(g, "words"), word)]
+        fits = self.scope_grants(actor, word, group or self.place)
         onlys = [str(self.state.get(g, "only") or "") for g in fits]
         def admits(only):
             if not only:
@@ -980,6 +1005,11 @@ class Kernel:
                         return False
                 elif clause.startswith('fields:'):
                     if word not in ('set', 'undo') or not fields or not set(fields) <= set(clause[7:].split(',')):
+                        return False
+                elif clause.startswith('library:'):
+                    from .document_scope import admits
+                    if not isinstance(fields, dict) or not admits(
+                            self, actor, clause[8:], word, kind, target, fields, group):
                         return False
                 else:
                     return False
@@ -1801,6 +1831,28 @@ class Kernel:
 
     # ------------------------------------------------------------------ module words
     def module_word(self, actor, st, entry, group, text, press, saw=None):
+        from . import document_scope as docs
+        bound = entry.get("bound") or entry["word"]
+        if bound in docs.WORDS:
+            with self.lock:
+                library = docs.selection(self, actor, bound, st.target, st.kv)
+                if st.words or not library:
+                    raise Refused("Documents request is outside a visible inherited library; nothing was done")
+                # Every module in the caller chain must independently admit the
+                # same selection; clauses from separate grants never combine.
+                current = actor
+                while current:
+                    if current.kind == "module":
+                        grants = self.scope_grants(current, bound, group)
+                        if not any(str(self.state.get(g, "only") or "") in ("", "library:" + library)
+                                   for g in grants):
+                            raise Refused("Documents request is outside the caller's library grant; nothing was done")
+                    current = current.caller
+                # Per-call context, never mutate the widget's shared Actor.
+                scoped = Actor(actor.id, actor.person, actor.kind, actor.module, actor.caller)
+                scoped.seen_key, scoped.session = actor.seen_key, actor.session
+                scoped.document_library, scoped.document_target = library, st.target
+                actor = scoped
         mname = self.source(entry)[1]
         mid = self.module_named(mname)
         if not mid or not self.state.get(mid, "on"):
@@ -1906,6 +1958,12 @@ class Kernel:
                         raise Refused(f"{entry['word']} would {st.word} {st.target or ''}, and {self.refusal_for(e, group)}; "
                                       f"nothing was done")
                     raise Refused(f"{self.name(mid)} holds no grant for {st.word}; nothing was done")
+                library = getattr(caller, "document_library", None)
+                if library:
+                    from .document_scope import admits
+                    kind = st.kv.get("kind") if st.word == "make" else self.state.get(st.target, "kind")
+                    if st.words or not admits(self, author, library, st.word, kind, st.target, st.kv, group):
+                        raise Refused("Documents answer is outside the selected library; nothing was done")
                 self.guard(author, e, st)
                 said = self.once(author, e, st.target, tx)
                 if said:
@@ -1923,7 +1981,21 @@ class Kernel:
         """A module reading while it answers a call: a see word, run as the caller narrowed to the module."""
         author = Actor(mid, caller.person, "module", module=mid, caller=caller)
         try:
-            r = self.step(author, line, mode="see")
+            library = getattr(caller, "document_library", None)
+            if library:
+                from .document_scope import read_rows
+                st = L.parse(line)
+                # This reviewed provider only needs unadorned rows readings.
+                # Refuse aliases/extra projections rather than expose raw text.
+                if (st.word != "rows" or st.target or st.kv
+                        or st.words not in ("document-library", "document-folder", "document-entry", "file", "post")):
+                    raise Refused("Documents provider read is outside the selected library")
+                with self.lock:
+                    r = self.step(author, line, mode="see")
+                    r["rows"] = read_rows(self, author, library, caller.document_target, st.words, r.get("rows", []))
+                    r["text"] = ""  # step's original text can contain unrelated rows
+            else:
+                r = self.step(author, line, mode="see")
         except Refused as exc:
             return {"refused": str(exc), "text": f"refused: {exc}", "rows": []}
         # the kernel read these for the caller, so they count as the caller's look: a taskbar button that lists
