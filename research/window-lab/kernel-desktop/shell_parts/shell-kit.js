@@ -79,19 +79,15 @@ const ShellKit = (() => {
   }
 
   // ------------------------------------------------------------------------------------------------ icons
+  // The host's own pages. Every app is an `app` thing in the world (below).
   const AGORA_APPS = {
     viewer: ['Viewer', 'window.open viewer'],
-    lines: ['Lines', 'window.open lines'], help: ['Help', 'window.open help'], board: ['Board', 'window.open board'],
-    taskboard: ['Task board', 'window.open taskboard-components'], appearance: ['Appearance', 'window.open appearance'],
-    feed: ['Feed', 'window.open feed'], thing: ['Thing', 'window.open thing'], tasks: ['Running windows', 'window.open tasks'],
-    work: ['Work', 'window.open work'],          // who is at work and what is moving (kernel-lab/apps/work, 27 Oct)
-    writing: ['Writing', 'window.open writing'], // documents and plans to review (kernel-lab/apps/writing, 27 Oct)
+    lines: ['Lines', 'window.open lines'], help: ['Help', 'window.open help'],
+    thing: ['Thing', 'window.open thing'], tasks: ['Running windows', 'window.open tasks'],
   };
   // Every other app is an `app` thing in the world (4 Nov): name=<what dock_apps says> label= does="window.open <lens>"
   // [icon=agora:<svg name>|data:image/...]. A new app is one make, never a line here. Only the steward's own app things
-  // count (the settings' person), only ones that open a lens, and a name the host already has above stays the host's.
-  // The entries above that are apps rather than the host's own pages (board, taskboard, appearance, feed, work,
-  // writing) are older than app things; each moves out when its installer makes its app thing.
+  // count (the dock's person), only ones that open a lens, and a name the host already has above stays the host's.
   const BUILT_IN = new Set(Object.keys(AGORA_APPS));
   const APP_ICONS = {};
   function takeApps(rows, owner) {
@@ -184,11 +180,15 @@ const ShellKit = (() => {
       return [...theirs, ...mine];
     },
     async settings() { const r = await this.see('rows shell-settings'); return (r && r.rows && r.rows[0]) || {}; },
-    // the world's app things (see takeApps); AGORA_APPS follows them, so every part that reads it sees the same apps
+    // the world's app things (see takeApps); AGORA_APPS follows them, so every part that reads it sees the same apps.
+    // Whose app things count: the person whose dock this is (the shell-dock widget's).
     async apps() {
-      const [r, s] = await Promise.all([this.see('rows app'), this.settings()]);
-      return takeApps(!refused(r) && Array.isArray(r.rows) ? r.rows : [], s.for || s.made_by);
+      const [r, w] = await Promise.all([this.see('rows app'), this.see('rows widget name=shell-dock')]);
+      const dock = (w && w.rows && w.rows[0]) || {};
+      return takeApps(!refused(r) && Array.isArray(r.rows) ? r.rows : [], dock.for || dock.made_by);
     },
+    // an app is on the dock when it is the host's own or the lens it opens is in the world
+    shows: (n, lenses) => !!AGORA_APPS[n] && (BUILT_IN.has(n) || lenses.has(opensLens(AGORA_APPS[n][1]))),
     async pins() {
       const r = await this.see('rows any bar=taskbar');
       return ((r && r.rows) || []).filter((p) => !p.slot && p.kind !== 'widget' && (p.path || /^window\.open /.test(p.does || '')));

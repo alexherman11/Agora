@@ -25,7 +25,7 @@ export default {mount(api, s) {
     }
     const have = new Set(state.lenses);
     const apps = String(s.apps || state.settings.dock_apps || K.DOCK_APPS).split(/[ ,]+/).filter(Boolean)
-      .filter((n) => K.AGORA_APPS[n] && (['viewer', 'lines', 'help', 'thing', 'tasks'].includes(n) || have.has(n)));
+      .filter((n) => K.Data.shows(n, have));
     const pinned = apps.map((n) => ({ id: 'app:' + n, app: K.AGORA_APPS[n][0], exe: '', icon: K.appIcon(n), wins: [], line: K.AGORA_APPS[n][1], launcher: n, pin: { id: '' } }));
     const launched = new Set(pinned.map((p) => p.line));
     for (const p of state.pins) {

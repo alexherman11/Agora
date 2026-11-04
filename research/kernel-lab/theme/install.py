@@ -61,6 +61,7 @@ def install(door):
     ids["widget"] = mid
     ids["button"] = upsert(door, "button", "appearance-button", label="Appearance", bar="taskbar", icon="palette",
                            does="window.open appearance")
+    painter_install.app(door, "appearance", "Appearance", "appearance")
     return ids
 
 

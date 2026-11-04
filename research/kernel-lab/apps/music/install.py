@@ -68,8 +68,7 @@ def install(door):
             door.say("look " + shell["id"])
             door.say("set " + shell["id"] + " dock_apps=" + Q(apps + ",music"))
     # What the dock shows for "music" is a world thing (4 Nov), not a line in shell-kit.js: made once, never overwritten.
-    if not door.rows("app", name="music"):
-        door.say('make kind=app name=music label=Music does="window.open music" icon=agora:music')
+    painter.app(door, "music", "Music", "music", icon="agora:music")
     return {"lens": lens, "widget": widget}
 
 

@@ -17,7 +17,7 @@ HERE = Path(__file__).resolve().parent
 LAB = HERE.parents[1]
 ROOT = LAB.parents[1]
 sys.path[:0] = [str(LAB)]
-from painter.install import upsert, widget_source, taskboard, Q  # noqa: E402
+from painter.install import upsert, widget_source, taskboard, Q, app  # noqa: E402
 
 LENS = 'writing'
 GRANTS = ('window.surface rows look look-view history components help component-health component-action file-read '
@@ -149,6 +149,7 @@ def install(door, docs=True):
         door.say('widget ' + ids['widget'] + ' surface=window grants=' + Q(GRANTS))
     ids['button'] = upsert(door, 'button', LENS + '-button', label='Writing', bar='taskbar', icon='pen-line',
                            does='window.open ' + LENS)
+    app(door, LENS, 'Writing', LENS)
     if docs:
         ids.update(documents(door))
     return ids

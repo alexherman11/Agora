@@ -28,6 +28,13 @@ def upsert(door,kind,name,**facts):
     return t
 
 
+def app(door,name,label,opens,icon=None):
+    """An app on the dock and in the launcher (shell-kit.js reads `rows app`, 4 Nov). Made once and never overwritten:
+    after that the world's label, line and icon are the ones that count."""
+    if not door.rows('app',name=name):
+        door.say('make kind=app name='+name+' label='+Q(label)+' does='+Q('window.open '+opens)+(' icon='+Q(icon) if icon else ''))
+
+
 def widget_source(vocabulary=(), board_look=True):
     """The painter's code for one widget. vocabulary: extra reviewed files loaded before the painter runs (the shell's
     ShellKit); board_look=False leaves out the task board's stylesheet (theme.js), whose class names a bar does not want."""
@@ -56,6 +63,7 @@ def install(door, board=True):
         upsert(door,'lens','taskboard-components',title='Task board · Components',painter='components',
                text=(LAB/'apps/taskboard/component-board.lens').read_text(encoding='utf-8'))
         ids['taskboard-components']=activate(door,'taskboard-components','Task board · Components')
+        app(door,'taskboard','Task board','taskboard-components')
     # The gallery is an arrangement made from catalogue components, including
     # live examples and literal setting cards. No separate gallery renderer.
     gallery=['root : column, role catalogue', '  heading : text "Component gallery"']
