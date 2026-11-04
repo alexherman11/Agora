@@ -294,3 +294,105 @@ form is the change.
 - **The trailers:** start with the next commit. The House's landing step needs a small change to require them and to stop
   truncating worker messages, which is itself a `Source: fix`.
 - **§4.5 and §4.6** are new design work and go through Alex one at a time.
+
+**Applied 4 Nov** (Alex: "everything good but skip 3C"):
+- Headers on 97 runtime files (821a11709).
+- The AGENTS.md paragraph and the changed sentence.
+- The wallpaper pilot (7a8841313).
+
+The ratchet test is not built.
+
+## 6. What the wallpaper pilot taught (4 Nov, after building it)
+
+### 6.1 What it cost
+**Ran** (`git show --numstat 7a8841313`, source only, tests and docs left out): +181 −235 lines, net −54.
+- **Kernel:** +9 −2 lines and no new word. `upload` takes `digest=`, and it now checks a module grant's `only=`, a scope
+  hole it always had.
+- **Host:**
+  - `window.picture` and the follow-the-setting code: +149.
+  - `wallpaper.py` 365 → 160 lines.
+- **Theme module:** +3 (`theme.changed` offered as a word).
+- **World, no source:**
+  - one grant, `window upload only=kind:file`;
+  - one rule, `Wallpaper follows my theme`, dk2177;
+  - one setting, `Shell settings wallpaper=`.
+
+**Ran, live:**
+- A screen-sized picture takes 4.3 s.
+- Emptying the setting brought the Spotlight picture back, and `undo` brought Agora's back.
+- `theme.try Dusk seconds=20` changed the wallpaper and changed it back. The Seabright Day picture came out byte-identical
+  both times.
+
+**Imagined, but cheap to check:** the next asks in this family cost no source:
+- your own photo: `set Shell settings wallpaper=<photo>`;
+- a wallpaper by time of day: a rule on the clock;
+- a picture of any lens for sharing: `window.picture <lens>`.
+
+The first pilot did not shrink the code much (net −54). It moved the behaviour into the world, which is where the payoff is.
+
+### 6.2 What only building it found
+1. **A module's happenings can't be heard by rules unless the module also lists them as words.** The theme module announced
+   `theme.changed` for weeks, and pages listened to it, but `rule on=theme.changed` was refused: "a rule needs on=<published
+   word>". The fix was one entry in the theme module. The general form belongs in the kernel: any happening a module
+   announces inside its own namespace is a word a rule can hear.
+2. **The door never serves an original image, only the `files` converter's cleaned copy.** That's right for browsers and
+   wrong for a host on the same machine, so the window host reads the world's content-addressed store and checks the
+   hash itself. One way of serving files was being used for two different readers.
+3. **`upload` ignored a module grant's `only=` scope.** It was a security gap, found only because a new user (a module) came
+   along.
+4. **Generated files pile up.** Every theme change makes a new picture file, and so does every trial start and end. A
+   trial's end announced `theme.changed` twice, so the rule ran twice. Each upload also counts toward the 40-a-day cap. Five
+   picture files were made in ten minutes of testing.
+   Missing words: replace a file thing's content (or keep only the latest by name), and a dedupe or `once` on a rule.
+   Both belong to the clutter design.
+5. **Parallel sessions edit the same core files.** During this work, other sessions had uncommitted changes in `words.py`,
+   `card_signals.py`, `kdesk.py`, `twitch_chat.py`, `house.py` and `builders.py`.
+   - **Headers:** I had to stage them line by line.
+   - **Tests:** the kernel suite's 11 House failures come from that unfinished work, not this pilot (**ran**: they fail
+     the same with my kernel change taken out).
+   - **A swept deletion:** one plain `git commit` of mine took another session's staged deletion of `kd_twitch.py` with
+     it. I told that session.
+
+   The shared checkout plus many writers is itself a source of churn and of unclear verification.
+
+### 6.3 Re-proposal: general changes to the structure
+Revised from §4 with what the pilot showed. Each item is a design for Alex; nothing here is built.
+
+1. **One default shape for host features: seam + setting + rule.**
+   - The host offers small words (`window.picture`) and follows settings things (`wallpaper=`). Behaviour is a rule.
+   - The pilot is the template, and the next candidates take the same shape:
+     - the dock's app list (apps as world things);
+     - the game and overlay exe lists;
+     - the Twitch channel (the adapter work under way already does this);
+     - house-settings: models, caps, and brief and notice templates.
+2. **The kernel makes module happenings hearable by default** (§6.2.1). It removes a whole class of small edits, each
+   module remembering to list its hear words, for one general change.
+3. **Generated things are kept tidy by the world.**
+   - Words: "replace this file's content", "keep the latest N with this name", and `once`/dedupe on a rule.
+   - Every generator (pictures, exports, summaries, reports) uses them instead of its own clean-up.
+   - Fold this into the clutter design rather than a new one.
+4. **Who may edit the kernel.**
+   - Kernel edits go through one Board card at a time with one holder.
+   - Everyone else files the missing word as a card citing their need, rather than editing `kernel/` in parallel.
+   - This cuts collisions and makes every kernel change a deliberate general word.
+   - The same could apply to `kdesk.py`, which 11 commits used for seeding.
+5. **Commit hygiene enforced where work lands.**
+   - The House's landing step requires the `Source:`/`Missing-word:` lines and stops truncating worker messages.
+   - Anyone committing by hand commits with explicit paths (`git commit -- <paths>`).
+6. **The world as master for app content** (§4.6). Still the largest single lever, and still Alex's decision. Unchanged by
+   the pilot.
+7. **Build order, revised:**
+   1. Settings things for every module.
+   2. Hearable happenings plus rules over a set (`each`, dedupe).
+   3. Kind policy and relational `may`/`sees`.
+   4. Richer readings.
+   5. Worker runs as world things.
+   6. Shared host seams.
+
+   The adapter runner (§4.5 step 7) has already started in another session.
+
+**What would change my mind on items 1 and 4:**
+- **Item 1:** if a seam + setting + rule feature turns out slower or less reliable than the code it replaced. The pilot
+  cost 4.3 s per render and one double-fire, both acceptable for a wallpaper but maybe not for something on every
+  keystroke.
+- **Item 4:** if one holder for kernel edits blocks more work than the collisions cost.
