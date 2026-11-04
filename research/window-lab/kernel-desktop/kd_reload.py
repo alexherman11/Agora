@@ -73,6 +73,23 @@ def own_files(entry):
     return [p for p in entry.parent.glob("*.py") if not p.name.startswith("test_")]
 
 
+def world_names(mods, token):
+    """Each process named as the world names the module that runs it (rows module: its run), not by its file: one
+    source can run several modules (4 Nov: the adapter source runs twitch). A file no module runs keeps its stem."""
+    runs = {}
+    for m in say("rows module", token).get("rows") or []:
+        run = m.get("run") or []
+        if len(run) > 1 and m.get("on"):
+            runs.setdefault(str(Path(run[1])).lower(), []).append(m["name"])
+    used, out = {}, []
+    for name, entry, start, pid in mods:
+        key = str(entry).lower()
+        have, i = runs.get(key) or [], used.get(key, 0)
+        used[key] = i + 1
+        out.append((have[i] if i < len(have) else name, entry, start, pid))
+    return out
+
+
 def newer(files, than):
     return sorted({str(p.relative_to(ROOT)) for p in files if p.exists() and p.stat().st_mtime > than})
 
@@ -91,6 +108,7 @@ def main():
         return
     sessions = json.loads((HERE / "state" / "world" / "keep" / "sessions.json").read_text(encoding="utf-8"))
     token = next(t for t, v in sessions.items() if v.get("signer") == "alex")
+    mods = world_names(mods, token)
 
     kernel = [] if a.only else newer([p for d in KERNEL for p in (d.glob("*.py") if d.is_dir() else [d])], kd_start)
     proto = newer([HERE / "modproto.py"], min((m[2] for m in mods), default=kd_start))
