@@ -1,5 +1,10 @@
 # Current resolution: no supported live policy replacement
 
+**4 November 2026:** no supported hot replacement still holds. Use
+[the joint dk1706/dk2125 handoff](SHARING-CLOSEOUT-dk1706-dk2125.md) for current
+source, test and activation status. Test counts and draft details below are
+historical; none verifies the latest sharing corrections.
+
 This section supersedes the earlier design preserved below. House generic
 review passed `7a7c49e22c0af99a8f8ffb57374bdd59d8a2fea7`; this worktree contains
 uncommitted corrections to that commit. No source has been activated.

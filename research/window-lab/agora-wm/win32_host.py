@@ -261,6 +261,7 @@ class Native:
                 'agora':agora,'state':'minimised' if u.IsIconic(hwnd) else 'normal','focused':hwnd==front,
                 'rect':r.values(),'space':'primary','managed':not why,'why':why,'ref':ref,'_preferred':preferred,
                 '_normal':normal,'owned':owned,'maximised':maximised,
+                'browser_class':ref.cls.startswith('Chrome_WidgetWin_'),
                 'share_candidate':screen_sized and why=='frameless; no app rule',
                 'display_mode':'maximised' if maximised else 'screen-sized (exclusive unknown)' if screen_sized else 'windowed'})
             return True
@@ -300,6 +301,15 @@ class Native:
 
     def minimise(self,ref):self.check(ref);u.ShowWindowAsync(ref.hwnd,7)
     def restore(self,ref):self.check(ref);u.ShowWindowAsync(ref.hwnd,4)
+    def restore_shared(self,ref):
+        """Ask the app's window-state handler to restore; never synthesize input.
+
+        Unlike a bare geometry change this reaches an application's system
+        command handler. App-owned/exclusive fullscreen may still decline.
+        The manager measures the result and falls back without minimising it.
+        """
+        self.check(ref)
+        if not u.PostMessageW(ref.hwnd,0x112,0xF120,0):raise OSError(C.get_last_error(),'SC_RESTORE')
     def focus(self,ref):self.check(ref);return bool(u.SetForegroundWindow(ref.hwnd))
     def close(self,ref):self.check(ref);return bool(u.PostMessageW(ref.hwnd,0x10,0,0))
 

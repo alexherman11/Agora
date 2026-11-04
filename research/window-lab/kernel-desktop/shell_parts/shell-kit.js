@@ -189,8 +189,10 @@ const ShellKit = (() => {
       return this.act(`window.activate handle=${w.key}`);
     },
     async launch(line, exe) {
-      if (this.wmOK && exe && /^window\.launch\s/.test(line) && /\.exe$/i.test(exe)) {
-        const ready = await this.act(`wm.arrange expect=${JSON.stringify(exe)}`);
+      const expected = /^window\.open\s/.test(line) ? 'agora'
+        : exe && /^window\.launch\s/.test(line) && /\.exe$/i.test(exe) ? exe : null;
+      if (this.wmOK && expected) {
+        const ready = await this.act(`wm.arrange expect=${JSON.stringify(expected)}`);
         if (refused(ready)) return ready;
       }
       return this.act(line);

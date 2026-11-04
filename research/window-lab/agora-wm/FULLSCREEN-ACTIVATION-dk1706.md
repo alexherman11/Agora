@@ -1,5 +1,11 @@
 # Fullscreen sharing closeout — held for JEFF
 
+**Superseded operational handoff, 4 November 2026:** use
+[the joint dk1706/dk2125 closeout](SHARING-CLOSEOUT-dk1706-dk2125.md).
+The source has changed again after the recorded failed live outcome.
+Everything below retains historical evidence and conditional instructions;
+it is not a fresh observation or authority to replay grants/lifecycle steps.
+
 Follow-up: JEFF authorized source-only delivery repair, with no off/on, guard
 retry or activation. See [WM policy handoff](POLICY-RELOAD-dk1706.md) for the
 current refusal-only resolution, tests and exact lifecycle exception needed.

@@ -32,7 +32,7 @@ HELP={
  'close':('do','<key>','Ask the window politely to close with WM_CLOSE; never kill a process.'),
  'pin':('do','<key>','Keep this window fixed. Screen state, kept by this window manager, never in the world.'),
  'unpin':('do','<key>','Let this pinned window move again. Screen state, never in the world.'),
- 'arrange':('do','[expect=<exe>]','Re-solve the layout; expect arms one bar-requested shared layout for a new executable window, for at most five seconds. Exclusive fullscreen is unsupported.'),
+ 'arrange':('do','[expect=<exe|agora>]','Re-solve the layout; expect arms one bar-requested shared layout for a new executable or Agora window, for at most five seconds. Browser windows keep half-screen width; LRU gives way before the request. Exclusive fullscreen is unsupported.'),
  'reload':('do','sha256=<reviewed digest>','Unavailable: refuses before source/native/lease operations. Existing watchdog cannot guarantee a bounded live handoff.'),
  'rollback':('do','sha256=<previous digest>','Unavailable: no retained code generation; requires a separately authorized WM lifecycle, with geometry/claim release.'),
  'mode':('do','live|shadow|off','Shadow computes only; live needs rollout arming; off releases every saved placement.'),

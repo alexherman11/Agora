@@ -52,5 +52,9 @@ reject = true;
 assert.deepEqual(await click([]), [`wm.arrange expect=${JSON.stringify(exe)}`],
   'a refused sharing request must not launch or forward');
 reject = false;
-assert.deepEqual(await click([], 'window.open writing'), ['window.open writing']);
-console.log('PASS: 7 production dock click/vocabulary cases; DOM/transport stand-ins, native outcome unverified');
+assert.deepEqual(await click([], 'window.open writing'),
+  ['wm.arrange expect="agora"', 'window.open writing']);
+reject = true;
+assert.deepEqual(await click([], 'window.open writing'), ['wm.arrange expect="agora"'],
+  'an exclusive/inspection refusal must not open a native lens');
+console.log('PASS: 8 production dock click/vocabulary cases; DOM/transport stand-ins, native outcome unverified');

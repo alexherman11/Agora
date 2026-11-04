@@ -41,6 +41,7 @@ class Window:
     managed: bool = True
     minimised: bool = False
     home: Rect | None = None   # a pin's chosen rectangle; it may be narrowed from it, and grows back to it
+    no_evict: bool = False     # a fullscreen participant must not be the share fallback victim
 
 
 @dataclass
@@ -56,6 +57,7 @@ class State:
     gesture: dict | None = None
     displacement: dict = field(default_factory=dict)  # victim -> causal stack, newest last
     pin_min: float = PIN_MIN
+    fill_on_close: bool = False
 
     @property
     def bounds(self):
@@ -271,6 +273,69 @@ def adaptive(s, incoming):
     return False
 
 
+def fill_space(s):
+    """Grow shared tiles into adjacent free space without moving fixed windows."""
+    movable=sorted((w for w in s.windows.values()
+        if w.rect and w.managed and not w.pinned and not w.minimised),
+        key=lambda w:(-w.minimum[0],-w.last_used,w.key))
+    for w in movable:
+        choices=[r for r in free_rectangles(s.bounds,occupied(s,(w.key,)),s.gap_inner)
+                 if r.contains(w.rect)]
+        if choices:w.rect=max(choices,key=lambda r:(r.w*r.h,r.w,r.h,-r.y,-r.x))
+
+
+def share_layout(s, incoming):
+    """Explicit bar intent: fit everybody, then evict LRU, never the request.
+
+    Reuses the same bounded packing and fixed geometry as open/restore.
+    Minimized apps other than the requested one stay asleep.
+    """
+    original=copy_state(s)
+    target=s.windows[incoming]
+    target.minimised=False
+    s.clock+=1;target.last_used=s.clock
+    s.fill_on_close=True
+    s.displacement.clear()
+    victims=sorted((w for w in s.windows.values() if w.key!=incoming
+        and w.managed and not w.pinned and not w.minimised and not w.no_evict),
+        key=lambda w:(w.last_used,w.key))
+    def foreground():
+        # Evicting other windows cannot solve fixed fullscreen geometry.
+        # Restore all visibility and geometry from before the attempted packing.
+        s.windows=original.windows
+        target=s.windows[incoming]
+        target.minimised=False
+        target.last_used=s.clock
+        size=tuple(max(p,m) for p,m in zip(target.preferred,target.minimum))
+        origin=target.rect or s.bounds
+        target.rect=clamp(Rect(origin.x,origin.y,*size),s.bounds,target.minimum)
+        target.managed=False
+        # Only the intentional overlap is floating. Its neighbours retain their
+        # observed bounds and are not placed/minimised by the controller.
+        for key,w in s.windows.items():
+            if key!=incoming and w.rect and not w.minimised and w.rect.near(target.rect,s.gap_inner):
+                w.managed=False
+        return ['Requested window shown in front; fixed windows prevent sharing']
+    # Test the request against fixed geometry before considering LRU eviction.
+    # There is no benefit in minimising unrelated apps around an unmovable wall.
+    if not target.managed:return foreground()
+    if target.managed:
+        fixed=[w.rect for w in s.windows.values() if w.key!=incoming and w.rect
+               and not w.minimised and (w.pinned or not w.managed)]
+        if not any(r.w>=target.minimum[0] and r.h>=target.minimum[1]
+                   for r in free_rectangles(s.bounds,list(s.obstacles)+fixed,s.gap_inner)):
+            return foreground()
+    while not adaptive(s,incoming):
+        if not victims:
+            # Fixed/unmovable fullscreen can occupy the entire work area.
+            # Keep it visible and show the request in front, not an error or
+            # a minimised request. Manager holds only this overlap as floating.
+            return foreground()
+        victims.pop(0).minimised=True
+    fill_space(s)
+    return []
+
+
 def placement(w):return (w.rect,w.minimised)
 
 
@@ -325,6 +390,12 @@ def restore_displacement(s,cause):
 
 def solve(state,event=None):
     s=copy_state(state);e=event or {'type':'arrange'};kind=e['type'];notes=[]
+    if kind=='share' and e.get('key') in s.windows:
+        notes=share_layout(s,e['key'])
+        return Result({k:w.rect for k,w in sorted(s.windows.items()) if w.rect and not w.minimised},
+            sorted(k for k,w in s.windows.items() if w.minimised),notes,s)
+    if kind=='fill':
+        fill_space(s)
     key=e.get('key');w=s.windows.get(key)
     if kind=='open' and w is not None:kind='restore'
     if kind in ('minimise','restore','pin','unpin','drag-start','resize-start','drag-move','drag-end','resize-move','resize-end','manual'):
@@ -428,7 +499,8 @@ def solve(state,event=None):
     if kind in ('close','minimise'):
         restore_displacement(s,key)
         regrow_pins(s)
-        if s.reflow=='gentle':gentle(s)
+        if s.fill_on_close:fill_space(s)
+        elif s.reflow=='gentle':gentle(s)
     if not valid(s):notes.append('infeasible fixed geometry: pins/obstacles retained; no safe global solution')
     return Result({k:v.rect for k,v in sorted(s.windows.items()) if v.rect and not v.minimised},
         sorted(k for k,v in s.windows.items() if v.minimised),notes,s)

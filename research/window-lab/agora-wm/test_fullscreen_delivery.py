@@ -4,6 +4,7 @@ House-only; no real windows, processes, input or world are used. This checks
 behavior beyond JS line construction, but is not guarded native acceptance.
 """
 from copy import deepcopy
+from itertools import permutations
 from pathlib import Path
 import sys
 import tempfile
@@ -21,11 +22,13 @@ WORK = Rect(0, 0, 3840, 2160)
 
 
 def row(key, box, **kw):
-    return dict(key=key, app=key, exe='C:/fixture/' + key + '.exe', icon='',
+    data=dict(key=key, app=key, exe='C:/fixture/' + key + '.exe', icon='',
                 agora=None, state='normal', focused=False, rect=list(box),
                 space='primary', managed=True, why='', owned=False,
                 maximised=False, _normal=None, _preferred=list(box[2:]),
-                ref=NS(hwnd=1 if key == 'claude' else 2), **kw)
+                ref=NS(hwnd=1 if key == 'claude' else 2))
+    data.update(kw)
+    return data
 
 
 class NativeFixture:
@@ -54,6 +57,13 @@ class NativeFixture:
         r['maximised'] = False
         r['rect'] = list(r['_normal'] or [16, 16, *r['_preferred']])
 
+    def restore_shared(self, ref):
+        r=self.find(ref)
+        self.calls.append(('state-restore',r['key']))
+        if r.get('honors_state_restore',True):
+            r['app_fullscreen']=False
+            self.restore(ref)
+
     def focus(self, ref):
         self.calls.append(('focus', self.find(ref)['key']))
         for r in self.rows:
@@ -63,6 +73,7 @@ class NativeFixture:
     def place(self, ref, target):
         r = self.find(ref)
         self.calls.append(('place', r['key']))
+        if r.get('app_fullscreen'):return
         r['rect'] = target.values()
 
     def minimise(self, ref):
@@ -92,15 +103,20 @@ class FullscreenController(unittest.TestCase):
         music.update(state='minimised', _normal=[16, 16, 950, 700])
         self.native = NativeFixture([claude] if new else [claude, music])
         self.music = music
+        self.setup_rows(self.native.rows)
+
+    def setup_rows(self, rows, work=WORK):
+        self.native=NativeFixture(rows)
+        self.work=work
         self.m = Manager(self.native, self.tmp.name, allow_live=True, gate_fn=lambda: self.gates)
         self.m.mode = 'live'
         self.m.lease = Mock()
-        self.m.ingest(self.native.windows(), WORK)
+        self.m.ingest(self.native.windows(), work)
         self.w = WMModule(headless=False)
         self.w.owner = 'owner'
         self.w.manager = self.m
         # Importing the controller's work-area dependency uses this fixed fake.
-        self.modules_patch = patch.dict(sys.modules, {'win32_host': NS(work_area=lambda: WORK)})
+        self.modules_patch = patch.dict(sys.modules, {'win32_host': NS(work_area=lambda: work)})
         self.modules_patch.start()
         self.addCleanup(self.modules_patch.stop)
 
@@ -133,9 +149,11 @@ class FullscreenController(unittest.TestCase):
         self.assertTrue(WORK.contains(a) and WORK.contains(b))
         self.assertTrue(valid(self.m.state))
         self.assertEqual(self.m.state.windows['music'].preferred, (950, 700))
-        self.assertEqual((b.w, b.h), (950, 700))
+        self.assertGreaterEqual(a.w, WORK.w//2)
+        self.assertGreaterEqual(b.w, 480)
+        self.assertGreaterEqual(b.h, 320)
         if remembered:
-            self.assertEqual((a.w, a.h), (1200, 800))
+            self.assertEqual(self.m.remembered['claude'], (1200, 800))
         before = [r['rect'] for r in rows]
         mutations = len(self.native.calls)
         for _ in range(4):
@@ -161,6 +179,130 @@ class FullscreenController(unittest.TestCase):
         self.music['state'] = 'normal'
         self.native.rows.append(self.music)
         self.assert_shared(remembered=True)
+
+    def test_flagged_electron_and_agora_are_reprobed_by_explicit_bar_request(self):
+        for exe,agora in (('Claude.exe',None),('Discord.exe',None),
+                          ('Spotify.exe',None),('python.exe','fixture-chat')):
+            with self.subTest(exe=exe):
+                self.setup_case()
+                self.native.rows[0].update(exe='C:/fixture/'+exe,agora=agora,
+                    browser_class=exe!='python.exe')
+                self.m.failures.update(claude=3,music=3)
+                self.m.rows=self.native.windows()
+                self.assertFalse(self.m.reading()[0]['managed'])
+                result=self.dispatch('wm.restore','music',share='yes')
+                self.assertNotIn('refused',result)
+                for _ in range(10):self.tick()
+                self.assertTrue(all(r['state']=='normal' for r in self.native.rows))
+                self.assertIn(('restore','claude'),self.native.calls)
+                self.assertFalse(any(c[0]=='minimise' for c in self.native.calls))
+
+    def test_each_new_bar_launch_reprobes_the_same_flagged_window(self):
+        self.setup_case()
+        for _ in range(2):
+            self.native.rows[0].update(maximised=True,rect=[0,0,3840,2160])
+            self.m.rows=self.native.windows()
+            self.m.failures['claude']=3
+            result=self.dispatch('wm.focus','music',share='yes')
+            self.assertNotIn('refused',result)
+            for _ in range(10):self.tick()
+        self.assertEqual(self.native.calls.count(('restore','claude')),2)
+        self.assertFalse(any(c[0]=='minimise' for c in self.native.calls))
+
+    def test_new_agora_chat_arms_then_joins_existing_apps(self):
+        self.setup_case(new=True)
+        self.assertNotIn('refused',self.dispatch('wm.arrange',expect='agora'))
+        self.assertEqual(self.native.calls,[])
+        self.music.update(agora='fixture-chat',exe='python.exe',state='normal')
+        self.native.rows.append(self.music)
+        self.assert_shared(remembered=True)
+
+    def test_stubborn_fullscreen_keeps_request_visible_after_transaction_expires(self):
+        self.setup_case(borderless=True)
+        place=self.native.place
+        def stubborn(ref,target):
+            if self.native.find(ref)['key']=='claude':
+                self.native.calls.append(('refused-geometry','claude'))
+            else:place(ref,target)
+        self.native.place=stubborn
+        self.assertNotIn('refused',self.dispatch('wm.restore','music',share='yes'))
+        for _ in range(16):self.tick()
+        self.assertTrue(all(r['state']=='normal' for r in self.native.rows))
+        self.assertFalse(any(c[0]=='minimise' for c in self.native.calls))
+        self.assertTrue(any(r.get('share_note') for r in self.m.reading()))
+        self.assertEqual(self.native.find(NS(hwnd=2))['rect'][2:],[950,700])
+        self.assertEqual(self.native.calls.count(('refused-geometry','claude')),1)
+
+    def test_state_restore_precedes_placement_and_exits_cooperative_app_fullscreen(self):
+        self.setup_case(borderless=True)
+        self.native.rows[0].update(app_fullscreen=True,_normal=[16,16,1200,800])
+        self.assertNotIn('refused',self.dispatch('wm.restore','music',share='yes'))
+        self.assert_shared(remembered=False)
+        self.assertFalse(self.native.rows[0]['app_fullscreen'])
+        calls=self.native.calls
+        self.assertLess(calls.index(('state-restore','claude')),calls.index(('place','claude')))
+
+    def test_state_restore_refusal_stops_share_without_native_retry_or_lease_release(self):
+        self.setup_case()
+        def refused(ref):
+            self.native.calls.append(('denied-state',self.native.find(ref)['key']))
+            raise PermissionError('fixture state operation denied')
+        self.native.restore_shared=refused
+        self.assertNotIn('refused',self.dispatch('wm.restore','music',share='yes'))
+        for _ in range(8):self.tick()
+        self.assertIsNone(self.m.share)
+        self.assertEqual(sum(c[0]=='denied-state' for c in self.native.calls),1)
+        self.assertFalse(any(c[0] in ('place','minimise') for c in self.native.calls))
+        self.m.lease.release.assert_not_called()
+        self.m.lease.acquire.assert_not_called()
+
+    def test_requested_focus_refusal_cancels_without_followup_native_actions(self):
+        self.setup_case()
+        def refused(ref):
+            self.native.calls.append(('denied-focus',self.native.find(ref)['key']))
+            raise PermissionError('fixture focus operation denied')
+        self.native.focus=refused
+        self.assertIn('refused',self.dispatch('wm.restore','music',share='yes'))
+        for _ in range(8):self.tick()
+        self.assertIsNone(self.m.share)
+        self.assertEqual(self.native.calls,[('denied-focus','music')])
+        self.m.lease.release.assert_not_called()
+
+    def test_three_apps_all_bar_orders_through_production_controller(self):
+        for order in permutations(('claude','spotify','chat')):
+            with self.subTest(order=order):
+                self.gates[:]=['full-screen foreground application']
+                self.setup_rows([],Rect(0,0,1920,1080))
+                for key in order:
+                    result=self.dispatch('wm.arrange',expect='agora' if key=='chat' else f'C:/fixture/{key}.exe')
+                    self.assertNotIn('refused',result)
+                    self.native.rows.append(row(key,(16,16,1200 if key=='claude' else 700,700),
+                        ref=NS(hwnd={'claude':1,'spotify':2,'chat':3}[key]),agora='chat-window' if key=='chat' else None))
+                    for _ in range(8):self.tick()
+                    self.assertTrue(all(r['state']=='normal' for r in self.native.rows))
+                    self.assertTrue(valid(self.m.state))
+                    for r in self.native.rows:
+                        if r['key']=='claude':self.assertGreaterEqual(r['rect'][2],960)
+                    self.assertFalse(any(c[0]=='minimise' for c in self.native.calls))
+                self.gates.clear();self.m.gate_cache=(None,-1)
+                before=sum(r['rect'][2]*r['rect'][3] for r in self.native.rows if r['key']!='chat')
+                self.native.rows[:]=[r for r in self.native.rows if r['key']!='chat']
+                for _ in range(8):self.tick()
+                self.assertGreater(sum(r['rect'][2]*r['rect'][3] for r in self.native.rows),before)
+                self.assertTrue(valid(self.m.state))
+                self.assertGreaterEqual(next(r for r in self.native.rows if r['key']=='claude')['rect'][2],960)
+                self.m.lease.release.assert_not_called()
+
+    def test_lru_fallback_minimises_oldest_never_request(self):
+        self.gates[:]=['full-screen foreground application']
+        rows=[row(key,(16,16,700,600),ref=NS(hwnd=i+1)) for i,key in enumerate(
+            ('oldest','recent','newer','newest','request'))]
+        self.setup_rows(rows,Rect(0,0,1200,800))
+        self.assertNotIn('refused',self.dispatch('wm.focus','request',share='yes'))
+        for _ in range(10):self.tick()
+        self.assertEqual([r['key'] for r in self.native.rows if r['state']=='minimised'],['oldest'])
+        self.assertNotIn(('minimise','request'),self.native.calls)
+        self.assertTrue(valid(self.m.state))
 
     def test_exclusive_unknown_pin_and_dialog_refuse_without_native_actions(self):
         self.setup_case()

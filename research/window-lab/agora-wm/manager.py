@@ -28,6 +28,20 @@ def public_rows(rows,pins=()):
         'state':'pinned' if row['key'] in pins and row['state']!='minimised' else row['state']} for row in rows]
 
 
+def browser_class(row):
+    """Browser/Electron host windows, excluding small native/chat surfaces."""
+    exe=str(row.get('exe','')).replace('\\','/').rsplit('/',1)[-1].lower()
+    if row.get('agora') or exe in ('spotify.exe',):return False
+    return bool(row.get('browser_class') or exe in (
+        'chrome.exe','msedge.exe','firefox.exe','brave.exe','vivaldi.exe',
+        'opera.exe','claude.exe','chatgpt.exe','discord.exe'))
+
+
+def minimum_size(row,work):
+    return ((work.w+1)//2 if browser_class(row) else min(480,max(0,work.w-32)),
+            min(320,max(0,work.h-32)))
+
+
 def colorref(value):
     if not isinstance(value,str) or len(value)!=7 or not value.startswith('#'):raise ValueError('native color must be #RRGGBB')
     r,g,b=(int(value[i:i+2],16) for i in (1,3,5));return r|(g<<8)|(b<<16)
@@ -43,6 +57,8 @@ class Manager:
         self.styled={};self.feel=Feel(scale=self._scale());self.gesture_ref=None;self.released=None
         self.logged=None;self.gate_cache=(None,-1.0)
         self.share=None;self.borderless=set()
+        self.share_floats={};self.share_note=''
+        self.remembered={};self.recency={};self.use_clock=0;self.policy_minima={}
         if gate_fn is None:
             from win32_host import gate
             gate_fn=gate
@@ -103,7 +119,8 @@ class Manager:
         if self.mode!='live':raise PermissionError('shared layout requires live mode')
         previous=self.share
         self.share={'until':time.monotonic()+5,'keys':{r['key'] for r in self.rows},
-            'target':key,'expect':expect,'new':{r['key'] for r in self.rows},'ready':False}
+            'target':key,'expect':expect,'new':{r['key'] for r in self.rows},'ready':False,
+            'probed':set(),'probe_wait':{},'planned':False,'failed':set()}
         self.gate_cache=(None,-1.0)
         if self.layout_gates():
             self.share=previous
@@ -111,21 +128,35 @@ class Manager:
         row=next((r for r in self.rows if r['key']==key),None)
         if key and (not row or not self._shareable(row) or key in self.pins):
             self.share=previous
-            raise PermissionError('requested window cannot join shared layout')
+            raise PermissionError('requested window is excluded, pinned or unavailable')
         if not key and not expect:
             self.share=previous
             raise ValueError('shared arrangement needs a window or expected executable')
         self._drop_gesture()
+        self.share_floats.clear();self.share_note=''
+        # Failure counts are observations, not an app exclusion. A new explicit
+        # bar request permits one fresh probe, never a background retry.
+        for candidate in self.rows:
+            if self._shareable(candidate):self.failures.pop(candidate['key'],None)
         self.pending.clear()
         self.boot=True
 
     def _shareable(self,row):
-        candidate=(row.get('share_candidate') or row['key'] in self.borderless) and row.get('why')=='frameless; no app rule'
-        return not row.get('owned') and self._managed({**row,'managed':row['managed'] or candidate})
+        candidate=row.get('why')=='frameless; no app rule'
+        return not row.get('owned') and self._managed({**row,'managed':row['managed'] or candidate},failures=False)
+
+    def _hold_share(self,note):
+        """End a failed/expired request without a native retry or reflow."""
+        if self.share:
+            self.share_floats.update({r['key']:list(r['rect']) for r in self.rows
+                if r['key'] in self.share['keys'] and self._shareable(r) and r['key'] not in self.pins})
+        self.pending.clear();self.share=None;self.share_note=note
 
     def _sharing(self):
         if self.share and time.monotonic()>=self.share['until']:
-            self.share=None
+            # Stop at the deadline, including incomplete asynchronous work.
+            # The following ordinary tick must not evict the requested app.
+            self._hold_share('Sharing timed out; observed windows retained without further native actions')
         return self.share
 
     def read_theme(self):
@@ -172,6 +203,21 @@ class Manager:
     def ingest(self,rows,work,events=()):
         """Polling reconciles missing hooks, size refusals and work-area changes."""
         now=time.monotonic();self.rows=rows;self.refs={r['key']:r['ref'] for r in rows}
+        for row in rows:
+            key=row['key'];old=self.actual.get(key)
+            if key not in self.recency or row['focused'] and (not old or not old['focused']):
+                self.use_clock+=1;self.recency[key]=self.use_clock
+            if key not in self.remembered:
+                normal=row.get('_normal')
+                size=row.get('_preferred',row['rect'][2:])
+                if not normal and (row.get('share_candidate') or row.get('display_mode','').startswith('screen-sized')):
+                    size=(1200,800)  # no normal bounds known for app-owned fullscreen
+                self.remembered[key]=tuple(normal[2:] if normal else size)
+        present={r['key'] for r in rows}
+        self.remembered={k:v for k,v in self.remembered.items() if k in present}
+        self.recency={k:v for k,v in self.recency.items() if k in present}
+        self.policy_minima={k:v for k,v in self.policy_minima.items() if k in present}
+        if set(self.share_floats)-present:self.share_floats.clear()
         if self.mode=='off':
             current={r['key']:r for r in rows}
             self.changed.update(set(current)^set(self.actual))
@@ -181,7 +227,8 @@ class Manager:
         sharing=self._sharing()
         if sharing and sharing['expect'] and not sharing['ready']:
             target=next((r for r in rows if r['key'] not in sharing['new']
-                and str(r['exe']).lower()==sharing['expect'].lower() and self._shareable(r)),None)
+                and (str(r['exe']).lower()==sharing['expect'].lower()
+                    or sharing['expect']=='agora' and r.get('agora')) and self._shareable(r)),None)
             if target:
                 sharing['target']=target['key'];sharing['keys'].add(target['key'])
         if sharing:
@@ -194,18 +241,47 @@ class Manager:
             self.gesture=None;self.preview=None;self.gesture_ref=None
             return {'at':time.time(),'gated':gates,'observed_apps':sorted(set(r['app'] for r in rows)),
                 'plan':[],'minimise':[]}
+        if sharing and sharing['ready'] and self.mode=='live':
+            # Ask state restoration before learning a fullscreen rectangle as
+            # an app minimum. Only one probe per explicit request; no input.
+            waiting=False
+            for row in rows:
+                key=row['key']
+                if key not in sharing['keys'] or key in self.pins or not self._shareable(row):continue
+                if key in sharing['probe_wait']:
+                    if now-sharing['probe_wait'][key]<.35:waiting=True
+                    elif self.native.needs_restore(row['ref']):self.failures[key]=3
+                    continue
+                if key not in sharing['probed'] and (row.get('maximised') or row.get('share_candidate')
+                        or key==sharing['target'] and row['state']=='minimised'
+                        or row.get('display_mode','').startswith('screen-sized')):
+                    sharing['probed'].add(key)
+                    try:
+                        self.lease.heartbeat();self.lease.save(row['ref'])
+                        self.native.restore_shared(row['ref'])
+                    except (OSError,PermissionError):
+                        self.failures[key]=3
+                        self._hold_share('Window-state probe refused; sharing stopped without retry')
+                        return {'gated':[],'plan':[],'minimise':[],'notes':[self.share_note]}
+                    sharing['probe_wait'][key]=now;waiting=True
+            if waiting:
+                return {'gated':[],'plan':[],'minimise':[],'notes':['Waiting for requested window-state restore']}
         resumed=self.gated;self.gated=False
         self.read_theme()
         everything={r['key'] for r in rows}
         current={}
         for row in rows:
             key=row['key']
+            if not sharing and key in self.share_floats:
+                if row['rect']==self.share_floats[key]:continue
+                del self.share_floats[key]  # external geometry change returns it to ordinary policy
             admitted=bool(sharing and key in sharing['keys'] and self._shareable(row) and key not in self.pins)
             if floating(row) and not admitted:continue
             if sharing and key not in sharing['keys']:continue
-            if admitted and row.get('share_candidate'):self.borderless.add(key)
+            if admitted and row.get('why')=='frameless; no app rule':self.borderless.add(key)
             current[key]={**row,'managed':True} if key in self.borderless and self._shareable(row) else row
         self.borderless.intersection_update(everything)
+        self.share_floats={k:r for k,r in self.share_floats.items() if k in everything}
         self.state.work=work
         if self.boot or resumed:
             # Starting/resuming uses actual geometry, never replays stale drag debt.
@@ -216,11 +292,12 @@ class Manager:
                     normal=row.get('_normal')
                     size=row.get('_preferred',(r.w,r.h))
                     r=Rect(*normal) if normal else Rect(r.x,r.y,*size)
-                self.state.windows[row['key']]=Window(row['key'],tuple(row.get('_preferred',(r.w,r.h))),
-                    rect=r,last_used=i if not row['focused'] else len(rows)+1,
-                    managed=self._managed(row),pinned=pinned,home=r if pinned else None,minimised=row['state']=='minimised')
-            self.state.clock=len(rows)+1;self.boot=False
-            self.state=solve(self.state,{'type':'arrange'}).state
+                self.state.windows[row['key']]=Window(row['key'],self.remembered[row['key']],
+                    minimum=minimum_size(row,work),rect=r,last_used=self.recency[row['key']],
+                    managed=self._managed(row),pinned=pinned,home=r if pinned else None,minimised=row['state']=='minimised',
+                    no_evict=bool(sharing and row['key'] in sharing['probed']))
+            self.state.clock=self.use_clock;self.boot=False
+            if not sharing:self.state=solve(self.state,{'type':'arrange'}).state
         for key in sorted(set(self.state.windows)-set(current)):
             self.changed.add(key);self.pending.pop(key,None)
             if self.gesture and self.gesture.key==key:self._drop_gesture()
@@ -248,17 +325,22 @@ class Manager:
         for key,row in current.items():
             old=self.actual.get(key);r=Rect(*row['rect']);w=self.state.windows.get(key)
             if w is None:
-                size=row.get('_preferred',(r.w,r.h));pref=(min(size[0],self.state.bounds.w),min(size[1],self.state.bounds.h))
+                size=self.remembered[key];pref=(min(size[0],self.state.bounds.w),min(size[1],self.state.bounds.h))
                 if row['state']=='minimised':
-                    self.state.windows[key]=Window(key,pref,rect=r,managed=self._managed(row),pinned=key in self.pins,
+                    self.state.windows[key]=Window(key,pref,minimum=minimum_size(row,work),rect=r,managed=self._managed(row),pinned=key in self.pins,
                         home=r if key in self.pins else None,minimised=True)
                 else:
                     self.state=solve(self.state,{'type':'open','key':key,'window':{'preferred':pref,
-                        'rect':r.values(),'managed':self._managed(row),'pinned':key in self.pins,
+                        'minimum':minimum_size(row,work),'rect':r.values(),'managed':self._managed(row),'pinned':key in self.pins,
                         'home':r if key in self.pins else None}}).state
                 w=self.state.windows[key]
                 if row['state']=='minimised':w.minimised=True
             w.managed=self._managed(row) and not self.failures.get(key,0)>=3
+            floor=minimum_size(row,work)
+            previous=self.policy_minima.get(key,(0,0))
+            w.minimum=tuple(max(floor[i],w.minimum[i] if w.minimum[i]>previous[i] else 0) for i in (0,1))
+            self.policy_minima[key]=floor
+            w.last_used=self.recency[key];self.state.clock=max(self.state.clock,self.use_clock)
             if not w.managed:
                 w.rect=r;w.minimised=row['state']=='minimised';continue
             if key in self.pins and not w.pinned:w.rect=r;w.pinned=True;w.home=r
@@ -290,13 +372,17 @@ class Manager:
                         self.failures[key]=3;w.managed=False;w.rect=r;w.minimised=row['state']=='minimised'
                 elif r!=pending['rect'] and row['state']!='minimised':
                     expected=pending['rect'];self.failures[key]=self.failures.get(key,0)+1
+                    if sharing:
+                        # One fresh explicit probe, not a cycle of resize
+                        # attempts that learns fullscreen as a minimum size.
+                        self.failures[key]=3;w.managed=False;w.rect=r
                     # Only excess dimensions establish a minimum; position refusal is an obstacle.
-                    w.minimum=(max(w.minimum[0],r.w if r.w>expected.w else 0),
-                        max(w.minimum[1],r.h if r.h>expected.h else 0))
+                    else:w.minimum=(max(w.minimum[0],r.w if r.w>expected.w else 0),
+                                    max(w.minimum[1],r.h if r.h>expected.h else 0))
                     w.rect=r
                     if w.pinned:w.home=r if not w.home else Rect(w.home.x,w.home.y,max(w.home.w,r.w),max(w.home.h,r.h))
                     if self.failures[key]>=3:w.managed=False
-                    self.state=solve(self.state,{'type':'arrange'}).state
+                    if not sharing:self.state=solve(self.state,{'type':'arrange'}).state
                 self.pending.pop(key,None)
             if old and row['focused'] and not old['focused']:
                 self.state=solve(self.state,{'type':'focus','key':key}).state
@@ -313,7 +399,35 @@ class Manager:
                 # A self-resizer or move without native modal hooks still gets reconciled.
                 self.state=solve(self.state,{'type':'drag-end','key':key,'rect':r.values()}).state
         # Unmanaged windows are fixed within windows; no duplicate obstacles.
-        if not self.gesture:self.state=solve(self.state,{'type':'arrange'}).state
+        if sharing and sharing['ready'] and not self.gesture:
+            failed={k for k in current if self.failures.get(k,0)>=3}
+            if not sharing['planned'] or failed!=sharing['failed']:
+                # Intermediate open/restore reconciliation may have evicted a
+                # neighbour. Begin the explicit share from observed visibility,
+                # so repacking gets a chance before any real minimisation.
+                for key,row in current.items():
+                    self.state.windows[key].minimised=row['state']=='minimised'
+                shared=solve(self.state,{'type':'share','key':sharing['target']})
+                self.state=shared.state
+                self.share_note='; '.join(shared.notes)
+                evicted=[current[k]['app'] for k in shared.minimise
+                    if k in current and current[k]['state']!='minimised']
+                if evicted:self.share_note+='; least recently used stepped aside: '+', '.join(evicted)
+                sharing['planned']=True;sharing['failed']=failed
+                target=self.state.windows.get(sharing['target'])
+                if target and not target.managed:
+                    self.share_note='Requested window shown in front; fixed windows prevent sharing'
+                    for key,row in current.items():
+                        w=self.state.windows[key]
+                        if key!=target.key:
+                            w.rect=Rect(*row['rect']);w.minimised=row['state']=='minimised'
+                            if w.rect.near(target.rect,self.state.gap_inner) and not w.minimised:w.managed=False
+                    self.share_floats={k:list(r['rect']) for k,r in current.items()
+                        if not self.state.windows[k].managed and k!=sharing['target']}
+                    if target.rect:self.share_floats[target.key]=target.rect.values()
+        elif not self.gesture:self.state=solve(self.state,{'type':'arrange'}).state
+        if not sharing and self.state.fill_on_close and set(self.actual)-everything and not self.gesture:
+            self.state=solve(self.state,{'type':'fill'}).state
         plan=solve(self.state,{'type':'noop'})
         rows_out=[]
         for key,row in current.items():
@@ -323,7 +437,8 @@ class Manager:
         for row in rows:
             if self.actual.get(row['key'])!=row:self.changed.add(row['key'])
         result={'at':time.time(),'mode':self.mode,'gated':[],'work':work.values(),'plan':rows_out,
-            'minimise':[r['app'] for r in rows_out if r['minimise']], 'notes':plan.notes,'valid':valid(plan.state)}
+            'minimise':[r['app'] for r in rows_out if r['minimise']],
+            'notes':plan.notes+([self.share_note] if self.share_note else []),'valid':valid(plan.state)}
         if self.mode=='shadow':self._log(result)
         elif self.mode=='live' and not self.gesture:
             self.apply(plan,current)
@@ -370,24 +485,39 @@ class Manager:
             with self.log_path.open('a',encoding='utf-8') as f:f.write(json.dumps(result)+'\n')
         except OSError:pass
 
-    def _managed(self,row):
-        return row['managed'] and self.failures.get(row['key'],0)<3 and row['app'].lower() not in {x.lower() for x in self.settings['never']} and (
+    def _managed(self,row,failures=True):
+        return row['managed'] and (not failures or self.failures.get(row['key'],0)<3) and row['app'].lower() not in {x.lower() for x in self.settings['never']} and (
             self.settings['manage']=='all' or row['key'] in self.adopted)
 
     def apply(self,plan,current):
         if not valid(plan.state):return  # impossible fixed geometry fails closed
         if self.layout_gates():return
+        try:self._apply_plan(plan,current)
+        except (OSError,PermissionError):
+            if not self.share:raise
+            self._hold_share('Native sharing operation refused; stopped without retry')
+
+    def _apply_plan(self,plan,current):
         self.lease.heartbeat()
         # Minimise before placement; never transiently move over another managed window.
         for key in plan.minimise:
+            if self.share and (key==self.share['target'] or self.state.windows[key].no_evict):continue
             row=current.get(key)
             if row and self._managed(row) and row['state']!='minimised' and not self.state.windows[key].pinned:
                 if key in self.pending:continue
-                self.lease.save(row['ref']);self.native.minimise(row['ref'])
+                try:
+                    self.lease.save(row['ref']);self.native.minimise(row['ref'])
+                except (OSError,PermissionError):
+                    if not self.share:raise
+                    self.failures[key]=3
+                    self._hold_share('LRU minimisation refused; sharing stopped without retry')
+                    return
                 self.pending[key]={'kind':'minimise','rect':None,'at':time.monotonic()}
         for key,target in plan.placements.items():
             row=current.get(key)
             if not row or not self._managed(row):continue
+            if self.share and key==self.share['target'] and self.share_note.startswith('Requested window shown in front') and not self.share.get('front'):
+                self.lease.save(row['ref']);self.native.focus(row['ref']);self.share['front']=True
             role='pinned' if self.state.windows[key].pinned else ('focused' if row['focused'] else 'unfocused')
             color=self.theme.get('colors',{}).get(role);corner={'square':1,'round':2,'small':3}.get(self.theme.get('corner'))
             desired=(color,corner)
@@ -406,6 +536,9 @@ class Manager:
                 self.pending[key]={'rect':target,'at':time.monotonic()}
             except (OSError,PermissionError):
                 self.failures[key]=3;self.state.windows[key].managed=False
+                if self.share:
+                    self._hold_share('Native placement refused; sharing stopped without retry')
+                    return
 
     def action(self,verb,key,share=False):
         if self.mode!='live':raise PermissionError('native window actions require live mode')
@@ -420,9 +553,12 @@ class Manager:
             # opposite action). The native call alone leaves stale policy.
             self.pending.pop(key,None)
             self.state=solve(self.state,{'type':verb,'key':key}).state
-        self.lease.heartbeat();self.lease.save(row['ref'])
-        result=getattr(self.native,verb)(row['ref'])
-        if share and verb=='restore':result=self.native.focus(row['ref'])
+        try:
+            self.lease.heartbeat();self.lease.save(row['ref'])
+            result=self.native.focus(row['ref']) if share else getattr(self.native,verb)(row['ref'])
+        except (OSError,PermissionError):
+            if share:self._hold_share('Requested focus refused; sharing stopped without retry')
+            raise
         if verb in ('minimise','restore') and not share and key in self.state.windows:
             self.pending[key]={'kind':verb,'rect':self.state.windows[key].rect,'at':time.monotonic()}
         return result
@@ -433,4 +569,7 @@ class Manager:
             if row['key'] in self.failures and self.failures[row['key']]>=3:
                 row['managed']=False;row['why']='unmovable or repeatedly self-resizing'
             elif not self._managed(row):row['managed']=False;row['why']=row['why'] or 'app excluded or not adopted'
+            if row['key'] in self.share_floats:
+                row['managed']=False;row['why']='foreground fallback retained until geometry changes'
+            if self.share_note:row['share_note']=self.share_note
         return rows
