@@ -10,6 +10,8 @@ body:has(.smart-search){background:#f6f8f5!important;color:#233c34!important}
 .search-hit{background:white;border:1px solid #d9e3dc;border-radius:14px;padding:16px;margin:12px 0}
 .search-hit p{white-space:pre-wrap;overflow-wrap:anywhere}.search-hit h2{font-size:18px}
 .search-coverage{font-size:13px;color:#52665d}
+.search-sources{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0}
+.search-sources li{background:#e9eeeb;border-radius:8px;padding:7px 10px;font-size:13px}
 `,mount(api){
   const {P}=api,D=api.draft,Q=api.Q;
   const el=(tag,attrs,...kids)=>P.node(tag,attrs,...kids);
@@ -21,11 +23,11 @@ body:has(.smart-search){background:#f6f8f5!important;color:#233c34!important}
   let closed=false,generation=0,hits=[],opening=false;
   const root=api.part('body','main',{class:'smart-search'});
   const input=el('input',{type:'search','aria-label':'Search Apps and World text',
-    maxlength:'1200',value:D.query||'',placeholder:'Words to find'});
+    maxlength:'1200',value:D.query||'',placeholder:'Find an app, note or discussion'});
   input.value=D.query||'';
   const filter=el('select',{'aria-label':'Sources'},
     ...['All available','Apps','World'].map(v=>el('option',{value:v},v)));
-  filter.value=D.source||'All available';
+  filter.value=['All available','Apps','World'].includes(D.source)?D.source:'All available';
   const submit=el('button',{type:'submit'},'Search');
   const status=el('p',{role:'status','aria-live':'polite'});
   const results=el('section',{'aria-label':'Search results'});
@@ -78,8 +80,11 @@ body:has(.smart-search){background:#f6f8f5!important;color:#233c34!important}
   form.onsubmit=e=>{e.preventDefault();return search();};
   input.oninput=()=>{D.query=input.value;++generation;hits=[];results.replaceChildren();submit.disabled=false;};
   filter.onchange=()=>{D.source=filter.value;draw();};
-  root.append(el('h1',{},'Apps and World text search'),
-    el('p',{},'Matches words in available text; does not verify requested capabilities. Files, Email and Web are not connected.'),
+  root.append(el('h1',{},'Search'),
+    el('p',{},'Find words in Apps and World text. A result opens its source; it does not verify requested capabilities.'),
+    el('ul',{class:'search-sources','aria-label':'Source coverage'},
+      el('li',{},'Apps: available'),el('li',{},'World: available'),
+      el('li',{},'Email: not connected'),el('li',{},'Files: not connected'),el('li',{},'Web: not connected')),
     form,filter,el('p',{class:'search-coverage'},'Apps: visible Agora entries. World: supported visible text kinds. Results are limited before display filters; this is not complete search.'),
     status,results);
   api.cleanup(()=>{closed=true;++generation;});

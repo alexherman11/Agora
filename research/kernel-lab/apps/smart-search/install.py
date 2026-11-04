@@ -5,7 +5,6 @@ change shell settings or restart the broker. House handles reviewed activation.
 """
 import hashlib
 import importlib.util
-import json
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -29,9 +28,9 @@ def install(door):
         limitations="Word matches only; up to 50 results before supported-kind/source filters. Capabilities unverified. Files, Email and Web disconnected. No inference.",
         code=source)
     # House must review exact code hash, then activate separately.
-    lens = painter.upsert(door, "lens", "smart-search", title="Apps and World text search",
+    lens = painter.upsert(door, "lens", "smart-search", title="Search",
         painter="components", text=(HERE / "search.lens").read_text(encoding="utf-8"))
-    widget = painter.upsert(door, "widget", "smart-search", title="Apps and World text search", style="bars",
+    widget = painter.upsert(door, "widget", "smart-search", title="Search", style="bars",
         component_lens="smart-search", code=painter.widget_source(board_look=False))
     return dict(component=cid, lens=lens, widget=widget,
                 review_sha256=hashlib.sha256(source.encode()).hexdigest(),
@@ -40,5 +39,5 @@ def install(door):
 
 def entry(door):
     """Explicit post-review one-click entry; creates no fixture apps or windows."""
-    return painter.upsert(door, "button", "smart-search-button", label="Apps and World text search",
+    return painter.upsert(door, "button", "smart-search-button", label="Search",
                           bar="taskbar", icon="search", does="window.open smart-search")

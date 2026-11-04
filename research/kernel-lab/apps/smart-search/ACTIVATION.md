@@ -1,5 +1,28 @@
 # Search everything — scoped House handoff
 
+## Current small step: Search (4 November)
+
+Sable authorized the lexical window and one **Search** taskbar button.
+Window title: **Search**. `install(door)` selects only `lexical.js`;
+`entry(door)` upserts the single button targeting `window.open smart-search`.
+It returns Apps/World word matches with clickable source names, source filters,
+and separate Email/Files/Web **not connected** labels. Enter never runs commands.
+Clicks re-read caller-visible evidence and carry its revision.
+
+House brings current main into this branch at review; the worker uses no Git.
+Preserve the projected-label correction in `kernel/words.py` when reconciling
+shared kernel edits. Do not take raw-name fallback from an older search.
+No `house.py` edits or model adoption/restart/settings are needed.
+The five `host_acceptance` files are removed; that harness is abandoned.
+
+After landing under House authority, use an already authenticated Door:
+`install(door)`, ordinary exact component review, the standard widget activation
+with only `REQUIRED_GRANTS`, then `entry(door)`. Do not modify shell grants or
+launcher behavior. This source handoff does not perform those live operations.
+To withdraw later, turn off only this widget and its Search entry.
+The window may be snapped as **Search** after activation; none was opened here.
+Earlier sections below retain design/evidence history, not current instructions.
+
 Draft completion increment, 3 November 2026. JEFF owns serial review, landing and activation. This file performs none of them.
 
 **LEXICAL INTERIM REJECTED:** independent review dk1757 identified a field-private kernel search label leak. Current correction/re-review input is `research/smart-search-lab/search-projection-correction-2026-11-03.md` and `projection-review-manifest.json`, including the corrected kernel dependency. No activation/landing/grants/inference in this round. Generic House passed metadata does not approve feature behavior. Earlier activation proposals below are history until independent feature re-review passes.

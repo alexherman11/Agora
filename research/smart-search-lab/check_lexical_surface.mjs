@@ -35,8 +35,32 @@ const check=(label,fn)=>{fn();checks++;console.log('PASS '+label);};
   check('Honest capability, disconnected-source and incomplete-coverage copy',()=>{
     const copy=all(ui.root).flatMap(n=>[n.textContent,...n.children.filter(c=>typeof c==='string')]).join(' ');
     assert(copy.includes('does not verify requested capabilities'));
-    assert(copy.includes('Files, Email and Web are not connected'));
+    for(const source of ['Email','Files','Web'])assert(copy.includes(source+': not connected'));
+    assert.equal(ui.get('h1').children[0],'Search');
     assert(copy.includes('coverage is incomplete'));
+  });
+}
+{
+  const world={id:'ss2',rev:7,kind:'said',name:'Editor discussion',snippet:'We discussed image editing.'};
+  const ui=mount(async()=>[hit,world]);
+  await ui.get('form').onsubmit({preventDefault(){}});
+  const titles=()=>all(ui.root).filter(n=>n.tag==='h2').map(n=>n.children[0].children[0]);
+  check('Both Apps and World matches have clickable names',()=>{
+    assert.deepEqual(titles(),['Larch','Editor discussion']);
+    for(const name of titles())assert.equal(typeof ui.button(name).attrs.on.click,'function');
+  });
+  ui.get('select').value='World';ui.get('select').onchange();
+  check('World filter retains discussion and draft without another request',()=>{
+    assert.deepEqual(titles(),['Editor discussion']);assert.equal(ui.draft.source,'World');
+    assert.equal(ui.reads.length,1);assert.deepEqual(ui.fires,[]);
+  });
+  ui.get('select').value='Apps';ui.get('select').onchange();
+  check('Apps filter retains app evidence without claiming launch',()=>{
+    assert.deepEqual(titles(),['Larch']);assert.deepEqual(ui.fires,[]);
+  });
+  await ui.button('Larch').attrs.on.click();
+  check('Clicking a result name uses the same fresh evidence action',()=>{
+    assert.deepEqual(ui.fires,[['evidence',{id:'ss1',saw:{ss1:4}}]]);
   });
 }
 for(const [label,current] of [
