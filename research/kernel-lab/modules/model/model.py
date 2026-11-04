@@ -13,6 +13,7 @@ import sys
 import threading
 import time
 from pathlib import Path
+import smart_search
 
 pending = {}
 output_lock = threading.Lock()
@@ -66,7 +67,7 @@ def local(path, payload=None, timeout=7):
         conn.close()
 
 
-def generate(model, prompt, tokens=96, images=None):
+def generate(model, prompt, tokens=96, images=None, admission=None):
     # Refuse concurrent GPU work instead of queueing past the kernel's deadline.
     if not inference_lock.acquire(blocking=False):
         raise ValueError('the local model is busy; please try again shortly')
@@ -75,6 +76,8 @@ def generate(model, prompt, tokens=96, images=None):
             keep_alive='5m', options=dict(temperature=0, num_predict=tokens))
         if images:
             payload['images'] = images
+        if admission:
+            admission()  # Under lock, immediately before POST.
         data = local('/api/generate', payload)
         if not data.get('done') or not isinstance(data.get('response'), str) or not data['response'].strip():
             raise OSError('local model returned no complete answer')
@@ -225,6 +228,8 @@ def plan(message, operation=None):
 
 
 def call(message):
+    if message['word'] == 'model.search':
+        return search(message)
     if message['word'] == 'model.preview':
         limit(message['use'], 'model.preview', message['caller']['person'])
         # The bridge must not bypass a steward disabling the canonical word.
@@ -240,6 +245,79 @@ def call(message):
         result = plan(message, op)
         return dict(rows=[result], text='Prepared quoted summary data; no facts written')
     return plan(message)
+
+
+def search_admission(selected):
+    """Search safety admission under generate's nonblocking lock."""
+    try:
+        desktop = Path(__file__).resolve().parents[3] / 'window-lab/kernel-desktop'
+        sys.path.insert(0, str(desktop))
+        from gaming_gate import reasons
+        from search_resources import reason, require_idle
+        if reasons():
+            raise ValueError('gaming/full-screen gate held')
+        held = reason(selected, local('/api/ps', timeout=.5))
+        if held:
+            raise ValueError(held)
+        require_idle()  # Fresh input inspection after metadata, before generation.
+    except Exception as exc:
+        raise ValueError('search admission unavailable or held: ' + str(exc)) from exc
+
+
+def search(message):
+    """Read-only operation in the existing broker, with its existing grant/budget."""
+    use = message['use']
+    kv = (message.get('args') or {}).get('kv') or {}
+    query = str(kv.get('q') or '').strip()
+    if not query or len(query) > 1200:
+        raise ValueError('search needs 1–1200 characters')
+    mode = kv.get('mode', 'lexical')
+    if mode not in {'lexical', 'semantic', 'check'}:
+        raise ValueError('choose lexical, semantic or check')
+    rows = read(use, 'rows any')
+    records = smart_search.descriptors(rows)
+    if mode == 'check':
+        target = str(kv.get('id', ''))
+        row = next((r for r in rows if r['id'] == target and
+                    str(r.get('rev')) == str(kv.get('rev')) and not r.get('forgotten')), None)
+        if row is None or target not in {r['id'] for r in records}:
+            return dict(rows=[], text='This result changed or is no longer available. Search again.')
+        return dict(rows=[dict(id=target, rev=row['rev'],
+                              app=smart_search.app_target(row, rows))], text='Current visible result')
+    semantic, state = None, 'Exact lexical search'
+    # Select a deterministic bounded corpus, independent of lexical matches.
+    # Show the incomplete scope; never imply that this covers every world item.
+    scan = smart_search.select_scan(records)
+    confirmed = smart_search.confirmed_filters(kv) if mode == 'semantic' else set()
+    if mode == 'semantic':
+        if confirmed is None:
+            state = 'Confirm explicit filters before semantic search; no inference'
+        elif confirmed:
+            state = 'Hard filters require verified independent provenance; abstained without inference'
+        else:
+            try:
+                limit(use, 'model.search', message['caller']['person'])
+                settings = read(use, 'rows model-settings name=model')
+                selected = str(settings[0].get('model') or MODEL) if settings else MODEL
+                raw = generate(selected, smart_search.prompt(query, scan), tokens=256,
+                               admission=lambda: search_admission(selected))
+                semantic = smart_search.decode(raw, query, scan)
+                state = 'Local relevance suggestions; capabilities unverified'
+            except (OSError, ValueError, http.client.HTTPException, json.JSONDecodeError):
+                state = 'Semantic search unavailable or invalid; lexical results'
+        # Fresh caller-filtered data after inference. Revocations/changes cannot
+        # survive by virtue of having been present in the earlier prompt.
+        rows = read(use, 'rows any')
+    result = smart_search.merge(query, records, rows, semantic, confirmed=confirmed)
+    if result['constraint_status'] != 'unverified evidence only':
+        state = result['constraint_status']
+    current = {r['id']: r for r in rows}
+    for hit in result['hits']:
+        hit['app'] = smart_search.app_target(current[hit['id']], rows)
+    result.update(state=state, semantic_scanned=len(scan) if semantic else 0,
+                  semantic_scope=f'Semantic scope: up to 12 known app entries and recent World text, '
+                                 f'{len(scan)} of {len(records)} descriptors; lexical covers visible text')
+    return dict(rows=[result], text=state)
 
 
 def answer(message):
@@ -263,6 +341,7 @@ def main():
             words = []
             for name, kind, takes, help_ in [
                 ('ask', 'see', '<question> [about=<thing>]', 'Answer a question with visible facts only; answer text is data.'),
+                ('search', 'see', 'q=<text> [mode=lexical|semantic|check] [confirmed=yes filters=<JSON-list>]', 'Held semantic prototype: explicit filter confirmation required. Hard filters abstain pending independent provenance. Empty filters mean relevance only. Shares lock/budget and idle admission. No web/mail/files connector.'),
                 ('summarize', 'do', '<id> [into=<field>] [words=<n>]', 'Write a short, labelled summary; default short, 12 words. Undo restores its facts. Offline: labelled trimmed description.'),
                 ('classify', 'do', '<id> options=<labels> [into=<field>]', 'Write exactly one allowed label; default topic. Invalid output refuses. Undo restores its facts.'),
                 ('status', 'see', '', 'Read selected, installed and actually loaded local models; plainly says when Ollama is down.'),

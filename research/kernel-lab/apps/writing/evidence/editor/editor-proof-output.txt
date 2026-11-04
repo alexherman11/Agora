@@ -1,0 +1,29 @@
+sandbox: copied the live world to world-claude-writing-editor
+installed in 34.9 s
+PASS opens as one continuous page: no boxes, headings without #, bullets, a box, a table, the link by title (1.1s) · {'blocks': 0, 'border': '0px', 'shadow': 'none', 'bg': 'rgba(0, 0, 0, 0)', 'first': 'Editor walk', 'h2': 'A list', 'table': True, 'boxes': 1, 'bullets': 2, 'link': ['Moving into the desktop→dk933'], 'bold': 'The first paragraph has bold words, a slant, code, and a Moving into the desktop link.'}
+PASS a press puts the caret where pressed; that line shows its marks, others stay drawn (0.6s) · {'caret': 29, 'asked': 29, 'heading line': '# Editor walk'}
+PASS typing keeps itself: Saved, and the world's text is the editor's, with an edit history (1.3s) · {'end': 'ast paragraph ends here. And more words.', 'history': 'dk2305 text= · 2 changes kept'}
+PASS dragging selects across a heading, a paragraph and a list; Shift+press extends it (1.0s) · {'dragged': [4, 142], 'shift-pressed to': 172, 'drawn selection pieces': 3}
+PASS right-click on the selection: Comment, Send to JEFF, Copy, Cut (0.4s) · ['Commentin the margin', 'Send to JEFFConversation', 'CopyCtrl C', 'CutCtrl X']
+PASS a selection across sections deletes as one; Ctrl+Z puts it back exactly, Ctrl+Y again, kept each time (2.7s) · {'deleted': 100, 'undo and redo': 'exact'}
+PASS Enter in a list makes the next item; Enter on an empty item ends the list (1.4s) · - one
+- two
+- three
+After the list.
+PASS Ctrl+B bolds the selection and again takes it off; Ctrl+I slants it (1.5s)
+PASS Tab outside a list indents in the text, and the caret stays in the editor (0.9s) · Tab indents in the text and the caret stays; Backspace takes it back
+PASS pressing a task box ticks it in the text (1.2s) · {'kept': '- [x] a task to tick', 'struck through': True}
+PASS [[ offers documents by title; Enter writes the link, drawn by its title (1.6s) · {'offered': ['Shedding clutterPlans', 'Shedding clutter, in shortPlans'], 'drawn': ['Shedding clutter']}
+PASS pressing a drawn link opens it; Back returns, with the editor and its undo intact (1.7s) · undo survived opening another document and coming back
+PASS typing steadily through saves loses nothing and keeps the order (4.5s) · {'end': 'ght through several saves without losing a letter.'}
+PASS a change written meanwhile by someone else comes in under what is typed; both are kept (1.3s) · {'both kept': ['Written by someone else first.', '> AMine:  quote from']}
+PASS a table is drawn; pressing it shows its source to edit; leaving draws it again (0.4s) · ['| Name | Role |', '| --- | --- |']
+PASS Ctrl+F opens find and replace; Escape closes it (0.3s)
+PASS select, right-click, Comment: the words are marked in the text and the comment sits in the margin (1.0s) · {'mark': 'last paragraph', 'card': '“last paragraph”', 'state': 'under § A list'}
+PASS Ctrl+E shows every mark, and again hides them (0.2s) · every mark shown, then hidden again
+PASS pressing the empty page below puts the caret at the end; Ctrl+A selects everything (0.3s) · press below the text: caret at the end; Ctrl+A: all of it
+PASS pasting several lines puts them in as text (1.2s)
+PASS every change is in the document's CRDT history beside the world (0.0s) · {'changes kept': 5, 'body bytes': 2523, 'first line': 'dk2305 text= · 5 changes kept'}
+PASS the longest document opens, takes a keystroke in the middle, keeps it, and undoes it (3.1s) · {'title': 'Agent prompts', 'characters': 40816, 'open s': 0.3, 'keystroke to frame ms': 17.1}
+PASS no script errors in the window (0.0s)
+23 of 23 steps pass

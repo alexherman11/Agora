@@ -42,6 +42,15 @@ KERNEL_ENTRIES = [
           ("review", 'basis=<token> next_action=<text>', "task.review <task>: designated reviewer acknowledges the current result; clears review_at."),
           ("verify", 'basis=<token> evidence=<id>', "task.verify <task>: designated reviewer attests acceptance against current visible evidence."),
           ("followup", 'review_at=<ISO-datetime>', "task.followup <task>: retain an explicit review deadline with timezone; never starts a timer.")]],
+    _k('edit', 'do', '<id> changes=<json> base=<len:hash> [field=<name>] [version=<v>]', 'maker or leaders', 'yes',
+       help='edit <thing> changes=[[from,to,"inserted"],...] base=<len:hash> [field=text] [version=<v>]: change a text '
+            'fact by its changed spans (UTF-16 positions into the base text), as an editor types. It ends as a set of '
+            'the new text, with every check set makes; undo takes it back. Every change is also kept, with who and '
+            'when, in a CRDT history beside the world (edits <thing> reads it). If the text changed meanwhile, '
+            'version= (from an earlier edit) merges the change into it; without it the edit is refused as stale.'),
+    _k('edits', 'see', '<id> [field=<name>]', 'anyone', 'no',
+       help='edits <thing> [field=text]: the changes kept for a text fact written with edit: who, when, how many '
+            'operations. The deleted words themselves are never shown.'),
     _k('upload', 'do', 'name=<name> [in=<group>] [digest=<sha256>]', 'members', 'yes', once='at most 40 per day per person',
        help='upload: send bytes through POST /upload or agora.upload(file). Private file until attach. Size/type/hash are kernel facts; undo removes the file, retaining unreachable bytes. A module hands its caller a file it made with digest=<sha256> of bytes it put in the world\'s blob store.'),
     _k('attach', 'do', '<id> to=<id>', 'members', 'yes',
@@ -1056,8 +1065,10 @@ def search(k, actor, st, entry, tx, group, saw=None):
         kind = str(a.get("kind") or "thing").casefold()
         return None if want and kind != want and not kind.endswith("-" + want) else a
 
-    def called(t, a):
-        return str(a.get("title") or a.get("label") or a.get("name") or a.get("word") or k.name(t))
+    def called(a):
+        # Only this caller's projection may label a result or a related-view
+        # snippet. Raw k.name() can reveal a field-private name.
+        return str(a.get("title") or a.get("label") or a.get("name") or a.get("word") or "Untitled result")
 
     found, shows = {}, {}
     for t in list(k.state.things):
@@ -1078,11 +1089,12 @@ def search(k, actor, st, entry, tx, group, saw=None):
             # channels' own titles never say Seabright (Announcements, Asks & offers)
             for kd in re.findall(r'reading:"rows ([a-z][a-z0-9-]*)', str(a.get("text", ""))):
                 if kd != "kind":
-                    shows.setdefault(kd, called(t, a))
+                    shows.setdefault(kd, called(a))
     for kd, view in shows.items():
         for t in k.things(kd):
             a = visible(t)
-            if t not in found and a is not None and (a.get("title") or a.get("name") or a.get("label")):
+            if t not in found and a is not None and a.get("kind") == kd and (
+                    a.get("title") or a.get("name") or a.get("label")):
                 found[t] = (3, a, f"shown in {view}")
     order = []
     for t, (rank, a, snip) in found.items():
@@ -1092,7 +1104,7 @@ def search(k, actor, st, entry, tx, group, saw=None):
     found = order
     rows = []
     for _, t, rank, a, snip in found[:limit]:
-        row = {"id": t, "kind": str(a.get("kind") or "thing"), "name": called(t, a), "rev": k.state.rev.get(t, 0),
+        row = {"id": t, "kind": str(a.get("kind") or "thing"), "name": called(a), "rev": k.state.rev.get(t, 0),
                "match": "title" if rank < 3 else "part" if rank == 3 else "text", "snippet": snip}
         row.update({f: a[f] for f in ("lane", "status") if a.get(f)})
         rows.append(row)
@@ -1221,12 +1233,14 @@ from .chat import say, receive as chat_receive, chat as chat_word, closed_sees
 from .store import GONE
 from .next_steps import change as task_change
 from .card_signals import signal as card_signal
+from .bodies import edit as body_edit, edits as body_edits
 from painter.arrangement import component, look_view, components, component_card, window_view
 from painter.health import component_health, component_action, personal_view, personal_style, paint_clear
 
 KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant": grant, "widget": widget, "describe": describe,
           "task.signal": card_signal,
           **{"task-" + action: task_change for action in ("next", "revise", "review", "verify", "followup")},
+          'edit': body_edit, 'edits': body_edits,
           'upload': upload, 'attach': attach, 'file-result': file_result, 'file-read': file_read,
           'dictionary-copy': dictionary_copy, 'group': group_word, 'clock': clock, 'forgotten': forgotten,
           'component': component, 'look-view': look_view, 'view': window_view, 'components': components,

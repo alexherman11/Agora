@@ -44,6 +44,7 @@ home-line : doc-row, look list
 page-view : doc-page, measure 780
   watch reading:"rows document"
   watch reading:"rows note"
+  on write do edit $d.id changes=$changes base=$base version=$version
   on edit do set $d.id text=$value
   on retitle do set $d.id title=$value
   on move do set $d.id collection=$value
