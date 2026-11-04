@@ -117,10 +117,14 @@ class Door:
 
 
 PROVIDERS = {  # Alex, 28 Oct: up to four Claude and four Codex workers at a time
+    # the model and reasoning here are only the fallback: House settings `claude_model`, `claude_reasoning`,
+    # `codex_model`, `codex_reasoning` choose them (Alex, 4 Nov: numbers and names live in the world)
     'claude': dict(model='claude-opus-5-5', reasoning='medium', label='Claude'),
     'codex': dict(model='gpt-6.1-sol', reasoning='medium', label='Codex'),
 }
-MAX_TURNS = 25          # a worker's conversation with its resident ends here; review or a new card starts afresh
+REASONING = {'low', 'medium', 'high', 'xhigh'}
+# Alex, 4 Nov: no limit on a worker's turns or on how long a turn runs, unless House settings set `max_turns` or
+# `worker_timeout` (seconds); left out, there is none.
 CLAUDE_TOOLS = ('Bash', 'Read', 'Edit', 'MultiEdit', 'Write', 'Glob', 'Grep', 'TodoWrite',
                 'mcp__agora__see', 'mcp__agora__do', 'mcp__agora__lines')
 CLAUDE_DENIED = ('Bash(git push:*)', 'Bash(git checkout main:*)', 'Bash(git switch main:*)', 'Bash(git reset --hard:*)',
@@ -128,6 +132,24 @@ CLAUDE_DENIED = ('Bash(git push:*)', 'Bash(git checkout main:*)', 'Bash(git swit
 
 
 class Builders:
+    def settings(self):
+        """The House settings thing's facts, read each time (never cached): {} when there is none."""
+        reading = self.h.m.see('rows house-settings')
+        rows = [r for r in reading.get('rows', []) if r.get('kind') == 'house-settings']
+        return rows[0] if len(rows) == 1 else {}
+
+    def worker_model(self, provider):
+        """(model, reasoning) for a new worker of this provider: House settings, else the PROVIDERS fallback."""
+        s, p = self.settings(), PROVIDERS[provider]
+        model = str(s.get(provider + '_model') or '').strip() or p['model']
+        reasoning = str(s.get(provider + '_reasoning') or '').strip().lower()
+        return model, (reasoning if reasoning in REASONING else p['reasoning'])
+
+    def limit(self, name):
+        """A positive whole number from House settings (max_turns, worker_timeout), or None: no limit."""
+        value = str(self.settings().get(name) or '').strip()
+        return int(value) if value.isdigit() and int(value) > 0 else None
+
     def capacity_for(self, provider):
         """Each provider has its own pool: house-settings `claude_workers` / `codex_workers` (1 to 4), default 4.
         The older shared `builder_capacity` still sizes the Codex pool when `codex_workers` is not set."""
@@ -306,11 +328,12 @@ class Builders:
             if target in self.states and not again:
                 return {'text': 'existing request: ' + self.states[target]['phase'], 'rows': [self.row(self.states[target])]}
             queued = self.full(provider)       # every slot busy: it waits its turn (start_queued), never refused
+            model, reasoning = self.worker_model(provider)
             run = 'kernel-' + target + '-' + uuid.uuid4().hex[:10]
             state = dict(task=target, run=run, name=p['label']+' — '+short(task.get('title') or 'Builder', 60), requester=caller['person'],
                          requester_name=caller.get('name', ''), provider=provider,
                          title=task.get('title') or target, phase='asked', detail='claim pending',
-                         model=p['model'], reasoning=p['reasoning'], created=stamp(), activity=[],
+                         model=model, reasoning=reasoning, created=stamp(), activity=[],
                          task_owner=task.get('who',''), pending=[], basis={k:task.get(k,'') for k in ('title','text','acceptance','who')})
             if msg.get('_managed'):
                 state['manager'] = caller['person']
@@ -475,7 +498,8 @@ class Builders:
                    '--disallowedTools', ','.join(CLAUDE_DENIED)]
         else:
             cmd = [str(T.PY), str(T.REPO/'research/codex-residents/codex_worker.py'),
-                   '--model', state['model'], '--reasoning', state['reasoning'], '--timeout', '2400',
+                   '--model', state['model'], '--reasoning', state['reasoning'],
+                   '--timeout', str(self.limit('worker_timeout') or 0),
                    '--prompt-file', str(folder/'prompt.md'), '--mcp-config', mcp, '--lease', str(folder/'process.lock')]
         if state.get('session'):
             cmd += ['--resume', state['session']]
@@ -946,7 +970,8 @@ class Builders:
             state['last_words'] = words
             self.save(state)
         self.stopped(state)
-        left = MAX_TURNS - state.get('turns', 0)
+        cap = self.limit('max_turns')
+        left = f" ({cap - state.get('turns', 0)} turns left)" if cap else ''
         agents = getattr(self.h, 'agents', {})
         for t in tellers:
             other = agents.get(t['person'])
@@ -956,7 +981,7 @@ class Builders:
             other.wake(
                 f"~ The worker {state['name']} ({state['task']}), which you told something, finished a turn and says:\n"
                 f"{words}\n\n~ Its owner {state.get('requester_name') or state['requester']} is woken too and stays in "
-                f"charge of it. You may answer it with house.tell {state['task']} <your words> ({left} turns left).")
+                f"charge of it. You may answer it with house.tell {state['task']} <your words>{left}.")
             self.event(state, 'told', f"woke {t['name']}, who told it this turn ({t['as']})")
         others = ', '.join(sorted({t['name'] for t in tellers}))
         if not self.route(state):
@@ -966,7 +991,7 @@ class Builders:
             f"~ Your worker {state['name']} ({state['task']}) finished a turn and says:\n{words}\n\n"
             + (f"~ This turn it also followed words from {others}; you are still in charge.\n" if others else '')
             + f"~ You are in charge of this worker. To answer it, run house.tell {state['task']} <your words>: that is "
-            f"its next instruction ({left} turns left). When its work is done: house.land {state['task']} runs the "
+            f"its next instruction{left}. When its work is done: house.land {state['task']} runs the "
             f"checks, lands it on main and switches it on. To stop it now: house.stop {state['task']}; to drop it: "
             f"house.release {state['task']}.")
 
@@ -1130,8 +1155,9 @@ class Builders:
                 return {'refused':'worker stopped before its worktree was made; house.retry '+state['task']+' starts it'}
             if len(state.setdefault('pending',[])) >= 10:
                 return {'refused':'ten follow-ups already pending; no more were queued'}
-            if state.get('turns',0) >= MAX_TURNS:
-                return {'refused':f'this worker has had {MAX_TURNS} turns; review it, or start a new card'}
+            cap=self.limit('max_turns')
+            if cap and state.get('turns',0) >= cap:
+                return {'refused':f'this worker has had {cap} turns (House settings max_turns); land it, or start a new card'}
             if how!='owner':  # the worker knows who said it; the owner stays in charge and is still woken
                 name=caller.get('name') or caller.get('person') or 'someone'
                 words=f'From {name} ({how}; {state.get("requester_name") or "your owner"} stays in charge): {words}'

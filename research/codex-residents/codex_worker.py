@@ -234,7 +234,8 @@ def serve(args):
             def watch(turn=turn_id, done=finished):
                 import time
 
-                deadline = time.monotonic() + args.timeout
+                # 0 or less: no time limit (Alex, 4 Nov: workers have none)
+                deadline = time.monotonic() + args.timeout if args.timeout > 0 else float("inf")
                 while not done.wait(0.1):
                     if closed.is_set() or time.monotonic() >= deadline:
                         timer = threading.Timer(5, client.close)

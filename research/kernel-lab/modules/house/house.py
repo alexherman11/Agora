@@ -228,7 +228,10 @@ class Agent:
             # conversation resumes under the new prompt (Alex, 4 Nov: he writes JEFF's prompt in Writing)
             if self.child and self.child.alive():
                 text = self.house.system_text(self)
-                if hashlib.sha256(text.encode("utf-8")).hexdigest() != self.state.get("system_sha"):
+                sha, known = hashlib.sha256(text.encode("utf-8")).hexdigest(), self.state.get("system_sha")
+                if known is None:                     # a process started before the prompt was fingerprinted
+                    self.state["system_sha"] = sha
+                elif sha != known:
                     self.log("restart", "its system prompt changed")
                     self.child.stop()
                     self.child = None
