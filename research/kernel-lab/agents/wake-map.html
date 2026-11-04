@@ -1,0 +1,513 @@
+<title>Agent Wake Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column; wide figures (bars, grid) break out to 1100px. Colour = where the words live. */
+:root{
+  --bg:#f6f7f3; --panel:#ffffff; --fg:#1d2721; --muted:#5f6c64; --line:#dfe4dc; --soft:#eef1ea;
+  --world:#4f9a72; --world-soft:#dcefe3;
+  --code:#d0812f; --code-soft:#f8e6d1;
+  --repo:#4a7cc0; --repo-soft:#dde8f6;
+  --prov:#9890b8; --prov-soft:#e9e6f3;
+  --accent:#2c7a6a; --warn:#c2475f; --warn-soft:#f8e0e5; --new:#2c7a6a; --new-soft:#d6efe9;
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:"Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141a17; --panel:#1b231f; --fg:#e4ebe6; --muted:#9aa89f; --line:#2e3a34; --soft:#212b26;
+  --world:#6fbf93; --world-soft:#22382c; --code:#e59b52; --code-soft:#3d2c1b; --repo:#7aa5e0; --repo-soft:#1f2d40;
+  --prov:#b1aad3; --prov-soft:#2b283b; --accent:#5cc0aa; --warn:#e87a8f; --warn-soft:#3d2228; --new:#5cc0aa; --new-soft:#1d3833;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141a17; --panel:#1b231f; --fg:#e4ebe6; --muted:#9aa89f; --line:#2e3a34; --soft:#212b26;
+  --world:#6fbf93; --world-soft:#22382c; --code:#e59b52; --code-soft:#3d2c1b; --repo:#7aa5e0; --repo-soft:#1f2d40;
+  --prov:#b1aad3; --prov-soft:#2b283b; --accent:#5cc0aa; --warn:#e87a8f; --warn-soft:#3d2228; --new:#5cc0aa; --new-soft:#1d3833;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:16px/1.55 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 80px}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:56px}
+.prose{max-width:68ch}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(30px,5vw,44px);font-weight:700;letter-spacing:-.01em}
+h2{font-size:26px;font-weight:700}
+h3{font-size:18px;font-weight:700}
+p{margin:0}
+.eyebrow{font:600 12px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.sec{display:flex;flex-direction:column;gap:16px}
+.lede{font-size:18px;color:var(--fg)}
+.muted{color:var(--muted)}
+code,.mono{font-family:var(--f-mono);font-size:.86em}
+.facts{display:flex;flex-wrap:wrap;gap:10px}
+.fact{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:15px}
+.fact b{font-family:var(--f-display);font-size:20px;margin-right:6px}
+.label{display:inline-block;font:600 11px/1 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;padding:4px 7px;border-radius:5px;vertical-align:2px}
+.l-read{background:var(--soft);color:var(--muted)} .l-ran{background:var(--world-soft);color:var(--world)} .l-imag{background:var(--prov-soft);color:var(--prov)}
+/* legend */
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:14px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:14px;height:14px;border-radius:3px;display:inline-block}
+.world{background:var(--world)} .code{background:var(--code)} .repo{background:var(--repo)} .prov{background:var(--prov)}
+/* controls */
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tab{font:600 14px var(--f-body);border:1px solid var(--line);background:var(--panel);color:var(--fg);padding:8px 14px;border-radius:999px;cursor:pointer}
+.tab[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.tab:focus-visible,.row-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.switch{display:inline-flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;color:var(--fg)}
+.switch input{accent-color:var(--accent);width:16px;height:16px}
+.ctl{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between}
+/* bars */
+.chart{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:14px}
+.scen-note{font-size:14px;color:var(--muted);min-height:2.6em}
+.bars{display:grid;grid-template-columns:150px minmax(0,1fr) 64px;gap:10px 14px;align-items:center}
+.who{font-weight:700;font-size:15px;line-height:1.2}
+.who small{display:block;font-weight:400;color:var(--muted);font-size:12px;font-family:var(--f-mono)}
+.track{position:relative;height:30px;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(var(--tick) - 1px),var(--line) calc(var(--tick) - 1px),var(--line) var(--tick));border-radius:4px}
+.track.prop{height:16px;opacity:1}
+.bar{position:absolute;inset:0 auto 0 0;display:flex;height:100%;transition:width .35s ease}
+.seg{height:100%;min-width:2px;border-right:1px solid var(--panel);position:relative;cursor:default;overflow:hidden;color:#fff;font:600 11px/30px var(--f-mono);padding-left:5px;white-space:nowrap}
+.track.prop .seg{line-height:16px;font-size:10px}
+.seg.world{background:var(--world)} .seg.code{background:var(--code)} .seg.repo{background:var(--repo)} .seg.prov{background:var(--prov)}
+.seg.hatch{background:repeating-linear-gradient(135deg,var(--prov) 0 6px,var(--prov-soft) 6px 12px)}
+.seg.dup{box-shadow:inset 0 0 0 2px var(--warn)}
+.num{font:600 13px var(--f-mono);text-align:right;color:var(--fg);font-variant-numeric:tabular-nums}
+.num.prop{color:var(--new)}
+.axis{display:grid;grid-template-columns:150px minmax(0,1fr) 64px;gap:14px}
+.axis .ticks{position:relative;height:16px;font:11px var(--f-mono);color:var(--muted)}
+.axis .ticks span{position:absolute;transform:translateX(-50%)}
+.tip{position:fixed;z-index:20;pointer-events:none;background:var(--fg);color:var(--bg);padding:8px 10px;border-radius:8px;font-size:13px;max-width:280px;line-height:1.35;opacity:0;transition:opacity .1s}
+.extra{font:12px var(--f-mono);color:var(--muted)}
+.proprow{color:var(--new);font:600 11px var(--f-mono);text-align:right}
+/* grid of wakes */
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:14px}
+th,td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+thead th{font:600 12px var(--f-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);background:var(--soft);position:sticky;top:0}
+tbody tr{cursor:pointer}
+tbody tr:hover td,tbody tr.on td{background:var(--soft)}
+td.ev{font-weight:700;width:30%}
+td.ev small{display:block;font-weight:400;color:var(--muted)}
+.chip{display:inline-block;padding:3px 8px;border-radius:6px;font-size:12.5px;line-height:1.3;background:var(--code-soft);color:var(--fg)}
+.chip.none{background:transparent;color:var(--muted);padding-left:0}
+.chip.bad{background:var(--warn-soft)}
+.group td{background:var(--bg)!important;font:600 12px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);cursor:default;padding-top:16px}
+.row-btn{all:unset}
+.detail{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.detail pre{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 var(--f-mono);background:var(--code-soft);padding:14px;border-radius:10px;color:var(--fg)}
+.detail .where{font-size:13px;color:var(--muted)}
+/* sources */
+.homes{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.home{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.home h3{display:flex;align-items:center;gap:8px}
+.home ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+.home li{font-size:14px;line-height:1.35;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px}
+.home li .n{font:12px var(--f-mono);color:var(--muted);text-align:right}
+.home li .r{grid-column:1/-1;font-size:12.5px;color:var(--muted)}
+.home li.flag .r{color:var(--warn)}
+/* friction */
+.hurts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.hurt{border-left:3px solid var(--warn);padding:2px 0 2px 14px;display:flex;flex-direction:column;gap:6px}
+.hurt p{font-size:15px}
+/* proposal */
+.book{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:20px;align-items:start}
+@media (max-width:760px){.book{grid-template-columns:1fr}.bars,.axis{grid-template-columns:96px minmax(0,1fr) 52px}}
+.doc{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;font-size:14px;display:flex;flex-direction:column;gap:8px}
+.doc .h{font-family:var(--f-display);font-weight:700}
+.doc .h1{font-size:19px}
+.doc .h2{font-size:15px;padding-top:6px;display:flex;justify-content:space-between;gap:8px}
+.doc .h2 em{font:400 12px var(--f-mono);color:var(--muted);font-style:normal}
+.doc .sub{padding-left:14px;color:var(--muted);font-size:13px}
+.env{display:flex;flex-direction:column;gap:12px}
+.env .box{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:12px 14px}
+.env .box b{font-family:var(--f-display)}
+.env pre{margin:6px 0 0;white-space:pre-wrap;font:12.5px/1.5 var(--f-mono);color:var(--fg);background:var(--new-soft);padding:10px;border-radius:8px}
+.recs{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--line)}
+.rec{display:grid;grid-template-columns:44px minmax(0,1fr);gap:4px 14px;padding:16px 0;border-bottom:1px solid var(--line)}
+.rec .k{font:700 15px var(--f-mono);color:var(--accent)}
+.rec h3{font-size:17px}
+.rec p{font-size:15px;grid-column:2}
+.rec .why{font-size:14px;color:var(--muted);grid-column:2}
+.qs{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.q{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;font-size:14.5px;display:flex;flex-direction:column;gap:6px}
+.q b{font-family:var(--f-display);font-size:15.5px}
+.q .lean{color:var(--accent);font-size:13.5px}
+.mind{background:var(--soft);border-radius:12px;padding:16px;font-size:15px}
+@media (prefers-reduced-motion:reduce){.bar{transition:none}}
+</style>
+
+<div class="wrap">
+
+<header class="sec prose" style="gap:14px">
+  <div class="eyebrow">Harness workshop · 3 Nov 2026 · draft by Claude for Alex</div>
+  <h1>What JEFF, the residents and the workers are sent</h1>
+  <p class="lede">Every word that reaches each agent, when it arrives and where it lives today. Read from the live world and the House's source at 18:30 on 3 Nov. My proposal is at the end and needs your yes before anything is built.</p>
+  <div class="facts">
+    <div class="fact"><b>20</b>separate texts make up their prompts</div>
+    <div class="fact"><b>7</b>of them are in source code</div>
+    <div class="fact"><b>3</b>different rule books</div>
+    <div class="fact"><b>~420</b>words on every plain wake, mostly repeats</div>
+  </div>
+  <p class="muted" style="font-size:14px"><span class="label l-read">read</span> means I read it in the source or the world this evening. <span class="label l-ran">ran</span> means I measured it through the door. <span class="label l-imag">imagined</span> means a proposal. Word counts are measured where shown exactly and marked "about" where a message has blanks that are filled in each time.</p>
+</header>
+
+<section class="sec" id="hold">
+  <div class="prose sec" style="gap:8px">
+    <div class="eyebrow">1 · Side by side</div>
+    <h2>What each one is handed</h2>
+    <p>One bar per agent, in words. Each block is one text, coloured by where it lives. Pick the moment, then switch on <em>Proposed</em> to see the same moment after the changes in section 5.</p>
+  </div>
+  <div class="chart">
+    <div class="ctl">
+      <div class="tabs" role="group" aria-label="Moment">
+        <button class="tab" data-s="fresh" aria-pressed="true">Fresh start</button>
+        <button class="tab" data-s="plain" aria-pressed="false">Plain wake</button>
+        <button class="tab" data-s="worker" aria-pressed="false">Their worker finished</button>
+        <button class="tab" data-s="compact" aria-pressed="false">After a compaction</button>
+      </div>
+      <label class="switch"><input type="checkbox" id="showprop"> Proposed</label>
+    </div>
+    <div class="legend">
+      <span><i class="sw world"></i>A thing in the world (you can edit it)</span>
+      <span><i class="sw code"></i>Source code (only a builder can change it)</span>
+      <span><i class="sw repo"></i>A repo file (AGENTS.md)</span>
+      <span><i class="sw prov"></i>Model provider's own prompt</span>
+      <span><i class="sw" style="box-shadow:inset 0 0 0 2px var(--warn)"></i>Sent twice</span>
+    </div>
+    <p class="scen-note" id="scen-note"></p>
+    <div class="bars" id="bars"></div>
+    <div class="axis"><div></div><div class="ticks" id="ticks"></div><div></div></div>
+  </div>
+  <p class="muted prose" style="font-size:14px"><span class="label l-ran">ran</span> Souls, rules, guide and task lists were measured through the door at 18:30. <span class="label l-read">read</span> Welcome, brief and message sizes are counted from house.py, builders.py, manager.py and next_steps.py. Workers also get Claude Code's or Codex's own system prompt, which I did not measure. A worker's "worker finished" moment doesn't apply, because the worker is the one finishing.</p>
+</section>
+
+<section class="sec" id="when">
+  <div class="prose sec" style="gap:8px">
+    <div class="eyebrow">2 · When</div>
+    <h2>What wakes each one, and what it says</h2>
+    <p>Every kind of wake the House sends today. Click a row to read the words. Every house-agent wake also starts with the next-steps header and the whole task list, so the chip shows only what comes after them.</p>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>What happened</th><th>JEFF</th><th>Sable · Pike</th><th>Rowan</th><th>A worker</th></tr></thead>
+      <tbody id="grid"></tbody>
+    </table>
+  </div>
+  <div class="detail" id="detail" aria-live="polite"></div>
+</section>
+
+<section class="sec" id="where">
+  <div class="prose sec" style="gap:8px">
+    <div class="eyebrow">3 · Where</div>
+    <h2>Where the words live</h2>
+    <p>Twenty texts in four kinds of place. You can edit the green ones in Writing today. The orange ones need a source change and a House restart.</p>
+  </div>
+  <div class="homes" id="homes"></div>
+</section>
+
+<section class="sec" id="hurts">
+  <div class="prose sec" style="gap:8px">
+    <div class="eyebrow">4 · Where it hurts</div>
+    <h2>What the shape does to them</h2>
+  </div>
+  <div class="hurts">
+    <div class="hurt"><h3>Three rule books that disagree</h3><p>JEFF gets your 681-word rules. Sable and Pike get a 130-word copy from 27 Oct. Rowan gets a 237-word Codex version from 28 Oct. A rule you add to your rules never reaches the residents.</p><span class="label l-ran" style="align-self:start">ran</span></div>
+    <div class="hurt"><h3>The flow is explained ten times, in three voices</h3><p>"How work flows" explains it once, plainly. Then nine messages each explain it again in their own words. The header on every wake explains it a third way: "Receipt is not review… Held/unknown work requires its stated resolver". That old voice teaches them to wait. The new guide teaches them to finish.</p><span class="label l-read" style="align-self:start">read</span></div>
+    <div class="hurt"><h3>The whole task list on every wake</h3><p>Every wake carries 220 to 370 words of task list, even when nothing changed. All 8 of JEFF's items read "result awaiting owner review · acceptance: missing · reviewed=no · verified=no". It is noise, and it reads like a list of things that are stuck.</p><span class="label l-ran" style="align-self:start">ran</span></div>
+    <div class="hurt"><h3>JEFF is woken by the board</h3><p>JEFF is the only one woken whenever his task list changes, so every card change near him costs a turn. Meanwhile "a card was given to you" now wakes nobody: the code skips anyone with a task list, and all four have one.</p><span class="label l-read" style="align-self:start">read</span></div>
+    <div class="hurt"><h3>Workers get the least, and the wrong things</h3><p>A worker gets a 226-word brief, is told to read AGENTS.md (1,718 words written for builders like me, with its own ask-first rules), and is told to "ask them when something is unclear instead of guessing". Asking ends the worker's turn and wakes a resident.</p><span class="label l-read" style="align-self:start">read</span></div>
+    <div class="hurt"><h3>Compaction sends things twice</h3><p>After a compaction, the rules and task list come back through a hook. Then the next wake sends the welcome, guide, soul and task list again. Rowan still runs the older house.manage path, with its own messages.</p><span class="label l-read" style="align-self:start">read</span></div>
+  </div>
+</section>
+
+<section class="sec" id="proposal">
+  <div class="prose sec" style="gap:8px">
+    <div class="eyebrow">5 · Proposal <span class="label l-imag">imagined</span></div>
+    <h2>One Agent Book, in Writing</h2>
+    <p>Everything that reaches any agent comes from one Writing document, the Agent Book. You edit it like any other page. The House reads it by heading at each wake, so an edit counts on the next wake with no restart. The code keeps only the mechanics: which headings each class gets, and filling blanks like <code>{worker}</code>.</p>
+  </div>
+  <div class="book">
+    <div class="doc" aria-label="Agent Book outline">
+      <div class="h h1">Agent Book</div>
+      <div class="h h2">Rules <em>everyone · system prompt</em></div>
+      <div class="sub">Your standing rules, one copy. Replaces the three rule books.</div>
+      <div class="h h2">How work flows <em>everyone · system prompt</em></div>
+      <div class="sub">Today's guide: who does what, and the words for it.</div>
+      <div class="h h2">Roles <em>by class · system prompt</em></div>
+      <div class="sub">General manager (JEFF) · Resident · Worker. Each one says what that role does, what "done" means and when to stop. This is the only place the how-to lives.</div>
+      <div class="h h2">Messages <em>one line each · per wake</em></div>
+      <div class="sub">"{worker} finished a turn: {words}" · "{worker} is live and checked" · "{worker} needs you: {why}" · "{who} handed you {worker}" · "Reminder: {list}" · "{who} in {chat}: {text}"</div>
+      <div class="h h2">Worker brief <em>workers · first turn</em></div>
+      <div class="sub">Task, acceptance, where to work. Replaces "read AGENTS.md first".</div>
+      <div class="h h2">Souls <em>linked · each agent's own</em></div>
+      <div class="sub">They stay with each agent, who writes and keeps their own. The Book links them.</div>
+    </div>
+    <div class="env">
+      <div class="box"><b>Every house-agent wake, same shape</b>
+<pre>~ it is Tue 03 Nov, 18:40
+~ Pike's worker Dock unpin finished a turn:
+  "Done: unpin works, tested with test_dock.py, 14 passed."
+~ your list: +1 Dock unpin (needs you)</pre></div>
+      <div class="box"><b>A worker's first turn</b>
+<pre>[system]  Rules · Worker role
+[message] You are Dock unpin, working for Pike.
+          Task … Acceptance …
+          Finish it: decide, note what you assumed, test,
+          leave BUILD-RESULT.md. Stop only for an ask-first thing.</pre></div>
+      <div class="box"><b>See it before they do</b>
+<pre>house.preview Pike worker-finished</pre>
+<p class="muted" style="font-size:13.5px;margin-top:6px">A new word that prints exactly what Pike would be sent, so you can check an edit to the Book before it reaches anyone.</p></div>
+    </div>
+  </div>
+
+  <div class="recs">
+    <div class="rec"><span class="k">R1</span><h3>One Agent Book, read by heading</h3><p>Promote "Agent prompts" from a snapshot to the live source: rename it Agent Book and give it the headings above. The House reads each heading when it builds a message. A missing heading falls back to the current text, and the House says so in Shop talk.</p><p class="why">One place to edit. What you see in Writing is what they get.</p></div>
+    <div class="rec"><span class="k">R2</span><h3>One rule book for everyone</h3><p>Your standing rules go to all four house-agents and to every worker. The three copies get a superseded banner and are archived, not deleted.</p><p class="why">A rule you add reaches everyone, including the residents.</p></div>
+    <div class="rec"><span class="k">R3</span><h3>Say the how-to once</h3><p>The Role pages hold the flow. Each message is one line of what happened. The nine how-to paragraphs and the "receipt is not review" header go away.</p><p class="why">One voice. And it is the voice that says finish, not hold.</p></div>
+    <div class="rec"><span class="k">R4</span><h3>Task list only when it changes</h3><p>The full list goes out on a fresh start and after a compaction. Every other wake gets one line of what changed, or nothing. The "acceptance: missing · reviewed=no" fields leave the list.</p><p class="why">A plain wake drops from about 420 words to about 40.</p></div>
+    <div class="rec"><span class="k">R5</span><h3>The same wake rules for everyone</h3><p>JEFF is woken when addressed, like the residents, not by board churn. A card given to someone wakes that one person once.</p><p class="why">This fixes the dead "card given to you" path and JEFF's stream of extra turns.</p></div>
+    <div class="rec"><span class="k">R6</span><h3>Workers are told to finish</h3><p>The brief comes from the Book, not AGENTS.md. In place of "ask when unclear", it says: decide, note the assumption, test, finish. Stop only for the ask-first list. This pairs with the House finishing the loop itself (in "Why the agents stall"): review, land and check run on their own, and the owner gets one message at the end.</p><p class="why">The owner messages per task go from four or five to one.</p></div>
+    <div class="rec"><span class="k">R7</span><h3>One builder for starts and compactions</h3><p>A fresh start and a compaction build the same message once, from the Book. Nothing is sent twice. Rowan moves onto the same flow as the others (house.work, review, land).</p><p class="why">Fewer paths, and fewer places for drift.</p></div>
+  </div>
+
+  <div class="sec" style="gap:10px">
+    <h3>Your calls</h3>
+    <div class="qs">
+      <div class="q"><b>One document, or one per section?</b><span>One page with headings is one place to read and compare. Separate pages are easier for agents to link.</span><span class="lean">I lean: one document.</span></div>
+      <div class="q"><b>Souls in the Book?</b><span>The agents write their own souls. JEFF's is 2,742 words and still from the old desk.</span><span class="lean">I lean: they stay each agent's own. JEFF rewrites his against the Book.</span></div>
+      <div class="q"><b>Who may edit the Book?</b><span>Only you, or JEFF too, with each change shown to you.</span><span class="lean">I lean: you, plus JEFF as drafts you accept.</span></div>
+      <div class="q"><b>Workers read AGENTS.md?</b><span>It is written for builders working with you. Workers are builders too, but for one task.</span><span class="lean">I lean: no. The Worker role page covers it.</span></div>
+    </div>
+  </div>
+  <p class="mind"><b>What would change my mind:</b> if agents on one-line messages forget their words (house.tell, house.review) more often than they do now. Then the fix is a short hint in the message, or a refusal that teaches the right word. It isn't a reason to bring back the paragraphs. I'd watch the first two days of logs to see.</p>
+</section>
+
+</div>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+const W={world:'world',code:'code',repo:'repo',prov:'prov'};
+// pieces: [label, words, home, where, dup?]
+const P={
+  rulesJ:['Your standing rules',681,'world','dk838 · system prompt'],
+  rulesR:['Rules for everyone (27 Oct copy)',130,'world','dk1151 / dk1279 · system prompt'],
+  rulesRo:["Rowan's charter (Codex version)",237,'world','dk1193 · system prompt'],
+  welcome:['Welcome',140,'code','house.py welcome()'],
+  guide:['How work flows',349,'world','dk1833 (dk1832 is a copy)'],
+  soulJ:["JEFF's soul",2742,'world','dk837'], soulS:["Sable's soul",1776,'world','dk1150'],
+  soulP:["Pike's soul",1384,'world','dk1278'], soulRo:["Rowan's soul",329,'world','dk1192'],
+  head:['Next-steps header',47,'code','kernel/next_steps.py packet()'],
+  listJ:['Task list',374,'world','his cards, laid out by next_steps.py'], listS:['Task list',239,'world','her cards'],
+  listP:['Task list',217,'world','its cards'], listRo:['Task list',333,'world','its cards'],
+  time:['~ it is …',5,'code','house.py'],
+  line:['The line that woke it (about)',40,'code','house.py line_text()'],
+  howto:['How-to paragraph',85,'code','builders.py report_turn()'],
+  wwords:["Worker's words (about)",200,'world','its last message, up to 3,500 chars'],
+  receipt:["Rowan's receipt message",48,'code','manager.py notify()'],
+  brief:['Worker brief',226,'code','builders.py prompt()'],
+  task:['Card text (varies)',150,'world','the card'],
+  agents:['AGENTS.md (told to read)',1718,'repo','repo root'],
+  rulesW:['Your standing rules (told to look)',681,'world','look dk838'],
+  follow:['Follow-up prefix',13,'code','builders.py resume()'],
+  owner:["Owner's words (about)",40,'world','house.tell'],
+  // proposed
+  bRules:['Book · Rules',681,'world','Agent Book'], bGuide:['Book · How work flows',349,'world','Agent Book'],
+  bRole:['Book · Role page (about)',250,'world','Agent Book'], bMsg:['Book · one-line message',15,'world','Agent Book · Messages'],
+  bDiff:['List change (about)',25,'world','what moved since last wake'],
+  bBrief:['Book · Worker brief (about)',90,'world','Agent Book'],
+  bYou:['You are …',20,'world','Agent Book'],
+};
+const dup=(k)=>[...P[k],true];
+const AG=[
+  {id:'J',name:'JEFF',sub:'Codex gpt-6-astra',rules:'rulesJ',soul:'soulJ',list:'listJ'},
+  {id:'S',name:'Sable',sub:'Claude Opus 5.5',rules:'rulesR',soul:'soulS',list:'listS'},
+  {id:'P',name:'Pike',sub:'Claude Opus 5.5',rules:'rulesR',soul:'soulP',list:'listP'},
+  {id:'R',name:'Rowan',sub:'Codex gpt-6.1-sol',rules:'rulesRo',soul:'soulRo',list:'listRo',rowan:true},
+  {id:'CW',name:'Claude worker',sub:'+ Claude Code prompt',worker:true},
+  {id:'XW',name:'Codex worker',sub:'+ Codex prompt',worker:true},
+];
+const NOTE={
+  fresh:'A new conversation: the system prompt plus the first message. Workers also read AGENTS.md and your rules on their own, because the brief tells them to.',
+  plain:'Someone says a line to it. The rules, guide and soul are already in its context, so this is only what the House adds to the new message.',
+  worker:'One of its workers ended a turn. Sable, Pike and JEFF get the worker’s words plus a how-to paragraph. Rowan gets a receipt and has to go and read the report.',
+  compact:'The first message after its context was compacted. A hook puts the rules and task list back, then the next wake sends the welcome, guide, soul and task list again.',
+};
+function now(a,s){
+  if(a.worker){
+    if(s==='fresh') return [P.brief,P.task,P.agents,P.rulesW];
+    if(s==='plain') return [P.follow,P.owner];
+    return null;
+  }
+  const R=P[a.rules],S=P[a.soul],L=P[a.list];
+  if(s==='fresh') return [R,P.welcome,P.guide,S,P.head,L,P.time,P.line];
+  if(s==='plain') return [P.head,L,P.time,P.line];
+  if(s==='worker') return a.rowan?[P.head,L,P.time,P.receipt]:[P.head,L,P.time,P.howto,P.wwords];
+  if(s==='compact') return [dup(a.rules),dup(a.list),P.welcome,P.guide,S,P.head,dup(a.list),P.time,P.line];
+}
+function prop(a,s){
+  if(a.worker){
+    if(s==='fresh') return [P.bRules,P.bRole,P.bBrief,P.task];
+    if(s==='plain') return [P.owner];
+    return null;
+  }
+  const S=P[a.soul],L=P[a.list];
+  if(s==='fresh') return [P.bRules,P.bGuide,P.bRole,P.bYou,S,L,P.time,P.bMsg];
+  if(s==='plain') return [P.time,P.bMsg,P.bDiff];
+  if(s==='worker') return [P.time,P.bMsg,P.wwords];
+  if(s==='compact') return [P.bYou,S,L,P.time,P.bMsg];
+}
+const MAX=5600, TICK=1000;
+const sum=a=>a?a.reduce((t,p)=>t+p[1],0):0;
+const fmt=n=>n.toLocaleString('en-US');
+const bars=document.getElementById('bars'), tip=document.getElementById('tip');
+let scen='fresh', showProp=false;
+function seg(p){
+  const d=document.createElement('div');
+  d.className='seg '+p[2]+(p[4]?' dup':'');
+  d.style.width=(p[1]/MAX*100)+'%';
+  if(p[1]/MAX>0.07) d.textContent=p[0];
+  d.dataset.tip=`<b>${p[0]}</b><br>${fmt(p[1])} words · ${p[3]}${p[4]?'<br><span style="opacity:.8">sent a second time</span>':''}`;
+  return d;
+}
+function track(pieces,cls){
+  const t=document.createElement('div'); t.className='track'+(cls?' '+cls:'');
+  t.style.setProperty('--tick',(TICK/MAX*100)+'%');
+  const b=document.createElement('div'); b.className='bar';
+  (pieces||[]).forEach(p=>b.appendChild(seg(p)));
+  b.style.width=(Math.min(sum(pieces),MAX)/MAX*100)+'%';
+  t.appendChild(b); return t;
+}
+function draw(){
+  bars.innerHTML='';
+  document.getElementById('scen-note').textContent=NOTE[scen];
+  AG.forEach(a=>{
+    const n=now(a,scen);
+    const who=document.createElement('div'); who.className='who';
+    who.innerHTML=`${a.name}<small>${a.sub}</small>`;
+    bars.appendChild(who);
+    if(!n){
+      const t=document.createElement('div'); t.className='extra'; t.textContent=scen==='worker'?'does not apply: the worker is the one finishing':'workers rarely reach a compaction (25 turns at most)';
+      bars.appendChild(t); bars.appendChild(document.createElement('div'));
+    } else {
+      bars.appendChild(track(n)); const num=document.createElement('div'); num.className='num'; num.textContent=fmt(sum(n)); bars.appendChild(num);
+    }
+    if(showProp){
+      const p=prop(a,scen);
+      const l=document.createElement('div'); l.className='proprow'; l.textContent='proposed'; bars.appendChild(l);
+      if(p){ bars.appendChild(track(p,'prop')); const num=document.createElement('div'); num.className='num prop'; num.textContent=fmt(sum(p)); bars.appendChild(num);}
+      else { bars.appendChild(document.createElement('div')); bars.appendChild(document.createElement('div')); }
+    }
+  });
+  const ticks=document.getElementById('ticks'); ticks.innerHTML='';
+  for(let v=0;v<=MAX;v+=TICK){const s=document.createElement('span'); s.style.left=(v/MAX*100)+'%'; s.textContent=v===0?'0':fmt(v); ticks.appendChild(s);}
+}
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
+  scen=b.dataset.s; document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-pressed',x===b)); draw();
+}));
+document.getElementById('showprop').addEventListener('change',e=>{showProp=e.target.checked; draw();});
+bars.addEventListener('mousemove',e=>{
+  const s=e.target.closest('.seg'); if(!s){tip.style.opacity=0;return}
+  tip.innerHTML=s.dataset.tip; tip.style.opacity=1;
+  const x=Math.min(e.clientX+14,innerWidth-300); tip.style.left=x+'px'; tip.style.top=(e.clientY+16)+'px';
+});
+bars.addEventListener('mouseleave',()=>tip.style.opacity=0);
+draw();
+
+// ---- the grid of wakes
+const G=[
+ {g:'Anyone, any time'},
+ {ev:'A line is said to it',sm:'Conversation, Shop talk, an @name',c:['line ~40','line ~40','line ~40',null],w:'house.py line_text()',
+  t:`~ {who} in {chat name} ({chat id}, line {line id}): {text}`},
+ {ev:'Lines that waited while the House was down',sm:'on House start',c:['catch-up','catch-up','catch-up',null],w:'house.py _catch_up()',
+  t:`~ for you while the house was away:\n~ {who} in {chat} ({chat id}, line {id}): {text}\n~ …`},
+ {ev:'A card note addressed to it',sm:'card rules write these',c:['note','note','note',null],w:'house.py card_signal_text()',
+  t:`~ {note text} (card {card id}; note {note id})`},
+ {ev:'Its task list changed',sm:'any card edit that moves its list',c:['wake ~10',{n:'never (addressed only)'},{n:'never (addressed only)'},null],w:'house.py task_changes()',
+  t:`~ your task projection changed; reconcile current next actions.`,bad:0},
+ {ev:'A card is given to it',sm:'make/set … who=<name>',c:[{b:'never: dead path'},{b:'never: dead path'},{b:'never: dead path'},null],w:'house.py happen()',
+  t:`~ {by} gave you a task: {title} ({card}); look {card}\n\n(Sent only to an agent with no task list and no wake_policy=addressed. All four have a task list, so nobody gets it.)`},
+ {ev:'Someone runs house.wake',sm:'a steward or Alex',c:['wake','wake','wake',null],w:'house.py call()',
+  t:`~ {by} woke you (house.wake): {words}`},
+ {ev:'Its context is compacted',sm:'at 400k',c:[{b:'rules + list, then welcome + guide + soul'},{b:'rules + list, then welcome + guide + soul'},{b:'rules + list, then welcome + guide + soul'},null],w:'charter_hook.py, codex_resident.py, house.py welcome()',
+  t:`[hook, straight after the compaction]\n## Alex's standing rules (read again after the compaction; look {charter} is the live one)\n{the rules}\n\n{the whole task list}\n\n[the next wake]\nYou are {name} ({person}), a person in Alex's desktop world … (welcome, 140 words)\n# How work flows here (dk1833)\n{guide}\n# Your soul ({soul}, yours to keep)\n{soul}\n\nNext steps (canonical tasks; …)\n{the whole task list again}\n~ it is …\n{the line}`},
+ {g:'About workers (to the one in charge)'},
+ {ev:'Its worker finished a turn',sm:'received',c:['~85 how-to + words','~85 how-to + words',{b:'receipt ~48, no words'},null],w:'builders.py report_turn() · manager.py notify()',
+  t:`~ Your worker {name} ({card}) finished a turn and says:\n{its words, up to 3,500 chars}\n\n~ You are in charge of this worker. To answer it, run house.tell {card} <your words>: that is its next instruction ({n} turns left). When its work is done and it says what it tested: house.review {card}, then house.land {card} once the checks pass; house.snap shows what Alex would see. Tell JEFF in Shop talk, in plain words, when it is done and looks good, or when something needs Alex.\n\n— Rowan gets this instead —\n~ Your builder has a receipt for {title} ({card}): {phase}. Read house.manage {card} action=report and its current card. Received is not reviewed; landed is not activated or verified. Continue only this approved task, respect holds and corrections, coordinate activation with JEFF in Shop talk.`},
+ {ev:'A worker it told something finished',sm:'not its owner',c:['~45 + words','~45 + words','~45 + words',null],w:'builders.py report_turn()',
+  t:`~ The worker {name} ({card}), which you told something, finished a turn and says:\n{words}\n\n~ Its owner {owner} is woken too and stays in charge of it. You may answer it with house.tell {card} <your words> ({n} turns left).`},
+ {ev:'Its review passed',sm:'reviewed',c:['~40','~40','receipt',null],w:'builders.py outcome()',
+  t:`~ {name} ({card}) passed its independent checks (commit {sha}). If it changes what Alex sees, look before landing: house.snap <thing> from={card} shows the worker's code in a hidden sandbox. Then house.land {card}.`},
+ {ev:'It landed on main',sm:'landed',c:['~70','~70','receipt',null],w:'builders.py outcome()',
+  t:`~ {name} ({card}) landed on main ({sha}). {detail}\n~ Check it works where Alex will see it (house.snap <thing>; if it needs the kernel or the House restarted first, ask JEFF in Shop talk). Then tell JEFF in Shop talk, in plain words, that it is done and looks good, or what is wrong, and set the card's lane to Done once you have checked.`},
+ {ev:'It stopped or failed',sm:'blocked, recovery-needed …',c:['~45','~45','receipt',null],w:'builders.py outcome()',
+  t:`~ {name} ({card}) stopped ({phase}): {detail, up to 700 chars}\n~ You are in charge of it: tell it what to do (house.tell {card} <words>), review it again (house.review {card}), hand it on (house.hand {card} <name>), or tell JEFF in Shop talk if it needs Alex.\n\n(The same failure twice wakes nobody the second time.)`},
+ {ev:'One reminder',sm:'its turn ended with workers waiting',c:['~45','~45',{n:'no'},null],w:'builders.py remind()',
+  t:`~ Reminder: these workers stopped and still wait on you:\n- {name} ({card}): {phase} since {time}. {detail}\n~ For each: answer it (house.tell <card> <words>), review or land it, check it (house.snap), hand it on (house.hand <card> <name>), or say on its card why it waits. This is the only reminder.`},
+ {ev:'A worker is handed to it',sm:'house.hand',c:['~85 + last words','~85 + last words','~85 + last words',null],w:'builders.py hand()',
+  t:`~ {by} handed you the worker {name} ({card}); you are in charge of it now (it was {was}'s).\n~ Where it stands: {phase}. {detail}\n~ Its last words:\n{up to 2,500 chars}\n~ Read the card (look {card}) and its log (house.log {card}). Then answer it (house.tell {card} <words>), review or land it (house.review / house.land {card}), check what Alex would see (house.snap), and tell JEFF in Shop talk, in plain words, when it is done and looks good, or when it needs Alex. If it is no longer wanted, say so on the card and set its lane to Done.`},
+ {ev:'The House restarted mid-work',sm:'workers cut off',c:['~60 + list','~60 + list',{n:'no'},null],w:'builders.py wake_cut_off()',
+  t:`~ The House restarted and cut these workers off mid-way. You are the one to pick them up:\n- {name} ({card}): {phase} since {time}. {detail} It can carry on: house.tell {card} <words> starts a new turn on its worktree.\n~ For each: carry it on, hand it on (house.hand <card> <name>), or say on its card why it waits.`},
+ {ev:'Nobody can pick this up',sm:'owner down, or Alex asked',c:['~35 prefix',{n:'no'},{n:'no'},null],w:'builders.py route()',
+  t:`~ Nobody can pick this up: {why}. Ask a resident in Shop talk to take it, and hand it over with house.hand {card} <name>; or leave it if it should wait.\n{then the owner's message above}`},
+ {g:'To the worker'},
+ {ev:'It starts',sm:'house.work / house.build',c:[null,null,null,'brief 226 + card'],w:'builders.py prompt()',
+  t:`You are {name}, a coding worker in Alex's Agora desktop (the kernel world on 8810).\n{owner} is in charge of you. Your last message each turn is posted in your chat with {owner}; they answer there, and their answer is your next instruction. Ask them when something is unclear instead of guessing.\nTask: {title} ({card}). Task text: {text}\nAcceptance: {acceptance, or "what the task text asks for, working and tested"}\nYou work only in this worktree, on this task. Read AGENTS.md first, then Alex's live standing rules with the Agora tools (see \`look dk838\`). Use the Agora tools (see, do, lines) to read the world; never change credentials, security settings or providers, and never start another worker.\nNo visible test windows (hidden fixtures only), no pushes, no merging to main, no deleting other people's work, no stopping Alex's programs. If something is denied, stop and say so; do not route around it.\nUse the pinned {python}. Do not commit: leave your changes in the worktree; at review the House commits them to your branch (except BUILD-RESULT.md and top-level dot-folders, where scratch and temp fixtures belong).\nWhen done, leave BUILD-RESULT.md at the worktree root: what you changed (files), what you ran and its results, what is left. Then end your turn with a short summary for {owner}: done, or what you need from them.`},
+ {ev:'Its owner answers',sm:'house.tell, or a line in its chat',c:[null,null,null,'prefix + words'],w:'builders.py resume()',
+  t:`Follow-up on this same task. Retain its scope and all safety boundaries.\n{a note if it was handed on or cut off}\n{the owner's words}`},
+];
+const grid=document.getElementById('grid'), det=document.getElementById('detail');
+function chip(c){
+  if(c===null) return '<span class="chip none">—</span>';
+  if(typeof c==='string') return `<span class="chip">${c}</span>`;
+  if(c.n) return `<span class="chip none">${c.n}</span>`;
+  if(c.b) return `<span class="chip bad">${c.b}</span>`;
+}
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function show(i,tr){
+  const r=G[i];
+  grid.querySelectorAll('tr').forEach(x=>x.classList.toggle('on',x===tr));
+  det.innerHTML=`<h3>${r.ev}</h3><div class="where">Lives in <code>${r.w}</code>. Every house-agent wake also starts with the 47-word next-steps header, the whole task list and "~ it is …".</div><pre>${esc(r.t)}</pre>`;
+}
+G.forEach((r,i)=>{
+  const tr=document.createElement('tr');
+  if(r.g){tr.className='group';tr.innerHTML=`<td colspan="5">${r.g}</td>`;grid.appendChild(tr);return}
+  tr.tabIndex=0;
+  tr.innerHTML=`<td class="ev">${r.ev}<small>${r.sm}</small></td>`+r.c.map(c=>`<td>${chip(c)}</td>`).join('');
+  tr.addEventListener('click',()=>show(i,tr));
+  tr.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();show(i,tr)}});
+  grid.appendChild(tr);
+});
+show(9,grid.children[9]);
+
+// ---- where the words live
+const H=[
+ {k:'world',t:'In the world',s:'Editable in Writing today',items:[
+  ['Your standing rules','dk838','681','JEFF (system prompt), workers (told to look)'],
+  ['Rules for everyone','dk1151','130','Sable. A 27 Oct copy: it misses your newer rules',1],
+  ["Pike's charter",'dk1279','130','Pike. Word for word the same as Sable’s',1],
+  ["Rowan's charter",'dk1193','237','Rowan. A Codex version from 28 Oct',1],
+  ['How work flows','dk1833','349','All four, in the welcome. dk1832 is an identical copy',1],
+  ['Four souls','dk837 · 1150 · 1278 · 1192','6,231','Each agent, in the welcome. JEFF’s is from the old desk'],
+  ['Cards','the Board','220–370','Laid out as the task list by code (below)'],
+ ]},
+ {k:'code',t:'In source code',s:'Needs a builder and a House restart',items:[
+  ['Welcome','house.py','140','All four, on a fresh start and after a compaction'],
+  ['Wake-line formats','house.py','short','Said lines, catch-up, card notes, house.wake, list changed'],
+  ['Next-steps header','next_steps.py','47','Every wake, all four. The old cautious voice',1],
+  ['Worker brief','builders.py','226','Every worker, first turn'],
+  ['Nine owner messages','builders.py','35–85 each','Each one re-explains the flow',1],
+  ["Rowan's receipt",'manager.py','48','Rowan only. The older house.manage path',1],
+  ['Compaction re-send','charter_hook.py','—','Puts the rules and task list back, a second time',1],
+ ]},
+ {k:'repo',t:'In the repository',s:'Edited by builders, in git',items:[
+  ['AGENTS.md','repo root','1,718','Every worker is told to read it first. Written for builders; still carries a ten-rule snapshot from the old desk',1],
+ ]},
+ {k:'prov',t:"The model provider's",s:'Not ours to edit',items:[
+  ["Claude Code's system prompt",'claude -p','?','Claude workers'],
+  ["Codex's system prompt",'codex','?','Codex workers and the two Codex residents (under your rules)'],
+ ]},
+];
+document.getElementById('homes').innerHTML=H.map(h=>`<div class="home"><h3><i class="sw ${h.k}"></i>${h.t}</h3><div class="muted" style="font-size:13px">${h.s}</div><ul>`+
+  h.items.map(i=>`<li class="${i[4]?'flag':''}"><span>${i[0]} <span class="mono muted">${i[1]}</span></span><span class="n">${i[2]}</span><span class="r">${i[3]}</span></li>`).join('')+`</ul></div>`).join('');
+</script>

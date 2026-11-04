@@ -36,10 +36,22 @@ def test_one_resident_card_without_builder_and_no_duplicates():
     assert len(rows) == 1 and rows[0]["owner"] == "Codex"
 
 
-@pytest.mark.parametrize("phase", ["asked", "received", "reviewed", "landed", "released", "idle"])
+@pytest.mark.parametrize("phase", ["asked", "landed", "released", "idle"])
 def test_old_builder_phase_is_not_active(phase):
     assert not project([card(build="building", build_run="old")],
                        [{"task": "dk10", "doing": phase, "name": "Codex", "build_run": "old"}])
+
+
+@pytest.mark.parametrize("phase,why", [("received", "Finished, waiting on its review since 2026-10-29"),
+                                       ("reviewed", "Checks passed, waiting to land since 2026-10-29")])
+def test_a_stopped_result_waits_on_its_owner_by_name(phase, why):
+    """Alex, 3 Nov: finished results sat for days unattended because the panel hid them. A stopped worker's result
+    waits on the one in charge of it, so it shows, after the blocked cards, with how long it has waited."""
+    got = project([card(build="landing", build_run="old")],
+                  [{"task": "dk10", "doing": phase, "name": "Codex", "build_run": "old",
+                    "awaiting": "2026-10-29T05:00:00Z", "owner_name": "Sable"}])
+    assert len(got) == 1 and got[0]["state"] == "Waiting"
+    assert got[0]["blocker"] == why and got[0]["resolver"] == "Sable"
 
 
 def test_unclaimed_now_card_is_not_work_in_progress():
@@ -187,3 +199,24 @@ def test_todays_world_shows_working_builders_and_blockers_by_name():
     for r in got:
         for field in ("title", "owner", "blocker", "resolver"):
             assert not re.search(r"\bdk\d+\b", r[field]), (field, r[field])
+
+
+def project_with(settings_rows, cards, hello):
+    def see(line, use):
+        if line == "rows taskboard-task":
+            return {"rows": cards}
+        return {"rows": list(settings_rows) if line == "rows work-settings" else []}
+    module = SimpleNamespace(see=see, hello=hello)
+    return W.rows(module, {"jeff": SimpleNamespace(person="dk2", name="JEFF")}, SimpleNamespace(rows=lambda m: []), "r")
+
+
+def test_work_settings_are_the_worlds_and_only_the_house_persons():
+    """4 Nov: which lanes hide and what Work says are facts on work-settings, read at each call."""
+    blocked = card(blocker="Needs a key")
+    mine = {"kind": "work-settings", "made_by": "dk2", "word_blocked": "Stuck", "hide_lanes": "now"}
+    theirs = {"kind": "work-settings", "made_by": "dk99", "word_blocked": "Hijacked"}
+    assert project_with([theirs], [blocked], {"for": "dk2"})[0]["state"] == "Blocked"
+    assert project_with([mine], [blocked], {"for": "dk2"}) == []          # lane Now hidden by Alex's setting
+    mine["hide_lanes"] = "done"
+    assert project_with([mine], [blocked], {"for": "dk2"})[0]["state"] == "Stuck"
+    assert project_with([], [blocked], {"for": "dk2"})[0]["state"] == "Blocked"

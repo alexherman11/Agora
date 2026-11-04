@@ -4,7 +4,6 @@ import json
 import secrets
 import shutil
 import sys
-import tempfile
 import threading
 import unittest
 from pathlib import Path
@@ -13,6 +12,7 @@ LAB = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(LAB), str(LAB / "tests"), str(LAB / "proof")]
 from kernel.kernel import Kernel
 from kernel.door import serve
+from kernel import scratch
 from test_skeleton import StandInEntry, post
 from test_painter import quoted
 import kits
@@ -25,7 +25,7 @@ class Kits(unittest.TestCase):
         self.t, self.turl, self.tg, self.tm = self.world("bb")
 
     def world(self, tag):
-        folder = tempfile.mkdtemp(prefix="kits-test-")
+        folder = scratch.mkdtemp(prefix="kits-test-")
         entry = StandInEntry(secrets.token_hex(16))
         k = Kernel(folder, {"tag": tag, "name": tag, "steward": {"account": "owner", "name": "Owner"},
             "invites_counted_by": "kernel", "invites": [{"code": "join", "uses": 5}],
@@ -186,7 +186,7 @@ class Kits(unittest.TestCase):
 @unittest.skipUnless(shutil.which("node"), "agenda needs Node")
 class KitsProof(unittest.TestCase):
     def test_two_communities_over_http(self):
-        with tempfile.TemporaryDirectory(prefix="kits-evidence-") as folder:
+        with scratch.TemporaryDirectory(prefix="kits-evidence-") as folder:
             evidence = kits.run(Path(folder))
             self.assertEqual(evidence["passed"], evidence["of"])
             self.assertTrue(evidence["complete"])

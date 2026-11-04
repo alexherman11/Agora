@@ -1,10 +1,17 @@
-"""Kernel House builders. No Frontier queue and no credentials or grants minted here.
+"""EDITING A MODULE (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+A module is a seam to something outside the kernel (a model provider, git, Twitch, the media session, a map server) and
+turns it into world facts and words. What the world does with them (who is told, when, in what words, how it looks)
+belongs in rules, lenses and this module's settings thing, read at each use. Names (JEFF, Alex), ids (dk...), models,
+counts, timeouts and message text in this file are debt: move them to settings when you touch them, and never add more.
+
+Kernel House builders. No Frontier queue and no credentials or grants minted here.
 
 Calls return a durable request promptly. A builder uses the requester's existing
 agent session, just as residents use their own door sessions (MOVING-IN D3).
 Received work is reviewed independently; neither a model result nor landing
 closes the user's task. Restart uncertainty is held for explicit reconciliation.
 """
+import calendar
 import hashlib
 import json
 import os
@@ -23,6 +30,40 @@ import manager as M
 
 ACTIVE = {'asked', 'preparing', 'working', 'reviewing', 'landing'}
 RESUMABLE = {'received', 'blocked', 'reviewed'}   # stopped, not landed or released: house.tell gives it a new turn
+CUT = {'recovery-needed', 'uncertain'}             # cut off (House restart, lost answer): resumable once its process is gone
+WAITING = RESUMABLE | CUT                          # stopped and waiting on the one in charge of it
+FINISHED = {'done', 'verified', 'finished', 'completed', 'released', 'cancelled', 'trashed'}   # a card's lane or status
+QUEUED = 'queued'                                  # asked for while every slot of its kind was busy: starts when one frees
+CUT_RESUME_HOURS = 6                               # a worker a restart cut off this recently is picked back up by itself
+
+
+class Released(Exception):
+    """Its card no longer holds this worker (moved on to another run, or finished): it ends quietly as released."""
+
+
+def age_hours(when):
+    try:
+        return (time.time() - calendar.timegm(time.strptime(str(when), '%Y-%m-%dT%H:%M:%SZ'))) / 3600
+    except (TypeError, ValueError):
+        return float('inf')
+
+
+def alive(pid):
+    """Is this process still running? Unsure counts as alive, so a cut-off worker is never run twice."""
+    if not pid:
+        return False
+    try:
+        import ctypes
+        k = ctypes.windll.kernel32
+        h = k.OpenProcess(0x1000, False, int(pid))          # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return k.GetLastError() == 5                     # access denied: something is there
+        code = ctypes.c_ulong()
+        ok = k.GetExitCodeProcess(h, ctypes.byref(code))
+        k.CloseHandle(h)
+        return not ok or code.value == 259                   # STILL_ACTIVE
+    except Exception:                                        # noqa: BLE001
+        return True
 HELD = {'yes', 'true', '1', 'paused', 'held', 'blocked', 'cancelled', 'canceled'}
 CHECKS = [
     ['research/kernel-lab/tests/test_chat.py', 'research/kernel-lab/tests/test_paint_health.py'],
@@ -76,10 +117,14 @@ class Door:
 
 
 PROVIDERS = {  # Alex, 28 Oct: up to four Claude and four Codex workers at a time
+    # the model and reasoning here are only the fallback: House settings `claude_model`, `claude_reasoning`,
+    # `codex_model`, `codex_reasoning` choose them (Alex, 4 Nov: numbers and names live in the world)
     'claude': dict(model='claude-opus-5-5', reasoning='medium', label='Claude'),
     'codex': dict(model='gpt-6.1-sol', reasoning='medium', label='Codex'),
 }
-MAX_TURNS = 25          # a worker's conversation with its resident ends here; review or a new card starts afresh
+REASONING = {'low', 'medium', 'high', 'xhigh'}
+# Alex, 4 Nov: no limit on a worker's turns or on how long a turn runs, unless House settings set `max_turns` or
+# `worker_timeout` (seconds); left out, there is none.
 CLAUDE_TOOLS = ('Bash', 'Read', 'Edit', 'MultiEdit', 'Write', 'Glob', 'Grep', 'TodoWrite',
                 'mcp__agora__see', 'mcp__agora__do', 'mcp__agora__lines')
 CLAUDE_DENIED = ('Bash(git push:*)', 'Bash(git checkout main:*)', 'Bash(git switch main:*)', 'Bash(git reset --hard:*)',
@@ -87,6 +132,24 @@ CLAUDE_DENIED = ('Bash(git push:*)', 'Bash(git checkout main:*)', 'Bash(git swit
 
 
 class Builders:
+    def settings(self):
+        """The House settings thing's facts, read each time (never cached): {} when there is none."""
+        reading = self.h.m.see('rows house-settings')
+        rows = [r for r in reading.get('rows', []) if r.get('kind') == 'house-settings']
+        return rows[0] if len(rows) == 1 else {}
+
+    def worker_model(self, provider):
+        """(model, reasoning) for a new worker of this provider: House settings, else the PROVIDERS fallback."""
+        s, p = self.settings(), PROVIDERS[provider]
+        model = str(s.get(provider + '_model') or '').strip() or p['model']
+        reasoning = str(s.get(provider + '_reasoning') or '').strip().lower()
+        return model, (reasoning if reasoning in REASONING else p['reasoning'])
+
+    def limit(self, name):
+        """A positive whole number from House settings (max_turns, worker_timeout), or None: no limit."""
+        value = str(self.settings().get(name) or '').strip()
+        return int(value) if value.isdigit() and int(value) > 0 else None
+
     def capacity_for(self, provider):
         """Each provider has its own pool: house-settings `claude_workers` / `codex_workers` (1 to 4), default 4.
         The older shared `builder_capacity` still sizes the Codex pool when `codex_workers` is not set."""
@@ -135,15 +198,21 @@ class Builders:
         self.lock = threading.RLock()
         self.states, self.children = {}, {}
         self.stopping = False
+        self.landing_lock = threading.Lock()          # one landing at a time; the next waits its turn, never refused
+        self.house_restart_due = False                # a landed change to the House itself: restart once all is idle
         for path in self.home.glob('*/state.json'):
             state = json.loads(path.read_text(encoding='utf-8'))
             if state.get('superseded_by'):        # an earlier run of a card that has had a new one
                 continue
             if state['phase'] in ACTIVE:
-                state.update(phase='recovery-needed', detail='House restarted during an operation; inspect retained process, branch and receipts before resuming')
+                state.update(cut_phase=state['phase'], cut_from=state.get('updated', ''), phase='recovery-needed',
+                             updated=stamp(), detail=f"House restarted while it was {state['phase']}")
             rows=house.m.see('look '+state['task']).get('rows') or []
-            if rows and rows[0].get('build_run') != state['run']:
-                state.update(phase='released',detail='world claim released or reassigned; preserved work is not running')
+            if rows and rows[0].get('build_run') != state['run'] and state['phase'] not in ('released', 'landed'):
+                state.update(phase='released',detail='its card moved on to another worker; its worktree is kept')
+            elif rows and state['phase'] not in ('landed', 'released') and any(
+                    str(rows[0].get(f, '')).strip().casefold() in FINISHED for f in ('lane', 'status')):
+                state.update(phase='released', detail='its card is finished; its worktree is kept')
             self.states[state['task']] = state
             self.save(state)
 
@@ -155,9 +224,12 @@ class Builders:
             tmp.write_text(json.dumps(state, indent=2), encoding='utf-8')
             os.replace(tmp, folder / 'state.json')
 
-    def event(self, state, what, text):
+    def event(self, state, what, text, detail=None):
         with self.lock:
-            state.setdefault('activity', []).append(dict(at=stamp(), what=what, text=str(text)[:4000]))
+            entry = dict(at=stamp(), what=what, text=str(text)[:4000])
+            if detail is not None:
+                entry['detail'] = detail
+            state.setdefault('activity', []).append(entry)
             state['activity'] = state['activity'][-100:]
             self.save(state)
         self.h.m.happen('house.doing', state['task'], str(text)[:200])
@@ -218,7 +290,7 @@ class Builders:
         state.update(phase=phase, detail=detail, updated=stamp())
         self.event(state, phase, detail)
         build = {'asked':'asked', 'preparing':'asked', 'working':'building', 'reviewing':'landing',
-                 'received':'landing', 'reviewed':'landing', 'landed':'landed'}.get(phase, 'blocked')
+                 'received':'landing', 'reviewed':'landing', 'landed':'landed', 'released':'released'}.get(phase, 'blocked')
         self.update(state, build=build, build_phase=phase, build_detail=detail[:1500], **facts)
 
     def start(self, msg):
@@ -255,13 +327,13 @@ class Builders:
         with self.lock:
             if target in self.states and not again:
                 return {'text': 'existing request: ' + self.states[target]['phase'], 'rows': [self.row(self.states[target])]}
-            if self.full(provider):
-                return {'refused': f'worker capacity is occupied: all {self.capacity_for(provider)} {provider} workers are busy; nothing was queued'}
+            queued = self.full(provider)       # every slot busy: it waits its turn (start_queued), never refused
+            model, reasoning = self.worker_model(provider)
             run = 'kernel-' + target + '-' + uuid.uuid4().hex[:10]
             state = dict(task=target, run=run, name=p['label']+' — '+short(task.get('title') or 'Builder', 60), requester=caller['person'],
                          requester_name=caller.get('name', ''), provider=provider,
                          title=task.get('title') or target, phase='asked', detail='claim pending',
-                         model=p['model'], reasoning=p['reasoning'], created=stamp(), activity=[],
+                         model=model, reasoning=reasoning, created=stamp(), activity=[],
                          task_owner=task.get('who',''), pending=[], basis={k:task.get(k,'') for k in ('title','text','acceptance','who')})
             if msg.get('_managed'):
                 state['manager'] = caller['person']
@@ -270,8 +342,14 @@ class Builders:
                 state['previous_run'] = prev['run']
                 prev['superseded_by'] = run
                 self.save(prev)
+            if queued:
+                state.update(phase=QUEUED, detail=f'waiting for a free {provider} slot')
             self.states[target] = state
             self.save(state)
+            if queued:
+                self.event(state, QUEUED, state['detail'])
+                return {'text': f'all {self.capacity_for(provider)} {provider} workers are busy; this one starts by itself '
+                                f'as soon as one is free', 'external': True, 'rows': [self.row(state)]}
             threading.Thread(target=self.guarded, args=(state, self.build), daemon=True).start()
         return {'text': 'builder request recorded; claim and launch follow asynchronously', 'external': True,
                 'rows': [self.row(state)]}
@@ -279,9 +357,19 @@ class Builders:
     def guarded(self, state, operation):
         try:
             operation(state)
+        except Released as exc:
+            self.released(state, str(exc))
         except Exception as exc:
+            halted, releasing = state.pop('halted_by', None), state.pop('releasing', None)
             uncertain=isinstance(exc,(TimeoutError,ConnectionError,urllib.error.URLError,subprocess.TimeoutExpired))
-            state.update(phase='uncertain' if uncertain else 'blocked', detail=str(exc)[:2000])
+            if releasing:
+                self.released(state, releasing)
+                return
+            if halted:
+                state.update(phase='blocked', detail=f"stopped by {halted}; house.tell {state['task']} <words> starts it "
+                                                     f"again with new words, house.release {state['task']} drops it")
+            else:
+                state.update(phase='uncertain' if uncertain else 'blocked', detail=str(exc)[:2000])
             self.event(state, state['phase'], state['detail'])
             try:
                 if not uncertain:
@@ -291,6 +379,76 @@ class Builders:
                 pass
         finally:
             M.notify(self, state)
+            try:
+                self.outcome(state)
+            except Exception as exc:                 # noqa: BLE001  telling is a help, never a reason to fail
+                self.event(state, 'unsaid', f'outcome wake: {exc!r}')
+            try:                                     # a slot may be free now; a House change may be waiting for quiet
+                self.start_queued()
+                self.idle_check()
+            except Exception as exc:                 # noqa: BLE001
+                self.event(state, 'unsaid', f'queue or restart check: {exc!r}')
+
+    def released(self, state, detail):
+        """It ends for good: nothing runs, nobody is reminded, its worktree and branch are kept for reading."""
+        for k in ('awaiting', 'reminded', 'halted_by', 'releasing', 'queued_turn', 'quiet'):
+            state.pop(k, None)
+        state['pending'] = []
+        state.update(phase='released', detail=detail, updated=stamp())
+        self.event(state, 'released', detail)
+        try:
+            self.update(state, build='released', build_phase='released', build_detail=detail[:1500])
+        except Exception:                            # noqa: BLE001  its card moved on: the new run's facts aren't ours
+            pass
+        self.save(state)
+
+    def start_queued(self):
+        """A slot came free: queued workers start, then queued follow-ups, oldest first. Nothing waiting is refused."""
+        with self.lock:
+            waiting = sorted((s for s in self.states.values() if s['phase'] == QUEUED or s.get('queued_turn')),
+                             key=lambda s: s.get('queued_turn') or s.get('created') or '')
+            for state in waiting:
+                try:
+                    if self.full(state.get('provider', 'codex')):
+                        continue
+                except RuntimeError:
+                    return
+                if state['phase'] == QUEUED:
+                    state.update(phase='asked', detail='claim pending')
+                    self.save(state)
+                    self.event(state, 'asked', 'a slot came free; it starts now')
+                    threading.Thread(target=self.guarded, args=(state, self.build), daemon=True).start()
+                elif self.resumable(state) and state.get('pending'):
+                    state.pop('queued_turn', None)
+                    self.reopen(state)
+                    threading.Thread(target=self.guarded, args=(state, self.resume), daemon=True).start()
+                else:
+                    state.pop('queued_turn', None)
+                    self.save(state)
+
+    def idle_check(self):
+        """A landed change to the House itself switches on only when no worker runs, nothing is landing and no agent
+        is mid-turn, so the restart cuts nobody off (Alex, 4 Nov: work lands on his system by itself)."""
+        if not self.house_restart_due or self.stopping:
+            return
+        if self.children or any(s['phase'] in ('reviewing', 'landing', 'asked', 'preparing', 'working')
+                                 for s in self.states.values()):
+            return
+        if any(getattr(a, 'busy', False) or getattr(a, 'inbox', None) for a in getattr(self.h, 'agents', {}).values()):
+            return
+        self.house_restart_due = False
+        self.spawn_reload(['house'], self.home / 'activation-house.log')
+
+    def spawn_reload(self, args, log):
+        """kd_reload, detached from the House (it may restart the House itself), with no window."""
+        helper = Path(__file__).resolve().parent / 'activate_now.py'
+        pyw = Path(str(T.PY)).with_name('pythonw.exe')
+        exe = pyw if pyw.exists() else Path(str(T.PY))
+        line = f'"{exe}" "{helper}" --log "{log}" ' + ' '.join(args)
+        ps = ("$r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = '"
+              + line.replace("'", "''") + "' }; $r.ReturnValue")
+        subprocess.run(['powershell', '-NoProfile', '-Command', ps], capture_output=True, text=True, timeout=60,
+                       creationflags=T.NO_WINDOW)
 
     def build(self, state):
         M.check_state(self, state)
@@ -340,12 +498,20 @@ class Builders:
                    '--disallowedTools', ','.join(CLAUDE_DENIED)]
         else:
             cmd = [str(T.PY), str(T.REPO/'research/codex-residents/codex_worker.py'),
-                   '--model', state['model'], '--reasoning', state['reasoning'], '--timeout', '2400',
+                   '--model', state['model'], '--reasoning', state['reasoning'],
+                   '--timeout', str(self.limit('worker_timeout') or 0),
                    '--prompt-file', str(folder/'prompt.md'), '--mcp-config', mcp, '--lease', str(folder/'process.lock')]
         if state.get('session'):
             cmd += ['--resume', state['session']]
         self.assert_owned(state)
-        child = T.Child(cmd, tree, T.clean_env(), events, lambda *_: None, stderr=folder/'stderr.log')
+        env = T.clean_env()
+        # 3 Nov: the Codex sandbox may write only inside the worktree, so its temp folder is there too (a top-level
+        # dot-folder, which the House never commits). Python 3.12's mkdtemp still makes owner-only folders; tests
+        # should make scratch folders with plain mkdir (test_kdesk scratch_dir).
+        scratch = tree / '.tmp'
+        scratch.mkdir(exist_ok=True)
+        env.update(TMP=str(scratch), TEMP=str(scratch), TMPDIR=str(scratch))     # gettempdir reads TMPDIR first
+        child = T.Child(cmd, tree, env, events, lambda *_: None, stderr=folder/'stderr.log')
         self.children[state['task']] = child
         state['pid'] = child.proc.pid
         self.phase(state, 'preparing', f'adapter started; awaiting authenticated {label} thread', builder_chat=state['chat'])
@@ -360,6 +526,8 @@ class Builders:
                 except queue.Empty:
                     if self.stopping:
                         raise RuntimeError('House shutting down; preserve work and reconcile before retry')
+                    if state.get('halted_by') or state.get('releasing'):
+                        raise RuntimeError('stopped')       # house.stop / house.release: guarded says how it ended
                     continue
                 kind = e.get('e')
                 if kind == 'init':
@@ -374,7 +542,9 @@ class Builders:
                     state['turn_id'] = e.get('turn')
                     self.phase(state, 'working', f'authenticated {label} turn running')
                 elif kind == 'tool':
-                    self.event(state, 'act', e.get('name', 'tool'))
+                    activity = T.worker_activity.tool(e)
+                    self.event(state, 'act', activity['summary'] if activity else e.get('name', 'tool'),
+                               activity['detail'] if activity else None)
                 elif kind == 'text':
                     self.event(state, 'said', e['text'])
                     said.append(e['text'])
@@ -460,6 +630,329 @@ class Builders:
             return None                  # Rowan's managed builds are woken by manager.notify
         return getattr(self.h, 'agents', {}).get(state['requester'])
 
+    # ---- who picks a stopped worker back up (Alex, 3 Nov: work sat for days, unattended or forgotten)
+
+    def general_manager(self):
+        """JEFF: the one who hears about work nobody else can pick up. A house-agent with role=general-manager."""
+        agents = getattr(self.h, 'agents', {})
+        return next((a for a in agents.values() if (getattr(a, 'cfg', None) or {}).get('role') == 'general-manager'), None) or \
+            next((a for a in agents.values() if a.name == 'JEFF'), None)
+
+    @staticmethod
+    def usable(agent):
+        """Can this agent take a turn now? Asleep, or failing (e.g. its sign-in expired), it cannot."""
+        if agent is None:
+            return False
+        cfg, st = getattr(agent, 'cfg', None) or {}, getattr(agent, 'state', None) or {}
+        return cfg.get('want', 'awake') != 'asleep' and not (st.get('error') and not getattr(agent, 'busy', False))
+
+    def route(self, state):
+        """Who hears that this worker stopped: its owner; and JEFF, with a note, when nobody can act on it (Alex asked
+        for it himself, or its owner is down). Rowan's managed builds go through manager.notify instead."""
+        if state.get('manager'):
+            return []
+        agent = self.owner(state)
+        if self.usable(agent):
+            return [(agent, '')]
+        out = [(agent, '')] if agent is not None else []          # it reads this when it is back
+        gm = self.general_manager()
+        if gm is not None and gm is not agent:
+            if agent is None:
+                why = f"{state.get('requester_name') or 'Alex'} asked for it and is not a resident the House can wake"
+            else:
+                why = f"{agent.name}, in charge of it, can't act now ({(getattr(agent, 'state', None) or {}).get('error') or 'asleep'})"
+            out.append((gm, f"~ Nobody can pick this up: {why}. Ask a resident in Shop talk to take it, and hand it "
+                            f"over with house.hand {state['task']} <name>; or leave it if it should wait.\n"))
+        return out
+
+    def wake_owner(self, state, text):
+        for agent, prefix in self.route(state):
+            agent.wake(prefix + text)
+            self.event(state, 'told', f"woke {agent.name} (busy={getattr(agent, 'busy', '?')}, "
+                                      f"inbox={len(getattr(agent, 'inbox', None) or [])})"
+                       + (' for its owner' if prefix else ''))
+
+    def stopped(self, state):
+        """It waits on the one in charge from now; they get one reminder if a turn of theirs ends without acting."""
+        with self.lock:
+            state['awaiting'] = stamp()
+            state.pop('reminded', None)
+            self.save(state)
+
+    def answered(self, state):
+        with self.lock:
+            state.pop('awaiting', None)
+            state.pop('reminded', None)
+            self.save(state)
+
+    def cut_phase(self, state):
+        """What a cut-off worker was doing (older runs did not record it: read it off the activity)."""
+        if state.get('cut_phase'):
+            return state['cut_phase']
+        for e in reversed(state.get('activity') or []):
+            what = e.get('what')
+            if what in ('said', 'act', 'heard', 'working', 'preparing', 'asked', 'reopened', 'received'):
+                return 'working'
+            if what in ('reviewing', 'review-again', 'committed'):
+                return 'reviewing'
+            if what in ('reviewed', 'landing', 'carried'):
+                return 'landing'
+        return None
+
+    def resumable(self, state):
+        """Stopped and safe for a new turn on its worktree: received, blocked or reviewed; or cut off mid-turn
+        with its process gone (never mid-review or mid-landing, where main or its branch may be half moved)."""
+        if state['task'] in self.children:
+            return False
+        if state['phase'] in RESUMABLE:
+            return True
+        return (state['phase'] in CUT and bool(state.get('tree')) and self.cut_phase(state) == 'working'
+                and not alive(state.get('pid')))
+
+    def outcome(self, state):
+        """A House operation on the worker ended (review, landing, or a failure): the one in charge hears how."""
+        phase, task, name = state['phase'], state['task'], state['name']
+        if self.stopping:
+            return                       # the House is going down; wake_cut_off tells them when it is back
+        if phase in ACTIVE or phase in ('received', 'released', QUEUED) or state.get('manager'):
+            return                       # received: report_turn already woke them with the worker's words
+        if state.pop('quiet', None):
+            self.save(state)
+            return                       # its owner stopped it themselves: they know
+        if phase == 'reviewed':
+            text = (f"~ {name} ({task}) passed its checks (commit {str(state.get('candidate', ''))[:9]}). "
+                    f"house.land {task} lands it and switches it on.")
+        elif phase == 'landed':
+            text = (f"~ {name} ({task}) landed on main ({str(state.get('landed_commit', ''))[:9]}); "
+                    f"{state.get('activation') or 'it is live'}.\n~ Check it works where Alex will see it "
+                    f"(house.snap <thing>), set the card's lane to Done, and tell JEFF in Shop talk in plain words. "
+                    f"If it isn't right, start a worker on the fix.")
+        else:
+            text = (f"~ {name} ({task}) stopped ({phase}): {str(state.get('detail', ''))[:700]}\n~ It's yours to move: "
+                    f"tell it what to do (house.tell {task} <words>), land it (house.land {task}), drop it "
+                    f"(house.release {task}), or hand it on (house.hand {task} <name>). If something outside your reach "
+                    f"is in the way, tell JEFF in Shop talk exactly what.")
+        said = [phase, str(state.get('detail', ''))[:300]]
+        if state.get('last_outcome') == said:
+            self.event(state, 'quiet', 'same outcome as last time; nobody woken again')
+            return                       # the same failure twice wakes nobody twice (the 3 Nov loop)
+        state['last_outcome'] = said
+        self.stopped(state)
+        self.wake_owner(state, text)
+
+    def card_done(self, state):
+        """Its card is finished (lane Done and the like): nobody needs reminding about the worker any more."""
+        try:
+            rows = self.h.m.see('look ' + state['task']).get('rows') or []
+        except Exception:                                 # noqa: BLE001
+            return False
+        card = rows[0] if rows else {}
+        return any(str(card.get(f, '')).strip().casefold() in FINISHED for f in ('lane', 'status'))
+
+    def waiting_line(self, state):
+        since = str(state.get('awaiting') or state.get('updated') or '')[:16].replace('T', ' ')
+        return f"- {state['name']} ({state['task']}): {state['phase']} since {since}. {str(state.get('detail', ''))[:200]}"
+
+    def wake_cut_off(self):
+        """House start: owners hear, once, about workers a restart cut off (each gets one wake listing them)."""
+        heard = {}
+        with self.lock:
+            for state in self.states.values():
+                if state['phase'] not in CUT or state.get('cut_told') or state.get('manager') or self.card_done(state):
+                    continue
+                state['cut_told'] = stamp()
+                # 4 Nov: a worker cut off mid-turn a little while ago simply carries on, by itself (nobody is woken;
+                # its owner hears when that turn ends). Older ones go to their owner to decide.
+                if (self.resumable(state) and state.get('session')
+                        and age_hours(state.get('cut_from')) < CUT_RESUME_HOURS):
+                    state['pending'] = (state.get('pending') or []) + ['Carry on with your task.']
+                    state['queued_turn'] = stamp()
+                    self.event(state, 'picked-up', 'cut off by a House restart; it carries on by itself')
+                    self.save(state)
+                    continue
+                for agent, prefix in self.route(state):
+                    heard.setdefault(agent.person, (agent, []))[1].append((state, prefix))
+        for agent, items in heard.values():
+            lines = []
+            for state, prefix in items:
+                self.stopped(state)
+                ok = self.resumable(state)
+                lines.append(self.waiting_line(state) + (
+                    f" It can carry on: house.tell {state['task']} <words> starts a new turn on its worktree."
+                    if ok else f" It was cut off while {self.cut_phase(state) or 'busy'}: land it again "
+                               f"(house.land {state['task']}), or drop it (house.release {state['task']}) and start "
+                               f"afresh (house.build {state['task']}).")
+                    + (' (Its owner cannot act now: hand it to a resident with house.hand.)' if prefix else ''))
+            agent.wake("~ The House restarted and cut these older workers off mid-way. They're yours to move:\n"
+                       + '\n'.join(lines) + "\n~ For each: carry it on, drop it (house.release <card>), or hand it on "
+                       "(house.hand <card> <name>).")
+            for state, _ in items:
+                self.event(state, 'told', f'woke {agent.name} about the cut-off')
+        self.start_queued()
+
+    def remind(self, person):
+        """A turn of theirs ended and workers still wait on them: one reminder per stopped result, never more."""
+        agent = getattr(self.h, 'agents', {}).get(person)
+        if agent is None or agent.busy or agent.inbox:
+            return
+        waiting = []
+        with self.lock:
+            for state in self.states.values():
+                if (state['requester'] == person and state.get('awaiting') and not state.get('reminded')
+                        and state['phase'] in WAITING and state['task'] not in self.children
+                        and not state.get('pending') and not state.get('manager') and not self.card_done(state)):
+                    state['reminded'] = stamp()
+                    self.save(state)
+                    waiting.append(state)
+        if not waiting:
+            return
+        agent.wake("~ Reminder: these workers stopped and still wait on you:\n"
+                   + '\n'.join(self.waiting_line(s) for s in waiting)
+                   + "\n~ For each: answer it (house.tell <card> <words>), land it (house.land <card>), drop it (house.release <card>), "
+                     "hand it on (house.hand <card> <name>), or say on its card why it waits. This is the only reminder.")
+        for state in waiting:
+            self.event(state, 'reminded', f'reminded {agent.name}')
+
+    def hand(self, msg):
+        """house.hand <card> <name>: give a worker (and its card) to another resident, who is in charge from now."""
+        args = msg.get('args') or {}
+        caller = msg.get('caller') or {}
+        state = self.states.get(args.get('target'))
+        name = str(args.get('words') or '').strip().lstrip('@').strip()
+        if not state:
+            return {'refused': 'this card has no worker'}
+        if not name:
+            return {'refused': 'house.hand <card> <name>: who takes it'}
+        if not (self.may_act(state, msg) or self.alex(caller.get('person'))):
+            return {'refused': "only the worker's owner, a steward or Alex may hand it on"}
+        agents = getattr(self.h, 'agents', {})
+        to = next((a for a in agents.values() if a.name.casefold() == name.casefold()), None)
+        if to is None:
+            return {'refused': f"{name} is not a House agent; they are: " + ', '.join(a.name for a in agents.values())}
+        if to.person == state['requester']:
+            return {'refused': f'{to.name} is already in charge of it'}
+        with self.lock:
+            if state['task'] in self.children or state['phase'] in ACTIVE:
+                return {'refused': f"it is {state['phase']} now; hand it on once it stops"}
+            if state['phase'] == 'released':
+                return {'refused': 'it was released; house.build starts a new worker on the card'}
+        try:
+            door = self.session(to.person)
+        except RuntimeError:
+            return {'refused': f'{to.name} has no worker session; it cannot run workers yet'}
+        card = state['task']
+        task = door.look(card)
+        if not task:
+            return {'refused': f'{to.name} cannot see the card {card}'}
+        # The card is rewritten by whoever may: the one handing it on (JEFF and Alex lead the desktop), else its old
+        # owner, else the new one (3 Nov: a resident may not set a card it did not make).
+        moved, why = False, ''
+        for person in dict.fromkeys(p for p in (caller.get('person'), state['requester'], to.person) if p):
+            try:
+                self.session(person).call('/do', f'set {card} who={q(to.name)} lead={q(to.name)}',
+                                          saw={card: int(task['rev'])})
+                moved = True
+                break
+            except Exception as exc:                  # noqa: BLE001  try the next who may
+                why = str(exc)
+        if not moved:
+            return {'refused': f'not handed: the card could not be given to {to.name}: {why[:300]}'}
+        try:
+            task = door.look(card)
+            chat = door.call('/do', 'make kind=chat name=' + q(state['name']) + ' about=' + card + ' with=' + to.person,
+                             press=state['run'] + '-chat-' + to.person)['made'][-1]
+        except Exception as exc:                          # noqa: BLE001
+            return {'refused': f'not handed: {str(exc)[:300]}'}
+        was = state.get('requester_name') or state['requester']
+        by = caller.get('name') or caller.get('person') or 'someone'
+        with self.lock:
+            state.update(requester=to.person, requester_name=to.name, task_owner=task.get('who', ''), chat=chat,
+                         boss_note=f'{was} handed you on: {to.name} is in charge of you from now, and your messages '
+                                   f'go to them.', tellers=[], told_by=[])
+            state.pop('manager', None)
+            if state.get('basis'):
+                state['basis'] = {k: task.get(k, '') for k in ('title', 'text', 'acceptance', 'who')}
+            state.setdefault('handed', []).append(dict(at=stamp(), by=by, was=was, to=to.name))
+            self.save(state)
+        self.event(state, 'handed', f'{by} handed it from {was} to {to.name}')
+        last = str(state.get('last_words') or '').strip()
+        try:
+            note = f'{by} handed this worker to {to.name}. Last words: ' + (last or '(none kept)')
+            door.call('/do', f'say {chat} text={q(note[:3000])}')
+        except Exception as exc:                          # noqa: BLE001
+            self.event(state, 'unsaid', str(exc))
+        self.stopped(state)
+        ok = self.resumable(state)
+        to.wake(f"~ {by} handed you the worker {state['name']} ({card}); you are in charge of it now (it was {was}'s).\n"
+                f"~ Where it stands: {state['phase']}. {str(state.get('detail', ''))[:500]}\n"
+                + (f"~ Its last words:\n{last[:2500]}\n" if last else '')
+                + f"~ Read the card (look {card}) and its log (house.log {card}). Then "
+                + (f"answer it (house.tell {card} <words>), " if ok else '')
+                + f"land it (house.land {card}: checks, lands and switches it on), check what Alex sees (house.snap), "
+                  f"and tell JEFF in Shop talk, in plain words, when it is done and looks good, or when it needs "
+                  f"Alex. If it is no longer wanted, drop it (house.release {card}) and set the card's lane to Done.")
+        return {'text': f'{to.name} is in charge of {state["name"]} ({card}) now and was woken with where it stands',
+                'external': True}
+
+    def halt(self, msg):
+        """house.stop <card>: end a running worker's turn now (Alex, 4 Nov: JEFF could not stop a looping worker).
+        It keeps its worktree; house.tell starts it again with new words, house.release drops it."""
+        state = self.states.get((msg.get('args') or {}).get('target'))
+        caller = msg.get('caller') or {}
+        if not state:
+            return {'refused': 'this card has no worker'}
+        if not (self.may_act(state, msg) or self.alex(caller.get('person'))):
+            return {'refused': "only the worker's owner, a steward or Alex may stop it"}
+        by = caller.get('name') or caller.get('person') or 'someone'
+        with self.lock:
+            child = self.children.get(state['task'])
+            if state['phase'] in ('reviewing', 'landing'):
+                return {'refused': 'the House is landing it, not a worker turn; it ends by itself in a few minutes'}
+            if child is None:
+                if state['phase'] in ('asked', 'preparing'):
+                    return {'refused': 'it is starting up; stop it in a moment, or house.release drops it now'}
+                return {'refused': f'it is not running ({state["phase"]}); house.release {state["task"]} drops it for good'}
+            dropped, state['pending'] = state.get('pending') or [], []
+            state['halted_by'] = by
+            if caller.get('person') == state['requester']:
+                state['quiet'] = True
+            self.event(state, 'stopping', f'stopped by {by}' + (('; not sent: ' + ' | '.join(dropped))[:500] if dropped else ''))
+            self.save(state)
+        child.stop()
+        return {'text': f'{state["name"]} is stopping; it keeps its worktree. house.tell {state["task"]} <words> starts it '
+                        f'again with new words', 'external': True}
+
+    def release(self, msg):
+        """house.release <card> [why]: this worker ends for good (stopped first if it is running). Its worktree and
+        branch are kept; the card is free for a new worker. Nobody is reminded about it again."""
+        args = msg.get('args') or {}
+        state = self.states.get(args.get('target'))
+        caller = msg.get('caller') or {}
+        if not state:
+            return {'refused': 'this card has no worker'}
+        if not (self.may_act(state, msg) or self.alex(caller.get('person'))):
+            return {'refused': "only the worker's owner, a steward or Alex may release it"}
+        by = caller.get('name') or caller.get('person') or 'someone'
+        why = f'released by {by}' + (f': {str(args.get("words")).strip()[:300]}' if args.get('words') else '')
+        with self.lock:
+            if state['phase'] == 'landed':
+                return {'refused': 'it already landed; nothing to release'}
+            if state['phase'] == 'released':
+                return {'text': 'it was already released', 'external': True}
+            if state['phase'] in ('reviewing', 'landing'):
+                return {'refused': 'the House is landing it now; release it after, if you still want to'}
+            child = self.children.get(state['task'])
+            if child is not None:
+                state['releasing'] = why
+                state['pending'] = []
+                self.save(state)
+            else:
+                self.released(state, why)
+        if child is not None:
+            child.stop()
+        return {'text': f'{state["name"]} is released; its worktree and branch are kept, and the card is free for a new '
+                        f'worker (house.build {state["task"]})', 'external': True}
+
     def report_turn(self, state, words):
         """End of a worker turn: its last words go into its chat (as the worker, so they never count as the owner's
         instruction), and the resident in charge is woken there. Whatever the resident says back in that chat is the
@@ -474,8 +967,11 @@ class Builders:
             self.event(state, 'unsaid', str(exc))
         with self.lock:
             tellers, state['tellers'] = state.get('tellers') or [], []     # others whose words this turn followed
+            state['last_words'] = words
             self.save(state)
-        left = MAX_TURNS - state.get('turns', 0)
+        self.stopped(state)
+        cap = self.limit('max_turns')
+        left = f" ({cap - state.get('turns', 0)} turns left)" if cap else ''
         agents = getattr(self.h, 'agents', {})
         for t in tellers:
             other = agents.get(t['person'])
@@ -485,21 +981,19 @@ class Builders:
             other.wake(
                 f"~ The worker {state['name']} ({state['task']}), which you told something, finished a turn and says:\n"
                 f"{words}\n\n~ Its owner {state.get('requester_name') or state['requester']} is woken too and stays in "
-                f"charge of it. You may answer it with house.tell {state['task']} <your words> ({left} turns left).")
+                f"charge of it. You may answer it with house.tell {state['task']} <your words>{left}.")
             self.event(state, 'told', f"woke {t['name']}, who told it this turn ({t['as']})")
-        agent = self.owner(state)
-        if agent is None:
+        others = ', '.join(sorted({t['name'] for t in tellers}))
+        if not self.route(state):
             self.event(state, 'told', 'posted in its chat; no resident to wake (Alex reads it there)')
             return
-        others = ', '.join(sorted({t['name'] for t in tellers}))
-        agent.wake(
+        self.wake_owner(state,
             f"~ Your worker {state['name']} ({state['task']}) finished a turn and says:\n{words}\n\n"
             + (f"~ This turn it also followed words from {others}; you are still in charge.\n" if others else '')
             + f"~ You are in charge of this worker. To answer it, run house.tell {state['task']} <your words>: that is "
-            f"its next instruction ({left} turns left). When its work is done and it says what it tested: "
-            f"house.review {state['task']}, then house.land {state['task']} once the checks pass. Tell JEFF in Shop "
-            f"talk when it lands, or when something needs Alex.")
-        self.event(state, 'told', f'woke {agent.name} in its chat {chat} (busy={agent.busy}, inbox={len(agent.inbox)})')
+            f"its next instruction{left}. When its work is done: house.land {state['task']} runs the "
+            f"checks, lands it on main and switches it on. To stop it now: house.stop {state['task']}; to drop it: "
+            f"house.release {state['task']}.")
 
     def owner_turn_ended(self, person):
         """A resident's turn ended: what it said to its workers during that turn starts their next turn now."""
@@ -507,13 +1001,31 @@ class Builders:
             if state['requester'] != person or not state.get('pending'):
                 continue
             with self.lock:
-                if state['phase'] not in RESUMABLE or state['task'] in self.children:
+                if not self.resumable(state):
                     continue
                 if self.full(state.get('provider', 'codex')):
-                    self.event(state, 'held', 'resident replied, but all workers of this kind are busy; it waits')
+                    if not state.get('queued_turn'):
+                        state['queued_turn'] = stamp()      # start_queued gives it the next free slot
+                        self.event(state, QUEUED, 'its owner replied while every slot was busy; it starts when one frees')
+                        self.save(state)
+                    continue
+                # 3 Nov, live: an old worker whose card had moved on kept its words; every turn end resumed it, it
+                # blocked at once (claim changed), the block woke JEFF, his turn ended... 33 times in an hour.
+                # Words for a worker whose card no longer holds it are dropped, never retried.
+                try:
+                    rows = self.h.m.see('look ' + state['task']).get('rows') or []
+                except Exception:                         # noqa: BLE001
+                    rows = []
+                card = rows[0] if rows else {}
+                if not card or card.get('build_run') != state['run'] or held(card) or self.card_done(state):
+                    dropped, state['pending'] = state.get('pending') or [], []
+                    self.event(state, 'dropped', 'its card no longer holds this worker (claim moved, held or done); '
+                               'not sent: ' + ' | '.join(dropped)[:500])
                     continue
                 self.reopen(state)
                 threading.Thread(target=self.guarded, args=(state, self.resume), daemon=True).start()
+        self.remind(person)
+        self.idle_check()
 
     def take_pending(self, state):
         """Hand the queued words to the worker; whoever said them (besides its owner) hears how this turn ends."""
@@ -532,8 +1044,13 @@ class Builders:
             if old:
                 state.setdefault('earlier_reviews', []).append(dict(old, phase=was, detail=state.get('detail', ''), at=stamp()))
             self.event(state, 'reopened', f"was {was} ({str(state.get('detail', ''))[:300]}); a new turn on the same worktree")
+        if was in CUT:
+            state['resume_note'] = ('You were cut off mid-turn (the House restarted or lost touch with you). Check what '
+                                    'your worktree already holds before going on.')
         state['reopened_from'] = was if was != 'received' else state.get('reopened_from', '')
         state['phase'] = 'preparing'
+        state.pop('awaiting', None)
+        state.pop('reminded', None)
         self.save(state)
 
     def work(self, msg):
@@ -571,7 +1088,9 @@ class Builders:
         self.assert_owned(state)
         with self.lock:
             pending=self.take_pending(state)
-        prompt='Follow-up on this same task. Retain its scope and all safety boundaries.\n'+'\n'.join(pending)
+            notes=[state.pop(k) for k in ('boss_note','resume_note') if state.get(k)]
+            self.save(state)
+        prompt='Follow-up on this same task. Retain its scope and all safety boundaries.\n'+'\n'.join(notes+pending)
         if not state.get('session'):      # stopped before any model thread: the worker has not read its task yet
             prompt=self.prompt(state,self.session(state['requester']).look(state['task']))+'\n'+prompt
         self.run_worker(state, prompt)
@@ -611,22 +1130,34 @@ class Builders:
             return {'refused':"only the worker's owner, the card's lead, a steward or Alex may tell this worker"}
         if not words:
             return {'refused':'house.tell <task> <words>: provide a follow-up'}
-        if held(task) or task.get('build_run') != state['run'] or task.get('who','') != state.get('task_owner',''):
-            return {'refused':'task is held or claim changed; message did not wake it'}
+        if held(task):
+            return {'refused':'its card is paused (held); unpause the card, then tell it'}
+        if task.get('build_run') != state['run']:
+            return {'refused':f'its card has moved on to another worker; house.release {state["task"]} drops this one'}
         with self.lock:
             phase=state['phase']
             if phase in ('landed','released'):
                 return {'refused':f'this worker is {phase}; start a new run with house.build {state["task"]}'}
-            if phase not in ('asked','preparing','working') and phase not in RESUMABLE:
-                # reviewing/landing: the House is acting on its result now; uncertain/recovery-needed: a process
-                # may still be alive or a write's outcome is unknown, so a new turn could run twice.
-                return {'refused':f'worker is {phase}; reconcile it before a new turn (message did not restart it)'}
+            if phase == QUEUED:
+                return {'refused':'it has not started yet (every slot is busy); it starts by itself when one frees'}
+            if phase not in ('asked','preparing','working') and phase not in RESUMABLE and not self.resumable(state):
+                # reviewing/landing: the House is acting on its result now. Cut off (recovery-needed, uncertain):
+                # resumable once its process is gone, and only if it was cut off mid-turn, not mid-review/landing.
+                if phase in CUT and self.cut_phase(state) == 'working':
+                    return {'refused':f'worker is {phase} and its process may still be running; house.stop '
+                                      f'{state["task"]} ends it, then tell it again'}
+                if phase in CUT:
+                    return {'refused':f'worker was cut off while {self.cut_phase(state) or "busy"}; land it again '
+                                      f'(house.land {state["task"]}), or drop it (house.release {state["task"]}) and '
+                                      f'start afresh (house.build {state["task"]})'}
+                return {'refused':f'worker is {phase}; the House is landing it now, you hear when it ends'}
             if phase in RESUMABLE and state['task'] not in self.children and not state.get('tree'):
                 return {'refused':'worker stopped before its worktree was made; house.retry '+state['task']+' starts it'}
             if len(state.setdefault('pending',[])) >= 10:
                 return {'refused':'ten follow-ups already pending; no more were queued'}
-            if state.get('turns',0) >= MAX_TURNS:
-                return {'refused':f'this worker has had {MAX_TURNS} turns; review it, or start a new card'}
+            cap=self.limit('max_turns')
+            if cap and state.get('turns',0) >= cap:
+                return {'refused':f'this worker has had {cap} turns (House settings max_turns); land it, or start a new card'}
             if how!='owner':  # the worker knows who said it; the owner stays in charge and is still woken
                 name=caller.get('name') or caller.get('person') or 'someone'
                 words=f'From {name} ({how}; {state.get("requester_name") or "your owner"} stays in charge): {words}'
@@ -637,14 +1168,17 @@ class Builders:
                 state['pending'].append(words[:8000])
                 self.event(state,'heard',words)
                 return {'text':'follow-up retained until your turn ends','external':True}
-            resume=phase in RESUMABLE and state['task'] not in self.children
-            if resume and self.full(state.get('provider','codex')):
-                if how!='owner' and added:state['told_by'].pop()
-                return {'refused':'builder capacity is occupied; follow-up did not start or queue another builder'}
+            resume=self.resumable(state)
             # Explicit owner correction replaces the task basis, never its authority.
             state['basis']={k:task.get(k,'') for k in ('title','text','acceptance','who')}
             state['pending'].append(words[:8000])
             self.event(state,'heard',words)
+            if resume and self.full(state.get('provider','codex')):
+                state['queued_turn']=stamp()        # every slot busy: it starts with these words when one frees
+                self.event(state,QUEUED,'told while every slot was busy; it starts when one frees')
+                self.save(state)
+                return {'text':f'every {state.get("provider","codex")} slot is busy; it starts with your words by itself '
+                               f'as soon as one frees','external':True}
             if how!='owner':
                 self.event(state,how,f"{caller.get('name') or caller.get('person')} told it as {how}, not its owner")
             if resume:
@@ -691,15 +1225,17 @@ class Builders:
         boss = state.get('requester_name') or 'the person who asked'
         return f'''You are {state['name']}, a coding worker in Alex's Agora desktop (the kernel world on 8810).
 {boss} is in charge of you. Your last message each turn is posted in your chat with {boss}; they answer there,
-and their answer is your next instruction. Ask them when something is unclear instead of guessing.
+and their answer is your next instruction. Finish the task in this turn if you can: build it, test it, fix what the
+tests show. When something is unclear, make the sensible choice, say what you chose in your summary, and keep going.
 Task: {state['title']} ({state['task']}). Task text: {task.get('text', '')}
 Acceptance: {task.get('acceptance', '') or 'what the task text asks for, working and tested'}
-You work only in this worktree, on this task. Read AGENTS.md first; its `read a6529 :3` line points at the
-archived old desk, so skip it (the rules it lists are current). Use the Agora tools (see, do, lines) to read the
+You work only in this worktree, on this task. Read AGENTS.md first, then Alex's live standing rules with the
+Agora tools (see `look dk838`). Use the Agora tools (see, do, lines) to read the
 world; never change credentials, security settings or providers, and never start another worker.
 No visible test windows (hidden fixtures only), no pushes, no merging to main, no deleting other people's work, no
-stopping Alex's programs. If something is denied, stop and say so; do not route around it.
-Use the pinned {T.PY}. Do not commit: leave your changes in the worktree; at review the House commits them to your
+stopping Alex's programs. If something within this task is in your way, fix it. If it is outside your reach (a
+permission, another person's files), say exactly what you need in your summary; never route around a denial.
+Use the pinned {T.PY}. Do not commit: leave your changes in the worktree; at landing the House commits them to your
 branch (except BUILD-RESULT.md and top-level dot-folders, where scratch and temp fixtures belong).
 When done, leave BUILD-RESULT.md at the worktree root: what you changed (files), what you ran and its results, what is
 left. Then end your turn with a short summary for {boss}: done, or what you need from them.
@@ -708,10 +1244,22 @@ left. Then end your turn with a short summary for {boss}: done, or what you need
     def assert_owned(self, state):
         M.check_state(self, state)
         task = self.session(state['requester']).look(state['task'])
-        if task.get('build_run') != state['run'] or held(task):
-            raise RuntimeError('task claim changed or is held; stop this operation')
+        # Alex, 4 Nov: nothing sits blocked. A worker whose card moved on or finished is released, quietly; a card
+        # that changed goes to the worker as its new instructions. Only a card someone paused (held) stops it.
+        if task.get('build_run') != state['run']:
+            raise Released('its card moved on to another worker; its worktree is kept')
+        if state['phase'] != 'landing' and any(str(task.get(f, '')).strip().casefold() in FINISHED
+                                               for f in ('lane', 'status')):
+            raise Released('its card is finished; its worktree is kept')
+        if held(task):
+            raise RuntimeError('its card is paused (held); it carries on when the card is unpaused')
         if state.get('basis') and any(task.get(k,'') != v for k,v in state['basis'].items()):
-            raise RuntimeError('task instructions or owner changed; review the correction before continuing')
+            state['basis'] = {k: task.get(k, '') for k in ('title', 'text', 'acceptance', 'who')}
+            state['resume_note'] = ('Your card changed since you started. Follow its current version.\nTask: '
+                                    + str(task.get('text', ''))[:3000] + '\nAcceptance: '
+                                    + str(task.get('acceptance', '') or 'what the task text asks for'))
+            self.event(state, 'card-changed', 'its card changed; the new version goes to the worker at its next turn')
+            self.save(state)
 
     def request_review(self, msg):
         state = self.states.get(msg.get('args', {}).get('target'))
@@ -727,11 +1275,11 @@ left. Then end your turn with a short summary for {boss}: done, or what you need
                 state['pending'] = []
             if (state['phase'] != 'received' and not again) or state['task'] in self.children or state.get('pending'):
                 return {'refused': 'review requires a received, reviewed or review-failed result, not an active or uncertain worker'}
-            if self.full(state.get('provider', 'codex')):
-                return {'refused': 'worker capacity is occupied: all ' + state.get('provider', 'codex') + ' workers are busy; review did not start'}
             if again:
                 self.event(state, 'review-again', 'independent checks requested again on the current main')
             state['phase'] = 'reviewing'
+            state.pop('awaiting', None)
+            state.pop('reminded', None)
             self.save(state)
             threading.Thread(target=self.guarded, args=(state, self.review), daemon=True).start()
         return {'text': 'independent checks requested; source is not landed', 'external': True}
@@ -753,8 +1301,10 @@ left. Then end your turn with a short summary for {boss}: done, or what you need
         self.assert_owned(state)
         tree = Path(state['tree'])
         report = tree/'BUILD-RESULT.md'
-        if not report.is_file():
-            raise RuntimeError('worker self-proof BUILD-RESULT.md is missing')
+        if not report.is_file():     # 4 Nov: a missing note never stops a landing; its last words stand in for it
+            report.write_text('# Build result\n\n(The worker left no BUILD-RESULT.md. Its last words:)\n\n'
+                              + str(state.get('last_words') or '(none kept)') + '\n', encoding='utf-8')
+            self.event(state, 'self-proof', 'no BUILD-RESULT.md; the House wrote one from its last words')
         # Never erase or stash worker edits: commit them to its branch, then check that exact commit.
         self.commit_worker(state, tree)
         if self.git(tree, 'status', '--porcelain', '--untracked-files=no'):
@@ -795,20 +1345,83 @@ left. Then end your turn with a short summary for {boss}: done, or what you need
                    reviewed_commit=candidate)
 
     def land(self, msg):
+        """house.land <card>: one step (Alex, 4 Nov). The House runs the checks, lands the worker's work on main and
+        switches it on; the owner hears once, when it is live or what stopped it. One landing at a time: the next
+        waits its turn instead of being refused."""
         state = self.states.get(msg.get('args', {}).get('target'))
-        if not state or not self.may_act(state, msg):
-            return {'refused': 'only the requester may land this build'}
+        if not state:
+            return {'refused': 'this card has no worker; house.build or house.work starts one'}
+        if not self.may_act(state, msg):
+            return {'refused': "only the worker's owner, a steward or Alex may land it"}
         with self.lock:
-            if state['phase'] != 'reviewed':
-                return {'refused': 'independent review has not passed'}
-            if any(s['phase'] == 'landing' for s in self.states.values()):
-                return {'refused': 'another source publication is running'}
-            if self.full(state.get('provider', 'codex')):
-                return {'refused': 'worker capacity is occupied: all ' + state.get('provider', 'codex') + ' workers are busy; publication did not start'}
-            state['phase'] = 'landing'
+            phase = state['phase']
+            if state['task'] in self.children or phase in ('asked', 'preparing', 'working'):
+                return {'refused': f'it is still working; house.land {state["task"]} once its turn ends '
+                                   f'(or house.stop {state["task"]} first)'}
+            if phase in ('reviewing', 'landing'):
+                return {'text': 'it is already landing; you hear when it is live', 'external': True}
+            if phase in ('landed', 'released', QUEUED):
+                return {'refused': f'it is {phase}; nothing to land'}
+            if state.get('pending'):
+                return {'refused': "you told it something it hasn't read yet; let that turn run, then land it"}
+            if not state.get('tree'):
+                return {'refused': 'it stopped before it had a worktree; nothing to land'}
+            if phase in CUT and (self.cut_phase(state) not in ('working', 'reviewing') or alive(state.get('pid'))):
+                return {'refused': f'it was cut off while {self.cut_phase(state) or "busy"}; house.release it and '
+                                   f'start afresh with house.build {state["task"]}'}
+            state['land_from'] = phase
+            state['phase'] = 'reviewing'
+            state.pop('awaiting', None)
+            state.pop('reminded', None)
             self.save(state)
-            threading.Thread(target=self.guarded, args=(state, self.publish), daemon=True).start()
-        return {'text': 'source publication requested; activation and task verification remain separate', 'external': True}
+            threading.Thread(target=self.guarded, args=(state, self.land_all), daemon=True).start()
+        return {'text': 'landing: the House runs the checks, lands it on main and switches it on; you hear once, '
+                        'when it is live or what stopped it', 'external': True}
+
+    def land_all(self, state):
+        reviewed = state.pop('land_from', '') == 'reviewed'
+        with self.landing_lock:
+            for attempt in range(2):            # main may move between checks and landing (someone else landed)
+                main = self.git(self.repo, 'rev-parse', 'main')
+                if not (reviewed and state.get('candidate') and state.get('review_base') == main):
+                    self.review(state)
+                state['phase'] = 'landing'
+                self.save(state)
+                try:
+                    self.publish(state)
+                    break
+                except RuntimeError as exc:
+                    if 'main advanced' not in str(exc) or attempt:
+                        raise
+                    reviewed = False
+        self.activate(state)
+
+    def activate(self, state):
+        """Switch the landed change on: restart what it made stale (kd_reload, detached). A change to the House itself
+        restarts the House only once no worker runs and no agent is mid-turn (idle_check)."""
+        reload = T.REPO / 'research' / 'window-lab' / 'kernel-desktop' / 'kd_reload.py'
+        try:
+            dry = subprocess.run([str(T.PY), str(reload), '--dry'], capture_output=True, text=True, timeout=120,
+                                 creationflags=T.NO_WINDOW).stdout
+        except Exception as exc:                       # noqa: BLE001  landed is landed; say what didn't switch on
+            state['activation'] = f'not switched on ({type(exc).__name__}); ask JEFF to house.restart what it needs'
+            self.event(state, 'activation', state['activation'])
+            self.save(state)
+            return
+        lines = [x.strip() for x in dry.splitlines() if x.strip()]
+        if not lines or any('nothing is stale' in x for x in lines):
+            state['activation'] = 'nothing needed restarting; it is live'
+        else:
+            house = any(x.startswith('house:') for x in lines)
+            others = [x for x in lines if not x.startswith('house:')]
+            if others:
+                self.spawn_reload(['--skip', 'house'] if house else [], self.home / state['run'] / 'activation.log')
+            if house:
+                self.house_restart_due = True
+            state['activation'] = ('switching on: ' + '; '.join(x.split(' (')[0].split(':')[0] for x in lines)
+                                   + ('. The House restarts by itself once no worker or agent is busy' if house else ''))
+        self.event(state, 'activation', state['activation'])
+        self.save(state)
 
     def publish(self, state):
         self.assert_owned(state)
@@ -908,6 +1521,7 @@ left. Then end your turn with a short summary for {boss}: done, or what you need
                     colour='sage' if phase=='working' else 'rose' if phase in ('blocked','recovery-needed') else 'sky',
                     provider=state.get('provider', 'codex'), model=state['model'], reasoning=state['reasoning'],
                     turns=state.get('turns',0), last_turn=state.get('updated',''),
+                    awaiting=state.get('awaiting',''), owner_name=state.get('requester_name',''),
                     first_words_ms=None, error=state.get('detail','') if phase=='blocked' else '',
                     acts=[], acts_text='', waiting=0, session=state.get('session',''))
 
@@ -919,7 +1533,16 @@ left. Then end your turn with a short summary for {boss}: done, or what you need
     def log(self, task):
         state = self.states[task]
         lines = [f"{e['what']}\t{e['at'][11:16]}\t{state['name']}\t{e['text']}" for e in state['activity']]
-        return {'text':'\n'.join(lines), 'rows':[dict(person=task, name=state['name'], log='\n'.join(lines), lines=len(lines))]}
+        rendered = [
+            f"act-detail\t{e['at'][11:16]}\t{state['name']}\t" +
+            json.dumps(dict(summary=e['text'], detail=e['detail']), ensure_ascii=False)
+            if e.get('detail') else line
+            for e, line in zip(state['activity'], lines)]
+        if any(e['what'] == 'act' and not e.get('detail') for e in state['activity']):
+            note = 'info\t\t\tOlder or unsupported activity has no saved command or paths; shown as recorded.'
+            lines.append(note)
+            rendered.append(note)
+        return {'text':'\n'.join(lines), 'rows':[dict(person=task, name=state['name'], log='\n'.join(rendered), lines=len(lines))]}
 
     def off(self):
         self.stopping = True

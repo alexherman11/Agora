@@ -12,7 +12,7 @@ from wm_module import WMModule,offers
 
 def acts(native):
     """Native calls other than the read-only DPI query."""
-    return [c for c in native.mock_calls if c[0]!='scale']
+    return [c for c in native.mock_calls if c[0] not in ('scale','gate_token')]
 
 
 def row(key='a',box=(16,16,800,600),managed=True):
@@ -60,7 +60,7 @@ class ManagerTests(unittest.TestCase):
         self.m.switch('live');self.assertTrue(self.native.mutating);lease.acquire.assert_called_once()
         self.m.switch('off');lease.release.assert_called_once();self.assertFalse(self.native.mutating)
 
-    def test_ghost_defers_neighbours_until_release(self):
+    def test_uncrossed_neighbours_wait_and_release_animates(self):
         lease=Mock();ghost=Mock();self.m.lease_factory=lambda _:lease;self.m.ghost_factory=lambda:ghost
         rows=[row(),row('b',(832,16,700,600))]
         self.m.ingest(rows,Rect(0,0,2400,1400));self.m.switch('live');self.native.reset_mock()
@@ -69,6 +69,7 @@ class ManagerTests(unittest.TestCase):
         self.m.ingest(dragged,Rect(0,0,2400,1400))
         self.native.place.assert_not_called();self.native.minimise.assert_not_called();ghost.update.assert_called()
         self.m.ingest(dragged,Rect(0,0,2400,1400),[{'type':'drag-end','hwnd':97}])
+        self.m.motion_tick(__import__('time').monotonic()+1)
         self.native.place.assert_called();self.assertTrue(valid(self.m.state))
 
     def test_refused_size_becomes_learned_minimum_then_obstacle(self):
@@ -99,7 +100,8 @@ class ModuleIntentTests(unittest.TestCase):
         return self.wm.call({'word':word,'args':{'words':words},'caller':{'person':person},'use':'u'})
     def test_contract_help_and_owner(self):
         self.assertEqual({w['word'] for w in offers()},{'wm.windows','wm.focus','wm.minimise','wm.restore','wm.close',
-            'wm.pin','wm.unpin','wm.arrange','wm.mode','wm.leave-alone','wm.manage'})
+            'wm.pin','wm.unpin','wm.arrange','wm.mode','wm.leave-alone','wm.manage','wm.policy','wm.reload','wm.rollback',
+            'wm.sizes','wm.size'})
         self.assertTrue(all(w['help'] for w in offers()))
         self.assertIn('refused',self.call('wm.windows',person='stranger'))
     def test_modes_are_fenced_intent_and_live_disabled(self):
@@ -128,7 +130,9 @@ class LiveFeel(unittest.TestCase):
         clock=patch('manager.time.monotonic',lambda:self.now);clock.start();self.addCleanup(clock.stop)
         self.m=Manager(self.native,self.temp.name,allow_live=True,gate_fn=lambda:[],
             lease_factory=lambda _:self.lease,ghost_factory=lambda:self.ghost)
-        self.browser=app('browser',(16,73,1800,1300),'chrome');self.chat=app('chat',(1832,73,1992,1300),'Discord')
+        # Generic fixture windows: browser-specific half-screen minima are
+        # covered by test_share_policy, not this geometry scene.
+        self.browser=app('browser',(16,73,1800,1300),'FixtureBrowser');self.chat=app('chat',(1832,73,1992,1300),'FixtureChat')
         self.notes=app('notes',(16,1389,1000,629),'Notepad')
 
     def rows(self,**moved):
@@ -155,7 +159,10 @@ class LiveFeel(unittest.TestCase):
         path=[(16+20*i,1389-4*i,1000,629) for i in range(1,11)]           # up and right, 24 px into the browser's gap
         self.drag(path)
         self.now+=.016;self.m.ingest(self.rows(notes=path[-1]),WORK,[{'type':'drag-end','hwnd':hwnd}])
-        self.assertEqual(self.placed(),{hwnd:Rect(216,1389,1000,629)})
+        expected=self.m.state.windows['notes'].rect
+        self.now+=.3;self.m.motion_tick(self.now)
+        self.assertEqual(self.placed(),{hwnd:expected})
+        self.assertEqual(expected.y,1389)
         self.ghost.clear.assert_called()
 
     def test_hover_then_back_away_moves_nothing(self):
@@ -166,17 +173,18 @@ class LiveFeel(unittest.TestCase):
         self.now+=.016;self.m.ingest(self.rows(),WORK,[{'type':'drag-end','hwnd':hwnd}])
         self.native.place.assert_not_called();self.native.minimise.assert_not_called()
 
-    def test_ghost_shows_a_yielding_neighbour_and_real_windows_wait_for_release(self):
+    def test_glass_shows_open_spaces_without_dwell_yield(self):
         self.live();hwnd=self.notes['ref'].hwnd
         self.m.ingest(self.rows(),WORK,[{'type':'drag-start','hwnd':hwnd}])
         into=(16,1100,1000,629)
         self.drag([(16,1389-29*i,1000,629) for i in range(1,11)]);self.drag([into]*40)
         rects,landing=self.ghost.update.call_args.args
-        self.assertTrue(rects,'the browser gave way after the dwell')
+        self.assertTrue(rects or landing,'vacant landing areas are visible')
         self.native.place.assert_not_called()
         self.now+=.016;self.m.ingest(self.rows(notes=into),WORK,[{'type':'drag-end','hwnd':hwnd}])
         self.assertTrue(valid(self.m.state))
-        self.assertIn(self.browser['ref'].hwnd,self.placed())
+        self.now+=.3;self.m.motion_tick(self.now)
+        self.assertNotIn(self.browser['ref'].hwnd,self.placed())
 
     def test_maximised_and_owned_windows_float(self):
         maxed=app('video',(0,57,3840,1977),'vlc',maximised=True);dialog=app('save',(900,600,800,600),'chrome',owned=True)
@@ -189,7 +197,7 @@ class LiveFeel(unittest.TestCase):
 
     def test_pinned_spotify_stays_put_when_other_tiles_can_shrink(self):
         # Spotify pinned wide: with the browser minimised, 1600 px remain, under 60 % of the editor's 3000.
-        browser=app('browser',(16,73,1600,1945),'chrome');spotify=app('spotify',(1632,73,2192,1945),'Spotify')
+        browser=app('browser',(16,73,1600,1945),'FixtureBrowser');spotify=app('spotify',(1632,73,2192,1945),'Spotify')
         self.m.configure(DEFAULTS,['spotify']);self.m.ingest([browser,spotify],WORK);self.m.switch('live');self.native.reset_mock()
         editor=app('editor',(300,200,3000,1800),'Code',_preferred=(3000,1800))
         self.m.ingest([browser,spotify,editor],WORK)

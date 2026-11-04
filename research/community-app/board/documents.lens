@@ -1,0 +1,21 @@
+root : column, of tag:document-library, prop:name=seabright-documents as library, each documents-view
+documents-view : document-library, library $library.id
+  watch reading:"rows document-folder"
+  watch reading:"rows document-entry"
+  watch reading:"rows file"
+  tools : document-toolbar, library $library.id
+    on folder do files.folder library=$library.id parent=$parent name=$value
+  upload : document-upload, library $library.id
+    on store do files.store $target library=$library.id parent=$parent
+    on attach do attach $target to=$entry
+  phone : column
+  listing : document-list, of reading:"files.browse library=$library.id parent=$view.documentsFolder" as item, each document-item
+document-item : document-entry
+  on rename do files.rename $target name=$value
+  on move do files.move $target to=$parent
+  on store do files.store $target library=$library.id parent=$parent
+  preview : file, target $item.file_id, name $item.name, owner $item.upload_owner
+    on alt do set $target alt=$value
+    on rsvp do board.rsvp $target status=going
+    on calendar do board.calendar $target
+    table : table, sortable yes

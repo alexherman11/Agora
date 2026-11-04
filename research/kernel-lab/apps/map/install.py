@@ -27,7 +27,7 @@ MAP_WORDS = ('map.tile map.find map.where map.near map.place map.add map.adopt m
              'map.unhide map.style map.show map.cache')
 GRANTS = ('window.surface window.open rows look look-view history components help component-health component-action '
           'file-read ' + MAP_WORDS + ' make set forget undo post like personal-view personal-style hear:make hear:set '
-          'hear:forget hear:undo hear:post hear:like hear:component hear:component-action hear:map.route hear:map.hide '
+          'hear:forget hear:undo hear:post hear:like hear:component hear:component-action hear:view hear:map.route hear:map.hide '
           'hear:map.unhide hear:map.show hear:map.style hear:map.add hear:map.adopt')
 VIEW = {'tool': 'look', 'stops': '[]', 'selected': '', 'mode': 'walk', 'focus': '', 'fly': ''}   # plain values only
 
@@ -89,7 +89,7 @@ PAGES = [('place-page', 'Place', ''),
          ('home-page', 'Home', 'house detached residential apartments semidetached_house terrace bungalow home')]
 PAGE_GRANTS = ('window.surface rows look look-view history components help component-health component-action '
                'map.place map.tile map.show map.where make set forget undo post like hear:make hear:set hear:forget '
-               'hear:undo hear:post hear:like hear:map.add hear:map.adopt hear:component hear:component-action')
+               'hear:undo hear:post hear:like hear:map.add hear:map.adopt hear:component hear:component-action hear:view')
 
 
 def code():

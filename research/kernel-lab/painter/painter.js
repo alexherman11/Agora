@@ -1,3 +1,8 @@
+// EDITING THE PAINTER (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+// The painter's vocabulary (formats, handles, scopes, parts) is shared by every app. Add to it only what any lens could
+// use, documented where lens authors read it (ARRANGEMENT.md); never a handle, format or branch for one app. If one app
+// needs something, the general form of it is the change.
+//
 // Trusted arrangement runtime; component code supplies pixels, never the reading.
 // The entire painter uses the existing guarded widget surface and bridge.
 const {widget, target} = await agora.ready;
@@ -97,6 +102,8 @@ function render(node){return renderBoundary(node)}
 function renderTrusted(node){
   if(['column','row','text','grid','wrap','split','layers','absolute','scroll'].includes(node.component)){
     const n=part(node,node.name,'div',{class:node.component});
+    n._tilingOrder=node.tiling_order;
+    if(node.collection)n.dataset.tilingList='true';
     if(node.role&&/^[\w-]+$/.test(node.role))n.classList.add(node.role);
     if(node.component!=='text'){
       n.dataset.layout=node.component==='column'?'stack':node.component;
@@ -134,6 +141,9 @@ function renderTrusted(node){
     fire:(event,values)=>fire(node,event,values),openMenu,closeMenu,rows,tell,
     fireLatest:(latest,event,values)=>fire(latest,event,values),
     view:()=>({...viewState}), select:values=>{viewState={...viewState,...values};return refresh()},
+    // the window's side panels: a button for each on that side, for a component to place in its top bar
+    panelButtons:side=>panelsIn(currentPlan?.tree).filter(n=>n.panel.side===side).map(panelButton),
+    panelOpen:name=>panelOpen(name), panel:(name,open)=>setPanel(name,!!open),
     read:line=>{if(!renderReadings.has(line))renderReadings.set(line,rows(line));return renderReadings.get(line)},
     draft:owner.draft||(owner.draft={}),
     cleanup:fn=>{if(owner.closed||owner.generation!==generation)fn();else owner.dispose.push(fn)},
@@ -148,22 +158,48 @@ function renderTrusted(node){
     beginDrag:(event,card)=>beginDrag(event,card,node),
     latest:()=>findNode(currentPlan.tree,node.path)||node,
     redraw:refresh};
-  const n=module.mount(api,node.settings);n.dataset.component=node.component;n.dataset.path=node.path;n.dataset.root='true';return n;
+  const n=module.mount(api,node.settings);n.dataset.component=node.component;n.dataset.path=node.path;n.dataset.root='true';n._tilingOrder=node.tiling_order;return n;
 }
 function findNode(node,path){if(node.path===path)return node;for(const c of node.children){const n=findNode(c,path);if(n)return n}}
+let carryHandoff=null;
+const tileIdentity=el=>el.dataset.component+':'+el.dataset.factId;
+const tileRoots=()=>[...document.querySelectorAll('[data-root][data-fact-id]')].filter(el=>!el.closest('.dragging'));
+const tilePositions=()=>new Map(tileRoots().map(el=>[tileIdentity(el),el.getBoundingClientRect()]));
 function beginDrag(e,card,node){
   if(e.button!==0||e.target.closest('button,input,textarea'))return;
-  const start={x:e.clientX,y:e.clientY},bounds=card.getBoundingClientRect();let ghost,target,active=false,spring;
+  const start={x:e.clientX,y:e.clientY},bounds=card.getBoundingClientRect();let ghost,target,active=false,spring,drift,glass;
   card.setPointerCapture(e.pointerId);
   const move=ev=>{
-    if(!active&&Math.hypot(ev.clientX-start.x,ev.clientY-start.y)>5){active=dragging=true;ghost=card.cloneNode(true);ghost.classList.add('dragging');ghost.style.width=bounds.width+'px';document.body.append(ghost);card.style.opacity='.25';spring=P.spring((x,y)=>{ghost.style.left=x+'px';ghost.style.top=y+'px'},{x:bounds.x,y:bounds.y})}
+    if(!active&&Math.hypot(ev.clientX-start.x,ev.clientY-start.y)>5){active=dragging=true;ghost=card.cloneNode(true);ghost.classList.add('dragging');ghost.style.width=bounds.width+'px';document.body.append(ghost);card.style.opacity='.25';spring=P.spring((x,y)=>{ghost.style.left=x+'px';ghost.style.top=y+'px'},{x:bounds.x,y:bounds.y});
+      drift=CarryTargets.drift(card,'[data-component="card"]',body=>agora.tiling(body));
+      glass=document.createElement('div');Object.assign(glass.style,{position:'fixed',pointerEvents:'none',zIndex:'89',background:'var(--accent,#54745d)',opacity:'.18',border:'1px solid currentColor',borderRadius:'12px'});glass.hidden=true;document.body.append(glass);
+    }
     if(!active)return;spring.to(bounds.x+ev.clientX-start.x,bounds.y+ev.clientY-start.y);
     target=[...document.querySelectorAll('[data-drop]')].find(l=>{const r=l.getBoundingClientRect();return ev.clientX>=r.left&&ev.clientX<=r.right&&ev.clientY>=r.top&&ev.clientY<=r.bottom});document.querySelectorAll('[data-drop]').forEach(l=>l.classList.toggle('over',l===target));
+    if(target?.contains(card))target=null;
+    glass.hidden=true;
+    drift.move(target,{clientX:ev.clientX,clientY:ev.clientY,startX:start.x,startY:start.y},out=>{
+      glass.hidden=!out.allowed;
+      if(out.allowed)['left','top','width','height'].forEach((k,i)=>glass.style[k]=out.landing[i]+'px');
+    });
   };
   const finish=async ev=>{
-    card.removeEventListener('pointermove',move);card.removeEventListener('pointerup',finish);card.removeEventListener('pointercancel',finish);spring?.stop();ghost?.remove();card.style.opacity='';document.querySelectorAll('.over').forEach(l=>l.classList.remove('over'));dragging=false;
-    if(active&&ev.type!=='pointercancel'&&target){const receiver=target._node;try{await fire(receiver,'drop card',{carried:node.facts.id,saw:node.saw})}catch(e){tell(e)}}
-    await refresh();
+    card.removeEventListener('pointermove',move);card.removeEventListener('pointerup',finish);card.removeEventListener('pointercancel',finish);
+    if(active&&ev.type!=='pointercancel')move(ev);
+    const allowed=ev.type!=='pointercancel'&&(await drift?.flush())?.allowed;
+    spring?.stop();document.querySelectorAll('.over').forEach(l=>l.classList.remove('over'));
+    const handoff=immediate=>{
+      const positions=tilePositions();
+      positions.duration=drift?.duration;
+      if(ghost)positions.set(tileIdentity(card),ghost.getBoundingClientRect());
+      drift?.close(immediate);ghost?.remove();glass?.remove();card.style.opacity='';
+      return positions;
+    };
+    if(allowed&&ghost)carryHandoff=handoff;
+    else handoff(false);
+    if(active&&allowed&&target){const receiver=target._node;try{await fire(receiver,'drop card',{carried:node.facts.id,saw:node.saw})}catch(e){tell(e)}}
+    dragging=false;
+    try{await refresh()}finally{if(carryHandoff===handoff){carryHandoff=null;handoff(false)}}
   };
   card.addEventListener('pointermove',move);card.addEventListener('pointerup',finish);card.addEventListener('pointercancel',finish);
 }
@@ -218,15 +254,17 @@ function refresh(){
   refreshInFlight=refreshOnce().finally(()=>{refreshInFlight=null;if(refreshAgain){refreshAgain=false;queueMicrotask(()=>refresh().catch(tell))}});
   return refreshInFlight;
 }
-async function refreshOnce(){
+async function refreshOnce(settling=0){
   if(dragging)return;
   const plan=(await agora.project(viewState)).rows[0];
   viewState={...plan.view,...viewState};
+  // the window's size (the lens's `sizes`), and panels following their layout: read again once if either changed
+  if(settling<3&&(settleSize(plan)|settlePanels(plan)))return refreshOnce(settling+1);
   // A read begun before pointer capture may finish during a drag. Never replace
   // that captured DOM; its old facts must survive until the fenced drop.
   if(dragging)return;
   const fingerprint=p=>JSON.stringify(p,(key,value)=>key==='parts'?undefined:key==='health'?{quarantined:value.quarantined,action_epoch:value.action_epoch}:value);
-  if(currentPlan&&!repaintAll&&fingerprint(plan)===fingerprint(currentPlan)){currentPlan=plan;return}
+  if(currentPlan&&!repaintAll&&fingerprint(plan)===fingerprint(currentPlan)){currentPlan=plan;if(carryHandoff){carryHandoff(false);carryHandoff=null}return}
   repaintAll=false;
   for(const c of plan.components){
     const old=moduleCache.get(c.name);if(old?._source===c.code)continue;
@@ -241,6 +279,7 @@ async function refreshOnce(){
   const previousPlan=currentPlan;currentPlan=plan;renderReadings=new Map((plan.watches||[]).map(w=>[w.line,Promise.resolve(w.rows)]));
   const focus=document.activeElement;const focused=focus?.dataset.path;const focusedPart=focus?.dataset.part;const selection=focus?.selectionStart;const value=focus?.value;
   const passage=keepTextSelection();
+  const was=carryHandoff?carryHandoff(true):tilePositions();carryHandoff=null;
   const next=render(plan.tree);mounted?.remove();document.body.append(next);mounted=next;
   mounted.dataset.view=JSON.stringify(plan.view||{});
   applyTokens(plan);
@@ -248,6 +287,12 @@ async function refreshOnce(){
   if(focused){const n=[...document.querySelectorAll('[data-path]')].find(n=>n.dataset.path===focused&&n.dataset.part===focusedPart);if(n){if(value!==undefined)n.value=value;n.focus();if(typeof selection==='number'&&n.setSelectionRange)n.setSelectionRange(selection,selection)}}
   restoreTextSelection(passage);
   applyStyles(plan);
+  applyPanels();
+  for(const el of tileRoots()){
+    const before=was.get(tileIdentity(el));if(!before)continue;
+    const after=el.getBoundingClientRect(),dx=before.x-after.x,dy=before.y-after.y;
+    if(Math.abs(dx)>.5||Math.abs(dy)>.5)P.motion(el,{from:{transform:`translate(${dx}px,${dy}px)`},to:{transform:'none'},duration:was.duration});
+  }
   for(const owner of componentOwners.values())if(owner.element?.isConnected){
     if(!owner.failed&&!owner.node.disabled){
       if(owner.worker&&!owner.workerPainted)continue;
@@ -264,6 +309,93 @@ async function refreshOnce(){
     try{await hearMotion(m.trigger.slice(10))}catch(e){observeComponent(owner,'healthy','Motion subscription refused: '+String(e.message||e))}
   }
 }
+// ---- Panels and sizes (Alex, 4 Nov 2026) -----------------------------------------------------------------------------
+// A lens names its window's widths (`sizes narrow 0, middle 1080, wide 1460`): the window's $view.size, which any part
+// can read. A part with `panel left|right` is a side panel: open, or shut with no width, from a button in the top bar.
+// `shut when <sizes or condition>` is the layout's wish. A panel the layout shut opens again when the wish ends; one you
+// shut stays shut; one you open while the layout wants it shut lies over the page. Which panels are open is this
+// window's own view ($view.<panel> = open|shut): screen state, sent with each reading so look-view can show it, never
+// recorded. `view <window> rail=open` in Lines reaches it too.
+const panelBy={},layoutWish={};
+function panelsIn(tree){const out=[];(function walk(n){if(!n)return;if(n.panel)out.push(n);for(const c of n.children||[])walk(c)})(tree);return out}
+function sizeFor(sizes,width){let name='';for(const [n,from] of sizes||[])if(width>=from)name=n;return name}
+function settleSize(plan){const size=sizeFor(plan.sizes,innerWidth);if(!size||viewState.size===size)return false;viewState.size=size;return true}
+function settlePanels(plan){
+  let changed=false;
+  for(const n of panelsIn(plan.tree)){
+    const name=n.name,wish=!!n.panel.shut_now,was=layoutWish[name];layoutWish[name]=wish;
+    if(was===wish)continue;
+    const open=(viewState[name]||'open')!=='shut';
+    if(wish&&open){viewState[name]='shut';panelBy[name]='layout';changed=true}
+    else if(!wish&&!open&&panelBy[name]==='layout'){viewState[name]='open';delete panelBy[name];changed=true}
+  }
+  return changed;
+}
+const panelOpen=name=>(viewState[name]||'open')!=='shut';
+function setPanel(name,open,why='you'){
+  viewState[name]=open?'open':'shut';if(open)delete panelBy[name];else panelBy[name]=why;
+  // one panel lies over the page at a time
+  if(open&&layoutWish[name])for(const n of panelsIn(currentPlan?.tree))if(n.name!==name&&layoutWish[n.name]&&panelOpen(n.name)){viewState[n.name]='shut';panelBy[n.name]='layout'}
+  applyPanels();return refresh();
+}
+function panelLabel(n){return String(n.panel.label||n.name)}
+function panelButton(n){
+  const b=P.node('button',{type:'button',class:'ag-panel-toggle','data-panel-toggle':n.name,'aria-label':panelLabel(n)},P.icon(n.panel.icon||(n.panel.side==='left'?'sidebar':'sidebar-right')));
+  b.addEventListener('click',e=>{e.stopPropagation();setPanel(n.name,!panelOpen(n.name)).catch(tell)});return b;
+}
+function applyPanels(){
+  if(!currentPlan)return;let over=false;const panels=panelsIn(currentPlan.tree);
+  for(const n of panels){
+    const open=panelOpen(n.name),lying=open&&!!layoutWish[n.name];over||=lying;
+    // a component that holds the panel in a container of its own marks it data-panel-frame (="<panel>", or empty for
+    // the panel inside it): that container opens and shuts. Otherwise the part's own element does.
+    const frames=new Set([...document.querySelectorAll('[data-panel-frame]')].filter(f=>f.dataset.panelFrame===n.name));
+    for(const el of document.querySelectorAll('[data-path]'))if(el.dataset.path===n.path){
+      const f=el.closest('[data-panel-frame]');frames.add(f&&(f.dataset.panelFrame===''||f.dataset.panelFrame===n.name)?f:el)}
+    for(const frame of frames){
+      frame.dataset.panel=n.panel.side;frame.dataset.panelName=n.name;
+      frame.toggleAttribute('data-shut',!open);frame.toggleAttribute('data-over',lying);
+      const w=parseInt(n.panel.width,10);if(w>0)frame.style.setProperty('--panel-width',w+'px');
+    }
+  }
+  // a lens whose components place no buttons still gets them, floating at the top corners
+  for(const side of ['left','right']){
+    const missing=panels.filter(n=>n.panel.side===side&&![...document.querySelectorAll('[data-panel-toggle]')].some(b=>b.dataset.panelToggle===n.name&&!b.closest('.ag-panel-float')));
+    let float=document.querySelector('.ag-panel-float.'+side);
+    if(!missing.length){float?.remove();continue}
+    if(!float){float=P.node('div',{class:'ag-panel-float '+side});document.body.append(float)}
+    float.replaceChildren(...missing.map(panelButton));
+  }
+  for(const b of document.querySelectorAll('[data-panel-toggle]')){
+    const n=panels.find(p=>p.name===b.dataset.panelToggle);if(!n)continue;const open=panelOpen(n.name);
+    b.setAttribute('aria-pressed',String(open));b.title=(open?'Hide ':'Show ')+panelLabel(n).toLowerCase();
+  }
+  const bar=document.querySelector('[data-panel-toggle]')?.closest('header,[role=banner]');
+  document.documentElement.style.setProperty('--ag-panel-top',(bar?Math.round(bar.getBoundingClientRect().bottom):0)+'px');
+  document.documentElement.toggleAttribute('data-panel-over',over);
+}
+// a click on the page, or Escape, shuts a panel lying over it
+document.addEventListener('pointerdown',e=>{
+  if(!document.documentElement.hasAttribute('data-panel-over')||e.target.closest('[data-panel][data-over],[data-panel-toggle],.ag-panel-float'))return;
+  for(const n of panelsIn(currentPlan?.tree))if(layoutWish[n.name]&&panelOpen(n.name)){viewState[n.name]='shut';panelBy[n.name]='layout'}
+  applyPanels();refresh().catch(tell);
+},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.documentElement.hasAttribute('data-panel-over')){
+  for(const n of panelsIn(currentPlan?.tree))if(layoutWish[n.name]&&panelOpen(n.name)){viewState[n.name]='shut';panelBy[n.name]='layout'}
+  applyPanels();refresh().catch(tell)}});
+let sizeTimer;
+addEventListener('resize',()=>{applyPanels();clearTimeout(sizeTimer);sizeTimer=setTimeout(()=>{if(currentPlan&&sizeFor(currentPlan.sizes,innerWidth)!==(viewState.size||''))refresh().catch(tell)},120)});
+// view <window> key=value from Lines: only this person's own windows are told (the kernel addresses it to them)
+async function hearViews(){try{await agora.hear('view',event=>{
+  if(event.target!==(definition.id||widget.id||widget))return;
+  let values={};try{values=JSON.parse(event.text||'{}')}catch{return}
+  for(const [key,value] of Object.entries(values)){
+    const n=panelsIn(currentPlan?.tree).find(p=>p.name===key);
+    if(n&&(value==='open'||value==='shut')){viewState[key]=value;if(value==='open')delete panelBy[key];else panelBy[key]='you'}
+    else viewState[key]=value;
+  }
+  applyPanels();refresh().catch(tell);
+})}catch{/* a widget installed before 4 Nov holds no hear:view grant; its panels still work from the buttons */}}
 // The theme changed (the host sends it; common.js has already updated `theme`): repaint the tokens and styles at once.
 addEventListener('ag-theme',()=>{
   Object.assign(P.tokens,themeTokens());
@@ -291,6 +423,7 @@ async function hearMotion(word){if(heard.has(word))return;heard.add(word);await 
 function soon(){if(document.hidden)return;clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>refresh().catch(tell),80)}
 document.addEventListener('visibilitychange',()=>{if(document.hidden)return;clearTimeout(refreshTimer);refresh().catch(tell)});
 for(const word of ['make','set','forget','undo','component','component-action'])await hearMotion(word);
+await hearViews();
 await refresh();
 // A forgotten/private target may no longer be hearable. Time-dependent bindings
 // also have no world happening. Reconcile the visible projection, without

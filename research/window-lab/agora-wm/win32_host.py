@@ -1,4 +1,11 @@
-"""Official Win32 boundary. Construction is read-only unless explicitly armed.
+"""EDITING THE DESKTOP HOST (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+This file is a seam between the world and Windows: it turns world facts into screen effects and screen events into world
+facts, through small words. It holds no preferences and no content. Which apps, what a button opens, sizes, names, ids and
+who may do what live in settings things it reads (shell-settings, wm-settings). It does not seed the world at start
+(people, chats, pins). New behaviour is a rule over the words offered here. Before writing a Windows or browser helper,
+use the shared one (gaming_gate for full-screen and desktop tests, widget_browser for hidden pages) instead of a copy.
+
+Official Win32 boundary. Construction is read-only unless explicitly armed.
 Never reads window text. All mutations require an identity-bearing WindowRef.
 """
 import ctypes as C
@@ -31,6 +38,7 @@ sig(u,'GetWindowLongPtrW',C.c_ssize_t,W.HWND,C.c_int)
 for name in ('IsWindow','IsWindowVisible','IsIconic','IsZoomed'):
     sig(u,name,W.BOOL,W.HWND)
 sig(u,'GetForegroundWindow',W.HWND)
+sig(u,'GetCursorPos',W.BOOL,C.POINTER(W.POINT))
 sig(u,'GetWindow',W.HWND,W.HWND,W.UINT)
 sig(u,'MonitorFromPoint',W.HMONITOR,W.POINT,W.DWORD)
 sig(u,'SetWindowPos',W.BOOL,W.HWND,W.HWND,C.c_int,C.c_int,C.c_int,C.c_int,W.UINT)
@@ -163,7 +171,7 @@ def gate():
     hr=shell.SHQueryUserNotificationState(C.byref(state))
     if hr!=0:reasons.append('notification state unavailable')
     elif state.value in (1,3,4,7):reasons.append(f'notification gate {state.value}')
-    elif (state.value==2 and _foreground_exe().lower() not in SHELL_OVERLAYS
+    elif (state.value==2 and not gaming_gate.never_game(_foreground_exe())
           and not gaming_gate.is_desktop(u.GetForegroundWindow()) and _foreground_covers_monitor()):
         # "Busy" alone is not a game: on 26 Oct Windows reported it with Claude (an ordinary window) in front while
         # Agora's own desktop layer and the Claude app's screen overlay were screen-sized. Gate only when the window
@@ -197,10 +205,9 @@ def _foreground_covers_monitor():
     return r.left<=m.left and r.top<=m.top and r.right>=m.right and r.bottom>=m.bottom
 
 
-# Screen-sized shell windows that make Windows report "busy" (QUNS 2) with no full-screen program running.
-# Seen 26 Oct 2026: TextInputHost.exe (touch keyboard / emoji panel) held the foreground at 3840x2160.
-SHELL_OVERLAYS={'textinputhost.exe','nvidia overlay.exe','explorer.exe','shellexperiencehost.exe',
-                'startmenuexperiencehost.exe','searchhost.exe','lockapp.exe'}
+# Screen-sized windows that make Windows report "busy" (QUNS 2) with no game running (26 Oct: TextInputHost.exe
+# held the foreground at 3840x2160) are gaming_gate.never_game: Windows' own there, Alex's in the world's
+# game-settings not_games (4 Nov; the list lived here before).
 
 
 def _foreground_exe():
@@ -261,6 +268,7 @@ class Native:
                 'agora':agora,'state':'minimised' if u.IsIconic(hwnd) else 'normal','focused':hwnd==front,
                 'rect':r.values(),'space':'primary','managed':not why,'why':why,'ref':ref,'_preferred':preferred,
                 '_normal':normal,'owned':owned,'maximised':maximised,
+                'browser_class':ref.cls.startswith('Chrome_WidgetWin_'),'window_class':ref.cls,
                 'share_candidate':screen_sized and why=='frameless; no app rule',
                 'display_mode':'maximised' if maximised else 'screen-sized (exclusive unknown)' if screen_sized else 'windowed'})
             return True
@@ -268,6 +276,18 @@ class Native:
         return rows
 
     def scale(self):return dpi_scale()
+
+    def cursor(self):
+        """Read the pointer on this thread's desktop. Never synthesize input."""
+        point=W.POINT()
+        if not u.GetCursorPos(C.byref(point)):return None
+        return (point.x,point.y)
+
+    def gate_token(self):
+        """Cheap foreground/fullscreen changes invalidate the process-gate cache."""
+        state=C.c_int()
+        hr=shell.SHQueryUserNotificationState(C.byref(state))
+        return (u.GetForegroundWindow(),hr,state.value,_foreground_covers_monitor())
 
     def rect_of(self,ref):
         """One window's visible rectangle, for the 60 Hz drag path (no enumeration). Read-only."""
@@ -300,6 +320,15 @@ class Native:
 
     def minimise(self,ref):self.check(ref);u.ShowWindowAsync(ref.hwnd,7)
     def restore(self,ref):self.check(ref);u.ShowWindowAsync(ref.hwnd,4)
+    def restore_shared(self,ref):
+        """Ask the app's window-state handler to restore; never synthesize input.
+
+        Unlike a bare geometry change this reaches an application's system
+        command handler. App-owned/exclusive fullscreen may still decline.
+        The manager measures the result and falls back without minimising it.
+        """
+        self.check(ref)
+        if not u.PostMessageW(ref.hwnd,0x112,0xF120,0):raise OSError(C.get_last_error(),'SC_RESTORE')
     def focus(self,ref):self.check(ref);return bool(u.SetForegroundWindow(ref.hwnd))
     def close(self,ref):self.check(ref);return bool(u.PostMessageW(ref.hwnd,0x10,0,0))
 

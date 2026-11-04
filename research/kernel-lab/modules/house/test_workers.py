@@ -32,7 +32,8 @@ def test_claude_and_codex_pools_fill_separately(manager):
     with patch('builders.threading', SimpleNamespace(Thread=Mock())):
         for i, t in enumerate(('dk1', 'dk2', 'dk3', 'dk4')):
             assert manager.start(dict(msg(t), args=dict(target=t, kv={'with': 'claude'}))).get('external')
-        assert 'claude workers are busy' in manager.start(dict(msg('dk5'), args=dict(target='dk5', kv={'with': 'claude'})))['refused']
+        assert 'claude workers are busy' in manager.start(dict(msg('dk5'), args=dict(target='dk5', kv={'with': 'claude'})))['text']
+        assert manager.states['dk5']['phase'] == 'queued'               # 4 Nov: it waits its turn, never refused
         assert manager.start(msg('dk6')).get('external')            # a Codex worker still starts
     s = manager.states['dk1']
     assert s['provider'] == 'claude' and s['model'] == 'claude-opus-5-5' and s['name'].startswith('Claude — ')
@@ -71,7 +72,7 @@ def test_a_finished_turn_goes_to_the_chat_and_wakes_the_resident_there(manager):
     said = [w for w in manager.fixture_door.writes if w[1].startswith('say dk50 ')]
     assert said and 'the dock unpins now' in said[0][1]
     text, chat = agent.woken[0]
-    assert chat is None and 'the dock unpins now' in text and 'house.tell dk1' in text and 'house.review dk1' in text
+    assert chat is None and 'the dock unpins now' in text and 'house.tell dk1' in text and 'house.land dk1' in text
 
 
 def test_what_the_resident_says_during_its_turn_starts_the_worker_after_it(manager):
@@ -102,11 +103,25 @@ def test_asking_for_review_drops_what_was_said_in_the_same_turn(manager):
     assert s['pending'] == [] and s['phase'] == 'reviewing'
 
 
-def test_a_worker_has_at_most_its_turns(manager):
-    s = state(manager); s['turns'] = B.MAX_TURNS
+def test_no_turn_limit_unless_house_settings_sets_one(manager):
+    s = state(manager); s['turns'] = 500                     # Alex, 4 Nov: no limit on a worker's turns
     manager.session = lambda person: manager.fixture_door
+    with patch('builders.threading', SimpleNamespace(Thread=Mock())):
+        assert manager.tell(dict(args=dict(target='dk1', words='more'), caller=dict(person='dk99'))).get('external')
+    s = state(manager); s['turns'] = 3
+    settings(manager, max_turns='3')
     out = manager.tell(dict(args=dict(target='dk1', words='more'), caller=dict(person='dk99')))
-    assert f'{B.MAX_TURNS} turns' in out['refused']
+    assert '3 turns' in out['refused']
+
+
+def test_worker_models_and_limits_come_from_house_settings(manager):
+    assert manager.worker_model('codex') == ('gpt-6.1-sol', 'medium')          # no setting: the fallback
+    assert manager.limit('worker_timeout') is None and manager.limit('max_turns') is None
+    settings(manager, codex_model='gpt-6-astra', codex_reasoning='high', worker_timeout='0')
+    assert manager.worker_model('codex') == ('gpt-6-astra', 'high')
+    assert manager.limit('worker_timeout') is None                            # 0 means none
+    settings(manager, codex_reasoning='enormous')
+    assert manager.worker_model('codex')[1] == 'medium'                        # an unknown level falls back
 
 
 def test_a_claude_worker_runs_the_claude_cli_in_its_worktree(manager, tmp_path):

@@ -1,4 +1,11 @@
-"""The feel of a drag or a resize: dead zone, dwell before a neighbour gives way, swap or slide, eased ghosts,
+"""EDITING THE DESKTOP HOST (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+This file is a seam between the world and Windows: it turns world facts into screen effects and screen events into world
+facts, through small words. It holds no preferences and no content. Which apps, what a button opens, sizes, names, ids and
+who may do what live in settings things it reads (shell-settings, wm-settings). It does not seed the world at start
+(people, chats, pins). New behaviour is a rule over the words offered here. Before writing a Windows or browser helper,
+use the shared one (gaming_gate for full-screen and desktop tests, widget_browser for hidden pages) instead of a copy.
+
+The feel of a drag or a resize: centre crossings for moves, dwell for resizes, swap or slide, eased motion,
 settling back, snapping, shared edges and the landing. Pure and deterministic: time in ms is an input; nothing here
 reads a clock, the screen or the world. The design and its numbers are in WM.md, "Feel".
 
@@ -9,7 +16,8 @@ reads a clock, the screen or the world. The design and its numbers are in WM.md,
 Rectangles are engine Rects in physical pixels; Feel's pixel numbers are at 100 % and multiplied by `scale`.
 """
 from dataclasses import dataclass, field
-from engine import Rect, SQUASH, copy_state, free_rectangles, push, solve, valid
+from engine import (Rect, SQUASH, MOTION_MS, copy_state, free_rectangles, push, solve, valid,
+                    crossed_centre, drop_spaces, choose_space)
 
 
 # ------------------------------------------------------------------ tunables
@@ -18,7 +26,7 @@ class Feel:
     dwell_ms: int = 350        # rest on a window this long before it gives way (AOSP Launcher3 REORDER_TIMEOUT)
     snap_px: int = 16          # snap radius at 100 %
     deadzone_px: int = 10      # movement before a drag or resize breaks free
-    motion_ms: int = 250       # ghost animation (Material 3 medium1)
+    motion_ms: int = MOTION_MS # animation; overridden by wm-settings
     pin_min: float = 0.5       # narrowest a pin may get, share of its pinned width (engine reads it via State)
     edges: str = 'shared'      # snapped windows share a resized edge ('free': they don't)
     return_ms: int = 250       # a yielded window waits this long after the drag leaves, then eases home
@@ -227,6 +235,7 @@ class Frame:
     held: list = field(default_factory=list)       # neighbours resisting (in contact, not yet given way)
     yielded: list = field(default_factory=list)    # neighbours that gave way
     minimise: list = field(default_factory=list)   # neighbours the preview would minimise
+    spaces: list = field(default_factory=list)     # vacant areas and column slots
 
 
 class Gesture:
@@ -586,7 +595,7 @@ class Gesture:
         return best
 
     # -- per tick
-    def step(self, rect, t):
+    def step(self, rect, t, pointer=None):
         T = Rect(*rect) if not isinstance(rect, Rect) else rect
         dt = max(0, t - self.t)
         self.t = t
@@ -595,6 +604,8 @@ class Gesture:
         self.T = T
         self.samples = [(ts, r) for ts, r in self.samples if t - ts <= 120] + [(t, T)]
         self._classify(T)
+        if self.kind == 'move':
+            return self._move_step(T, t, pointer)
         if not self.broken:
             self.contacts = {}
             for k in list(self.shown):
@@ -643,6 +654,50 @@ class Gesture:
                            sorted(k for k in self.neighbours() if self.shown.get(k, 1) is None))
         return self.frame
 
+    def _move_step(self, T, t, pointer=None):
+        # Every decision uses pickup geometry. Animated neighbours cannot
+        # change their own threshold or cause an oscillating swap.
+        eligible = {k for k in self.neighbours() if self.movable(k)
+                    and crossed_centre(self.start, T, self.home(k))}
+        self.contacts = {k: penetration(T, self.home(k), self.gap)
+                         for k in eligible if T.near(self.home(k), self.gap)}
+        held = set(self.neighbours()) - eligible
+        for k in self.neighbours():
+            self.tr(k)['yielded'] = k in eligible
+        target = self._target(T)
+        layout = self._layout(target, held) if self.broken else copy_state(self.base)
+        blockers = [w.rect for k, w in layout.windows.items()
+                    if k != self.key and w.rect and not w.minimised] + list(layout.obstacles)
+        spaces = drop_spaces(layout.bounds, blockers, self.gap, self.minimum())
+        landing = choose_space(T, spaces, layout.bounds, pointer) if self.broken else self.start
+        if T == self.start:
+            layout = copy_state(self.base)
+            landing = self.start
+        elif self.base.windows[self.key].pinned:
+            landing = self._landing(T, held, layout)
+        elif self.swaps:
+            # Swapping occupies that tile, rather than unexpectedly growing
+            # across unrelated vacant space beside it.
+            slots = [self.home(k) for k in self.swaps
+                     if not any(self.home(k).near(q, self.gap) for q in blockers)]
+            landing = choose_space(T, slots, layout.bounds, pointer) or landing
+        landing = landing or self._landing(T, held, layout)
+        if not self._fits(layout, landing) or any(layout.windows[k].minimised for k in self.neighbours()):
+            # Do not solve an impossible hover by moving an uncrossed neighbour.
+            # Nor make a crossed window disappear instead of sliding.
+            layout = copy_state(self.base)
+            blockers = [self.home(k) for k in self.neighbours()] + list(layout.obstacles)
+            spaces = drop_spaces(layout.bounds, blockers, self.gap, self.minimum())
+            landing = choose_space(T, spaces, layout.bounds, pointer) or self.start
+        self.plan = (layout, landing)
+        self.landing = landing
+        for k in self.neighbours():
+            w = layout.windows[k]
+            self._aim(k, None if w.minimised else w.rect, t)
+        self.frame = Frame(self._ghosts(t), landing, self.kind,
+                           sorted(held), sorted(eligible), [], spaces)
+        return self.frame
+
     def _fits(self, layout, landing):
         trial = copy_state(layout)
         trial.windows[self.key].rect = landing
@@ -683,12 +738,12 @@ class Gesture:
         return out
 
     # -- mouse-up
-    def release(self, rect, t):
+    def release(self, rect, t, pointer=None):
         """Settle to exactly what the ghosts were showing: neighbours that gave way go where their ghosts were,
         neighbours still resisting stay, and the dragged window lands on its outline (pushed back out of what
         resisted, snapped). Then the engine's full solver (shrink to 60 %, minimise least recently used, clamp)
         guarantees the no-overlap invariant."""
-        frame = self.step(rect, t)
+        frame = self.step(rect, t, pointer)
         key = self.key
         if not self.broken:
             result = solve(self.base, {'type': 'noop'})

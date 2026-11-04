@@ -1,3 +1,10 @@
+// EDITING THE DESKTOP HOST (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+// This file is a seam between the world and Windows: it turns world facts into screen effects and screen events into world
+// facts, through small words. It holds no preferences and no content. Which apps, what a button opens, sizes, names, ids and
+// who may do what live in settings things it reads (shell-settings, wm-settings). It does not seed the world at start
+// (people, chats, pins). New behaviour is a rule over the words offered here. Before writing a Windows or browser helper,
+// use the shared one (gaming_gate for full-screen and desktop tests, widget_browser for hidden pages) instead of a copy.
+//
 /* Trusted host. No session, instance capability, native API or DOM crosses the wall. */
 'use strict';
 (() => {
@@ -61,7 +68,7 @@
       const p=pending.get(m.id);if(!p)return;pending.delete(m.id);m.error?p.reject(Error(m.error)):p.resolve(m.result);
     });
     const api={ready,do:(line,saw)=>call('do',{line,saw}),see:line=>call('see',{line}),
-      project:view=>call('project',{view}),file:(target,variant='content')=>call('file',{target,variant}),
+      project:view=>call('project',{view}),tiling:geometry=>call('tiling',{geometry}),file:(target,variant='content')=>call('file',{target,variant}),
       download:target=>call('download',{target}),downloadReading:line=>call('download-reading',{line}),
       upload:async(file,group)=>{if(!(file instanceof Blob))throw Error('Choose a file');const bytes=new Uint8Array(await file.arrayBuffer());let raw='';for(let i=0;i<bytes.length;i+=32768)raw+=String.fromCharCode(...bytes.subarray(i,i+32768));return call('upload',{name:file.name||'Upload',data:btoa(raw),group})},
       hear:async(word,fn)=>{await call('hear',{word});if(!listeners.has(word))listeners.set(word,[]);listeners.get(word).push(fn);return()=>{listeners.set(word,listeners.get(word).filter(f=>f!==fn))}},
@@ -144,9 +151,9 @@
         else native.paint=rect(e.data.rect);
         result={ok:true};
       }else{
-        if(!['do','see','hear','theme','describe','upload','project','file','download','download-reading'].includes(op))throw Error('Unknown bridge call');
+        if(!['do','see','hear','theme','describe','upload','project','file','download','download-reading','tiling'].includes(op))throw Error('Unknown bridge call');
         if(componentView)await callTurn();
-        result=await call({op:['file','download'].includes(op)?'file-check':op==='download-reading'?'see':op,line:e.data.line,saw:e.data.saw,word:e.data.word,text:e.data.text,name:e.data.name,data:e.data.data,group:e.data.group,view:e.data.view,target:e.data.target,variant:e.data.variant});
+        result=await call({op:['file','download'].includes(op)?'file-check':op==='download-reading'?'see':op,line:e.data.line,saw:e.data.saw,word:e.data.word,text:e.data.text,name:e.data.name,data:e.data.data,group:e.data.group,view:e.data.view,target:e.data.target,variant:e.data.variant,geometry:e.data.geometry});
         if(!result.ok){const kept=Error(result.text||'Refused');kept.kept=true;throw kept}
         if(op==='hear')heardWords.add(String(e.data.word||''));
         if(op==='file'||op==='download'){

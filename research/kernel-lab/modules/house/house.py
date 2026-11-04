@@ -1,8 +1,16 @@
-"""house: the module that runs the world's agents (MOVING-IN D3). Python, the kernel's module protocol (SHAPE 11).
+"""EDITING A MODULE (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+A module is a seam to something outside the kernel (a model provider, git, Twitch, the media session, a map server) and
+turns it into world facts and words. What the world does with them (who is told, when, in what words, how it looks)
+belongs in rules, lenses and this module's settings thing, read at each use. Names (JEFF, Alex), ids (dk...), models,
+counts, timeouts and message text in this file are debt: move them to settings when you touch them, and never add more.
+
+house: the module that runs the world's agents (MOVING-IN D3). Python, the kernel's module protocol (SHAPE 11).
 
 An agent is a person in the world with a `house-agent` thing saying how it runs:
     make kind=house-agent name=JEFF person=<person> signer=jeff provider=claude model=claude-opus-5-5 reasoning=medium
          fallback_provider=codex fallback_model=gpt-6-astra soul=<thing> charter=<thing> speaks=text want=awake
+    Its system prompt is prompt=<thing> (its own, optional) followed by charter=<thing> (the standing rules), both read
+    again at every wake: an edit to either restarts its process under the new prompt, keeping the conversation.
     wake_policy=addressed skips warm starts and task-change wakes while retaining next_steps=on context.
     Chat addresses and explicit house.wake still reach it; compaction continues its addressed conversation.
 
@@ -28,6 +36,7 @@ live.py), never into the log. Transcripts and state stay in <world>/modules/hous
 
 Off switch: off house (every agent's process ends with it).
 """
+import hashlib
 import json
 import re
 import os
@@ -128,7 +137,13 @@ class Agent:
         return self.cfg["person"]
 
     def provider(self):
-        """The provider in use: the fallback while the preferred one's plan is used up (quota_policy's rule)."""
+        """The provider in use: the fallback while the preferred one's plan is used up (quota_policy's rule).
+        Alex, 4 Nov: the fallback holds only for the model whose plan ran out. Choosing another model on the
+        house-agent thing ends it (JEFF sat on the fallback from 28 Oct to 4 Nov because nothing ever cleared it)."""
+        if self.state.get("on_fallback") and self.state.get("fallback_from") != [
+                self.cfg.get("provider", "claude"), self.cfg.get("model", "")]:
+            self.state.pop("on_fallback", None)
+            self.state.pop("fallback_from", None)
         if self.state.get("on_fallback") and self.cfg.get("fallback_provider"):
             return (self.cfg["fallback_provider"], self.cfg.get("fallback_model", ""),
                     self.cfg.get("fallback_reasoning") or self.cfg.get("reasoning", "medium"))
@@ -155,7 +170,8 @@ class Agent:
             raise RuntimeError(f"no door session for {self.name} (signer {self.cfg.get('signer')})")
         self.token_file().write_text(token, encoding="utf-8")
         self.door = Door(token)
-        charter = self.house.charter_text(self.cfg.get("charter"))
+        charter = self.house.system_text(self)
+        self.state["system_sha"] = hashlib.sha256(charter.encode("utf-8")).hexdigest()
         (self.dir / "charter.txt").write_text(charter, encoding="utf-8")
         mcp = T.mcp_config(URL, self.token_file(), self.dir / "mcp.json")
         session = self.state.get("session") if self.state.get("session_provider") == provider else None
@@ -189,19 +205,36 @@ class Agent:
         self.house.publish()
 
     # ---- waking
-    def wake(self, text, chat=None, record=None):
+    def wake(self, text, chat=None, record=None, card_notes=None, first_record=None):
         """Something addressed to it. Said now if it is free, else at the end of its turn. Never blocks."""
         with self.lock:
-            self.inbox.append({"text": text, "chat": chat, "record": record, "at": time.time()})
+            item = {"text": text, "chat": chat, "record": record, "at": time.time()}
+            if first_record is not None:
+                item["first_record"] = first_record
+            if card_notes:
+                item["card_signal_notes"] = list(card_notes)
+            self.inbox.append(item)
             # the cursor moves when a line is said to the model, not when it is queued (`_begin`), so a restart with
             # lines waiting finds them again in catch-up (security review round 2: queued chats were lost)
             if not self.busy:
                 self._begin()
 
     def _begin(self):
+        self.house.refresh_card_signals(self)
         if self.cfg.get("want", "awake") == "asleep" or not self.inbox:
             return
         try:
+            # its system prompt (prompt= and charter=) is read at each wake: an edit ends the old process, and the
+            # conversation resumes under the new prompt (Alex, 4 Nov: he writes JEFF's prompt in Writing)
+            if self.child and self.child.alive():
+                text = self.house.system_text(self)
+                sha, known = hashlib.sha256(text.encode("utf-8")).hexdigest(), self.state.get("system_sha")
+                if known is None:                     # a process started before the prompt was fingerprinted
+                    self.state["system_sha"] = sha
+                elif sha != known:
+                    self.log("restart", "its system prompt changed")
+                    self.child.stop()
+                    self.child = None
             if not (self.child and self.child.alive()):
                 self.start()
         except Exception as exc:                      # noqa: BLE001
@@ -233,10 +266,15 @@ class Agent:
                      "receipts": [], "line": None, "woken_by": items[-1]["text"].splitlines()[0][:160]}
         if self.child.send(text):
             self.busy = True
+            signals = {n for i in items for n in i.get("card_signal_notes", [])}
+            if signals:
+                self.state["card_signals_seen"] = sorted(set(self.state.get("card_signals_seen", [])) | signals)
             sent = [int(i["record"]) for i in items if i.get("record")]
             if sent:
                 # at least once, never lost: past what was said, but not past a line still waiting in another chat
-                waiting = [int(i["record"]) for i in self.inbox if i.get("record")]
+                # A catch-up packet spans several records: protect its oldest
+                # line, even when its newest line follows the delivered note.
+                waiting = [int(i.get("first_record") or i["record"]) for i in self.inbox if i.get("record")]
                 upto = min(max(sent), min(waiting) - 1) if waiting else max(sent)
                 self.state["cursor"] = max(int(self.state.get("cursor", 0)), upto)
                 self.save()
@@ -309,7 +347,8 @@ class Agent:
                     # its plan is used up: the fallback takes over with a fresh conversation, and what it was told
                     # is said again there (quota_policy: only a verified limit switches, never an auth failure)
                     self.log("quota", ev["detail"])
-                    self.state.update(on_fallback=now_s(), quota=ev["detail"][:200])
+                    self.state.update(on_fallback=now_s(), quota=ev["detail"][:200],
+                                      fallback_from=[self.cfg.get("provider", "claude"), self.cfg.get("model", "")])
                     self.inbox.insert(0, {"text": "~ (said again: your other model's plan ran out mid-turn)\n"
                                                   + self.state.get("last_sent", ""), "chat": self.turn.get("chat"),
                                           "at": self.turn.get("woken", time.time())})
@@ -429,6 +468,10 @@ class House:
         self.ready.set()
         for state in self.builders.states.values():
             BM.notify(self.builders, state)
+        try:
+            self.builders.wake_cut_off()
+        except Exception as exc:                          # noqa: BLE001  a help, never a reason not to start
+            print(f"house: cut-off wakes failed: {exc!r}", flush=True)
         self.task_changes()
         threading.Thread(target=self.ticker, daemon=True, name="house-live").start()
 
@@ -446,6 +489,79 @@ class House:
                 self.agents[p] = Agent(self, r)
         for p in [p for p in self.agents if p not in seen]:
             self.agents.pop(p).stop("its house-agent thing is gone")
+
+    snaps, snapping, snap_lock = {}, 0, threading.Lock()
+
+    def snap(self, msg):
+        """house.snap <thing> [from=<task>] | house.snap last (Alex, 3 Nov: residents check work visually, hidden, and
+        tell JEFF "done and looks good"). The picture takes longer than a word may (10 s), so it is taken in the
+        background; the asker is woken when it is ready, and `house.snap last` answers with it. The answer carries an
+        [image: <path>] line, which the MCP door adapter turns into a picture the agent sees."""
+        args, caller = msg.get("args") or {}, msg.get("caller") or {}
+        kv, person = dict(args.get("kv") or {}), caller.get("person")
+        target = str(args.get("target") or args.get("words") or "").strip().split(" ")[0]
+        if target == "last":
+            got = self.snaps.get(person)
+            if not got:
+                return {"text": "no picture yet: house.snap <thing> takes one"}
+            if got.get("error"):
+                return {"text": f"the picture of {got['label']} failed: {got['error']}"}
+            if not got.get("path"):
+                return {"text": f"still taking the picture of {got['label']}; you are woken when it is ready"}
+            # A Codex resident calls this from inside its exec script: the picture reaches it only if the script
+            # hands the image part on (snap subagent, 3 Nov: otherwise the base64 arrives as text).
+            return {"text": f"{got['label']}, taken hidden at {got['at']}. The picture is attached. (Inside exec, "
+                            f"pass it on: for (const c of r.content) if (c.type === 'image') image(c).)\n"
+                            f"[image: {got['path']}]"}
+        if not target:
+            return {"refused": "house.snap <thing> [from=<task>], or house.snap last"}
+        if not self.m.see("look " + target, use=msg.get("use")).get("rows"):
+            return {"refused": f"you cannot see {target}"}
+        card = kv.get("from") or kv.get("worker")
+        source = None
+        if card:
+            state = self.builders.states.get(card)
+            if not state or not state.get("tree") or not Path(state["tree"]).is_dir():
+                return {"refused": f"{card} has no worker worktree to show"}
+            if not self.m.see("look " + card, use=msg.get("use")).get("rows"):
+                return {"refused": f"you cannot see {card}"}
+            source = state["tree"]
+        try:
+            token = self.builders.session(person).token
+        except RuntimeError:
+            return {"refused": "you have no session the House can take a picture as"}
+        try:
+            w, h = (int(n) for n in str(kv.get("size") or "1280x800").lower().split("x"))
+            size = (max(320, min(w, 2560)), max(240, min(h, 1600)))
+        except ValueError:
+            return {"refused": "size=<width>x<height>, e.g. size=1280x800"}
+        with self.snap_lock:
+            if self.snapping >= 2:
+                return {"refused": "two pictures are being taken now; try again in a minute"}
+            self.snapping += 1
+        label = target + (f" from the worker on {card} (its unlanded code)" if card else "")
+        at = time.strftime("%Y%m%dT%H%M%S")
+        out = self.home / "snaps" / f"{at}-{target}{'-' + card if card else ''}.png"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        self.snaps[person] = dict(label=label, at=time.strftime("%H:%M"), path=None)
+
+        def go():
+            try:
+                import snap as S
+                S.snap(target, token, out, door=URL, source=source, world=self.world, size=size)
+                self.snaps[person].update(path=str(out))
+                text = f"~ Your picture of {label} is ready. See it: house.snap last"
+            except Exception as exc:                  # noqa: BLE001
+                self.snaps[person].update(error=str(exc)[:500])
+                text = f"~ The picture of {label} failed: {str(exc)[:500]}"
+            finally:
+                with self.snap_lock:
+                    self.snapping -= 1
+            agent = self.agents.get(person)
+            if agent is not None:
+                agent.wake(text)
+        threading.Thread(target=go, daemon=True).start()
+        return {"text": f"taking a hidden picture of {label}; you are woken when it is ready (house.snap last shows it)"}
 
     def restart(self, msg):
         """house.restart kernel|house (stewards; Alex, 28 Oct: JEFF must be able to unstick the system). The kernel
@@ -498,6 +614,15 @@ class House:
         return ("## Alex's standing rules (look " + cid + " is the live one)\n\n" + text) if text else \
             f"charter: not read: {cid} is empty or gone; tell Alex."
 
+    def system_text(self, a):
+        """An agent's system prompt: its own prompt=<thing> (written by Alex), then the standing rules (charter=)."""
+        charter = self.charter_text(a.cfg.get("charter"))
+        if not a.cfg.get("prompt"):
+            return charter
+        rows = self.m.see(f"look {a.cfg['prompt']}").get("rows") or [{}]
+        own = str(rows[0].get("text") or "").strip()
+        return (own + "\n\n" + charter) if own else charter
+
     def welcome(self, a):
         cfg = a.cfg
         soul = ""
@@ -516,7 +641,14 @@ class House:
                if cfg.get("speaks", "text") == "text" else
                "Your words in a turn are your own thinking; say <chat> <words> is how anyone hears you. ")
             + "rows chat lists the chats; chat <chat> reads one.")
-        return own + (f"\n\n# Your soul ({cfg['soul']}, yours to keep)\n\n{soul}" if soul else "")
+        # Alex, 3 Nov: how work flows between JEFF, the residents and their workers is the world's, not the code's:
+        # a house-agent's guide=<thing> is read at each start, so it changes by editing that thing.
+        guide = ""
+        if cfg.get("guide"):
+            rows = self.m.see(f"look {cfg['guide']}").get("rows") or [{}]
+            guide = str(rows[0].get("text") or "").strip()
+        return own + (f"\n\n# How work flows here ({cfg['guide']})\n\n{guide}" if guide else "") \
+            + (f"\n\n# Your soul ({cfg['soul']}, yours to keep)\n\n{soul}" if soul else "")
 
     def next_steps(self, a):
         if a.cfg.get("next_steps") != "on":
@@ -542,9 +674,23 @@ class House:
 
     # ---- catching up
     def catch_up(self, a):
+        # Queue the whole durable backlog before any wake advances the shared
+        # chat cursor. A crash between card and chat catch-up must not lose chat.
+        with a.lock:
+            busy = a.busy
+            a.busy = True
+            try:
+                self._catch_up(a)
+            finally:
+                a.busy = busy
+            if not busy and a.inbox:
+                a._begin()
+
+    def _catch_up(self, a):
         """Lines addressed to it while the house was away (past its cursor), as one wake."""
         cursor = int(a.state.get("cursor", 0))
         got = []
+        self.card_signals(a, cursor=cursor)
         for r in self.m.see("rows said").get("rows") or []:
             rev = int(r.get("rev") or 0)
             if rev > cursor and a.person in str(r.get("to") or "").split() and r.get("made_by") != a.person \
@@ -559,7 +705,7 @@ class House:
         for chat, lines in by_chat.items():
             text = "~ for you while the house was away:\n" + "\n".join(
                 self.line_text(r.get("id"), dict(r, by_name=r.get("by")), r.get("chat")) for _, r in lines)
-            a.wake(text, chat=chat, record=lines[-1][0])
+            a.wake(text, chat=chat, record=lines[-1][0], first_record=lines[0][0])
 
     def chat_name(self, c):
         if c not in self.chat_names:
@@ -567,7 +713,7 @@ class House:
             self.chat_names[c] = rows[0].get("name") or c
         return self.chat_names[c]
 
-    def sees_line(self, a, sid, chat):
+    def line_for(self, a, sid):
         """Whether this agent may see a said line now, asked through its own door: covers closed chats, group-held
         chats, sees_when, and people who left (security review M3, 28 Oct: catch-up read with the house's sight).
         Without a door session for it, no: an agent with no session can't take a turn anyway, and the house's own
@@ -580,12 +726,15 @@ class House:
                 tok = None
             door = Door(tok) if tok else None
         if door is None or not sid:
-            return False
+            return None
         try:
             out = door.post("/see", f"look {sid}")
         except Exception:                             # noqa: BLE001  a door that won't answer hands nothing on
-            return False
-        return bool(out.get("ok", True) and out.get("rows"))
+            return None
+        return (out.get("rows") or [None])[0] if out.get("ok", True) else None
+
+    def sees_line(self, a, sid, chat):
+        return self.line_for(a, sid) is not None
 
     def in_chat(self, person, c):
         """Whether a closed chat (with=) holds this person; an open chat holds anyone. The house reads with its own
@@ -632,7 +781,88 @@ class House:
 
     def line_text(self, sid, row, chat):
         who = row.get("by_name") or row.get("speaker") or ""
-        return f"~ {who or 'someone'} in {self.chat_name(chat)} ({chat}, line {sid}): {row.get('text', '')}"
+        text = f"~ {who or 'someone'} in {self.chat_name(chat)} ({chat}, line {sid}): {row.get('text', '')}"
+        about = row.get("about")
+        if about:
+            # what the line is about, read with the House's sight: a right-click ask says where it was asked and on
+            # what (Ask reaches JEFF, 3 Nov 2026); anything else at least says its kind and id
+            seen = (self.m.see(f"look {about}").get("rows") or [{}])[0]
+            bits = [f"{seen.get('kind') or 'thing'} {about}"]
+            if seen.get("where"):
+                bits.append(f"asked at {seen['where']}")
+            if seen.get("about"):
+                bits.append(f"on {seen['about']}")
+            text += f" [about: {', '.join(bits)}]"
+        return text
+
+    def card_signals(self, agent=None, cursor=0, notice=None):
+        """Deliver durable addressed card notes through the ordinary inbox."""
+        revision = None
+        if notice:
+            found = self.m.see("look " + notice).get("rows") or []
+            if not found or not found[0].get("card_signal"):
+                return
+            revision = int(found[0].get("rev") or 0)
+        rows = self.m.see("rows taskboard-event").get("rows") or []
+        packets = {}
+        for row in rows:
+            if not row.get("card_signal"):
+                continue
+            record = int(row.get("rev") or 0)
+            if revision is not None and record != revision:
+                continue
+            for who in str(row.get("to") or "").split():
+                a = self.agents.get(who)
+                if a is None or (agent is not None and a is not agent):
+                    continue
+                if row["id"] in a.state.get("card_signals_seen", []) or any(
+                    row["id"] in item.get("card_signal_notes", []) for item in a.inbox
+                ):
+                    continue
+                current = self.line_for(a, row["id"])
+                if not current or not current.get("text") or not current.get("about"):
+                    continue
+                # Source visibility can narrow after the note was written.
+                if not self.sees_line(a, row.get("source"), None):
+                    continue
+                packets.setdefault((who, record), []).append(dict(current, id=row["id"]))
+        for (who, record), notes in sorted(packets.items(), key=lambda item: item[0][1]):
+            a = self.agents[who]
+            with a.lock:
+                queued = {sid for item in a.inbox for sid in item.get("card_signal_notes", [])}
+                seen = set(a.state.get("card_signals_seen", []))
+                notes = [r for r in notes if r["id"] not in queued | seen]
+                if notes:
+                    a.wake(self.card_signal_text(notes), record=record, card_notes=[r["id"] for r in notes])
+
+    @staticmethod
+    def card_signal_text(notes):
+        return "\n".join(f"~ {r['text']} (card {r['about']}; note {r['id']})" for r in notes)
+
+    def refresh_card_signals(self, a):
+        """Re-read queued notes at delivery: undo/privacy changes may remove part of a packet."""
+        if not any(i.get("card_signal_notes") for i in a.inbox):
+            return
+        kept = []
+        for item in a.inbox:
+            if not item.get("card_signal_notes"):
+                kept.append(item)
+                continue
+            notes = []
+            for sid in item["card_signal_notes"]:
+                row = self.line_for(a, sid)
+                if row and row.get("text") and row.get("about") and self.sees_line(a, row.get("source"), None):
+                    notes.append(dict(row, id=sid))
+            if notes:
+                kept.append(dict(item, text=self.card_signal_text(notes),
+                                 card_signal_notes=[r["id"] for r in notes]))
+        a.inbox[:] = kept
+
+    def retract_card_signals(self):
+        """Undo removes undelivered inbox entries too; a delivered wake is historical."""
+        for a in self.agents.values():
+            with a.lock:
+                self.refresh_card_signals(a)
 
     # ---- hearing
     def happen(self, msg):
@@ -640,6 +870,10 @@ class House:
             return
         word = msg.get("word")
         self.builders.hear(msg)
+        if word == "undo":
+            self.retract_card_signals()
+        if word == "make" and msg.get("target"):
+            self.card_signals(notice=msg["target"])
         if word in MESSAGE_WORDS and msg.get("said"):
             to = [p for p in msg.get("to") or [] if p in self.agents and p != msg.get("by_id")]
             if not to:
@@ -701,10 +935,18 @@ class House:
             return self.builders.retry(msg)
         if word == "house.tell":
             return self.builders.tell(msg)
+        if word == "house.hand":
+            return self.builders.hand(msg)
+        if word == "house.snap":
+            return self.snap(msg)
         if word == "house.review":
             return self.builders.request_review(msg)
         if word == "house.land":
             return self.builders.land(msg)
+        if word == "house.release":
+            return self.builders.release(msg)
+        if word == "house.stop" and args.get("target") in self.builders.states:
+            return self.builders.halt(msg)           # a card: stop its worker (owner, steward or Alex)
         if word in ("house.log", "house.activity") and args.get("target") in self.builders.states:
             state = self.builders.states[args["target"]]
             if not self.m.see("look " + (state.get("chat") or state["task"]), use=msg.get("use")).get("rows"):
@@ -743,6 +985,9 @@ class House:
             a.wake(f"~ {by} woke you (house.wake)" + (f": {words}" if words else ""))
             return {"text": f"{a.name} is {'woken' if a.busy else 'told'}; it answers in its own time", "external": True}
         if word == "house.stop":
+            caller = (msg.get("caller") or {}).get("person")
+            if not (self.builders.steward(caller) or self.builders.alex(caller)):
+                return {"refused": "house.stop <person> is for stewards; house.stop <card> stops a worker you own"}
             a.stop("house.stop")
             return {"text": f"{a.name}'s process ended; the next line to it starts it again", "external": True}
         return {"refused": f"the house has no word {word}"}
@@ -853,8 +1098,18 @@ OFFER = [
              "thread and worktree. Its owner, the card's lead, a steward or Alex may tell it; others are refused. A "
              "running worker reads them at its next turn boundary; a stopped one (received, blocked, reviewed) resumes "
              "with them in a new turn. Its owner is still woken at each turn end, and so is anyone else who told it. "
-             "Landed or released work does not restart (house.build starts a new run); held cards, uncertain or "
-             "recovery-needed workers, and work under review or landing are refused."},
+             "Landed or released work does not restart (house.build starts a new run). When every slot is busy, it "
+             "starts with your words by itself as soon as one frees. A paused (held) card and work being landed "
+             "are refused."},
+    {"word": "house.hand", "kind": "do", "needs": TASK_NEEDS, "takes": "<id> <name>", "undo": "external", "may": "members",
+     "help": "house.hand <task> <name>: give a card's worker, and the card, to another resident, who is in charge of it "
+             "from then on: woken at its turn ends, answers it with house.tell, reviews and lands it. Its owner, a "
+             "steward or Alex may hand it on; a worker mid-turn, mid-review or mid-landing is handed once it stops. "
+             "The new owner is woken with where it stands and its last words."},
+    {"word": "house.snap", "kind": "see", "takes": "<thing> [from=<task>] [size=<w>x<h>]", "may": "members",
+     "help": "house.snap <thing> [from=<task>]: a picture of a thing (a lens, an app, a chat, a card) the way it shows in "
+             "a window, taken hidden, never on Alex's screen. from=<task> shows a worker's unlanded code, in a hidden "
+             "copy of the world started from its worktree. Use it to check work looks right before saying it is done."},
     {"word": "house.work", "kind": "do", "takes": "<words> [with=claude|codex]", "undo": "external", "may": "members",
      "help": "house.work <what to do, in plain words> [with=claude|codex]: make a card for it and start a worker on it, in "
              "your charge. You are woken each time it finishes a turn (its words also go in its chat); answer it with "
@@ -870,7 +1125,13 @@ OFFER = [
     {"word": "house.review", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "members",
      "help": "house.review <task>: independently check a received committed result against current main, including hidden desktop checks. Does not land or close it."},
     {"word": "house.land", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "members",
-     "help": "house.land <task>: publish the exact reviewed source if main and ownership still match. Activation and owner verification remain separate."},
+     "help": "house.land <task>: one step. The House commits what the worker left, runs the checks, lands it on main "
+             "and switches it on (restarts what it touched; a change to the House itself restarts the House once "
+             "nobody is busy). You hear once, when it is live or what stopped it. One landing at a time; the next "
+             "waits its turn."},
+    {"word": "house.release", "kind": "do", "needs": TASK_NEEDS, "takes": "<id> [<why>]", "undo": "external", "may": "members",
+     "help": "house.release <task> [why]: the card's worker ends for good (stopped first if running). Its worktree and "
+             "branch are kept; the card is free for a new worker. Its owner, a steward or Alex may release it."},
     {"word": "house.active", "kind": "see", "takes": "",
      "help": "house.active: visible cards being worked on or blocked, with holder, blocker and resolver. Finished, queued and released work hides automatically."},
     {"word": "house.who", "kind": "see", "takes": "",
@@ -885,9 +1146,10 @@ OFFER = [
     {"word": "house.wake", "kind": "do", "takes": "<id> [<words>]", "undo": "external", "may": "members",
      "help": "house.wake <person> [words]: wake an agent now with your words. Usually you need not: saying @name in a "
              "chat, or any line in its closed chat, wakes it. It answers in its own time."},
-    {"word": "house.stop", "kind": "do", "takes": "<id>", "undo": "external", "may": "stewards",
-     "help": "house.stop <person>: end an agent's process now (mid-turn too). The next line to it starts it again; "
-             "set its house-agent want=asleep to keep it asleep."},
+    {"word": "house.stop", "kind": "do", "takes": "<id>", "undo": "external", "may": "members",
+     "help": "house.stop <card>: stop that card's worker mid-turn; it keeps its worktree, and house.tell starts it again "
+             "with new words (its owner, a steward or Alex). house.stop <person> (stewards): end an agent's process "
+             "now; the next line to it starts it again; set its house-agent want=asleep to keep it asleep."},
 ]
 
 

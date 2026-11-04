@@ -114,10 +114,10 @@ html:has(.wr-shell),html:has(.wr-shell) body{overflow:clip;height:100%}
 .wr-plan-calls .wr-btn{border:1px solid var(--ag-border,#e2dfd6)}
 .wr-plan-calls .wr-btn[aria-pressed=true]{border-color:var(--ag-accent,#4f7a6c)}
 .wr-open{font-size:13px;color:var(--ag-warn,#b5722a);display:flex;gap:8px;align-items:baseline}
-.wr-sheet{max-width:var(--wr-measure,740px);margin:0 auto;padding:34px 44px 40px;border-radius:var(--ag-radius-l,22px);background:var(--ag-raised,#fff);border:1px solid var(--ag-border,#e2dfd6);box-shadow:0 1px 0 #0000000a,0 14px 40px #00000012;min-height:340px;position:relative}
+.wr-sheet{max-width:var(--wr-measure,740px);margin:0 auto;position:relative;min-height:50vh}
+.wr-sheet .cm-editor{min-height:50vh}
+.wr-save{transition:color .2s}.wr-save-saving,.wr-save-editing{color:var(--ag-ink-faint,#a8b0ab)}.wr-save-failed{color:var(--ag-danger,#c0473f);font-weight:600}
 .wr-md{font:16.5px/1.72 var(--ag-font-ui,inherit);color:var(--ag-ink,#2f3a35);overflow-wrap:anywhere;cursor:text}
-.wr-md>.wr-block{border-radius:8px;transition:background .12s}
-.wr-md>.wr-block:hover{background:color-mix(in srgb,var(--ag-hover,#0000000d) 60%,transparent)}
 .wr-md h1,.wr-md h2,.wr-md h3,.wr-md h4,.wr-md h5,.wr-md h6{font-family:var(--ag-font-display,inherit);line-height:1.25;margin:1.5em 0 .5em;letter-spacing:-.005em}
 .wr-md h1{font-size:1.7em}.wr-md h2{font-size:1.32em}.wr-md h3{font-size:1.12em}.wr-md h4,.wr-md h5,.wr-md h6{font-size:1em}
 .wr-md>:first-child{margin-top:0}
@@ -164,7 +164,12 @@ mark.wr-mark.wr-hot{background:color-mix(in srgb,var(--ag-warn,#e0a040) 55%,tran
 .wr-below .wr-row{padding-left:12px}
 /* margin */
 .wr-margin{position:sticky;top:0;display:flex;flex-direction:column;gap:10px;padding-top:6px}
+.wr-page:has(>.wr-margin[data-shut]),.wr-page:has(>.wr-margin[data-over]){grid-template-columns:minmax(0,1fr)}
+.wr-margin[data-over]{padding:14px 16px 24px}
+.wr-shell:has(>.wr-railbox[data-shut]),.wr-shell:has(>.wr-railbox[data-over]){grid-template-columns:minmax(0,1fr)}
+.wr-railbox[data-over]{border-right:0}
 .wr-margin-head{display:flex;align-items:center;gap:8px;font:650 11.5px/1 var(--ag-font-ui,inherit);letter-spacing:.12em;text-transform:uppercase;color:var(--ag-ink-muted,#7b847f);padding:6px 2px}
+
 .wr-hint{font-size:12.5px;color:var(--ag-ink-muted,#7b847f);line-height:1.5;padding:10px 12px;border-radius:12px;border:1px dashed var(--ag-border,#e2dfd6)}
 .wr-c{display:flex;flex-direction:column;gap:7px;padding:12px 13px;border-radius:14px;background:var(--ag-raised,#fff);border:1px solid var(--ag-border,#e2dfd6);font-size:13.5px;line-height:1.5;transition:box-shadow .15s,border-color .15s}
 .wr-c.wr-hot{border-color:var(--ag-warn,#e0a040);box-shadow:0 0 0 3px color-mix(in srgb,var(--ag-warn,#e0a040) 22%,transparent)}
@@ -202,7 +207,7 @@ mark.wr-mark.wr-hot{background:color-mix(in srgb,var(--ag-warn,#e0a040) 55%,tran
 .wr-pop-row{display:flex;align-items:center;gap:6px}
 .wr-pop-row small{color:var(--ag-ink-muted,#7b847f);font-size:11.5px;margin-right:auto}
 .wr-pop code{font:11.5px/1.4 var(--ag-font-mono,monospace);color:var(--ag-ink-muted,#7b847f);overflow-wrap:anywhere}
-@media (max-width:980px){.wr-page{grid-template-columns:minmax(0,1fr);padding:20px 18px 60px}.wr-margin{position:static}.wr-sheet{padding:24px 22px}}
+@media (max-width:980px){.wr-page{padding:20px 18px 60px}}
 @media (prefers-reduced-motion:reduce){.wr-card,.wr-chev,.wr-c,mark.wr-mark{transition:none}}
 `;
 
@@ -355,11 +360,7 @@ function wrPlain(node){let s='';const walk=n=>{if(n.nodeType===3){s+=n.data;retu
 const WR_OUTLINE=new Map();
 function wrOutline(text){
   const key=String(text||'');if(WR_OUTLINE.has(key))return WR_OUTLINE.get(key);
-  let plain='',heading='';const sections=[];
-  for(const b of mdParse(key)){const el=mdRender([b],{resolve:()=>null},false)[0];if(!el)continue;const t=wrPlain(el);if(!t)continue;
-    if(b.t==='h')heading=t;if(plain)plain+=' ';sections.push({at:plain.length,heading});plain+=t}
-  const out={plain,sections,headingAt:i=>{let h='';for(const s of sections){if(s.at>i)break;h=s.heading}return h}};
-  if(WR_OUTLINE.size>40)WR_OUTLINE.clear();WR_OUTLINE.set(key,out);return out;
+  const out=wrSourcePlain(key);if(WR_OUTLINE.size>40)WR_OUTLINE.clear();WR_OUTLINE.set(key,out);return out;
 }
 function wrAround(outline,quote){
   const q=wrNorm(quote),at=outline.plain.indexOf(q);if(at<0)return {before:'',after:'',heading:''};
@@ -421,16 +422,21 @@ function wrToJeff(words,quote,doc){
 }
 
 // ---- writing-shell -----------------------------------------------------------------------------------------------------
+// window.wrSeeded: the target this page has already opened (one window per page; kept on the page, since component
+// code can be evaluated again on a repaint)
 function mountShell(api,s){
   const view=api.view(),root=api.part('body','div',{class:'wr-shell'});
+  // window.open writing <document> starts on that document (the window's $view.target), once
+  if(view.target&&window.wrSeeded!==view.target){window.wrSeeded=view.target;queueMicrotask(()=>api.select({open:view.target,back:view.open||''}))}
   const back=view.back&&view.back!==view.open;
-  const top=wrEl('header',{class:'wr-top'},wrEl('div',{class:'wr-brand'},wrEl('i',{},'✎'),s.title||'Writing'));
+  const top=wrEl('header',{class:'wr-top'},...api.panelButtons('left'),wrEl('div',{class:'wr-brand'},wrEl('i',{},'✎'),s.title||'Writing'));
   if(back)top.append(wrEl('button',{type:'button',class:'wr-btn','aria-label':'Back to the document before',title:'Back (Alt+←)',on:{click:()=>api.select({open:view.back,back:view.open})}},wrIcon('back'),'Back'));
   if(view.open)top.append(wrEl('button',{type:'button',class:'wr-btn wr-quiet',on:{click:()=>api.select({open:'',back:view.open})}},'Home'));
-  top.append(wrEl('span',{class:'wr-space'}));
+  top.append(wrEl('span',{class:'wr-space'}),...api.panelButtons('right'));
   if(wrHasGesture(api,'new'))top.append(wrEl('button',{type:'button',class:'wr-btn wr-primary',title:wrLineOf(api,'new'),on:{click:async()=>{
     try{const id=wrMade(await wrFire(api,'new',{}));if(id)api.select({open:id,back:api.view().open||'',fresh:id})}catch{}}}},wrIcon('plus'),'New document'));
-  const railbox=wrEl('aside',{class:'wr-railbox','aria-label':'Documents'}),deskbox=wrEl('main',{class:'wr-deskbox'});
+  // the rail's box is the frame that opens and shuts when the rail is a panel (the lens's `panel left`)
+  const railbox=wrEl('aside',{class:'wr-railbox','aria-label':'Documents','data-panel-frame':''}),deskbox=wrEl('main',{class:'wr-deskbox'});
   for(const child of api.children)(child.name==='rail'||child.component==='doc-rail'?railbox:deskbox).append(api.render(child));
   root.append(top,railbox,deskbox);
   const keys=e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();document.querySelector('.wr-find input')?.focus()}
@@ -541,33 +547,162 @@ function mountHome(api,s){
 }
 
 // ---- doc-page ------------------------------------------------------------------------------------------------------------
+// One continuous editor per document (4 Nov, Alex: "make it so its a continous document ... work about as well as
+// obsidian"): CodeMirror with a live preview (doc-editor.bundle.js, read here as WR_CM). The editor outlives repaints:
+// each document's editor is kept below (WR_EDITORS) and its element moved into the new page, so the caret, the selection
+// and undo survive a save. Saves go through the lens's `write` gesture (the kernel's `edit`: changed spans and the text
+// they were made against); the kernel keeps every change in the document's CRDT history.
+const WR_EDITORS=new Map();
+const WR_SAVE_MS=700;
+// The words of some Markdown as a reader sees them, each with where it stands in the source: what comments quote and
+// are found by. Headings, list and quote marks, emphasis, code ticks and link addresses are left out.
+function wrSourcePlain(src){
+  src=String(src||'');let plain='',heading='',space=true,fence=false;const map=[],sections=[];
+  const put=(ch,at)=>{if(/\s/.test(ch)){if(!space){plain+=' ';map.push(at);space=true}}else{plain+=ch;map.push(at);space=false}};
+  let at=0;
+  for(const raw of src.split('\n')){
+    const start=at;at+=raw.length+1;
+    if(/^\s*(```|~~~)/.test(raw)){fence=!fence;put('\n',start);continue}
+    if(!fence&&(/^\s{0,3}([-*_])(\s*\1){2,}\s*$/.test(raw)||/^\s*\|?\s*:?-{2,}/.test(raw))){put('\n',start);continue}
+    let i=0;
+    if(!fence){
+      const h=/^\s{0,3}(#{1,6})\s+/.exec(raw);
+      const pre=h||/^(\s*>\s?)+/.exec(raw)||/^\s*([-*+]|\d{1,9}[.)])\s+(\[[ xX]\]\s+)?/.exec(raw);
+      if(pre)i=pre[0].length;
+      if(h){heading=wrNorm(raw.slice(i).replace(/[*_`~]|\[\[[^\]|]*\||\]\]|\[\[/g,'').replace(/#+\s*$/,''));sections.push({at:plain.length+(plain&&!space?1:0),heading})}
+    }
+    while(i<raw.length){
+      const rest=raw.slice(i);let m;
+      if(fence){put(raw[i],start+i);i++;continue}
+      if((m=/^\[\[([^\]|\n]+)\|([^\]\n]*)\]\]/.exec(rest))){const t0=i+2+m[1].length+1;for(let j=0;j<m[2].length;j++)put(m[2][j],start+t0+j);i+=m[0].length;continue}
+      if((m=/^\[\[([^\]|\n]+)\]\]/.exec(rest))){for(let j=0;j<m[1].length;j++)put(m[1][j],start+i+2+j);i+=m[0].length;continue}
+      if((m=/^!?\[([^\]\n]*)\]\([^)\n]*\)/.exec(rest))){const t0=i+(rest[0]==='!'?2:1);for(let j=0;j<m[1].length;j++)put(m[1][j],start+t0+j);i+=m[0].length;continue}
+      if((m=/^(\*\*|__|~~|\*|`+)/.exec(rest))){i+=m[0].length;continue}
+      if(rest[0]==='_'&&!/\w/.test(raw[i-1]||'')){i++;continue}
+      if(rest[0]==='_'&&!/\w/.test(raw[i+1]||'')){i++;continue}
+      if(rest[0]==='|'){put(' ',start+i);i++;continue}
+      if(rest[0]==='\\'&&i+1<raw.length){i++;put(raw[i],start+i);i++;continue}
+      put(raw[i],start+i);i++;
+    }
+    put('\n',start+raw.length);
+  }
+  while(plain.endsWith(' ')){plain=plain.slice(0,-1);map.pop()}
+  return {plain,map,sections,headingAt:x=>{let h='';for(const s of sections){if(s.at>x)break;h=s.heading}return h}};
+}
+// where a quote's words stand in the source, or null
+function wrFindQuote(sp,quote){const q=wrNorm(quote);if(!q||q.length<2)return null;const a=sp.plain.indexOf(q);if(a<0)return null;
+  return {from:sp.map[a],to:sp.map[a+q.length-1]+1}}
+
+function wrEditorEntry(api,d,cfg){
+  const id=d.id,text=String(d.text||'');
+  let e=WR_EDITORS.get(id);
+  if(e){WR_EDITORS.delete(id);WR_EDITORS.set(id,e);return e}          // newest last
+  const CM=WR_CM;
+  e={id,base:{text,version:''},pending:CM.ChangeSet.empty(text.length),inflight:null,timer:0,status:'',hooks:{...(cfg.hooks||{})},api};
+  e.ed=CM.createEditor({doc:text,label:'Text of '+wrTitle(d),readonly:cfg.readonly,
+    placeholder:'Start writing…  # a heading, - a list, **bold**, [[ to link a document',
+    resolve:ref=>e.hooks.resolve?.(ref),documents:()=>e.hooks.documents?.()||[],drawTable:src=>e.hooks.drawTable?.(src),
+    onLink:(l,ev)=>e.hooks.link?.(l,ev),onContextMenu:(ev,v)=>e.hooks.menu?.(ev,v),onCommentPress:(cid,ev)=>e.hooks.commentPress?.(cid,ev),
+    onSave:()=>wrSave(e,true),onEscape:()=>wrSave(e,true),onBlur:()=>wrSave(e,true),onToggleSource:()=>e.hooks.toggleSource?.(),
+    onUpdate:u=>{
+      if(!u.docChanged)return;
+      for(const tr of u.transactions){if(!tr.docChanged||tr.isUserEvent('agora.remote'))continue;
+        if(e.inflight)e.inflight.buffer=e.inflight.buffer.compose(tr.changes);else e.pending=e.pending.compose(tr.changes)}
+      if(u.transactions.some(tr=>tr.docChanged&&!tr.isUserEvent('agora.remote'))){wrStatus(e,'editing');wrAfter(e,()=>wrSave(e),WR_SAVE_MS)}
+      e.hooks.changed?.();
+    }});
+  // Windows line ends arrive from files: the editor counts \r as a character, so take them out as a first change
+  if(text.includes('\r')){const c=[];for(let i=0;i<text.length;i++)if(text[i]==='\r')c.push({from:i,to:i+1});e.ed.view.dispatch({changes:c,annotations:CM.Transaction.addToHistory.of(false)})}
+  WR_EDITORS.set(id,e);
+  // keep a few documents' editors (and their undo); let go of the oldest that has nothing waiting to be kept
+  for(const [k,x] of WR_EDITORS){if(WR_EDITORS.size<=8)break;if(k!==id&&!x.inflight&&x.pending.empty){x.ed.view.destroy();WR_EDITORS.delete(k)}}
+  return e;
+}
+// Speak to an editor from outside any paint (see mountPage): a press on a painted button runs inside its paint
+const wrLater=fn=>Promise.resolve().then(fn).catch(()=>{});
+// An editor's save timer, made outside any paint so a repaint never drops it
+function wrAfter(e,fn,ms){clearTimeout(e.timer);const g=e.timerGen=(e.timerGen||0)+1;Promise.resolve().then(()=>{if(g===e.timerGen)e.timer=setTimeout(fn,ms)})}
+function wrStatus(e,s,why){e.status=s;e.why=why||'';e.hooks.status?.(s,e.why)}
+// The world's text changed by another hand (an agent, undo, another window): apply that change here, under ours
+function wrFollow(e,text){
+  const CM=WR_CM;if(e.inflight||text===e.base.text)return;
+  const R=CM.diff(e.base.text,text);
+  e.ed.view.dispatch({changes:R.map(e.pending),userEvent:'agora.remote',annotations:CM.Transaction.addToHistory.of(false)});
+  e.pending=e.pending.map(R,true);e.base={text,version:''};
+}
+// Keep what was typed: send the changed spans and the text they were made against
+async function wrSave(e,now){
+  const CM=WR_CM;clearTimeout(e.timer);e.timerGen=(e.timerGen||0)+1;
+  if(e.inflight){if(now)e.again=true;return}
+  if(e.pending.empty){if(e.status!=='failed')wrStatus(e,'saved');return}
+  const changes=e.pending,base=e.base,sent=changes.apply(CM.Text.of(base.text.split('\n'))).toString();
+  e.inflight={buffer:CM.ChangeSet.empty(changes.newLength)};e.pending=CM.ChangeSet.empty(changes.newLength);
+  wrStatus(e,'saving');e.sentAt=performance.now();
+  try{
+    
+    const out=await e.api.fire('write',{changes:JSON.stringify(CM.spans(changes)),base:CM.fingerprint(base.text),version:base.version||''});
+    const row=(out?.rows||[]).find(r=>r.id===e.id)||{};
+    const server=row.merged&&typeof row.text==='string'?row.text:sent;
+    const B=e.inflight.buffer;e.inflight=null;
+    if(server!==sent){const R=CM.diff(sent,server);e.ed.view.dispatch({changes:R.map(B),userEvent:'agora.remote',annotations:CM.Transaction.addToHistory.of(false)});e.pending=B.map(R,true)}
+    else e.pending=B;
+    e.base={text:server,version:CM.fingerprint(server)===row.base?row.version||'':''};
+    e.tries=0;wrStatus(e,e.pending.empty?'saved':'editing');
+  }catch(err){
+    
+    const B=e.inflight?.buffer||CM.ChangeSet.empty(changes.newLength);e.inflight=null;
+    const all=changes.compose(B),why=String(err?.message||err).split('\n')[0];
+    e.pending=all;
+    if(/stale/i.test(why)&&(e.tries=(e.tries||0)+1)<4){
+      // the text changed meanwhile: read it, put our changes on top of it, and send again
+      try{await e.api.redraw()}catch{}
+      const latest=e.api.latest?.();const now=latest?.facts?.id===e.id?String(latest.facts.text??''):null;
+      if(now!=null&&now!==base.text){const R=CM.diff(base.text,now);e.ed.view.dispatch({changes:R.map(all),userEvent:'agora.remote',annotations:CM.Transaction.addToHistory.of(false)});e.pending=all.map(R,true);e.base={text:now,version:''}}
+      wrAfter(e,()=>wrSave(e),150);return;
+    }
+    wrStatus(e,'failed',why);return;
+  }
+  if(e.again||!e.pending.empty){e.again=false;wrAfter(e,()=>wrSave(e),e.pending.empty?0:WR_SAVE_MS)}
+}
+// before leaving a document (another opens, the window closes): keep what was typed in every editor
+function wrSaveAll(){for(const e of WR_EDITORS.values())if(!e.pending.empty&&!e.inflight)wrSave(e,true)}
+addEventListener('pagehide',wrSaveAll);addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')wrSaveAll()});
+
+function wrCopy(text){try{navigator.clipboard?.writeText(text).catch(()=>fallback())}catch{fallback()}
+  function fallback(){const t=wrEl('textarea',{value:text,style:{position:'fixed',opacity:'0'}});document.body.append(t);t.select();try{document.execCommand('copy')}catch{}t.remove()}}
+
 function mountPage(api,s){
   const d=api.facts,id=d.id,D=api.draft,view=api.view();
-  const readonly=!!d.file_source,text=String(d.text||''),lines=text.split('\n'),plan=wrPlanState(d)||(d.collection==='plans'?'waiting':'');
+  const readonly=!!d.file_source,text=String(d.text||''),plan=wrPlanState(d)||(d.collection==='plans'?'waiting':'');
   if(!D.docs)D.docs=[];
   const desk=wrEl('div',{class:'wr-desk'}),root=api.part('body','article',{class:'wr-page','aria-label':wrTitle(d)});desk.append(root);
-  const paper=wrEl('div',{class:'wr-paper'}),margin=wrEl('aside',{class:'wr-margin','aria-label':'Comments'});root.append(paper,margin);
-  const rev=()=>api.latest().saw?.[id]??d.rev;
-  const sayRefusal=e=>String(e?.message||e).split('\n')[0];
+  // the margin is the frame of this page's panel (the lens's `panel right` on its comments): shut, it has no width
+  const panelName=api.children.find(c=>c.panel)?.name||'';
+  const margin=wrEl('aside',{class:'wr-margin','aria-label':'Comments','data-panel-frame':panelName}),paper=wrEl('div',{class:'wr-paper'});root.append(paper,margin);
+  if(/^\d{3,4}$/.test(String(s.measure||'')))root.style.setProperty('--wr-measure',s.measure+'px');
 
   // the head: title, who and when, the tools
   const title=api.part('title','input',{class:'wr-title',value:wrTitle(d),placeholder:'Untitled','aria-label':'Title',...(readonly?{readonly:''}:{})});
   // kept on Enter or leaving (not 'change': a repaint while it has focus hands its words to a new input, which then never changes)
   const retitle=()=>{const v=title.value.trim();if(!v||v===wrTitle(d)||D.retitling===v)return;D.retitling=v;wrFire(api,'retitle',{value:v}).catch(()=>{title.value=wrTitle(d)}).finally(()=>{D.retitling=''})};
-  title.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();retitle();desk.querySelector('.wr-md')?.focus()}if(e.key==='Escape'){title.value=wrTitle(d);title.blur()}});
+  title.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key==='ArrowDown'){ev.preventDefault();retitle();const k=ev.key;wrLater(()=>{const v=entry?.ed.view;if(v){v.focus();if(k==='Enter')v.dispatch({selection:{anchor:0}})}})}if(ev.key==='Escape'){title.value=wrTitle(d);title.blur()}});
   title.addEventListener('blur',()=>{if(title.isConnected)retitle()});
   const meta=wrEl('div',{class:'wr-meta'});
   if(d.drafted_by)meta.append(wrEl('span',{class:'wr-chip wr-claude',title:'Everything here not quoted as Alex’s words is '+d.drafted_by+'’s'},'Draft by '+d.drafted_by));
   meta.append(wrEl('span',{},d.kind==='note'?'a note':readonly?'from a file':(d.collection?{plans:'a plan',notes:'a note',documentation:'Agora documentation',personal:'personal writing'}[d.collection]||d.collection:'a document')));
   if(d.made_by)meta.append(wrEl('span',{class:'wr-sep'},'·'),wrWho(api,d,wrEl('span',{}),'by '));
   meta.append(wrEl('span',{class:'wr-sep'},'·'),wrEl('span',{title:d.changed||''},'changed '+wrAgo(api,d.changed||d.made)));
-  const words=wrNorm(text.replace(/[#>*_`|\-\[\]]/g,' ')).split(' ').filter(Boolean).length;
-  if(words)meta.append(wrEl('span',{class:'wr-sep'},'·'),wrEl('span',{},words.toLocaleString()+' words'));
-  if(d.page)meta.append(wrEl('span',{class:'wr-sep'},'·'),wrEl('a',{class:'wr-ext',title:d.page,tabindex:'0',role:'link',on:{click:e=>wrExternal(api,d.page,e.clientX,e.clientY)}},'its design page'));
+  const countWords=t=>wrNorm(t.replace(/[#>*_`|\-\[\]]/g,' ')).split(' ').filter(Boolean).length;
+  const wordsNode=wrEl('span',{});meta.append(wrEl('span',{class:'wr-sep'},'·'),wordsNode);
+  const setWords=t=>{const n=countWords(t);wordsNode.textContent=n.toLocaleString()+(n===1?' word':' words')};setWords(text);
+  const saveNode=wrEl('span',{class:'wr-save','aria-live':'polite'});
+  if(!readonly)meta.append(wrEl('span',{class:'wr-sep'},'·'),saveNode);
+  if(d.page)meta.append(wrEl('span',{class:'wr-sep'},'·'),wrEl('a',{class:'wr-ext',title:d.page,tabindex:'0',role:'link',on:{click:ev=>wrExternal(api,d.page,ev.clientX,ev.clientY)}},'its design page'));
   const actions=wrEl('div',{class:'wr-actions'});
-  if(!readonly)actions.append(wrEl('button',{type:'button',class:'wr-btn','aria-pressed':String(!!D.full),title:'Ctrl+E',on:{click:()=>toggleSource()}},wrIcon('code'),D.full?'Drawn':'Source',wrEl('span',{class:'wr-key'},'Ctrl E')));
-  if(wrHasGesture(api,'ask-jeff'))actions.append(wrEl('button',{type:'button',class:'wr-btn',title:'Send this document into JEFF’s Conversation',on:{click:e=>{const r=e.currentTarget.getBoundingClientRect();jeff('',r.left,r.bottom+6)}}},wrIcon('jeff'),'Send to JEFF'));
-  actions.append(wrEl('button',{type:'button',class:'wr-btn','aria-label':'More',on:{click:e=>{const r=e.currentTarget.getBoundingClientRect();moreMenu(r.left,r.bottom+6)}}},wrIcon('more')));
+  const srcBtn=wrEl('button',{type:'button',class:'wr-btn','aria-pressed':'false',title:'Show every Markdown mark (Ctrl+E)',on:{click:()=>toggleSource()}},wrIcon('code'),'Marks',wrEl('span',{class:'wr-key'},'Ctrl E'));
+  if(!readonly)actions.append(srcBtn);
+  if(wrHasGesture(api,'ask-jeff'))actions.append(wrEl('button',{type:'button',class:'wr-btn',title:'Send this document into JEFF’s Conversation',on:{click:ev=>{const r=ev.currentTarget.getBoundingClientRect();jeff('',r.left,r.bottom+6)}}},wrIcon('jeff'),'Send to JEFF'));
+  actions.append(wrEl('button',{type:'button','aria-label':'More',class:'wr-btn',on:{click:ev=>{const r=ev.currentTarget.getBoundingClientRect();moreMenu(r.left,r.bottom+6)}}},wrIcon('more')));
   paper.append(wrEl('header',{class:'wr-head'},title,meta,actions));
 
   // a plan: Alex's call on it, as the old desk's design review had it
@@ -583,149 +718,95 @@ function mountPage(api,s){
       box.append(calls)}
     paper.append(box);
   }
-  if(D.rescued){const ta=wrEl('textarea',{value:D.rescued,'aria-label':'Your unsaved words'});
-    paper.append(wrEl('div',{class:'wr-banner',role:'alert'},wrEl('strong',{},'Your last change was not saved. '+(D.rescuedWhy||'')),ta,
-      wrEl('div',{class:'wr-pop-row'},wrEl('small',{},'The document may have changed since you began. Your words are kept here.'),wrEl('button',{type:'button',class:'wr-btn wr-quiet',on:{click:()=>{D.rescued='';D.rescuedWhy='';ta.closest('.wr-banner').remove()}}},'Discard'),
-        wrEl('button',{type:'button',class:'wr-btn wr-primary',on:{click:()=>{D.edit={l0:lines.length,l1:lines.length,orig:'',value:ta.value,rev:rev(),src:text};D.rescued='';ta.closest('.wr-banner').remove();drawBody()}}},'Add them at the end'))))}
 
-  // the sheet: drawn Markdown, a block being edited, or the whole source (Ctrl+E)
-  const sheet=wrEl('div',{class:'wr-sheet'}),md=wrEl('div',{class:'wr-md',tabindex:'-1'});
-  paper.append(sheet);
+  // the sheet: one continuous editor (a file's pages are only read)
+  const sheet=api.part('editor','div',{class:'wr-sheet'});paper.append(sheet);
   let resolve=wrResolver(D.docs),docsSeen=JSON.stringify(D.docs.map(x=>[x.id,wrTitle(x),x.source]));
-  const ctx={resolve:ref=>resolve(ref),ago:iso=>wrAgo(api,iso),readonly};
+  const ctx={resolve:ref=>resolve(ref),ago:iso=>wrAgo(api,iso),readonly:true};
   const comments=[];for(const col of api.children)for(const c of (col.component==='doc-comment'?[col]:col.children||[]))if(c.component==='doc-comment')comments.push(c);
-  function drawBody(){
-    sheet.replaceChildren();
-    if(readonly){sheet.append(md);md.replaceChildren(wrEl('p',{class:'wr-placeholder'},'Opening the file’s pages…'));
-      api.read('file-read '+id).then(api.guard(r=>{const data=wrRows(r)[0]||{};md.replaceChildren(...(data.pages||[]).map((p,i)=>wrEl('section',{class:'wr-block'},wrEl('h4',{},'Page '+(i+1)),wrEl('pre',{},wrEl('code',{},String(p).slice(0,20000))))));
-        if(!(data.pages||[]).length)md.replaceChildren(wrEl('p',{class:'wr-placeholder'},data.reason||'This file has no readable pages.'))})).catch(()=>md.replaceChildren(wrEl('p',{class:'wr-placeholder'},'This file is not readable here.')));
-      return}
-    if(D.full){
-      const src=api.part('source','textarea',{class:'wr-source',value:D.full.value??text,'aria-label':'Markdown source of '+wrTitle(d),spellcheck:'true'});
-      wire(src,{full:true});sheet.append(wrEl('span',{class:'wr-srcnote'},'MARKDOWN · Ctrl+E to draw it'),src);return}
-    md.replaceChildren(...mdRender(mdParse(text),ctx));
-    if(!text.trim()&&!D.edit)md.append(wrEl('p',{class:'wr-placeholder wr-block','data-l0':'0','data-l1':'0'},'Start writing… (Markdown: # a heading, - a list, **bold**, [[ a link)'));
-    if(D.edit){const e=D.edit;const ta=api.part('editor','textarea',{class:'wr-editor',value:e.value,rows:Math.max(2,e.value.split('\n').length),'aria-label':'Editing part of '+wrTitle(d),spellcheck:'true'});
-      wire(ta,{});
-      const blocks=[...md.querySelectorAll(':scope>.wr-block')];const at=blocks.find(b=>+b.dataset.l0===e.l0);
-      if(at&&e.l1>e.l0){for(const b of blocks)if(+b.dataset.l0>=e.l0&&+b.dataset.l1<=e.l1&&b!==at)b.remove();at.replaceWith(ta)}
-      else{const after=blocks.find(b=>+b.dataset.l0>=e.l1);for(const b of blocks)if(b.classList.contains('wr-placeholder'))b.remove();if(after)md.insertBefore(ta,after);else md.append(ta)}
-      queueMicrotask(()=>grow(ta))}
-    sheet.append(md,wrEl('div',{class:'wr-tail',title:'Press to add to the end',on:{click:()=>{if(!D.edit)startEdit(lines.length,lines.length,'')}}}));
-    marks();
-  }
-  function marks(){
-    for(const c of comments){const f=c.facts||{};if(f.reply_to||f.resolved==='yes'||!f.quote)continue;
-      for(const b of md.querySelectorAll(':scope>.wr-block')){const mk=wrMarkQuote(b,f.quote,f.id);if(mk){mk.addEventListener('click',e=>{e.stopPropagation();hot(f.id,true)});break}}}
-  }
-  function hot(cid,scroll){for(const n of desk.querySelectorAll('.wr-hot'))n.classList.remove('wr-hot');
-    const card=margin.querySelector('[data-comment-card="'+cid+'"]');const mk=md.querySelector('mark[data-comment="'+cid+'"]');
-    card?.classList.add('wr-hot');for(const m of md.querySelectorAll('mark[data-comment="'+cid+'"]'))m.classList.add('wr-hot');
-    if(scroll)(card&&scroll==='card'?card:mk||card)?.scrollIntoView({block:'center',behavior:'smooth'})}
-
-  // editing ----------------------------------------------------------------------------------------------------------
-  function grow(ta){if(ta.classList.contains('wr-editor')){ta.style.height='auto';ta.style.height=ta.scrollHeight+4+'px'}}
-  function startEdit(l0,l1,value,caret){if(readonly)return;const orig=lines.slice(l0,l1).join('\n');D.edit={l0,l1,orig,value:value??orig,rev:rev(),src:text};drawBody();
-    const ta=sheet.querySelector('.wr-editor');if(ta){ta.focus();const at=caret==null?ta.value.length:Math.max(0,Math.min(ta.value.length,caret));ta.setSelectionRange(at,at);grow(ta)}}
-  function toggleSource(){if(readonly)return;
-    if(D.full){const v=sheet.querySelector('.wr-source')?.value??D.full.value;const was=D.full;D.full=null;save(v,was.rev,'source').then(ok=>{if(!ok)return;drawBody();actionsSync()});if(v===text){drawBody();actionsSync()}}
-    else{commitEdit('switch').finally(()=>{D.full={value:text,rev:rev()};drawBody();actionsSync();const src=sheet.querySelector('.wr-source');src?.focus()})}}
-  function actionsSync(){const b=actions.querySelector('[aria-pressed]');if(b){b.setAttribute('aria-pressed',String(!!D.full));b.childNodes[1].textContent=D.full?'Drawn':'Source'}}
-  async function save(value,base,how){
-    if(value===text)return true;
-    try{await wrFire(api,'edit',{value,saw:{[id]:base??rev()}});return true}
-    catch(e){D.rescued=value;D.rescuedWhy=sayRefusal(e);return false}
-  }
-  async function commitEdit(how){
-    const e=D.edit;if(!e||e.busy)return;const ta=sheet.querySelector('.wr-editor');const value=ta?ta.value:e.value;
-    D.edit=null;
-    if(value===e.orig){if(how!=='switch')drawBody();return}
-    const src=e.src.split('\n');const piece=value.replace(/\s+$/,'').split('\n');
-    let next=[...src.slice(0,e.l0),...(value.trim()?piece:[]),...src.slice(e.l1)];
-    if(value.trim()&&e.l0===e.l1){if(e.l0>0&&src[e.l0-1]?.trim())next.splice(e.l0,0,'');if(src[e.l1]?.trim())next.splice(e.l0+piece.length+(e.l0>0&&src[e.l0-1]?.trim()?1:0),0,'')}
-    if(!value.trim()&&e.l1<src.length&&!src[e.l1]?.trim()&&(e.l0===0||!src[e.l0-1]?.trim()))next.splice(e.l0,1);
-    const ok=await save(next.join('\n').replace(/\n{3,}/g,'\n\n'),e.rev,how);
-    if(!ok&&md.isConnected){D.edit={...e,value,busy:false};D.rescued='';drawBody();api.tell('Not saved: '+(D.rescuedWhy||'refused'))}
-  }
-  function wire(ta,{full}){
-    const pick=wrEl('div',{class:'wr-pick',role:'listbox',hidden:''});let options=[],sel=0,from=-1;
-    const draft=()=>{if(full){D.full={...(D.full||{}),value:ta.value}}else if(D.edit)D.edit.value=ta.value};
-    const closePick=()=>{pick.hidden=true;from=-1};
-    const showPick=()=>{
-      const before=ta.value.slice(0,ta.selectionStart),m=/\[\[([^\]\n|]{0,60})$/.exec(before);if(!m){closePick();return}
-      from=ta.selectionStart-m[1].length;const q=m[1].toLowerCase();
-      options=D.docs.filter(x=>x.id!==id&&(!q||wrTitle(x).toLowerCase().includes(q)||x.id===q)).slice(0,8);sel=Math.min(sel,Math.max(0,options.length-1));
-      pick.replaceChildren(...options.map((x,i)=>wrEl('button',{type:'button',role:'option','aria-selected':String(i===sel),on:{pointerdown:e=>{e.preventDefault();choose(i)}}},wrEl('span',{},wrTitle(x)),wrEl('small',{},wrCollection(x)))));
-      if(!options.length)pick.append(wrEl('p',{},q?'No document called “'+m[1]+'”. Keep typing, then ]] makes a link to start it.':'Type to find a document to link.'));
-      pick.hidden=false;const r=ta.getBoundingClientRect(),host=sheet.getBoundingClientRect();
-      pick.style.left=Math.max(0,r.left-host.left)+'px';pick.style.top=(r.bottom-host.top+6)+'px';
-    };
-    const choose=i=>{const x=options[i];if(!x)return;const v=ta.value,end=ta.selectionStart;const close=v.slice(end).startsWith(']]')?2:0;
-      const ins=x.id+'|'+wrTitle(x)+']]';ta.value=v.slice(0,from)+ins+v.slice(end+close);const at=from+ins.length;ta.setSelectionRange(at,at);closePick();draft();grow(ta);ta.focus()};
-    const wrap=mark=>{const a=ta.selectionStart,b=ta.selectionEnd;ta.setRangeText(mark+ta.value.slice(a,b)+mark,a,b,a===b?'end':'select');if(a===b)ta.setSelectionRange(a+mark.length,a+mark.length);draft();grow(ta)};
-    ta.addEventListener('input',()=>{draft();grow(ta);showPick()});
-    ta.addEventListener('click',showPick);
-    ta.addEventListener('scroll',()=>{if(full)D.fullScroll=ta.scrollTop},{passive:true});
-    ta.addEventListener('keydown',e=>{
-      if(!pick.hidden&&options.length){if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();sel=(sel+(e.key==='ArrowDown'?1:-1)+options.length)%options.length;showPick();return}
-        if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();choose(sel);return}}
-      if(!pick.hidden&&e.key==='Escape'){e.preventDefault();e.stopPropagation();closePick();return}
-      const mod=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
-      if(mod&&k==='b'){e.preventDefault();wrap('**')}else if(mod&&k==='i'){e.preventDefault();wrap('*')}
-      else if(mod&&k==='s'){e.preventDefault();full?save(ta.value,D.full?.rev).then(ok=>{if(ok&&D.full)D.full.rev=rev()}):commitEdit('save')}
-      else if(mod&&k==='e'){e.preventDefault();e.stopPropagation();if(full)toggleSource();else{commitEdit('switch').finally(()=>{D.full={value:String(api.latest().facts?.text??text),rev:rev()};drawBody();actionsSync();sheet.querySelector('.wr-source')?.focus()})}}
-      else if(e.key==='Escape'&&!full){e.preventDefault();commitEdit('escape')}
-      else if(e.key==='Enter'&&mod&&!full){e.preventDefault();commitEdit('enter')}
-      else if(e.key==='Tab'){const a=ta.selectionStart,ls=ta.value.lastIndexOf('\n',a-1)+1;if(/^\s*([-*+]|\d+[.)])\s/.test(ta.value.slice(ls))||full){e.preventDefault();
-        if(e.shiftKey){if(ta.value.slice(ls,ls+2)==='  '){ta.setRangeText('',ls,ls+2,'preserve');ta.setSelectionRange(a-2,a-2)}}else{ta.setRangeText('  ',ls,ls,'preserve');ta.setSelectionRange(a+2,a+2)}draft();grow(ta)}}
+  let entry=null;
+  if(readonly){
+    const md=wrEl('div',{class:'wr-md'});sheet.append(md);md.replaceChildren(wrEl('p',{class:'wr-placeholder'},'Opening the file’s pages…'));
+    api.read('file-read '+id).then(api.guard(r=>{const data=wrRows(r)[0]||{};md.replaceChildren(...(data.pages||[]).map((p,i)=>wrEl('section',{class:'wr-block'},wrEl('h4',{},'Page '+(i+1)),wrEl('pre',{},wrEl('code',{},String(p).slice(0,20000))))));
+      if(!(data.pages||[]).length)md.replaceChildren(wrEl('p',{class:'wr-placeholder'},data.reason||'This file has no readable pages.'))})).catch(()=>md.replaceChildren(wrEl('p',{class:'wr-placeholder'},'This file is not readable here.')));
+  }else if(typeof WR_CM==='undefined'||!wrHasGesture(api,'write')){
+    sheet.append(wrEl('p',{class:'wr-placeholder'},typeof WR_CM==='undefined'?'The editor did not load.':'This window has no write gesture, so the document is only shown.'),wrEl('div',{class:'wr-md'},...mdRender(mdParse(text),ctx)));
+  }else{
+    // The editor lives outside this paint: it is made, and spoken to, from a promise, where no part is painting. The
+    // painter ties timers and listeners made while a part paints to that paint and drops them at the next one;
+    // CodeMirror's own (parsing, measuring) and the save timer must outlast every repaint.
+    const host=wrEl('div',{class:'wr-cm-host'});sheet.append(host);
+    const kept=WR_EDITORS.get(id);
+    const focused=kept&&kept.ed.view.dom.contains(document.activeElement)?document.activeElement:null;   // the text, or its find box
+    if(kept){entry=kept;entry.api=api;host.append(kept.ed.view.dom)}  // moved in now, so nothing flickers
+    if(kept)srcBtn.setAttribute('aria-pressed',String(kept.ed.source()));
+    if(kept)showStatus(kept.status||'saved',kept.why);
+    Promise.resolve().then(()=>{
+      if(!host.isConnected)return;                                   // a newer paint took its place
+      // what the editor asks of this page, as this paint knows it (given before a new editor first draws)
+      const hooks={
+        resolve:ref=>{const x=resolve(ref);return x?{id:x.id,title:wrTitle(x)}:null},
+        documents:()=>D.docs.filter(x=>x.id!==id).map(x=>({id:x.id,title:wrTitle(x),detail:wrCollection(x)})),
+        drawTable:src=>{const el=mdRender(mdParse(src),ctx,false)[0];return el||null},
+        link:async(l,ev)=>{await wrSave(entry,true);
+          if(l.doc)wrOpen(api,l.doc);else if(l.url)wrExternal(api,l.url,ev.clientX,ev.clientY);
+          else if(l.missing&&wrHasGesture(api,'new'))wrFire(api,'new',{title:l.missing}).then(out=>{const nid=wrMade(out);if(nid)api.select({open:nid,back:id,fresh:''})}).catch(()=>{})},
+        menu:(ev,vw)=>contextMenu(ev,vw),
+        commentPress:cid=>hot(cid,true),
+        toggleSource:()=>toggleSource(),
+        status:(st,why)=>showStatus(st,why),
+        changed:()=>{clearTimeout(entry.countTimer);entry.countTimer=setTimeout(()=>{if(wordsNode.isConnected)setWords(entry.ed.view.state.doc.toString())},250)},
+      };
+      entry=wrEditorEntry(api,d,{readonly,hooks});entry.api=api;Object.assign(entry.hooks,hooks);
+      const ed=entry.ed,v=ed.view;
+      v.dom.wrView=v;                           // for a test walk to read (not global)
+      if(v.dom.parentNode!==host)host.append(v.dom);
+      wrFollow(entry,text);                     // what the world says now, under anything not yet kept
+      srcBtn.setAttribute('aria-pressed',String(ed.source()));
+      // comments: marks on the words they are about
+      const sp=wrSourcePlain(v.state.doc.toString()),list=[];
+      for(const c of comments){const f=c.facts||{};if(f.reply_to||f.resolved==='yes'||!f.quote)continue;const r=wrFindQuote(sp,f.quote);if(r)list.push({id:f.id,...r})}
+      ed.setComments(list);ed.relink();
+      showStatus(entry.status||'saved',entry.why);
+      if(v.state.doc.toString()!==text)setWords(v.state.doc.toString());
+      // moved into a new page: measure again, and give the caret back if it had it
+      v.requestMeasure();
+      if(focused&&focused!==v.contentDOM&&focused.isConnected)focused.focus();else if(focused||D.focusEditor){D.focusEditor=false;v.focus()}
     });
-    ta.addEventListener('blur',()=>{if(!ta.isConnected)return;closePick();api.setTimeout(()=>{if(!ta.isConnected||document.activeElement===ta)return;
-      if(full){if(D.full&&ta.value!==text)save(ta.value,D.full.rev).then(ok=>{if(ok&&D.full)D.full.rev=rev()})}else commitEdit('blur')},140)});
-    sheet.append(pick);
-    if(full)queueMicrotask(()=>{if(D.fullScroll)ta.scrollTop=D.fullScroll});
   }
+  function showStatus(st,why){if(!saveNode.isConnected&&!saveNode.parentNode)return;
+    saveNode.className='wr-save wr-save-'+st;saveNode.title=why||'';
+    saveNode.textContent=st==='saving'?'Saving…':st==='editing'?'Editing':st==='failed'?'Not saved: '+(why||'refused')+' · your words stay here':'Saved'}
+  function hot(cid,scroll){for(const n of desk.querySelectorAll('.wr-hot'))n.classList.remove('wr-hot');
+    if(scroll&&panelName&&!api.panelOpen(panelName))api.panel(panelName,true);   // a comment's words were pressed: show it
+    const card=margin.querySelector('[data-comment-card="'+cid+'"]');card?.classList.add('wr-hot');wrLater(()=>entry?.ed.hotComment(cid));
+    if(scroll==='mark'&&entry)wrLater(()=>{const c=entry.ed.comments().find(x=>x.id===cid);if(c){entry.ed.view.dispatch({selection:{anchor:c.from,head:c.to},scrollIntoView:true});entry.ed.view.focus()}})
+    else if(scroll)card?.scrollIntoView({block:'center',behavior:'smooth'})}
+  function toggleSource(){wrLater(()=>{if(!entry)return;const on=!entry.ed.source();entry.ed.setSource(on);srcBtn.setAttribute('aria-pressed',String(on));entry.ed.view.focus()})}
 
-  // pressing, right-clicking and keys on the drawn page
-  md.addEventListener('click',e=>{
-    const link=e.target.closest('a[data-doc],a[data-missing],a[data-url]');
-    if(link){e.preventDefault();e.stopPropagation();if(link.dataset.doc)wrOpen(api,link.dataset.doc);else if(link.dataset.url)wrExternal(api,link.dataset.url,e.clientX,e.clientY);
-      else if(link.dataset.missing&&wrHasGesture(api,'new'))wrFire(api,'new',{title:link.dataset.missing}).then(out=>{const nid=wrMade(out);if(nid)api.select({open:nid,back:id,fresh:''})}).catch(()=>{});return}
-    if(e.target.closest('mark[data-comment]'))return;
-    const box=e.target.closest('input[type=checkbox][data-line]');
-    if(box){e.preventDefault();const n=+box.dataset.line,l=lines[n];const next=l.replace(/\[([ xX])\]/,(_,x)=>x===' '?'[x]':'[ ]');if(next!==l){const all=[...lines];all[n]=next;save(all.join('\n'),rev())}return}
-    if(readonly||D.full||e.target.closest('.wr-editor,.wr-pick'))return;
-    const s2=getSelection();if(s2&&!s2.isCollapsed&&md.contains(s2.anchorNode))return;      // highlighting only selects
-    const block=e.target.closest('.wr-block');if(!block||block.parentElement!==md)return;
-    const l0=+block.dataset.l0,l1=+block.dataset.l1;
-    // the caret lands about where it was pressed: the share of the drawn words before the press, in the source
-    let caret=null;try{const pos=document.caretPositionFromPoint?.(e.clientX,e.clientY);const r=document.createRange();r.setStart(block,0);
-      if(pos){r.setEnd(pos.offsetNode,pos.offset);const shown=wrNorm(block.textContent).length||1,src=lines.slice(l0,l1).join('\n');caret=Math.round(src.length*Math.min(1,wrNorm(r.toString()).length/shown))}}catch{}
-    if(D.edit)commitEdit('switch').then(()=>startEdit(l0,l1,null,caret));else startEdit(l0,l1,null,caret);
-  });
-  md.addEventListener('keydown',e=>{const link=e.target.closest?.('a[data-doc],a[data-url],a[data-missing]');if(link&&(e.key==='Enter'||e.key===' ')){e.preventDefault();link.click()}});
-  root.addEventListener('contextmenu',e=>{
-    if(e.target.closest('textarea,input,.wr-c'))return;
-    const sel=getSelection(),inside=sel&&!sel.isCollapsed&&paper.contains(sel.anchorNode)&&paper.contains(sel.focusNode);
-    const quote=inside?wrNorm(sel.toString()).slice(0,1200):'';
-    const block=e.target.closest('.wr-md>.wr-block');
-    if(!quote&&!block)return;
-    e.preventDefault();
-    const x=e.clientX,y=e.clientY,items=[];
-    const words=quote||wrNorm(block?.textContent||'').slice(0,1200);
-    if(quote)items.push({quote:quote.length>140?quote.slice(0,140)+'…':quote});
-    if(wrHasGesture(api,'comment'))items.push({icon:'comment',label:quote?'Comment':'Comment on this part',key:'in the margin',run:()=>comment(words,x,y)});
-    if(wrHasGesture(api,'ask-jeff'))items.push({icon:'jeff',label:quote?'Send to JEFF':'Send this part to JEFF',key:'Conversation',run:()=>jeff(words,x,y)});
-    if(block&&!readonly&&!D.full)items.push('-',{icon:'pen',label:'Edit this part',run:()=>startEdit(+block.dataset.l0,+block.dataset.l1)});
+  // right-click on selected words: comment on them, send them to JEFF, copy or cut. With nothing selected the browser's
+  // own menu shows (spelling, paste)
+  function contextMenu(ev,vw){
+    const r=vw.state.selection.main;if(r.empty)return false;
+    const srcText=vw.state.sliceDoc(r.from,r.to),quote=wrSourcePlain(srcText).plain.slice(0,1200);
+    if(!quote)return false;
+    ev.preventDefault();
+    const x=ev.clientX,y=ev.clientY,items=[{quote:quote.length>140?quote.slice(0,140)+'…':quote}];
+    if(wrHasGesture(api,'comment'))items.push({icon:'comment',label:'Comment',key:'in the margin',run:()=>comment(quote,x,y)});
+    if(wrHasGesture(api,'ask-jeff'))items.push({icon:'jeff',label:'Send to JEFF',key:'Conversation',run:()=>jeff(quote,x,y)});
+    items.push('-',{label:'Copy',key:'Ctrl C',run:()=>{wrCopy(srcText);vw.focus()}});
+    if(!readonly)items.push({label:'Cut',key:'Ctrl X',run:()=>{wrCopy(srcText);vw.dispatch({changes:{from:r.from,to:r.to},userEvent:'delete.cut'});vw.focus()}});
     wrMenu(x,y,items,api.askBox?.());
-  });
+    return true;
+  }
   function comment(quote,x,y){
-    const outline=wrOutline(text),around=wrAround(outline,quote);
+    const sp=wrSourcePlain(entry?entry.ed.view.state.doc.toString():text),around=wrAround(sp,quote);
     wrComposer({x,y,title:'Comment',badge:'✎',quote,hint:'Your comment on these words…',label:'Comment',line:wrLineOf(api,'comment'),keep:D,
-      send:async w=>{if(!w)throw Error('Write your comment first');await wrFire(api,'comment',{value:w,quote,before:around.before,after:around.after,heading:around.heading},'Comment added')}});
+      send:async w=>{if(!w)throw Error('Write your comment first');if(entry)await wrSave(entry,true);await wrFire(api,'comment',{value:w,quote,before:around.before,after:around.after,heading:around.heading},'Comment added')}});
   }
   function jeff(quote,x,y){
     wrComposer({x,y,title:quote?'Send these words to JEFF':'Send “'+wrTitle(d)+'” to JEFF',badge:'J',quote,hint:quote?'What should JEFF know or do about them? (optional)':'What should JEFF know or do about this document?',
-      label:'Send to JEFF',line:wrLineOf(api,'ask-jeff'),keep:D,send:async w=>{if(!w&&!quote)throw Error('Say something to JEFF first');await wrFire(api,'ask-jeff',{value:wrToJeff(w,quote,d)},'Sent to JEFF · it is in the Conversation');
+      label:'Send to JEFF',line:wrLineOf(api,'ask-jeff'),keep:D,send:async w=>{if(!w&&!quote)throw Error('Say something to JEFF first');if(entry)await wrSave(entry,true);await wrFire(api,'ask-jeff',{value:wrToJeff(w,quote,d)},'Sent to JEFF · it is in the Conversation');
         // a said line is not bound into this view, so nothing repaints: read what was sent again, uncached
         api.rows('rows said about='+id).then(api.guard(sent=>drawBelow(D.docs,wrRows(sent)))).catch(()=>{})}});
   }
@@ -733,11 +814,12 @@ function mountPage(api,s){
     const items=[];
     if(!readonly&&d.kind!=='note'&&wrHasGesture(api,'move'))for(const [c,label] of [['notes','Notes'],['documentation','Agora documentation'],['personal','Personal writing'],['plans','Plans']])
       if(d.collection!==c)items.push({label:'Move to '+label,run:()=>wrFire(api,'move',{value:c},'Moved to '+label).catch(()=>{})});
-    items.push({icon:'code',label:'Copy its id',key:id,run:()=>{const t=wrEl('textarea',{value:id,style:{position:'fixed',opacity:'0'}});document.body.append(t);t.select();try{document.execCommand('copy')}catch{}t.remove();api.tell('Copied '+id)}});
+    if(entry)items.push({icon:'search',label:'Find in this document',key:'Ctrl F',run:()=>wrLater(()=>{entry.ed.view.focus();WR_CM.openSearchPanel(entry.ed.view)})});
+    items.push({icon:'code',label:'Copy its id',key:id,run:()=>{wrCopy(id);api.tell('Copied '+id)}});
     if(wrHasGesture(api,'forget'))items.push('-',{label:'Forget this document…',danger:true,run:()=>{if(confirm('Forget “'+wrTitle(d)+'”? Undo brings it back.'))wrFire(api,'forget',{},'Forgotten · undo brings it back').then(()=>api.select({open:view.back&&view.back!==id?view.back:'',back:''})).catch(()=>{})}});
     wrMenu(x,y,items);
   }
-  const keys=e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='e'&&!e.target.closest?.('textarea')){e.preventDefault();toggleSource()}};
+  const keys=ev=>{if(ev.defaultPrevented)return;if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='e'&&!ev.target.closest?.('textarea,input')){ev.preventDefault();toggleSource()}};
   document.addEventListener('keydown',keys);api.cleanup(()=>document.removeEventListener('keydown',keys));
 
   // the margin: comments, open first, in the order their words stand in the document
@@ -748,8 +830,8 @@ function mountPage(api,s){
   margin.append(wrEl('div',{class:'wr-margin-head'},wrIcon('comment'),open.length?open.length+(open.length===1?' comment':' comments'):'Comments'));
   if(!open.length)margin.append(wrEl('div',{class:'wr-hint'},'Select words, then right-click to comment on them, or to send them to JEFF. A comment stays beside the words it is about, and says so if they change.'));
   const card=c=>{const n=api.render(c);const box=n.querySelector?.('.wr-replies');if(box)for(const r of replies.filter(r=>r.facts.reply_to===c.facts.id))box.append(api.render(r));
-    n.addEventListener('mouseenter',()=>{for(const m of md.querySelectorAll('mark[data-comment="'+c.facts.id+'"]'))m.classList.add('wr-hot')});
-    n.addEventListener('mouseleave',()=>{for(const m of md.querySelectorAll('mark.wr-hot'))m.classList.remove('wr-hot')});
+    n.addEventListener('mouseenter',()=>wrLater(()=>entry?.ed.hotComment(c.facts.id)));
+    n.addEventListener('mouseleave',()=>wrLater(()=>entry?.ed.hotComment('')));
     n.querySelector('.wr-c-q')?.addEventListener('click',()=>hot(c.facts.id,'mark'));return n};
   for(const c of open)margin.append(card(c));
   if(done.length){const more=wrEl('button',{type:'button',class:'wr-more','aria-expanded':String(!!D.showDone),on:{click:()=>{D.showDone=!D.showDone;list.hidden=!D.showDone;more.textContent=(D.showDone?'Hide ':'Show ')+done.length+' resolved'}}},(D.showDone?'Hide ':'Show ')+done.length+' resolved');
@@ -763,13 +845,15 @@ function mountPage(api,s){
     if(links.length)below.append(wrEl('h2',{class:'wr-h'},'Linked from '+links.length),...links.map(x=>wrEl('button',{type:'button',class:'wr-row',on:{click:()=>wrOpen(api,x.id)}},wrEl('span',{class:'wr-row-title'},wrTitle(x)),wrEl('span',{class:'wr-row-meta'},wrAgo(api,x.changed)))));
     if(sent.length)below.append(wrEl('h2',{class:'wr-h'},'Sent to JEFF · '+sent.length),...sent.slice(-5).reverse().map(x=>wrEl('div',{class:'wr-row',style:{cursor:'default'}},wrEl('span',{class:'wr-snip'},wrNorm(String(x.text||'').replace(/^>.*$/gm,'').replace(/— (from|about) \[\[[^\]]*\]\]/,''))||'(a passage)'),wrEl('span',{class:'wr-row-meta'},wrWho(api,x,wrEl('span',{})),' · '+wrAgo(api,x.made)))));
   };
-  drawBody();
   // the documents list draws [[links]] and fills the picker; it is watched, so it is usually already here
   wrReadDocs(api).then(api.guard(docs=>{D.docs=docs;const seen=JSON.stringify(docs.map(x=>[x.id,wrTitle(x),x.source]));
-    if(seen!==docsSeen){docsSeen=seen;resolve=wrResolver(docs);if(!D.full&&!sheet.querySelector('.wr-editor'))drawBody()}
+    if(seen!==docsSeen){docsSeen=seen;resolve=wrResolver(docs);entry?.ed.relink()}
     api.read('rows said about='+id).then(api.guard(sent=>drawBelow(docs,wrRows(sent)))).catch(()=>drawBelow(docs,[]))})).catch(()=>{});
   desk.addEventListener('scroll',()=>{D.scroll=desk.scrollTop},{passive:true});
   queueMicrotask(()=>{if(D.scroll)desk.scrollTop=D.scroll});
+  // pressing the empty page below the text puts the caret at the end, as a word processor does
+  desk.addEventListener('mousedown',ev=>{if(!entry||ev.button!==0)return;if(ev.target!==desk&&ev.target!==root&&ev.target!==paper&&ev.target!==sheet)return;
+    const v=entry.ed.view,r=v.contentDOM.getBoundingClientRect();if(ev.clientY<r.top)return;ev.preventDefault();wrLater(()=>{v.focus();v.dispatch({selection:{anchor:v.state.doc.length},scrollIntoView:true})})});
   if(view.fresh===id&&!readonly&&!D.welcomed){D.welcomed=true;queueMicrotask(()=>{title.focus();title.select()})}
   return desk;
 }

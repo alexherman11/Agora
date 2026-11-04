@@ -524,6 +524,10 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
         while len(_IR) > 64:
             _IR.pop(next(iter(_IR)))
     w = desk.world
+    # The stable tie-break of a selection is its appearance order. Send only
+    # the displayed item's sort tuple, so a carry can preview another repeat
+    # without inventing an insertion order or reading undisplayed properties.
+    tiling_ordinals = {i: n for n, i in enumerate(w.nodes)}
     count = count if count is not None else [0]
     host = {f: acc.host(f) for f in ("me", "today", "session")}
     # a6010: a placed lens was keyed again under its placer after it was built (S._rekey, in place), so nothing of it
@@ -1068,6 +1072,13 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                                 when[(i, k)] = acc.when_key(i, k)
                             return when[(i, k)][0]
                         return props(i).get(k)
+                    def ordered_child(child, i):
+                        if b.get("by"):
+                            child["tiling_order"] = {
+                                "keys": list(b["by"]),
+                                "values": [list(moo.order_value(key_of(i, k.lstrip("-")))) for k in b["by"]],
+                                "tie": tiling_ordinals.get(i, 0)}
+                        return child
                     if b.get("by"):
                         if named is not None:
                             named = moo.sort_by(named, b["by"], lambda x, k: key_of(x[0], k))
@@ -1089,13 +1100,13 @@ def evaluate(desk, src, stack=(), count=None, props=None, closure=None, acc=None
                         base = max(0, total - keep) if b.get("last") else 0      # $index: the place in the whole repeat
                         for k, (i, st) in enumerate(pick(named), base + 1):
                             mcb = cb + shown + ([[i, S._rev_of(w, i), []]] if st != "live" else _member_reads(w, i, sel_text))
-                            out["kids"].append(instance(each, S._inst(ctx, node["ast"], dict(acc.thing(i, st), count=total, index=k, **({"run": place[i]} if place else {}))), f"{key}/{i}", em["layout"], chain, mcb))
+                            out["kids"].append(ordered_child(instance(each, S._inst(ctx, node["ast"], dict(acc.thing(i, st), count=total, index=k, **({"run": place[i]} if place else {}))), f"{key}/{i}", em["layout"], chain, mcb), i))
                         out["states"] = [f"{i} {st}" for i, st in named if st != "live"]
                     else:
                         total = len(ids)
                         base = max(0, total - keep) if b.get("last") else 0
                         for k, i in enumerate(pick(list(ids)), base + 1):
-                            out["kids"].append(instance(each, S._inst(ctx, node["ast"], dict(acc.thing(i), count=total, index=k, **({"run": place[i]} if place else {}))), f"{key}/{i}", em["layout"], chain, cb + shown + _member_reads(w, i, sel_text)))
+                            out["kids"].append(ordered_child(instance(each, S._inst(ctx, node["ast"], dict(acc.thing(i), count=total, index=k, **({"run": place[i]} if place else {}))), f"{key}/{i}", em["layout"], chain, cb + shown + _member_reads(w, i, sel_text)), i))
                 got = [k["item"] or k["key"] for k in out["kids"]]
                 out["members"] = {"of": sel_text, "n": total, "ids": got, "at": len(w.events)}
                 for r in acc.nodes:

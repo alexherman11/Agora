@@ -82,7 +82,9 @@ def run(out):
         alex = claude_door(s.url)
         page = open_writing(s.url, 'alex', 1440, 900)
         w = Walk(page, door, out)
-        clutter, moving, guide = ids['Shedding clutter'], ids['Moving into the desktop'], ids['Writing in Agora']
+        # the guide is made once; a copy of a world that already has it returns no id for it
+        guide = ids.get('Writing in Agora') or door.rows('document', source='research/kernel-lab/apps/writing/install.py#guide')[0]['id']
+        clutter, moving = ids['Shedding clutter'], ids['Moving into the desktop']
 
         def home():
             w.until('document.querySelector(".wr-hello")?.textContent.includes("Alex")')

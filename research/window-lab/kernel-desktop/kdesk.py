@@ -1,4 +1,11 @@
-"""kdesk: Alex's desktop on the new kernel. One process: the kernel (research/kernel-lab, unchanged), its
+"""EDITING THE DESKTOP HOST (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+This file is a seam between the world and Windows: it turns world facts into screen effects and screen events into world
+facts, through small words. It holds no preferences and no content. Which apps, what a button opens, sizes, names, ids and
+who may do what live in settings things it reads (shell-settings, wm-settings). It does not seed the world at start
+(people, chats, pins). New behaviour is a rule over the words offered here. Before writing a Windows or browser helper,
+use the shared one (gaming_gate for full-screen and desktop tests, widget_browser for hidden pages) instead of a copy.
+
+kdesk: Alex's desktop on the new kernel. One process: the kernel (research/kernel-lab), its
 door on loopback 8810, and the modules the world says are on (the window host and the little guy).
 
     python kdesk.py [--world <dir>] [--port 8810]       run it (kdesk_on.py starts it detached; kdesk_off.py stops all)
@@ -47,6 +54,7 @@ VENV_PY = HERE.parents[2] / ".venv/Scripts/python.exe"
 if not VENV_PY.is_file():
     VENV_PY = Path(sys.prefix) / "Scripts/python.exe"
 STEWARD_ACCOUNT = "desktop:alex"
+ADAPTERS = HERE.parents[1] / "kernel-lab/modules/adapters/adapters.py"
 
 WINDOW_GRANTS = "window.* make set forget rows look who failed hear:make hear:set hear:forget hear:undo hear:off"
 GUY_GRANTS = "guy.* window.list window.overlay rows look holds hear:window.opened"
@@ -76,6 +84,10 @@ def module_specs(headless=False):
          "grants": SYSTEM_GRANTS, "for": "steward"},
         {"name": "media", "run": [py, str(HERE / "kd_media.py")] + tail, "publishes": "media.*",
          "grants": MEDIA_GRANTS, "for": "steward"},
+        # an adapter (kernel-lab/modules/adapters): the one adapter source, run as the module named twitch; what it
+        # reads and where it writes is the adapter thing named twitch, in the world
+        {"name": "twitch", "run": [str(VENV_PY), str(ADAPTERS)] + tail, "publishes": "twitch.*",
+         "grants": "rows chat.receive", "only": "kind:chat,said", "for": "steward"},
         {"name": "house", "run": [py, str(HERE.parents[1] / "kernel-lab/modules/house/house.py")],
          "publishes": "house.*", "grants": HOUSE_GRANTS, "for": "steward"},
         {"name": "theme", "run": [py, str(HERE.parents[1] / "kernel-lab/theme/theme_module.py")],
@@ -98,6 +110,8 @@ ABOUT = {"window": "the window host: it makes the Agora windows on this desktop 
          "system": "what this machine is doing (CPU, memory, network, volume, battery, the window in front), for the "
                    "bars' widgets and system.now",
          "media": "the media words (media.play, media.next, media.prev, media.now) through Windows' media session",
+         "twitch": "read-only anonymous Twitch chat, an adapter: its settings (channel, into) and text are the adapter "
+                   "thing named twitch; twitch.now reads connection state; off twitch disconnects",
          "summarize": "local task summaries with honest literal fallback; off summarize stops it",
          "house": "the house: runs the world's agents (JEFF first), wakes one only when someone addresses it (@name, "
                   "its closed chat such as the Conversation, a task given to it, house.wake); house.who says what each "
@@ -116,6 +130,7 @@ def after_genesis(k, headless=False):
         steward = next((t for t in k.things("person") if k.is_steward(t)), None)
         have = {k.state.get(m, "name") for m in k.things("module")}
         new = [spec for spec in module_specs(headless) if spec["name"] not in have]
+        viewer_pin = not k.state.get(k.place, "viewer_installed")
         for m in k.things("module"):
             if k.state.get(m, "name") in ABOUT and steward and not k.state.get(m, "for"):
                 todo.append((m, "for", steward))
@@ -131,6 +146,12 @@ def after_genesis(k, headless=False):
                         todo.append((g,'words',words+' holds'))
             if ABOUT.get(name) and not k.state.get(m, "about"):
                 todo.append((m, "about", ABOUT[name]))
+            # a module whose program is gone from source (4 Nov: kd_twitch.py became the adapter source) follows what
+            # source now runs it with; a run someone pointed at a program that exists is theirs and stays
+            spec = next((s for s in module_specs(headless) if s["name"] == name), None)
+            run = k.state.get(m, "run") or []
+            if spec and run != spec["run"] and not all(Path(a).is_file() for a in run[1:2]):
+                todo.append((m, "run", spec["run"]))
         widen = []
         for m in k.things("module"):
             spec = next((s for s in module_specs(headless) if s["name"] == k.state.get(m, "name")), None)
@@ -148,10 +169,16 @@ def after_genesis(k, headless=False):
                 widen.append((m, " ".join(more), spec.get("only")))
             if str(k.state.get(m, "asks") or "") != spec["grants"]:
                 todo.append((m, "asks", spec["grants"]))
-        if not todo and not new:
+        if not todo and not new and not viewer_pin:
             return _widen(k, steward, widen)
         tx = Tx(k)
         tx.part("install", None, "install")
+        if viewer_pin:
+            pin = tx.mint()
+            for a, v in (("kind", "button"), ("name", "viewer-launcher"), ("label", "Viewer"),
+                         ("bar", "taskbar"), ("does", "window.open viewer")):
+                tx.set(pin, a, v)
+            tx.set(k.place, "viewer_installed", True)
         for t, a, v in todo:
             tx.set(t, a, v)
         for spec in new:                     # a module this desktop gained after the world was founded, as genesis says it
@@ -512,6 +539,8 @@ def start(world=DEFAULT_WORLD, port=8810, modules=True, headless=False, resident
     os.environ['AGORA_WIDGET_HOST_KEY'] = handler.widget_broker.guard_key
     os.environ["AGORA_KDESK_PORT"] = str(srv.server_address[1])     # the modules (children) read where the door is
     host = KM.Host(k, HERE)
+    if not modules:
+        k.modules = None             # fixture/setup acts must not start publishers implicitly
     if link and modules:
         # kept modules first: until each has its words back, a request would hear "window is not running".
         # Requests wait in the keeper's queue meanwhile.
@@ -522,6 +551,8 @@ def start(world=DEFAULT_WORLD, port=8810, modules=True, headless=False, resident
     if link:
         srv.window_origins.begin()
     threading.Thread(target=srv.serve_forever, daemon=True, name="door").start()
+    from twitch_chat import install as install_twitch
+    install_twitch(entry.token("alex"), srv.server_address[1])
     if modules and not link:
         host.reconcile()
     if modules and not headless:

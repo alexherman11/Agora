@@ -1,4 +1,11 @@
-"""Content addressed attachments. Bytes cross the door, never the act log.
+"""EDITING THE KERNEL (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+The kernel changes only to give every world a general capability: a word, a check, a kind of fact any app, module or
+person can use. It never names its tenants: no app, module, person, kind or field name appears in this code except the
+kernel's own (word, rule, kind, grant, person, ...). If your change needs `if kind == "..."`, a person's name or one app's
+field, stop: the missing piece is a general word (a kind's policy, a rule step, a reading). Build that, or put it on the
+Board. Names already here are debt (research/source-edits/SOURCE-AUDIT-KERNEL.md lists them); take them out when you can.
+
+Content addressed attachments. Bytes cross the door, never the act log.
 
 The converter is a reviewed process, not an OS sandbox. Its published facts
 are admitted by file-result; originals and derivatives are always addressed by
@@ -136,6 +143,13 @@ def receive(k, actor, data, name='Upload', group=None):
 
 def upload(k, actor, st, entry, tx, group, saw=None):
     data = getattr(k._local, 'upload_bytes', None)
+    if data is None and st.kv.get('digest') and actor.kind == 'module':
+        # A module hands its caller a file it made (a picture, an export): it put the bytes in this world's blob
+        # store (put() above, content-addressed) and names them by hash; get() checks the hash again. The file is
+        # the caller's, private, like any upload (4 Nov: window.picture; before this only the `files` module could).
+        # The module's grant for upload must reach files (only=kind:file), as a make must reach its kind.
+        k.reaches(actor, 'upload', 'file', group=group)
+        data = get(k, st.kv['digest'])
     if data is None:
         raise Refused('upload needs file bytes through the upload door or agora.upload(file)')
     if len(data) > cap(k):

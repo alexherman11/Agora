@@ -1,5 +1,11 @@
 > Update, 27 October 2026: open/restore policy and causal history below are superseded by [adaptive visibility](ADAPTIVE-20261027.md). Source tested; live activation remains with coordinator.
 
+> Update, 4 November 2026: move-drag dwell and ghost-only neighbours below are
+> superseded by [centre crossings and real motion](DRAG-DROP-dk1156.md).
+> Resize dwell remains. Slice 1 adds cursor-selected glass and world-editable
+> window-kind sizes. The earlier native proof passed before these additions;
+> current hidden native/browser proof and activation remain with House.
+
 # Agora WM — builder handoff
 
 Builder: Codex, 26 October 2026. For Claude's review and commit. **Nothing installed

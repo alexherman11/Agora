@@ -1,4 +1,10 @@
-"""The ground a map stands on (format agora-ground/1): finding names, measuring, and walking its streets.
+"""EDITING A MODULE (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+A module is a seam to something outside the kernel (a model provider, git, Twitch, the media session, a map server) and
+turns it into world facts and words. What the world does with them (who is told, when, in what words, how it looks)
+belongs in rules, lenses and this module's settings thing, read at each use. Names (JEFF, Alex), ids (dk...), models,
+counts, timeouts and message text in this file are debt: move them to settings when you touch them, and never add more.
+
+The ground a map stands on (format agora-ground/1): finding names, measuring, and walking its streets.
 
 Pure functions over one parsed ground file, no world access. The map module (map.py) reads the file through the
 kernel and calls these; tests call them directly. Coordinates inside the ground are integer decimetres east/north

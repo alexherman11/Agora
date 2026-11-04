@@ -9,6 +9,7 @@ dependencies = [
     "websockets==15.0.1",
     "pypdf==6.21.2",
     "Pillow==12.3.0",
+    "loro==1.17.1",
 ]
 
 [project.scripts]

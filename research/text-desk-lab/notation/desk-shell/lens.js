@@ -200,6 +200,7 @@
     // intrinsic size/baseline (and therefore the desk frame) on focus exit.
     if (p.partition) el.style.contain = "size layout";
     el._n = n; el.hidden = !!p.absent; el.dataset.key = n.key;   // Iris: with the key on the paint, agreement is a join
+    if(n.tiling_list)el.dataset.tilingList='true';
     el.id = "part:" + n.key;  // stable native part identity for platform accessibility clients
     next.set(n.key, { el, sig }); if (p.why) el.dataset.why = p.why;
     const role = p.role || (p.state || p.cut ? "cut" : null);    // a bind that is not live, or a clamp's leaf, says so in `cut`
@@ -1515,7 +1516,7 @@
   // carry is relation (pike-3): pick a thing up, put it down on a part that says `on drop <its part>`; the receiver says
   // what that means, and both are fenced. Pointer: press, move, release over a receiver. Keys: Space takes it, Tab
   // reaches the receivers that accept it, Enter puts it down, Escape cancels. Nothing is sent onto the receiver it came from.
-  let carrying = null;
+  let carrying = null, carryFrom = null, carryHandoff = null;
   const receivers = part => [...paint.querySelectorAll("[data-drop]")].filter(r => CarryTargets.accepts(r, part));
   // a5994: a receiver may say an act per side (`on drop <part> at left`); the one taken is the side whose edge the
   // pointer is within a third of (nearest first), else the plain act, else the nearest side. On the receiver it came
@@ -1529,23 +1530,43 @@
     if (carrying.over && carrying.over !== r) carrying.over.classList.remove(c);
     carrying.over = r; carrying.act = l && l.act; if (r) r.classList.add(c);
     // the landing box: where it will go, before the hand lets go
-    if (!l) { if (carrying.box) carrying.box.hidden = true; return; }
+    if (!l) { carrying.drift?.move(null); if (carrying.box) carrying.box.hidden = true; return; }
     if (!carrying.box) { carrying.box = document.createElement("div"); carrying.box.className = "landing-box " + Style.roleClass("landing"); document.body.appendChild(carrying.box); }
     const [x, y, w, h] = l.box;
     Object.assign(carrying.box.style, { left: x + "px", top: y + "px", width: w + "px", height: h + "px" }); carrying.box.hidden = false;
+    if(carrying.drift && m) {
+      const held=carrying;
+      held.drift.move(r,{clientX:m.clientX,clientY:m.clientY,startX:held.startX,startY:held.startY},out=>{
+        if(carrying!==held||!held.box)return;
+        held.box.hidden=!out.allowed;
+        if(out.allowed)Object.assign(held.box.style,out.landing.reduce((o,v,i)=>(o[["left","top","width","height"][i]]=v+"px",o),{}));
+      });
+    }
   };
   // a receiver is judged on what it meant at pick-up (pike-3), though the view keeps repainting while a card is in the air
   function take(el) { const rs = receivers(el._n.part); carrying = { el, n: el._n, over: null, seen: CarryTargets.snapshot(paint, el._n.part) }; V.hold = el._n.key; rs.forEach(r => { r.tabIndex = 0; }); }
-  function put(r, m) {
+  async function put(r, m) {
     const c = carrying; if (!c) return;
+    if(c.releasing)return;c.releasing=true;
+    if(c.drift && m)over(r,m);
+    if(c.drift && r && !(await c.drift.flush())?.allowed)r=null;
     const l = r ? landing(r, m) : null;
-    over(null); carrying = null; c.el.style.transform = ""; c.el.style.opacity = ""; c.el.style.animation = "";
-    if (c.ghost) { c.ghost.remove(); document.body.style.userSelect = ""; }
+    if(l&&c.ghost)carryFrom={key:thingOf(c.el),rect:c.ghost.getBoundingClientRect()};
+    if(c.over)c.over.classList.remove(Style.roleClass("tool.on"));
+    carrying = null; document.body.style.userSelect = "";
+    const cleanup = immediate => {
+      c.drift?.close(immediate);c.ghost?.remove();
+      c.el.style.transform="";c.el.style.opacity="";c.el.style.animation="";
+      if(c.box)c.box.remove();
+    };
+    cleanup.duration=c.drift?.duration;
     receivers(c.n.part).forEach(x => x.removeAttribute("tabindex"));
-    if (!l) { if (c.box) c.box.remove(); V.hold = null; c.el.focus(); return; }
+    if (!l) { cleanup(false); V.hold = null; return; }
     // Keep the direct placement preview until the answer is painted; no decorative fade.
-    const box = c.box; if (box) { box.hidden = false; Object.assign(box.style, l.box.reduce((o, v, i) => (o[["left", "top", "width", "height"][i]] = v + "px", o), {})); }
-    Promise.resolve(CarryTargets.submit(send, l, c.n.fence)).finally(() => { if (box) box.remove(); });
+    carryHandoff=cleanup;
+    Promise.resolve(CarryTargets.submit(send, l, c.n.fence)).finally(() => {
+      if(carryHandoff===cleanup){carryFrom=null;carryHandoff=null;cleanup(false);}
+    });
   }
   // a copy of the card follows the pointer, fixed to the window, so a lane that scrolls (and so clips) can't hide it
   function ghost(el) {
@@ -1582,6 +1603,7 @@
         if (!c) {
           if (Math.hypot(m.clientX - x0, m.clientY - y0) < 5 || carrying) return;
           take(el); c = carrying; c.ghost = ghost(el); el.style.opacity = ".35"; el.style.animation = "none";   // a1140: the dim wins over a pulse
+          c.startX=x0;c.startY=y0;c.drift=CarryTargets.drift(el);
           document.body.style.userSelect = "none"; getSelection().removeAllRanges();
         }
         c.ghost.style.transform = `translate(${m.clientX - x0}px, ${m.clientY - y0}px)`; over(at(m), m);
@@ -1663,7 +1685,7 @@
     // a6153: the scene's text is shown only in the inspector (#said); a page without it is not sent it (~400 KB and
     // ~25 ms of the home base's build at every press)
     const text = document.body.dataset.inspector === "on" ? "" : "&text=0";
-    const r = await (await fetch(`/api/scene?session=${encodeURIComponent(session)}&as=${who}&lens=${lens}${on}&view=painter&keys=${keys}${text}${have}`)).json();
+    const r = await (await fetch(`/api/scene?session=${encodeURIComponent(session)}&as=${who}&lens=${encodeURIComponent(lens)}${on}&view=painter&keys=${keys}${text}${have}`)).json();
     if (r.same) return;                          // deskd: nothing changed since the build this page has
     return paintAnswer(r, force);
   }
@@ -1683,6 +1705,7 @@
     if (r.refused) { V.show("refused: " + r.refused + (paint.firstChild ? "\n(showing the last good paint until the lens compiles again)" : "")); return; }
     V.recoverLayout(r.scene);
     const was = glideRects();
+    if(carryHandoff){was.duration=carryHandoff.duration;carryHandoff(true);carryHandoff=null;}
     V.keep(() => { next = new Map(); const root = make(r.scene); kept = next; if (paint.firstChild !== root) paint.replaceChildren(root); });
     dividers?.sync();
     partitions?.sync();
@@ -1694,20 +1717,21 @@
   // Nothing moves for a viewer who asked for reduced motion, nor on the first paint.
   const thingOf = el => (el._n && el._n.fence && el._n.fence.item) || (el.dataset.key || "").split("/").pop();
   function glideRects() {
-    const sel = (Style.glide || []).join(","); if (!sel) return null;
+    const sel = [...(Style.glide || []), "[data-carry]"].join(",");
     const m = new Map(); for (const el of paint.querySelectorAll(sel)) if (!el.hidden && el.offsetParent
       && !el.closest("[data-partition]")) m.set(thingOf(el), el.getBoundingClientRect());
+    if(carryFrom){m.set(carryFrom.key,carryFrom.rect);carryFrom=null;}
     return m;
   }
   function glideFrom(was) {
     if (!was || !was.size || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    for (const el of paint.querySelectorAll((Style.glide || []).join(","))) {
+    for (const el of paint.querySelectorAll([...(Style.glide || []), "[data-carry]"].join(","))) {
       if (el.hidden || !el.offsetParent) continue;
       const a = was.get(thingOf(el)), b = el.getBoundingClientRect();
       if (!a) { el.animate([{ opacity: 0, transform: "translateY(6px)" }, { opacity: 1, transform: "none" }], { duration: 360, easing: "ease-out" }); continue; }
       const dx = a.left - b.left, dy = a.top - b.top;
       if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
-      el.animate([{ transform: `translate(${dx}px, ${dy}px)`, zIndex: 2 }, { transform: "none", zIndex: 2 }], { duration: 520, easing: "cubic-bezier(.2,.8,.2,1)" });
+      el.animate([{ transform: `translate(${dx}px, ${dy}px)`, zIndex: 2 }, { transform: "none", zIndex: 2 }], { duration: was.duration??520, easing: "cubic-bezier(.2,.8,.2,1)" });
     }
   }
   // Alex, 7 Oct (c3674: comments must not push the paragraphs down): parts a style calls `afloat` take no room, so two

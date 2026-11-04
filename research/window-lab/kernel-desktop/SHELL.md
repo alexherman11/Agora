@@ -14,7 +14,7 @@ Progman/WorkerW and `WM_GETICON` on existing windows in `test_shell_icons.py` an
 |---|---|---|
 | Top bar | `pages/shell/top.html` + `shell.js` (`Top`) | Slim translucent rail. Every element is a button with a popover: launcher, focused app's window menu, clock (calendar), notifications, media, one quick-settings cluster (network, volume, battery), JEFF, off (two presses). Optional readings (CPU, memory) are off until `shell-settings` says so. |
 | Dock | `pages/shell/dock.html` + `shell.js` (`Dock`) | Centred floating pill. Real colour icons, grouped by exe, running / in-front / minimised marks, a stable remembered order, pinned Agora apps and world pin buttons. Click, middle-click (new window), right-click menu, hover preview. All through `wm.*`, with `native_shell` words when the WM is off. |
-| Desktop layer | `wallpaper.py`, `pages/shell/desktop.html` | Since 27 Oct (Alex's ask) no window: the desktop page is rendered once in hidden Edge at the monitor's real size and set as the Windows wallpaper, again when the theme changes. `window.shell off` puts the old wallpaper back; so does `wallpaper.py restore` without the desk (and keeps it off until `wallpaper.py on`). `AGORA_DESKTOP_LAYER=bottom` brings back the old bottom-most window. |
+| Desktop layer | `wallpaper.py`, `pages/shell/desktop.html` | Since 27 Oct no window. Since 4 Nov Windows shows the picture `Shell settings` names (`wallpaper=<file>`), and the world rule "Wallpaper follows my theme" fills it: on `theme.changed`, `window.picture shell-desktop size=screen ; set <Shell settings> wallpaper=$new`. Emptying the setting puts the old wallpaper back (undo brings Agora's again); `wallpaper.py restore` does it without the desk and keeps it off until `wallpaper.py on`. `AGORA_DESKTOP_LAYER=bottom` brings back the old bottom-most window. |
 | Icon pipeline | `shell_icons.py`, route `/desk/icon` in `kdesk.py` | See below. |
 | Native seams | `shell_native.py` | Window shape (`SetWindowRgn`), reserved strips, DWM thumbnails, bottom-most layer, opt-in WorkerW attach. |
 | Host wiring | `kd_window.py`, `native_shell.py`, `kdesk.py` | Shell views, `window.shell on\|off`, `/desk/icon`, icon refs on window rows. |
@@ -68,7 +68,7 @@ The desktop layer is not a bar (it is the wallpaper) and stays hand-written.
 | `media` | `shell-media` | `body`, `art`, `title`, `popover` | gestures `play`, `next`, `prev` |
 | `tray` | `shell-tray` | `body`, `popover` | holds chips; the quick-settings popover |
 | `network`, `volume`, `battery` | `shell-chip` | `body`, `glyph`, `value` | `key`, `value yes|no`; gesture `press` (`window.settings which=…`) |
-| `jeff` | `shell-jeff` | `body`, `dot`, `name`, `popover` | gesture `open` (the `shell-settings` `jeff_open` line; live since 27 Oct: `window.open url=<frontier jeff-chat> name=JEFF`, JEFF's conversation in its own window; default `window.open lines`) |
+| `jeff` | `shell-jeff` | `body`, `dot`, `name`, `popover` | gesture `open` (the `shell-settings` `jeff_open` line; live: `window.open jeff-chat`, JEFF's conversation in its own window (27 Oct it was the frontier desk's url); default `window.open lines`) |
 | `power` | `shell-power` | `body` | gesture `off` (`off window`), two presses |
 | dock `launcher`, `overview` | `shell-dock-button` | `body` | `icon`, `label`, gesture `press` or `opens launcher` |
 | dock `item` (one per app, keyed) | `shell-dock-item` | `body`, `icon`, `mark`, `count`, `menu`, `preview`, `tile` | facts `state`, `app` on `body` for styles (`shell-dock-item.body[state=front]`) |
@@ -124,7 +124,14 @@ ever needs a fourth call, it should become a reviewed per-call grant (`window.na
 World things the shell reads, none required (every one has a default):
 
 - `kind=shell-settings`: `show_cpu`, `show_memory` (`yes` shows an optional reading), `dock_apps` (comma list of Agora apps pinned
-  to the dock, default `lines,help,board,taskboard,appearance,feed`), `jeff_open` (the line the JEFF popover runs).
+  to the dock, default `lines,help,board,taskboard,appearance,feed`), `jeff_open` (the line the JEFF popover runs), `wallpaper` (a picture file: the Windows wallpaper; empty puts Alex's own back).
+- `kind=app name=<a dock_apps entry> label= does="window.open <lens>" [icon=agora:<svg>|data:image/...]` (4 Nov): what an
+  app on the dock and in the launcher is called and opens. Only the dock's person's own count (the shell-dock widget's),
+  only ones that open a lens, and the host's own pages (viewer, lines, help, thing, tasks) stay the host's. It is on the
+  dock when the lens it opens exists. Every app's installer makes its own, once (painter/install.py `app()`): Task
+  board, Appearance, Feed, Work, Writing, Music. A new app is one `make`, no edit to shell-kit.js.
+- `kind=work-settings` (4 Nov): what Work hides (`hide_lanes`), the order of its states (`order`) and every word it shows
+  (`word_*`), read by `house.active` at each call; the Work installer seeds it from work_overview.DEFAULTS.
 - `kind=button bar=taskbar path=<exe>`: existing taskbar pins; the dock shows them as pinned apps.
 - `kind=window shows=shell-top|shell-dock|shell-desktop`: the three shell windows `window.shell on` makes.
 - Data read: `wm.windows`, `system.now`, `media.now`, `rows notification`, `rows presence`, `rows shell-settings`, `rows any bar=taskbar`, `rows lens`, `wm.title <key>` (live titles, tolerated if refused).
@@ -418,3 +425,26 @@ Claude, 27 Oct (Alex: "set it as my real Windows wallpaper, and drop the full-sc
     The theme is re-read every 5 s (theme.json hash), because the window module does not hear theme things.
     Missing word: a module hearing another kind's changes it does not own (`hear:theme.changed` for the window module)
     without widening its `only` grant; polling stands in.
+
+Claude, 4 Nov (Alex: "do we really need wallpaper.py?"; the pilot for research/source-edits/SOURCE-EDITS-AUDIT.md):
+
+21. Rough spot 20 is retired. The wallpaper is now three general pieces and one world rule:
+    - `kernel/blobs.py` `upload digest=`: a module hands its caller a file it made. Before this only the module named
+      `files` could, by name. `upload` now also checks a module grant's `only=` scope, which it never did.
+    - `window.picture` (kd_window): what any window would show, drawn hidden in the shared `widget_browser`.
+    - `kd_window.follow_wallpaper`: Windows shows the file `Shell settings` names.
+
+    `wallpaper.py` lost its private renderer, its 5 s theme poll and the `Keeper` (365 → 160 lines). The layer row is no
+    longer a flag. The behaviour is the world's: the rule `Wallpaper follows my theme`, or `set <Shell settings>
+    wallpaper=<photo>`. Missing word, still: a way to replace a file thing's content (each theme change makes a new
+    picture file).
+
+22. `gaming_gate.py`, `agora-wm/win32_host.py`, `kd_window.follow_games` (4 Nov). Alex's games (`KNOWN`) and his NVIDIA
+    overlay (in `SHELL_OVERLAYS`) were lists in source, so a new game was a code edit. They are now the world thing
+    `Games` (kind=game-settings: `games=`, `not_games=`). The window host mirrors it to this machine's
+    `%LOCALAPPDATA%/Agora/games.json`, so every process that asks the gate (the WM, installers, proofs) reads it with or
+    without the door. In code stays only what is a fact about Windows: Game Bar's helpers and Windows' own shell
+    windows (`WINDOWS_OVERLAYS`, now one list in `gaming_gate`, used by the WM). **Ran:** set a running program as a game
+    in the world; the gate named it within 5 s, and named it no more once the list was set back.
+    Missing word: settings mirrored for programs that run without the door. The theme module's `theme-native.json` is
+    the same need, solved a second time.

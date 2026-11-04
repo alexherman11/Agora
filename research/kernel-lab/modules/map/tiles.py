@@ -1,4 +1,10 @@
-"""Live ground for the map: vector tiles fetched on demand, kept on disk, and cut into chunks the window can draw.
+"""EDITING A MODULE (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+A module is a seam to something outside the kernel (a model provider, git, Twitch, the media session, a map server) and
+turns it into world facts and words. What the world does with them (who is told, when, in what words, how it looks)
+belongs in rules, lenses and this module's settings thing, read at each use. Names (JEFF, Alex), ids (dk...), models,
+counts, timeouts and message text in this file are debt: move them to settings when you touch them, and never add more.
+
+Live ground for the map: vector tiles fetched on demand, kept on disk, and cut into chunks the window can draw.
 
 Two sources, both open data, both read without keys:
   base       OpenFreeMap (OpenMapTiles schema, from OpenStreetMap): water, land, roads, names, places. z0..14.

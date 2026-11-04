@@ -1,3 +1,10 @@
+// EDITING THE DESKTOP HOST (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+// This file is a seam between the world and Windows: it turns world facts into screen effects and screen events into world
+// facts, through small words. It holds no preferences and no content. Which apps, what a button opens, sizes, names, ids and
+// who may do what live in settings things it reads (shell-settings, wm-settings). It does not seed the world at start
+// (people, chats, pins). New behaviour is a rule over the words offered here. Before writing a Windows or browser helper,
+// use the shared one (gaming_gate for full-screen and desktop tests, widget_browser for hidden pages) instead of a copy.
+//
 // shell-kit.js: the shell bars' painter vocabulary (SHELL.md, "The bars as components"). Builder draft, 26 Oct 2026.
 //
 // Loaded only into the shell-top and shell-dock widgets' code, after the painter's core and before painter.js runs, the
@@ -72,17 +79,36 @@ const ShellKit = (() => {
   }
 
   // ------------------------------------------------------------------------------------------------ icons
+  // The host's own pages. Every app is an `app` thing in the world (below).
   const AGORA_APPS = {
-    lines: ['Lines', 'window.open lines'], help: ['Help', 'window.open help'], board: ['Board', 'window.open board'],
-    taskboard: ['Task board', 'window.open taskboard-components'], appearance: ['Appearance', 'window.open appearance'],
-    feed: ['Feed', 'window.open feed'], thing: ['Thing', 'window.open thing'], tasks: ['Running windows', 'window.open tasks'],
-    work: ['Work', 'window.open work'],          // who is at work and what is moving (kernel-lab/apps/work, 27 Oct)
-    writing: ['Writing', 'window.open writing'], // documents and plans to review (kernel-lab/apps/writing, 27 Oct)
+    viewer: ['Viewer', 'window.open viewer'],
+    lines: ['Lines', 'window.open lines'], help: ['Help', 'window.open help'],
+    thing: ['Thing', 'window.open thing'], tasks: ['Running windows', 'window.open tasks'],
   };
+  // Every other app is an `app` thing in the world (4 Nov): name=<what dock_apps says> label= does="window.open <lens>"
+  // [icon=agora:<svg name>|data:image/...]. A new app is one make, never a line here. Only the steward's own app things
+  // count (the dock's person), only ones that open a lens, and a name the host already has above stays the host's.
+  const BUILT_IN = new Set(Object.keys(AGORA_APPS));
+  const APP_ICONS = {};
+  function takeApps(rows, owner) {
+    const seen = new Set();
+    for (const r of rows || []) {
+      const n = String(r.name || '').toLowerCase(), does = String(r.does || '').trim();
+      if (!owner || (r.made_by !== owner && r.for !== owner) || BUILT_IN.has(n) || !/^[a-z][a-z0-9-]{0,40}$/.test(n)
+          || !/^window\.open [A-Za-z0-9_.-]+$/.test(does)) continue;
+      seen.add(n);
+      AGORA_APPS[n] = [String(r.label || r.title || n), does];
+      if (/^(agora:[a-z0-9-]+|data:image\/)/.test(String(r.icon || ''))) APP_ICONS[n] = String(r.icon); else delete APP_ICONS[n];
+    }
+    for (const n of Object.keys(AGORA_APPS)) if (!BUILT_IN.has(n) && !seen.has(n)) { delete AGORA_APPS[n]; delete APP_ICONS[n]; }
+    return [...seen].sort().map((n) => [n, ...AGORA_APPS[n], APP_ICONS[n] || '']);
+  }
+  const appIcon = (n) => APP_ICONS[n] || 'agora:' + n;
   const DOCK_APPS = 'lines,help,board,taskboard,appearance,feed';
   const appOf = (name) => {
     const n = (name || '').toLowerCase();
     if (AGORA_APPS[n]) return n;
+    for (const [app, [, line]] of Object.entries(AGORA_APPS)) if (!BUILT_IN.has(app) && opensLens(line) === n) return app;
     for (const [re, app] of [[/task/, 'taskboard'], [/board/, 'board'], [/appearance|theme/, 'appearance'], [/feed/, 'feed'],
                              [/help/, 'help'], [/lines|chat/, 'lines']]) if (re.test(n)) return app;
     return 'thing';
@@ -139,14 +165,14 @@ const ShellKit = (() => {
           if (w.agora && (!o || o.edge || /^(taskbar|shell-)/.test(o.shows || ''))) return [];
           const shows = (o && o.shows) || w.shows || '';
           return [{ key: String(w.key), app: (o && o.name) || w.app || nice((w.exe || '').split(/[\\/]/).pop().replace(/\.exe$/i, '')), exe: w.exe || '',
-            icon: w.agora ? 'agora:' + appOf(shows) : refOf(w.icon) || (w.exe ? 'exe:' + w.exe : ''),
+            icon: w.agora ? appIcon(appOf(shows)) : refOf(w.icon) || (w.exe ? 'exe:' + w.exe : ''),
             agora: w.agora || '', state: w.state || 'normal', focused: !!w.focused, managed: w.managed !== false, why: w.why || '', shows, space: w.space || '' }];
         });
       }
       this.wmOK = false;               // the window manager is off: the native shell is the fallback
       const [a, b] = await Promise.all([this.see('window.list'), this.see('window.desktop')]);
       const mine = (a.rows || []).filter((w) => w.kind === 'window' && !w.edge && !/^(taskbar|shell-)/.test(w.shows || ''))
-        .map((w) => ({ key: w.id, app: w.name || nice(w.shows), exe: '', icon: 'agora:' + appOf(w.shows),
+        .map((w) => ({ key: w.id, app: w.name || nice(w.shows), exe: '', icon: appIcon(appOf(w.shows)),
           agora: w.id, state: w.shown === false ? 'minimised' : 'normal', focused: !!w.front, managed: false, shows: w.shows, title: w.name }));
       const theirs = (b.rows || []).filter((w) => w.handle).map((w) => ({
         key: String(w.handle), app: nice(w.program), exe: w.path || '', icon: w.ref || (w.path ? 'exe:' + w.path : 'hwnd:' + w.handle),
@@ -154,6 +180,15 @@ const ShellKit = (() => {
       return [...theirs, ...mine];
     },
     async settings() { const r = await this.see('rows shell-settings'); return (r && r.rows && r.rows[0]) || {}; },
+    // the world's app things (see takeApps); AGORA_APPS follows them, so every part that reads it sees the same apps.
+    // Whose app things count: the person whose dock this is (the shell-dock widget's).
+    async apps() {
+      const [r, w] = await Promise.all([this.see('rows app'), this.see('rows widget name=shell-dock')]);
+      const dock = (w && w.rows && w.rows[0]) || {};
+      return takeApps(!refused(r) && Array.isArray(r.rows) ? r.rows : [], dock.for || dock.made_by);
+    },
+    // an app is on the dock when it is the host's own or the lens it opens is in the world
+    shows: (n, lenses) => !!AGORA_APPS[n] && (BUILT_IN.has(n) || lenses.has(opensLens(AGORA_APPS[n][1]))),
     async pins() {
       const r = await this.see('rows any bar=taskbar');
       return ((r && r.rows) || []).filter((p) => !p.slot && p.kind !== 'widget' && (p.path || /^window\.open /.test(p.does || '')));
@@ -181,13 +216,16 @@ const ShellKit = (() => {
     },
     // actions: wm.* when the manager answers, the native shell otherwise
     focus(w) {
+      if (this.wmOK && w.state === 'pinned') return this.act(`wm.focus ${w.key}`);
       if (this.wmOK) return this.act(w.state === 'minimised' ? `wm.restore ${w.key} share=yes` : `wm.focus ${w.key} share=yes`);
       if (w.agora) return this.act(`window.focus ${w.agora}`);
       return this.act(`window.activate handle=${w.key}`);
     },
     async launch(line, exe) {
-      if (this.wmOK && exe && /^window\.launch\s/.test(line) && /\.exe$/i.test(exe)) {
-        const ready = await this.act(`wm.arrange expect=${JSON.stringify(exe)}`);
+      const expected = /^window\.open\s/.test(line) ? 'agora'
+        : exe && /^window\.launch\s/.test(line) && /\.exe$/i.test(exe) ? exe : null;
+      if (this.wmOK && expected) {
+        const ready = await this.act(`wm.arrange expect=${JSON.stringify(expected)}`);
         if (refused(ready)) return ready;
       }
       return this.act(line);
@@ -207,7 +245,7 @@ const ShellKit = (() => {
   // ------------------------------------------------------------------------------------------------ the reading hub
   // watch(api, name, ms, fn): fn(value) now (if there is one) and whenever the reading changes; it runs as the part
   // (api.guard), and the subscription ends with the part (api.cleanup). poke(name): read again now (after an act).
-  const loaders = { windows: () => Data.windows(), settings: () => Data.settings(), pins: () => Data.pins(), lenses: () => Data.lensNames(),
+  const loaders = { windows: () => Data.windows(), settings: () => Data.settings(), apps: () => Data.apps(), pins: () => Data.pins(), lenses: () => Data.lensNames(),
     system: () => Data.system(), media: () => Data.media(), notes: () => Data.notes(), jeff: () => Data.jeff() };
   const hub = {};
   function feed(name) {
@@ -454,7 +492,7 @@ const ShellKit = (() => {
   readTheme();
   addEventListener('ag-theme', () => nativeTimers.requestAnimationFrame(readTheme));
 
-  return { h, glyph, Icon, iconUrl, AGORA_APPS, DOCK_APPS, appOf, opensLens, nice, yes, num, cssVar, Data, watch, poke, on, emit, fire,
+  return { h, glyph, Icon, iconUrl, AGORA_APPS, DOCK_APPS, appOf, appIcon, opensLens, nice, yes, num, cssVar, Data, watch, poke, on, emit, fire,
     Pop, Menu, roving, toast, ran, fmt, report, thumbs,
     set shape(fn) { shapeFn = fn; report(); }, get shape() { return shapeFn; } };
 })();

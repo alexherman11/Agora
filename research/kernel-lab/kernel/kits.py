@@ -1,4 +1,11 @@
-"""Definition-only kits. No transport, executable paths, authority or world data.
+"""EDITING THE KERNEL (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+The kernel changes only to give every world a general capability: a word, a check, a kind of fact any app, module or
+person can use. It never names its tenants: no app, module, person, kind or field name appears in this code except the
+kernel's own (word, rule, kind, grant, person, ...). If your change needs `if kind == "..."`, a person's name or one app's
+field, stop: the missing piece is a general word (a kind's policy, a rule step, a reading). Build that, or put it on the
+Board. Names already here are debt (research/source-edits/SOURCE-AUDIT-KERNEL.md lists them); take them out when you can.
+
+Definition-only kits. No transport, executable paths, authority or world data.
 
 The portable JSON is a value: a caller reads it through look and carries it to
 another door. Import validates the same closed schema as export, before minting.
@@ -14,7 +21,7 @@ FIELDS = {
     "lens": set("name title text".split()),
     "style": set("name title text".split()),
     "rule": set("name title on on_entry do do_bound off of_kind by".split()),
-    "kind": set("name title help fields needs extends".split()),
+    "kind": set("name title help fields needs extends value aliases has".split()),
     "widget": set("name title code style help".split()),
     "theme": set("name title text".split()),     # a theme is its JSON text (theme/model.py), wallpaper assets inline
 }
@@ -76,9 +83,11 @@ def validate(bundle):
             from .kinds import parse, KIND_NAME
             try:
                 parse(a.get("needs"))
+                parse(a.get("has"))
             except Refused as exc:
                 raise Refused(f"a {a['kind']} in this kit has a shape this kernel can't read: {exc}") from None
-            names = ([a["acts_on"]] if a.get("acts_on") else []) + str(a.get("extends") or "").split()
+            names = (([a["acts_on"]] if a.get("acts_on") else []) + str(a.get("extends") or "").split()
+                     + ([a["value"]] if a.get("value") else []) + str(a.get("aliases") or "").split())
             if any(not KIND_NAME.match(n.casefold()) for n in names):
                 raise Refused(f"a {a['kind']} in this kit names a kind that isn't a kind name: {' '.join(names)}")
         if a["kind"] == "theme":
@@ -184,7 +193,8 @@ def take(k, actor, st, entry, tx, group, saw=None):
                 # a kind taken from a kit is declared here, so it meets the same rules make does: never the kernel's
                 # own kinds, leaders only when it has a shape, one per scope (kernel review round 2: a kit gave said a
                 # shape)
-                k.kinds.validate_decl(actor, {f: a[f] for f in ("name", "needs", "extends") if f in a}, group)
+                k.kinds.validate_decl(actor, {f: a[f] for f in ("name", "needs", "extends", "value", "aliases", "has")
+                                              if f in a}, group)
             key = (a["kind"], a["name"])
             if key in named_definitions or any(k.state.get(t, "name") == a["name"] and group in k.groups_of(t)
                                                for t in k.things(a["kind"])):

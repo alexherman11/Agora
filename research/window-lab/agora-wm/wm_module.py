@@ -1,4 +1,11 @@
-"""wm module: SHAPE §17 JSON-lines protocol. No live installation at import/run.
+"""EDITING THE DESKTOP HOST (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+This file is a seam between the world and Windows: it turns world facts into screen effects and screen events into world
+facts, through small words. It holds no preferences and no content. Which apps, what a button opens, sizes, names, ids and
+who may do what live in settings things it reads (shell-settings, wm-settings). It does not seed the world at start
+(people, chats, pins). New behaviour is a rule over the words offered here. Before writing a Windows or browser helper,
+use the shared one (gaming_gate for full-screen and desktop tests, widget_browser for hidden pages) instead of a copy.
+
+wm module: SHAPE §17 JSON-lines protocol. No live installation at import/run.
 Run by a kernel from the supplied genesis snippet. The world's wm-settings mode (set only by an admitted wm.mode
 request) is the person's standing choice, and the module follows it: after a restart or a lost lease it arms live
 again by itself once the game gate is clear (28 Oct, Alex: "the window manager keeps booting into non-live mode").
@@ -17,20 +24,28 @@ import time
 import uuid
 from engine import Rect,solve
 from manager import Manager,DEFAULTS
+from size_policy import validate as size_rules, FRACTIONS
+from policy_reload import PolicyStatus,REFUSAL
 
 HERE=Path(__file__).resolve().parent
 sys.path.insert(0,str(HERE.parent/'kernel-desktop'))
 from modproto import Module,log
 
 HELP={
+ 'sizes':('see','','Editable window-kind defaults from wm-settings sizes; later matching kinds override earlier kinds.'),
+ 'size':('do','<kind> [match=<json>] [width=<fraction>] [height=<fraction>] [min_width=<fraction>] [min_height=<fraction>] [compact=yes|no] [remove=yes]',
+         'Set a named window-kind size rule. Fractions use usable work area, half width includes its gutter share. Changes are undoable world facts.'),
  'windows':('see','','Current windows: app, exe/icon reference, state, focus and geometry; never titles.'),
+ 'policy':('see','','Startup imported policy code snapshot, scoped to Manager/Native and their local module functions; hot reload is unavailable.'),
  'focus':('do','<key>','Ask Windows to focus a current manageable window; foreground lock may refuse.'),
  'minimise':('do','<key>','Really minimise a manageable unpinned window; never cloak.'),
  'restore':('do','<key>','Restore a manageable window and place it without overlap.'),
  'close':('do','<key>','Ask the window politely to close with WM_CLOSE; never kill a process.'),
  'pin':('do','<key>','Keep this window fixed. Screen state, kept by this window manager, never in the world.'),
  'unpin':('do','<key>','Let this pinned window move again. Screen state, never in the world.'),
- 'arrange':('do','[expect=<exe>]','Re-solve the layout; expect arms one bar-requested shared layout for a new executable window, for at most five seconds. Exclusive fullscreen is unsupported.'),
+ 'arrange':('do','[expect=<exe|agora>]','Re-solve the layout; expect arms one bar-requested shared layout for a new executable or Agora window, for at most five seconds. Browser windows keep half-screen width; LRU gives way before the request. Exclusive fullscreen is unsupported.'),
+ 'reload':('do','sha256=<reviewed digest>','Unavailable: refuses before source/native/lease operations. Existing watchdog cannot guarantee a bounded live handoff.'),
+ 'rollback':('do','sha256=<previous digest>','Unavailable: no retained code generation; requires a separately authorized WM lifecycle, with geometry/claim release.'),
  'mode':('do','live|shadow|off','Shadow computes only; live needs rollout arming; off releases every saved placement.'),
  'leave-alone':('do','<app>','Treat this app as fixed obstacles. Undoable world intent.'),
  'manage':('do','<app>','Remove an app exclusion (undoable); in adopted mode also adopts its current windows (screen state, kept locally).'),
@@ -41,7 +56,7 @@ HELP={
 
 def offers():
     return [{'word':'wm.'+name,'kind':kind,'takes':takes,'help':'wm.'+name+': '+help,
-        'may':'anyone','undo':'yes' if name in ('mode','leave-alone','manage') else ('external' if name=='close' else 'no')}
+        'may':'anyone','undo':'yes' if name in ('mode','leave-alone','manage','size') else ('external' if name=='close' else 'no')}
     # Focus, minimise, restore, pin and arrange change only this screen: not records (Alex, 26 Oct: "visual state should
     # not live in the world"; every dock click used to write one). close asks an app to close, so it stays recorded.
         for name,(kind,takes,help) in HELP.items()]
@@ -67,6 +82,7 @@ class WMModule:
         self.said={}            # topic -> last line said on stderr: a refusal is said once, not every second
         self.backlog=[]         # hook events drained during the 60 Hz drag path, handed to the next full tick
         self.full_at=0.0        # last full tick: during a drag one still runs each second (closes, the game gate)
+        self.policy_reload=None
         self.m=Module(offers(),self.call,on_hello=self.hello,on_off=self.stop.set,
             on_status=lambda:f'{self.manager.mode if self.manager else "starting"}; {len(self.manager.rows) if self.manager else 0} windows')
 
@@ -79,6 +95,11 @@ class WMModule:
         else:
             from win32_host import Native
             self.manager=Manager(Native(),self.home,allow_live=self.allow_live)
+            import manager as manager_module
+            import win32_host as native_module
+            # Before intent_loop can arm live: no fingerprint work on the
+            # lease-owning tick or request path.
+            self.policy_reload=PolicyStatus(manager_module,native_module)
         self.manager.theme_path=self.theme_native or self.home.parent/'theme'/'theme-native.json'
         threading.Thread(target=self.intent_loop,daemon=True).start()
 
@@ -128,10 +149,38 @@ class WMModule:
         words=str(args.get('words') or '').split();target=kv.get('key') or args.get('target') or (words[0] if words else None)
         if word=='windows':
             with self.lock:return {'rows':self.manager.reading(),'text':f'{len(self.manager.rows)} windows; {self.manager.mode}'}
+        if word=='policy':
+            r=self.policy_reload
+            return r.reading() if r else {'rows':[],'text':'imported policy snapshot unavailable'}
+        if word in ('reload','rollback'):
+            if caller.get('person') not in self.stewards:
+                return {'refused':'WM policy handoff requires a desktop steward'}
+            return {'refused':REFUSAL}
         if word in ('focus','minimise','restore','close'):
             return self._request('action',word,target,kv.get('share')=='yes')
         if word=='arrange':return self._request('arrange',kv.get('expect'))
         settings=self.read_intent(msg.get('use'));sid=settings['id'];saw={sid:settings['rev']}
+        if word in ('size','sizes'):
+            rules=size_rules(settings.get('sizes',{}))
+            if word=='sizes':
+                return {'rows':[{'name':name,**rule} for name,rule in rules.items()],
+                        'text':json.dumps(rules,ensure_ascii=False)}
+            if not target:return {'refused':'give a window-kind name'}
+            try:
+                if set(kv)-FRACTIONS-{'match','compact','remove','key'}:
+                    raise ValueError('unknown size rule option')
+                if kv.get('remove')=='yes':rules.pop(target,None)
+                else:
+                    rule=dict(rules.get(target,{}))
+                    if 'match' in kv:rule['match']=json.loads(kv['match'])
+                    for key in FRACTIONS & kv.keys():rule[key]=float(kv[key])
+                    if 'compact' in kv:
+                        if kv['compact'] not in ('yes','no'):raise ValueError('compact is yes|no')
+                        rule['compact']=kv['compact']=='yes'
+                    rules[target]=rule
+                size_rules(rules)
+            except (ValueError,TypeError) as exc:return {'refused':str(exc)}
+            return {'lines':[f'set {sid} sizes={quote(json.dumps(rules))}'],'saw':saw}
         if word=='mode':
             mode=target
             if mode not in ('live','shadow','off'):return {'refused':'mode is live|shadow|off'}
@@ -218,6 +267,8 @@ class WMModule:
                 events=self.backlog+(feed.drain() if feed else []);self.backlog=[]
                 g=manager.gesture;ref=manager.gesture_ref
                 now=time.monotonic()
+                if manager.motion and not events and now-self.full_at<.1:
+                    manager.motion_tick(now);return
                 if g and ref and manager.mode!='off' and now-self.full_at<1 and not g.idle(now*1000) and not any(
                         e['hwnd']==ref.hwnd and e['type'] in ('drag-end','minimise','close','hide') for e in events):
                     # Drag path: just the dragged window's rectangle (~0.05 ms), not a full enumeration (~7-12 ms,
@@ -228,6 +279,7 @@ class WMModule:
                 from win32_host import work_area
                 work=work_area();rows=manager.native.windows();self.full_at=now
             manager.ingest(rows,work,events)
+            manager.motion_tick()
             now=time.monotonic()
             if manager.changed and now-manager.last_change>=.1:
                 manager.changed.clear();manager.last_change=now   # screen churn stays here, never in the world's stream
@@ -240,7 +292,7 @@ class WMModule:
         self.m.run_reader()
         try:
             while not self.stop.is_set():
-                self.tick(feed);self.stop.wait(1/60 if self.manager and self.manager.gesture else .1)
+                self.tick(feed);self.stop.wait(1/60 if self.manager and (self.manager.gesture or self.manager.motion) else .1)
         finally:
             if self.manager:self.manager.switch('off')
             if feed:feed.close()

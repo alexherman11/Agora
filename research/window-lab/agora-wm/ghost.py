@@ -1,8 +1,15 @@
-"""Agora-owned translucent previews. Click-through, tool, no activation.
+"""EDITING THE DESKTOP HOST (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+This file is a seam between the world and Windows: it turns world facts into screen effects and screen events into world
+facts, through small words. It holds no preferences and no content. Which apps, what a button opens, sizes, names, ids and
+who may do what live in settings things it reads (shell-settings, wm-settings). It does not seed the world at start
+(people, chats, pins). New behaviour is a rule over the words offered here. Before writing a Windows or browser helper,
+use the shared one (gaming_gate for full-screen and desktop tests, widget_browser for hidden pages) instead of a copy.
+
+Agora-owned translucent previews. Click-through, tool, no activation.
 All calls must occur on one UI thread. No target application is touched.
 
-During a drag: one box per neighbour that is giving way (where it will go), and a fainter box where the dragged
-window will land (the snap and the resistance, shown before you let go). See WM.md, "Feel".
+During a drag: faint available spaces and a stronger box where the dragged
+window will land. Real neighbours move through the manager's eased positions.
 """
 import ctypes as C
 from ctypes import wintypes as W
@@ -13,14 +20,15 @@ sig(u,'CreateWindowExW',W.HWND,W.DWORD,W.LPCWSTR,W.LPCWSTR,W.DWORD,C.c_int,C.c_i
 sig(u,'DestroyWindow',W.BOOL,W.HWND)
 sig(u,'SetLayeredWindowAttributes',W.BOOL,W.HWND,W.COLORREF,W.BYTE,W.DWORD)
 
-NEIGHBOUR_ALPHA=70     # of 255: a neighbour's destination
-LANDING_ALPHA=40       # fainter: where the dragged window will land
+NEIGHBOUR_ALPHA=40     # of 255: available spaces (which can overlap)
+LANDING_ALPHA=70       # selected landing stays legible over available spaces
 
 
-def _make(alpha):
+def _make(alpha,selected=False):
     # STATIC class owns its paint; translucent solid preview, no hooks/input.
-    # WS_EX_LAYERED|WS_EX_TRANSPARENT|WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE; WS_POPUP|SS_BLACKRECT (a solid dark box).
-    hwnd=u.CreateWindowExW(0x80000|0x20|0x80|0x08000000,'STATIC','',0x80000000|0x00000004,
+    # Available areas use system gray, selected glass lights up white.
+    # WS_EX_LAYERED|WS_EX_TRANSPARENT|WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE; WS_POPUP.
+    hwnd=u.CreateWindowExW(0x80000|0x20|0x80|0x08000000,'STATIC','',0x80000000|(6 if selected else 5),
         0,0,1,1,None,None,None,None)
     if not hwnd:raise OSError('ghost CreateWindowExW')
     u.SetLayeredWindowAttributes(hwnd,0,alpha,2)
@@ -45,7 +53,7 @@ class Ghost:
             if i<len(rects):self._place(hwnd,rects[i])
             else:self._hide(hwnd)
         if landing is not None:
-            if not self.landing:self.landing=_make(LANDING_ALPHA)
+            if not self.landing:self.landing=_make(LANDING_ALPHA,selected=True)
             self._place(self.landing,landing)
         elif self.landing:self._hide(self.landing)
 

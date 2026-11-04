@@ -1,4 +1,9 @@
-"""First-party cards: data for discovery, installation and the live gallery."""
+"""EDITING THE PAINTER (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+The painter's vocabulary (formats, handles, scopes, parts) is shared by every app. Add to it only what any lens could
+use, documented where lens authors read it (ARRANGEMENT.md); never a handle, format or branch for one app. If one app
+needs something, the general form of it is the change.
+
+First-party cards: data for discovery, installation and the live gallery."""
 import json
 
 
@@ -20,7 +25,7 @@ CATALOGUE = {
         dict(label=T(),labels=T(default='{}')), 'body label count meter claim', '', 'claim', 'Community board; inventory; volunteering',
         'Claim admission, once and closing are checked by the world.'),
     'file': ('media', 'Read a converted photo, document, table, event, media or downloadable file.',
-        dict(labels=T(default='{}'),content=T('json',{}),name=T(),owner=T('fact'),variant=T(default='content'),stamp=T(),page=T('number',1),pageTarget=T(),pageRequest=T('number',0)), 'body preview page alt download status', 'table', 'quote alt rsvp calendar',
+        dict(labels=T(default='{}'),content=T('json',{}),target=T('fact'),name=T(),owner=T('fact'),variant=T(default='content'),stamp=T(),page=T('number',1),pageTarget=T(),pageRequest=T('number',0)), 'body preview page alt download status', 'table', 'quote alt rsvp calendar',
         'Community board; file browser; reading room; photo gallery',
         'Permission-checked Blob transport; no credentials or network in components. PDF pages show extracted text when no renderer is installed.'),
     'field-list': ('content', 'Show a kind declaration\'s fields in authored order, including neighbour-made kinds.',

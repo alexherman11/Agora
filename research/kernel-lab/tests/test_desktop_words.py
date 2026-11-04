@@ -8,7 +8,6 @@ import json
 import secrets
 import shutil
 import sys
-import tempfile
 import threading
 import time
 import unittest
@@ -23,6 +22,7 @@ from test_painter import quoted                      # noqa: E402
 from kernel import words as KW                       # noqa: E402
 from kernel.door import serve                        # noqa: E402
 from kernel.kernel import Kernel                     # noqa: E402
+from kernel import scratch  # noqa: E402
 
 GENESIS = {"tag": "dk", "name": "Alex's desktop", "steward": {"account": "google:alex", "name": "Alex"},
            "invites_counted_by": "kernel", "invites": [{"code": "x", "uses": 5}], "groups": [{"name": "Garden"}],
@@ -43,7 +43,7 @@ def until(test, s=8.0):
 
 class DesktopWords(unittest.TestCase):
     def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix="kernel-desk-")
+        self.dir = scratch.mkdtemp(prefix="kernel-desk-")
         self.secret = secrets.token_hex(16)
         self.entry = StandInEntry(self.secret)
         self.k = Kernel(self.dir, json.loads(json.dumps(GENESIS)))
@@ -221,7 +221,7 @@ class DesktopWords(unittest.TestCase):
         self.assertEqual(len(echoes), 3)
 
     def test_a_world_from_before_a_word_gets_it_on_start(self):
-        d = tempfile.mkdtemp(prefix="kernel-old-")
+        d = scratch.mkdtemp(prefix="kernel-old-")
         keep = list(KW.KERNEL_ENTRIES)
         try:
             KW.KERNEL_ENTRIES[:] = [e for e in keep if e["word"] not in ("verb", "rows")]

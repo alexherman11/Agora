@@ -19,6 +19,7 @@ LAB = HERE.parents[1] / 'kernel-lab'
 sys.path.insert(0, str(LAB))
 from kernel.blobs import get, put
 from protocol import line, read, run
+from documents import ENTRIES as DOCUMENT_WORDS, call as document_call
 
 world = None
 MAX_TEXT = 2_000_000
@@ -140,6 +141,8 @@ def start(message):
 
 
 def call(message):
+    if message['word'] != 'files.convert':
+        return document_call(message, read)
     use = message['use']
     args = message.get('args') or {}
     target = args.get('target')
@@ -165,6 +168,6 @@ def call(message):
 
 
 if __name__ == '__main__':
-    run([dict(word='files.convert', kind='do', takes='<id>', may='members', undo='yes',
+    run(DOCUMENT_WORDS + [dict(word='files.convert', kind='do', takes='<id>', may='members', undo='yes',
               help='files.convert <upload>: convert one visible file. Metadata-free photo, PDF pages, DOCX/text, CSV table, UTC calendar event, or media. Failures remain plain files with a reason. Undo removes conversion; off stops the process.')],
         call, 'Converting visible uploads; bounded extraction, no network, content-addressed output', start)

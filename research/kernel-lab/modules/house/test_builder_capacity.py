@@ -35,7 +35,8 @@ def test_three_requests_start_and_fourth_waits(manager):
     with patch('builders.threading', SimpleNamespace(Thread=Mock())) as threads:
         for target in ('dk1','dk2','dk3'):
             assert manager.start(msg(target))['rows'][0]['doing']=='asked'
-        assert 'refused' in manager.start(msg('dk4'))
+        assert 'starts by itself' in manager.start(msg('dk4'))['text']    # 4 Nov: it waits, never refused
+        assert manager.states['dk4']['phase']=='queued'
         assert threads.Thread.call_count==3
         assert threads.Thread.return_value.start.call_count==3
 
@@ -46,18 +47,18 @@ def test_decrease_does_not_stop_existing_workers(manager):
     children={key:SimpleNamespace(stop=lambda:pytest.fail('active child stopped')) for key in manager.states}
     manager.children.update(children)
     configure(manager,1)
-    assert 'refused' in manager.start(msg('dk4'))
+    assert manager.start(msg('dk4'))['rows'][0]['doing']=='queued'
     assert manager.children==children
-    assert len(manager.states)==3
+    assert len(manager.states)==4
 
 
-@pytest.mark.parametrize('phase,word',[('received','request_review'),('reviewed','land')])
-def test_review_and_publication_share_admission_capacity(manager,phase,word):
-    configure(manager,1)
+@pytest.mark.parametrize('phase,word',[('received','request_review'),('reviewed','land'),('received','land')])
+def test_checks_and_landing_never_wait_on_worker_slots(manager,phase,word):
+    configure(manager,1)                         # 4 Nov: landing is the House's own work, not a worker's slot
     target=state(manager,phase)
     manager.states['dk2']=dict(task='dk2',phase='working')
     with patch('builders.threading', SimpleNamespace(Thread=Mock())) as threads:
         result=getattr(manager,word)(msg())
-        assert 'capacity is occupied' in result['refused']
-        assert target['phase']==phase
-        threads.Thread.assert_not_called()
+        assert result.get('external'), result
+        assert target['phase']=='reviewing'
+        assert threads.Thread.call_count==1

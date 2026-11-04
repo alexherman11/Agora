@@ -1,7 +1,8 @@
 // shell-dock: the centred pill. Its parts are arranged in the lens (launcher, separators, the app slot, overview); the
 // child that is a shell-dock-item is a slot, repeated once per app: pinned apps first (Agora apps from dock_apps, then
 // kept programs), then running ones in a remembered order, then Agora's own windows. Reads wm.windows each second.
-// Handles: apps (comma list of Agora apps; default shell-settings dock_apps). Parts pill.
+// Handles: apps (comma list of Agora apps; default shell-settings dock_apps; an app is the host's own or an `app` thing
+// in the world, see shell-kit.js). Parts pill.
 export default {mount(api, s) {
   const K = globalThis.ShellKit, { Data } = K;
   document.body.dataset.page = 'dock';
@@ -24,14 +25,14 @@ export default {mount(api, s) {
     }
     const have = new Set(state.lenses);
     const apps = String(s.apps || state.settings.dock_apps || K.DOCK_APPS).split(/[ ,]+/).filter(Boolean)
-      .filter((n) => K.AGORA_APPS[n] && (['lines', 'help', 'thing', 'tasks'].includes(n) || have.has(n)));
-    const pinned = apps.map((n) => ({ id: 'app:' + n, app: K.AGORA_APPS[n][0], exe: '', icon: 'agora:' + n, wins: [], line: K.AGORA_APPS[n][1], launcher: n, pin: { id: '' } }));
+      .filter((n) => K.Data.shows(n, have));
+    const pinned = apps.map((n) => ({ id: 'app:' + n, app: K.AGORA_APPS[n][0], exe: '', icon: K.appIcon(n), wins: [], line: K.AGORA_APPS[n][1], launcher: n, pin: { id: '' } }));
     const launched = new Set(pinned.map((p) => p.line));
     for (const p of state.pins) {
       const exe = p.path || '';
       if (!exe && launched.has(p.does)) continue;
       pinned.push({ id: exe ? exe.toLowerCase() : 'pin:' + p.id, app: p.label || p.name || (exe.split(/[\\/]/).pop() || 'Pinned').replace(/\.exe$/i, ''), exe,
-        icon: exe ? 'exe:' + exe : 'agora:' + K.appOf(K.opensLens(p.does)), wins: [], line: p.does || `window.launch path=${exe}`, pin: { id: p.id } });
+        icon: exe ? 'exe:' + exe : K.appIcon(K.appOf(K.opensLens(p.does))), wins: [], line: p.does || `window.launch path=${exe}`, pin: { id: p.id } });
     }
     // a running Agora window shares the slot of whatever opens it (a launcher, or a button that says window.open)
     const slotted = new Set();
@@ -87,6 +88,7 @@ export default {mount(api, s) {
   K.watch(api, 'pins', 4000, (v) => { state.pins = v; paint(); });
   K.watch(api, 'lenses', 30000, (v) => { state.lenses = v; paint(); });
   K.watch(api, 'settings', 4000, (v) => { state.settings = v; paint(); });
+  K.watch(api, 'apps', 10000, () => paint());      // the world's app things (ShellKit keeps AGORA_APPS in step)
   pill.addEventListener('keydown', (e) => {
     const it = document.activeElement && document.activeElement.closest && document.activeElement.closest('.item');
     if (!it) return;

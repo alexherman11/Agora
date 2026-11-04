@@ -1,4 +1,11 @@
-"""Offscreen widget renderer. Stdlib CDP transport, based on hidden_evidence's
+"""EDITING THE DESKTOP HOST (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+This file is a seam between the world and Windows: it turns world facts into screen effects and screen events into world
+facts, through small words. It holds no preferences and no content. Which apps, what a button opens, sizes, names, ids and
+who may do what live in settings things it reads (shell-settings, wm-settings). It does not seed the world at start
+(people, chats, pins). New behaviour is a rule over the words offered here. Before writing a Windows or browser helper,
+use the shared one (gaming_gate for full-screen and desktop tests, widget_browser for hidden pages) instead of a copy.
+
+Offscreen widget renderer. Stdlib CDP transport, based on hidden_evidence's
 existing transport. The browser draws JavaScript; a native alpha surface displays
 its pixels. No browser window appears. Profile state is disposable.
 """
@@ -10,7 +17,7 @@ from pathlib import Path
 import socket
 import struct
 import subprocess
-import tempfile
+import sys
 import time
 import urllib.request
 from urllib.parse import urlsplit, quote
@@ -19,6 +26,8 @@ from urllib.parse import urlsplit, quote
 
 
 HERE = Path(__file__).resolve().parent
+sys.path.append(str(HERE.parents[1] / "kernel-lab"))
+from kernel import scratch  # noqa: E402
 
 
 def _job_that_dies_with_us():
@@ -173,7 +182,7 @@ class Browser:
         self.host_key = host_key or os.environ.get('AGORA_WIDGET_HOST_KEY','')
 
     def __enter__(self):
-        self.tmp = tempfile.TemporaryDirectory(prefix='edge-kdesk-', dir=HERE / 'state',ignore_cleanup_errors=True)
+        self.tmp = scratch.TemporaryDirectory(prefix='edge-kdesk-', dir=HERE / 'state',ignore_cleanup_errors=True)
         chrome=Path('C:/Program Files/Google/Chrome/Application/chrome.exe')
         executable=str(chrome) if chrome.is_file() else r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
         private='--incognito' if chrome.is_file() else '--inprivate'

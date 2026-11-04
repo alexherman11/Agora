@@ -28,11 +28,19 @@ def upsert(door,kind,name,**facts):
     return t
 
 
+def app(door,name,label,opens,icon=None):
+    """An app on the dock and in the launcher (shell-kit.js reads `rows app`, 4 Nov). Made once and never overwritten:
+    after that the world's label, line and icon are the ones that count."""
+    if not door.rows('app',name=name):
+        door.say('make kind=app name='+name+' label='+Q(label)+' does='+Q('window.open '+opens)+(' icon='+Q(icon) if icon else ''))
+
+
 def widget_source(vocabulary=(), board_look=True):
     """The painter's code for one widget. vocabulary: extra reviewed files loaded before the painter runs (the shell's
     ShellKit); board_look=False leaves out the task board's stylesheet (theme.js), whose class names a bar does not want."""
     files=[LAB/'widgets/common.js',HERE/'primitives.js',HERE/'themed.js',*([HERE/'theme.js'] if board_look else []),
-           HERE/'quarantine.js',HERE/'isolation.js',*vocabulary,HERE/'painter.js']
+           HERE/'quarantine.js',HERE/'isolation.js',
+           LAB.parent/'text-desk-lab/notation/desk-shell/carry-targets.js',*vocabulary,HERE/'painter.js']
     # a vocabulary entry is a file, or already its text (a str that is not an existing path)
     return '\n\n'.join(p if isinstance(p,str) else Path(p).read_text(encoding='utf-8') for p in files)
 
@@ -56,6 +64,7 @@ def install(door, board=True):
         upsert(door,'lens','taskboard-components',title='Task board · Components',painter='components',
                text=(LAB/'apps/taskboard/component-board.lens').read_text(encoding='utf-8'))
         ids['taskboard-components']=activate(door,'taskboard-components','Task board · Components')
+        app(door,'taskboard','Task board','taskboard-components')
     # The gallery is an arrangement made from catalogue components, including
     # live examples and literal setting cards. No separate gallery renderer.
     gallery=['root : column, role catalogue', '  heading : text "Component gallery"']
@@ -78,7 +87,7 @@ def activate(door,name,title):
     mid=upsert(door,'widget',name,title=title,style='bars',component_lens=name,code=widget_source())
     grants=('window.surface rows look look-view history components help component-health component-action task-add task-move task-assign task-done '
             'task-note task-priority task-colour task-note-colour task-note-style task-filter task-rename task-edit task-text task-remove summarize.* make set forget undo '
-            'hear:make hear:set hear:forget hear:undo hear:component hear:component-action hear:task-*')
+            'hear:make hear:set hear:forget hear:undo hear:component hear:component-action hear:view hear:task-*')
     current=door.rows('widget',name=name)[0]
     matching=any(g.get('words')==grants and not g.get('revoked') for g in door.rows('grant',to=mid))
     if not current.get('on') or not matching:

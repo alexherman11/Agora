@@ -5,6 +5,8 @@ appears on the screen). Everything is said as lines over HTTP, as Alex's pages a
     C:/Projects/Agora4/.venv/Scripts/python.exe -m unittest test_kdesk -v        (from research/window-lab/kernel-desktop)
 """
 import json
+import struct
+import os
 import shutil
 import sys
 import tempfile
@@ -19,6 +21,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import kdesk  # noqa: E402
+from kernel import scratch  # noqa: E402
 
 SEE = {"help", "look", "rows", "holds", "status", "window.list", "window.desktop", "system.now", "media.now"}
 FEED = ("root : column, role sheet, of tag:post as p, each card\n"
@@ -31,9 +34,24 @@ def quoted(text):
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
+def scratch_dir(prefix):
+    """A fresh folder for a test world. Not tempfile.mkdtemp: since Python 3.12.4 that makes an owner-only folder on
+    Windows (SYSTEM, Administrators, OWNER RIGHTS, nothing inherited), so a sandboxed House worker can't write inside it,
+    even in its own worktree. A plain mkdir inherits the folder's access. Point TMP at a writable place first."""
+    base = Path(tempfile.gettempdir())
+    for _ in range(100):
+        p = base / f"{prefix}{os.urandom(4).hex()}"
+        try:
+            p.mkdir(parents=True)
+            return str(p)
+        except FileExistsError:
+            continue
+    raise FileExistsError(f"no free scratch name under {base}")
+
+
 class Desk:
     def __init__(self):
-        self.dir = tempfile.mkdtemp(prefix="kdesk-test-")
+        self.dir = scratch_dir("kdesk-test-")
         self.k, self.srv, self.host, self.entry = kdesk.start(Path(self.dir) / "world", 0, headless=True)
         self.url = f"http://127.0.0.1:{self.srv.server_address[1]}"
         self.wait(lambda: "window.list" in self.say("help all", "alex")["text"] and
@@ -168,6 +186,41 @@ class DesktopTest(unittest.TestCase):
         for far in ("https://example.com/", "http://192.168.1.4:8794/", "file:///C:/Windows/win.ini", "http://127.0.0.1/"):
             self.assertIn("this machine only", d.say(f'window.open url="{far}"')["text"], far)
 
+    def test_a_picture_of_a_view_is_a_file_that_a_line_hands_on(self):
+        # 4 Nov, the wallpaper pilot: window.picture draws what window.open would show, hidden, and hands it back as
+        # the caller's own file; in a line, `; ... $new` passes it on (the world rule that makes the theme the
+        # wallpaper is this line on theme.changed). The window module may make files only once a steward says so.
+        d = self.d
+        mod = next(r["id"] for r in d.say("rows module", "alex")["rows"] if r.get("name") == "window")
+        refused = d.say("window.picture help size=320x200", "alex")
+        self.assertFalse(refused.get("ok"), refused["text"])
+        self.assertIn("upload", refused["text"])
+        self.assertTrue(d.say(f'grant {mod} words="upload" only=kind:file', "alex")["ok"])
+        sid = d.say('make kind=shell-settings name="Shell settings"', "alex")["made"][0]
+        out = d.say(f'window.picture help size=320x200 name="Help picture" ; set {sid} wallpaper=$new', "alex")
+        self.assertTrue(out["ok"], out["text"])
+        fid = d.say("rows shell-settings", "alex")["rows"][0]["wallpaper"]
+        f = next(r for r in d.say("rows file", "alex")["rows"] if r["id"] == fid)
+        self.assertEqual(("image/png", "Help picture"), (f["mime_type"], f["name"]))
+        data = (Path(d.dir) / "world" / "blobs" / f["blob_hash"]).read_bytes()
+        self.assertEqual(b"\x89PNG", data[:4])
+        self.assertEqual((320, 200), struct.unpack(">II", data[16:24]))     # the PNG's own width and height
+        self.assertIn("no view, lens or thing", d.say("window.picture nothing-called-this", "alex")["text"])
+
+    def test_the_games_the_owner_names_are_mirrored_for_the_gate(self):
+        # 4 Nov: Alex's games are a world thing, not a list in gaming_gate.py. The window host mirrors the owner's
+        # game-settings to a file every process can read; a hidden test's mirror is its own world's games.json.
+        d = self.d
+        mirror = Path(d.dir) / "world" / "games.json"
+        d.say('make kind=game-settings name=Mine games="Cs2.exe, notanexe, rocketleague.exe" not_games="NVIDIA Overlay.exe"', "alex")
+        d.wait(lambda: mirror.is_file() and "cs2.exe" in mirror.read_text(encoding="utf-8"), 15)
+        got = json.loads(mirror.read_text(encoding="utf-8"))
+        self.assertEqual((["cs2.exe", "rocketleague.exe"], ["nvidia overlay.exe"]), (got["games"], got["not_games"]))
+        d.say('make kind=game-settings name=Theirs games="sneaky.exe"', "jeff")      # not the desktop owner's
+        d.say('make kind=window shows=help name=Nudge', "alex")                        # any window act: a reconcile
+        time.sleep(2)
+        self.assertNotIn("sneaky.exe", mirror.read_text(encoding="utf-8"))
+
     def test_off_window_closes_all_and_undo_brings_them_back(self):
         d = self.d
         d.say("window.open lines")
@@ -183,6 +236,7 @@ class DesktopTest(unittest.TestCase):
         out = d.say('make kind=button bar=taskbar label="Lines" does="window.open lines"')
         self.assertTrue(out["ok"], out["text"])
         rows = d.say("rows any bar=taskbar")["rows"]
+        rows = [r for r in rows if r["id"] == out["made"][0]]
         self.assertEqual([r["label"] for r in rows], ["Lines"])
         self.assertTrue(d.say(rows[0]["does"], "alex")["ok"])                # the taskbar's press, as Alex
         d.wait(lambda: d.window("lines"))
@@ -402,7 +456,7 @@ class DesktopTest(unittest.TestCase):
         from restyle import install
         install(d.entry.token('claude'), d.srv.server_address[1])
         slots = {r['slot']:r for r in d.say('rows any bar=taskbar')['rows'] if r.get('slot')}
-        self.assertEqual(set(slots), {'start','agora','network','volume','battery','clock','off','holds'})
+        self.assertEqual(set(slots), {'start','agora','network','volume','battery','clock','off','holds','twitch'})
         self.assertEqual(slots['start']['does'], 'window.start')
         self.assertEqual(slots['off']['confirm'], 'yes')
         self.assertTrue(d.say(f"set {slots['start']['id']} label=Launcher icon=layout-grid")['ok'])
@@ -434,7 +488,7 @@ class RecoveryTest(unittest.TestCase):
         import taskbar_guard as guard
         self.C, self.W, self.guard = C, W, guard
         (HERE / 'state').mkdir(exist_ok=True)        # ignored by git, so absent in a fresh House worktree
-        self.tmp = tempfile.TemporaryDirectory(prefix='taskbar-probe-', dir=HERE / 'state')
+        self.tmp = scratch.TemporaryDirectory(prefix='taskbar-probe-', dir=HERE / 'state')
         self.lease = Path(self.tmp.name) / 'lease.json'
         self.u = C.WinDLL('user32')
         self.u.CreateWindowExW.argtypes = [W.DWORD,W.LPCWSTR,W.LPCWSTR,W.DWORD,C.c_int,C.c_int,C.c_int,C.c_int,W.HWND,W.HMENU,W.HINSTANCE,W.LPVOID]

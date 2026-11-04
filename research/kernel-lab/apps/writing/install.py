@@ -17,11 +17,12 @@ HERE = Path(__file__).resolve().parent
 LAB = HERE.parents[1]
 ROOT = LAB.parents[1]
 sys.path[:0] = [str(LAB)]
-from painter.install import upsert, widget_source, taskboard, Q  # noqa: E402
+from painter.install import upsert, widget_source, taskboard, Q, app  # noqa: E402
 
 LENS = 'writing'
 GRANTS = ('window.surface rows look look-view history components help component-health component-action file-read '
-          'make set forget undo say ask hear:make hear:set hear:forget hear:undo hear:say hear:component hear:component-action')
+          'make set edit edits forget undo say ask hear:make hear:set hear:edit hear:forget hear:undo hear:say '
+          'hear:component hear:component-action hear:view')
 VIEW = {'open': '', 'back': '', 'fresh': ''}
 
 KINDS = {
@@ -47,23 +48,26 @@ COMPONENTS = {
                 'row', '', '', dict(look=T(default='row'))),
     'doc-home': ('A writing window with nothing open: plans waiting for you, recently changed, and a way to start.',
                  'body', 'waiting recent', 'new', dict(recent=T('number', 8))),
-    'doc-page': ('One Markdown document, drawn as you write: press a part to edit it in place, Ctrl+E for the whole '
-                 'source, [[ to link another document, a plan\'s calls, comments in the margin on selected words, and '
-                 'sending a passage or the whole document into JEFF\'s Conversation.', 'body title plan editor source',
-                 'comments', 'edit retitle move verdict waiting comment ask-jeff new forget', {}),
+    'doc-page': ('One Markdown document as one continuous editor (CodeMirror with a live preview, like Obsidian): '
+                 'marks hide except where the caret is, select across anything, undo, find (Ctrl+F), [[ to link '
+                 'another document, Ctrl+E shows every mark; it keeps itself as you type (write: the changed spans, '
+                 'kept with their history). A plan\'s calls, comments in the margin on selected words, and sending '
+                 'a passage or the whole document into JEFF\'s Conversation.', 'body title plan editor',
+                 'comments', 'write edit retitle move verdict waiting comment ask-jeff new forget', {}),
     'doc-comment': ('A comment beside a document: the words it is about and where they are now (under a heading, moved, '
                     'changed or gone), its replies, reply, resolve and send to JEFF.', 'body quote text reply', '',
                     'reply resolve reopen ask-jeff', dict(doctext=T(), doctitle=T())),
 }
-LIMITS = ('Markdown only: headings, lists and tasks, quotes, code, tables, links, [[links]], ![[embeds]] as a card. '
-          'One person edits a block at a time; a change made meanwhile refuses the save and keeps your words. '
+LIMITS = ('Markdown only: headings, lists and tasks, quotes, code, tables, links, [[links]]; HTML and embeds stay as '
+          'text. One person types in a document at a time: a change made meanwhile is put under what you typed, '
+          'never over it, but there are no shared cursors. '
           'Web addresses cannot be opened from the window (no word for it yet): they are shown and copied.')
 
 GUIDE = '''# Writing in Agora
 
 > Draft by Claude, 27 Oct 2026, after the old desk's note of the same name. Every document here is a thing that belongs to the person who made it.
 
-A document is one **Markdown** text. It is drawn as you read it. Press a part to write in it: that part shows its marks, the rest stays drawn. Press *Ctrl+E* to see the whole source, and again to come back.
+A document is one **Markdown** text, written in one continuous page, as in Obsidian. Click anywhere to put the caret there; the marks (`#`, `**`, `[[`) show only on the line you are writing, and are hidden everywhere else. Press *Ctrl+E* to see every mark, and again to hide them. It keeps itself as you type.
 
 ## What it knows that a file can't
 
@@ -76,11 +80,14 @@ A document is one **Markdown** text. It is drawn as you read it. Press a part to
 
 | Key | What it does |
 | --- | --- |
-| `Ctrl+E` | the source, and back |
-| `Ctrl+B` / `Ctrl+I` | **bold** / *italic* while writing |
+| `Ctrl+E` | every mark, and back |
+| `Ctrl+B` / `Ctrl+I` | **bold** / *italic* |
+| `Ctrl+Z` / `Ctrl+Y` | undo / redo |
+| `Ctrl+F` | find and replace in the document |
 | `[[` | link to a document by its title |
-| `Tab` | indent a list item |
-| `Ctrl+S`, `Esc` | keep what you wrote (leaving the part keeps it too) |
+| `Enter` in a list | the next item; twice ends the list |
+| `Tab` / `Shift+Tab` | indent / outdent a list item |
+| `Ctrl+S` | keep it now (it keeps itself anyway) |
 | `Ctrl+K` | find a document |
 | `Alt+←` | back to the document before |
 
@@ -102,8 +109,12 @@ PLANS = [
 ]
 
 
-def code():
-    return (HERE / 'writing-components.js').read_text(encoding='utf-8')
+def code(name=''):
+    """Every component's code is writing-components.js; doc-page's also carries the editor (editor/, 0.4 MB built)."""
+    source = (HERE / 'writing-components.js').read_text(encoding='utf-8')
+    if name == 'doc-page':
+        source = (HERE / 'editor' / 'doc-editor.bundle.js').read_text(encoding='utf-8') + '\n' + source
+    return source
 
 
 def documents(door):
@@ -126,9 +137,9 @@ def install(door, docs=True):
     ids = {}
     for kind, facts in KINDS.items():
         ids['kind:' + kind] = upsert(door, 'kind', kind, **facts)
-    source = code()
-    digest = hashlib.sha256(source.encode()).hexdigest()
     for name, (purpose, parts, slots, gestures, schema) in COMPONENTS.items():
+        source = code(name)
+        digest = hashlib.sha256(source.encode()).hexdigest()
         tid = upsert(door, 'component', name, category='writing', purpose=purpose, settings=json.dumps(schema),
                      parts=json.dumps({p: dict(facts='bound visible row') for p in parts.split()}),
                      slots=json.dumps(slots.split()), gestures=gestures, example=f'root : {name}',
@@ -149,6 +160,7 @@ def install(door, docs=True):
         door.say('widget ' + ids['widget'] + ' surface=window grants=' + Q(GRANTS))
     ids['button'] = upsert(door, 'button', LENS + '-button', label='Writing', bar='taskbar', icon='pen-line',
                            does='window.open ' + LENS)
+    app(door, LENS, 'Writing', LENS)
     if docs:
         ids.update(documents(door))
     return ids

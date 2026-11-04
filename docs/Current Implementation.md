@@ -1,5 +1,7 @@
 # Current Implementation
 
+> This describes the text desk, which was archived on 27 Oct. The kernel desktop is not written up here yet. Until it is, see `research/kernel-lab/SHAPE.md`, `research/kernel-lab/guide/HOW-TO-BUILD-HERE.md`, `research/window-lab/kernel-desktop/README.md` and `help` in the world.
+
 **The text desk · last audited against the code at `e745bfc` on 8 October 2026 (read against the source; what was run is said where it is quoted)**
 
 The Dynamic Desk exists today as one prototype, the text desk, defined entirely in text:
@@ -384,7 +386,7 @@ The old single-pass evaluator (`scene.build`, `scene_for_old`) was retired on 5 
 | `picture` (13 Oct) | On a text part: the words are a drawing written as SVG, and the painter draws it as wide as its part (`lens.js` `picture`). Only shapes and words are kept: svg, g, path, rect, circle, ellipse, line, polyline, polygon, text, tspan, title, desc, defs, marker, gradients, clipPath; every other element, every `on…`, `href`, `src` and `style` attribute, and any `url(` that is not `#id` are dropped, so no script, link or address survives. Colours may name the style's tokens (`fill='var(--t-accent)'`). The print says `picture` and keeps the source as the text; `paint.picture` is true and no runs are read. Refused on a part with no text or with `on edit`. A text that is not SVG paints one line in role `cut`. Not built: anything that moves or is pressed inside a drawing |
 | `light "<passages>"` (13 Oct) | On a text part: lights each passage named, one a line, where it first stands in the drawn words (a `<mark>` in role `light`; `lens.js` `light`); a passage no longer in the words is not lit. A template filled as text is: `let spots = join($quote of lines:<chat> about=$item)` then `light "$(spots)"`; since 14 Oct more than one template may follow (`light "$(spots)" "$(mine)"`). The print says `light N`; `paint.light` is the list |
 | `clamp [last] <N>` | At most N lines, or N repeats; both printers say how many are left. On a repeat, `last` keeps the newest N, keyed as they would be without the clamp |
-| `of <selection> [as f]` + `each <part>` | Repeat over a selection, over ids named one by one (each printed with its state: unplaced, gone), or over a row source: `sections:<id>`, `comments:<id>`, `messages:<id>` (one row per text line: `item who said index at line to edited`, where `at` is the time of the event that made its line (a1581; before, matched from the append events by words): `08:15` today, `29 Sep 22:38` otherwise; `line` is the chat line (`m<n>`) it belongs to, `to` who that line addresses, `edited` is `edited` or empty; the last text line of a changed line ends `(edited, m<n>)` in `said`, as read prints it, so a change is never silent on a screen), `sayings [for:<name>] [in:<id>]` (a3319, lines phase 2: the sayings of the desk, chat lines and comments as they are stored, two kinds read through one showing, oldest first like a chat; nothing is migrated and no id is new: `item what saying by name at in to said answered edited before state eid`, where `what` is `line` or `comment`, `saying` its own id (`m<n>` or `c<n>`), `by` a line's signature or a comment's author as printed, `name` the writer as a word an @ can call, `in` the chat's title or the title of the thing commented on, `to` a line's stored address or the address a comment's event stores (`to` on the event, beside its args, written by `world`'s comment from the header rule; a comment made before a3319 has none), `state` empty for a line and `open`, `withdrawn` (its writer resolved it) or `resolved by <name>` for a comment; the terms follow the word after a space, so `scene.source_head` and not the first colon names the source. `in:<id>` keeps one chat's lines or one thing's comments. `for:<name>` keeps what is shown in that person's For you by the one showing rule, `rooms.shown`, which asks `rooms.calls` (a saying whose address names them, or any line of a direct chat; an address to everyone, a comment with no stored address, and what only knocks, such as a headerless comment on their commission or in their corner, are left out), leaves out what they wrote, and fills `answered` and `before`: a line is `yes` when a line of theirs follows it in that chat, else `no`; a comment is `yes` when they replied to it or commented later on that thing, `withdrawn` when its writer resolved it, else `no`, so someone else's resolve does not end it for them. Rows are keyed by `eid`, the event that made the saying, and same-second sayings stay in the order said. No lens restates the rule: `test_sayings.py` changes `rooms.calls` and the rows change), `inbox:<name>` (a3319: `sayings for:<name>` under its first name, with the names its rows had, so comments addressed to the person are in it too; `scene.inbox_rows` is gone. Oldest first like a chat, so a lens shows the newest with clamp last N, scroll end: `item chat who said at open index eid line before`. A line counts when its chat's members name the person (a direct chat), or its stored `to` has the person (a1581: the writer's word, @name outside quotes or to=, not a search of its words; a chat with no lines is still searched as before); @everyone and @all don't count, so it is narrower than what reaches a resident (Alex, 30 Sep). a2692: nothing shows from a chat the person is not a member of now (`rooms.is_member`, the rule the knock and the receipt ask: a chat whose `members=` leaves them out, unless it sits in their own corner), however it was addressed; leaving a chat takes its lines away. `before` is `addressed to you before you were a member of this chat` for a line addressed to them while they were not a member (they joined since: `members=` as it stood after the line's event, `rooms.members_at`, read from the undo of the next change to it), else empty; such a line never knocked them, and joining knocks no one after the fact (Pike c2697). `open` is `yes` until the person writes in that chat after it; rows are keyed by `eid`, the event that added the line), `lines[:<chat>]` (a1581: every chat line as a thing, of one chat or every placed chat, oldest first, one row per line however many text lines it spans: `item chat line who by at to said edited reply_to eid`; `by` and `at` from its event, `unknown` and empty when none made it; `of lines` with a part `only when $to has $me` shows the lines addressed to the viewer, though `has` is a test of words, so a name inside a longer name also matches), `actors`, `events`, `worktrees`, `house[:<corner>]`, `turns[:<corner>]` (each resident's last replies, oldest first like a chat: `resident corner turn at said acts`, where `acts` counts the lines that began with `>`), `days:<start>..<end>` (9 Oct, step 5, 2d46ba5: the days of a span as rows `n date weekday week`, at most a year, and terms over its fields keep the Mondays: `of days:$term.start..$term.end weekday=Mon as d`; what `derive days = days-from` with `over $days` built), and since 8 Oct (6b5944a, `table.py`, step 4 of the grammar unification) the desk's own vocabulary: `words [host=verb|command|lens|term|kind]` (`host word form slots doc`: every verb, command, lens word, selection term and kind, one row each, read from the hosts' own tables: `verbs.USAGE`, `DeskKnife.USAGE`, `scene.WORDS`, `knife.ASPECTS`, the kinds), `slots [host=... word=...]` (`host word slot type needed doc`: a word's typed slots, `move`'s `into before after to by` as things, `fold`'s `label` as prose and `open` as a flag, a kind's declared and observed slots with how many things have each) and `kinds` (`kind is shape things props declared`: what a kind's things carry, most common first with the usual type, and what its note declares). A source's field names no longer take a name from every lens (`scene.SOURCE_FIELDS`): `let shape = 1` compiles though the words source has a field `shape`; the nearer binding wins, as `names.py` says. An empty repeat prints `(empty)` |
+| `of <selection> [as f]` + `each <part>` | Repeat over a selection, over ids named one by one (each printed with its state: unplaced, gone), or over a row source: `sections:<id>`, `comments:<id>`, `messages:<id>` (one row per text line: `item who said index at line to edited`, where `at` is the time of the event that made its line (a1581; before, matched from the append events by words): `08:15` today, `29 Sep 22:38` otherwise; `line` is the chat line (`m<n>`) it belongs to, `to` who that line addresses, `edited` is `edited` or empty; the last text line of a changed line ends `(edited, m<n>)` in `said`, as read prints it, so a change is never silent on a screen), `sayings [for:<name>] [in:<id>]` (a3319, lines phase 2: the sayings of the desk, chat lines and comments as they are stored, two kinds read through one showing, oldest first like a chat; nothing is migrated and no id is new: `item what saying by name at in to said answered edited before state eid`, where `what` is `line` or `comment`, `saying` its own id (`m<n>` or `c<n>`), `by` a line's signature or a comment's author as printed, `name` the writer as a word an @ can call, `in` the chat's title or the title of the thing commented on, `to` a line's stored address or the address a comment's event stores (`to` on the event, beside its args, written by `world`'s comment from the header rule; a comment made before a3319 has none), `state` empty for a line and `open`, `withdrawn` (its writer resolved it) or `resolved by <name>` for a comment; the terms follow the word after a space, so `scene.source_head` and not the first colon names the source. `in:<id>` keeps one chat's lines or one thing's comments. `for:<name>` keeps what is shown in that person's For you by the one showing rule, `rooms.shown`, which asks `rooms.calls` (a saying whose address names them, or any line of a direct chat; an address to everyone, a comment with no stored address, and what only knocks, such as a headerless comment on their commission or in their corner, are left out), leaves out what they wrote, and fills `answered` and `before`: a line is `yes` when a line of theirs follows it in that chat, else `no`; a comment is `yes` when they replied to it or commented later on that thing, `withdrawn` when its writer resolved it, else `no`, so someone else's resolve does not end it for them. Rows are keyed by `eid`, the event that made the saying, and same-second sayings stay in the order said. No lens restates the rule: `test_sayings.py` changes `rooms.calls` and the rows change), `inbox:<name>` (a3319: `sayings for:<name>` under its first name, with the names its rows had, so comments addressed to the person are in it too; `scene.inbox_rows` is gone. Oldest first like a chat, so a lens shows the newest with clamp last N, scroll end: `item chat who said at open index eid line before`. A line counts when its chat's members name the person (a direct chat), or its stored `to` has the person (a1581: the writer's word, @name outside quotes or to=, not a search of its words; a chat with no lines is still searched as before); @everyone and @all don't count, so it is narrower than what reaches a resident (Alex, 30 Sep). a2692: nothing shows from a chat the person is not a member of now (`rooms.is_member`, the rule the knock and the receipt ask: a chat whose `members=` leaves them out, unless it sits in their own corner), however it was addressed; leaving a chat takes its lines away. `before` is `addressed to you before you were a member of this chat` for a line addressed to them while they were not a member (they joined since: `members=` as it stood after the line's event, `rooms.members_at`, read from the undo of the next change to it), else empty; such a line never knocked them, and joining knocks no one after the fact (Pike c2697). `open` is `yes` until the person writes in that chat after it; rows are keyed by `eid`, the event that added the line), `lines[:<chat>]` (a1581: every chat line as a thing, of one chat or every placed chat, oldest first, one row per line however many text lines it spans: `item chat line who by at to said edited reply_to eid`; `by` and `at` from its event, `unknown` and empty when none made it; `of lines` with a part `only when $to has $me` shows the lines addressed to the viewer, though `has` is a test of words, so a name inside a longer name also matches), `actors`, `events`, `worktrees`, `house[:<corner>]`, `turns[:<corner>]` (each resident's last replies, oldest first like a chat: `resident corner turn at said acts`, where `acts` counts the lines that began with `>`), `days:<start>..<end>` (9 Oct, step 5, 2d46ba5: the days of a span as rows `n date weekday week`, at most a year, and terms over its fields keep the Mondays: `of days:$term.start..$term.end weekday=Mon as d`; what `derive days = days-from` with `over $days` built), and since 8 Oct (6b5944a, `table.py`, step 4 of the grammar unification) the desk's own vocabulary: `words [host=verb|command|lens|term|kind]` (`host word form slots doc`: every verb, command, lens word, selection term and kind, one row each, read from the hosts' own tables: `verbs.USAGE`, `DeskKnife.USAGE`, `scene.WORDS`, `knife.ASPECTS`, the kinds), `slots [host=... word=...]` (`host word slot type needed doc`: a word's typed slots, `move`'s `into before after to by` as things, `fold`'s `label` as prose and `open` as a flag, a kind's declared and observed slots with how many things have each) and `kinds` (`kind is shape things props declared`: what a kind's things carry, most common first with the usual type, and what its note declares), `windows` (a5052, 14 Oct: the windows the window manager prototype keeps on the screen, `name title lens kind pinned collapsed focused order age by`, written by `research/window-lab/wm.py` beside the house through `witnessed.py`, never in the world) and `witnessed:<name>` (15 Oct, the home base: the rows any living program keeps beside the house under that name, every field it wrote, read through a frame (`of witnessed:desktop as w`, `$w.title`), with `order age by`; a field that is not a word or a number arrives as JSON; a program whose process has ended has no rows; `research/window-lab/hud.py` writes `desktop`, one row per window Alt+Tab would offer: `name` (its handle) `title program minimized front`). A source's field names no longer take a name from every lens (`scene.SOURCE_FIELDS`): `let shape = 1` compiles though the words source has a field `shape`; the nearer binding wins, as `names.py` says. An empty repeat prints `(empty)` |
 | `the <selection> [as f]` | Exactly one thing becomes the current thing; prints `(empty)`, or `(ambiguous: …)` with nothing built under it |
 | `as <name>` | Names this part's thing as a frame, read below as `$name.field`. Shadowing a built-in or an outer frame is refused |
 | `over $<list> [as f]` | Repeat over a list field the thing holds (`$tags`) or the rows a let holds (`let days = days-from($a, $b)`; 9 Oct, step 5: `derive` named them before); `$it` is each value, `$it.n` and `$it.date` a row's fields. Rows from a source go under `of` (`of days:$a..$b as d`), and the refusal says so |
@@ -507,7 +509,7 @@ A style is a note tagged `style` and titled with its name. It is edited, undone 
 - The style defines:
   - tokens, the only place a colour or number appears;
   - roles built from tokens. One role word is motion: `pulse` fades the part between full and 60% opacity, 2.5 s a cycle, every pulse on the page in one phase (a1140). For a viewer whose system asks for reduced motion it does nothing and the part is still. The scene print marks such a part `[<role> pulse]`. A carried card's dim wins over its pulse. pulse makes its part a layer while it runs; don't put it on a part that holds a float;
-  - the properties a role may say (`style.read_prop`, 8 Oct): `on <colour>`, a bare colour for the words, `edge <colour>`, `border <side> <colour>`, `corner <length>`, `pad [<side>] <length>`, `space above|below <length>`, `between <length>`, `height <length>` (a least height, 7 Oct), `width <length>`, `lift <length>`, `text [down|up [n]] [strong|medium|slant|tracked]`, `pulse`, `wave` (14 Oct: each character of the part's text drawn as its own span, rising and brightening in turn, 1.3 s a cycle, each a beat after the one before; still under reduced motion; for typing dots), and since 7 Oct `afloat` (the part takes no room and lies over what follows) and `shy` (unseen until the pointer or the caret is in the part that holds it, or the one above);
+  - the properties a role may say (`style.read_prop`, 8 Oct): `on <colour>`, a bare colour for the words, `edge <colour>`, `border <side> <colour>`, `corner <length>`, `pad [<side>] <length>`, `space above|below <length>`, `between <length>`, `height <length>` (a least height, 7 Oct), `width <length>`, `lift <length>`, `text [down|up [n]] [strong|medium|slant|tracked]`, `align start|center|end|stretch` (15 Oct: where the part stands across its parent's flow, drawn as `align-self`; a chat's own lines at the right), `pulse`, `wave` (14 Oct: each character of the part's text drawn as its own span, rising and brightening in turn, 1.3 s a cycle, each a beat after the one before; still under reduced motion; for typing dots), and since 7 Oct `afloat` (the part takes no room and lies over what follows) and `shy` (unseen until the pointer or the caret is in the part that holds it, or the one above);
   - `font <name> = Family, fallback` lines;
   - themes (`?theme=` on the painter's page; a theme redefines tokens, never roles).
   - the tree form (9 Oct, step 5, 2d46ba5): a role's properties may stand one per line under `role <name> :`, as a lens's words do under their part, and a theme's tokens are the lines under it; the comma form still reads. Both read through `tree.read`, the one indentation reader (`style.parse`), and `style.to_lines` prints the tree form.
@@ -1021,8 +1023,14 @@ tests 201 passed / 2 skipped, and the newly landed agent-line fence's standalone
 multiline message to two recipients, original-thread reply, and capture/send after source
 change. Repository tests: 201 passed, 2 skipped; scene/thread tests: 54 passed; focused
 context lifecycle/delivery tests: 31 passed. Copied-world health: passed in 114.0s,
-20 active lenses compile, zero unexpected refusals. Real desktop selection and a real
-resident attachment reply remain pending integration checks. The prototype currently
+20 active lenses compile, zero unexpected refusals. A real resident attachment reply was
+verified on 15 October: browser Send from Codex's own draft produced `m5410`; JEFF replied
+once as `m5411` (`e10449`), identifying the captured task revision separately from current
+state, receiving the test-window PNG, and recognizing an OS-native capture as title only.
+The native task fixture was captured through the API; the PNG and title capture came from
+the capture worker's controlled OS checks. A complete human desktop-drag journey remains
+unverified. Alex subsequently clarified that `a5080` is his conversation with JEFF; further
+tests and coordination belong in Shop talk or a separate demo feed. The prototype currently
 shows the latest 80 exchanges; older-history browsing, recipient completion and deletion
 of removed/sent private capture files are not implemented in the conversation UI.
 The working indicator uses an exact single-recipient comparison. Multiple recipients
@@ -1030,6 +1038,22 @@ remain valid for sending, but do not show a combined activity indicator; interpo
 the comma-separated list into the row query was found to refuse the whole lens and was
 replaced with a safe per-row comparison. The corrected multi-recipient scene and removal
 of one attachment while retaining the others were checked in the live browser.
+Expected native row-query refusals now become lens diagnostics at the compiler boundary.
+A regression exercises the actual `/api/do` handler: editing a style used by a malformed
+lens returns a successful durable write with a refusal note, survives reload and journal
+replay, and retains last-good lens fallback. Unexpected exceptions still propagate.
+The combined conversation/compiler check passes 104 tests.
+
+**Native visual report proof (15 October):** `visual-chat-proof-demo` (`a5456`)
+uses its own feed `a5450`, report `a5454` and style `a5452`; neither existing chat
+lens nor Alex/JEFF's feed was changed. A message's `visual` field places an authored
+native lens containing sanitized SVG and three local disclosure controls. Six copied
+compiler checks passed. Browser checks at 320/420/600px verified keyboard/mouse disclosure,
+draft retention and copied-feed Send; the live demo was also opened and expanded.
+This is not HTML support: lookup follows a mutable lens name, and a missing visual can
+refuse its enclosing feed. General adoption requires per-visual failure isolation;
+the proposed HTML renderer remains unbuilt pending review of the native proof.
+Authored sources and evidence are in `research/conversation-lab/README.md`.
 
 ## Related documents
 
@@ -1038,6 +1062,100 @@ of one attachment while retaining the others were checked in the live browser.
 - [[Previous Work]]: earlier architectures and what they taught.
 
 <!-- exported from the desk: world frontier, Home > Handbook > How the desk is built, at event e7556. Edit it there; a direct edit here makes the next export stop and warn. sha1:4fed8a826b95 -->
+
+
+### HUD repair, 16 Oct 2026
+
+The Home base viewer routes its Conversation selection (`a5080`) through `jeff-chat`, so both the pin and dock entry expose the existing draft and Send control. Other chats retain their viewer. The running HUD was replaced with current code to pick up the previously landed no-scroll and thumbnail-clipping changes. `hud_restart.py` retains `sys.executable`, because the base interpreter does not necessarily contain pywebview.
+
+**Ran:** the browser view at 1280×720 and 2560×1440 had no overflowing scroll containers; typing and Send in the isolated world `frontier@hud-codex-20261016` appended one message and cleared its draft. The live composer accepts focus; no test message was sent to the live Conversation. The new HUD process started with pinned Python. **Not verified:** native-window pixels, because the available UI tool did not enumerate the HUD tool-window. Root tests: 201 passed, 2 skipped. Documentation check retains the existing missing Dynamic Desk image; Ruff retains existing long lines in the restart helper. Native record: Processes and state `a245`, task `a5807`.
+
+
+### Message authorship repair, 16 Oct 2026
+
+16 Oct 2026, authorship repair (Codex, a5851). Structured multiline chat messages are one sayings row in every view (in:, for:, involving:), retaining blank lines, one writer and one event key; quoted speaker names inside the body never become another writer. Ordinary views keep the existing edited marker. New comment, reply and resolve-with-reply writes store the actual actor, including JEFF, instead of aliasing him to Alex. Historical signatures and events are unchanged: c5730/c5744 remain signed alex under the old rule, while their events e11032/e11053 correctly name jeff. Ran: four failing regressions before the fix; 47 focused tests after it, then 14 targeted tests including two added edit-marker/person-identity cases; comment/sayings/person-stored/lines scripts passed; root pytest 201 passed, 2 skipped. Browser in a copied world: multiline Send gave one Alex bubble, and another JEFF message caused repaint without duplicate keys or changed attribution. No live Conversation test messages. Source goes through hand landing; native-window capture integration remains worker-a5834.
+
+
+Live verification, 16 Oct: landed e4ac9a2 through the normal queue (522 seconds). The already-open live browser view updated without reload: real message e11178 changed from two reversed, differently attributed parts to one complete Alex bubble in paragraph order. No live message or draft was written. Historical attribution correction is recorded as c5884 on a5723.
+
+## Resident provider handover, 20 October 2026
+
+**Activated with Alex's explicit approval on 20 October 2026.** Jeff's existing
+Frontier corner f5189 now uses Codex gpt-6.1-sol, medium reasoning and ChatGPT
+subscription authentication. Native selection event e13620; reloaded house PID
+36324. Six live turns completed (442 to 448), after which Jeff rested.
+
+The adapter supports explicit portable handovers. The house drains the old turn,
+retains receipts and complete unresolved inputs, archives the old provider state,
+and starts a fresh conversation. Same-provider restarts resume their own token.
+Identity, world notes, tasks, permissions, cursor and queues remain canonical.
+Bounded recent context is historical data, never a replay script. Provider-private
+reasoning and compaction do not transfer. Claude remains the resident default.
+
+Managed Codex residents and workers require ChatGPT authentication before thread
+creation and each turn, mask API-key environment overrides, and reject custom
+authentication routes. Unavailable exact models refuse; pins were unchanged.
+Resident host tools remain empty, matching the existing Claude relay architecture.
+Native commands and delegated builders remain available through the world.
+
+The house now holds a per-world OS lifetime lease. Completed replies leave a durable
+relay marker until settled; an uncertain effect pauses for reconciliation instead
+of retry or HTTP-to-local fallback. There is no exactly-once guarantee or interactive
+reconciliation UI. Native actor labels remain unauthenticated. Worker tool/approval
+parity and provider delivery acknowledgement remain pre-existing limitations.
+
+**Ran:** 145 affected pytest checks passed in 9.00s; root suite 201 passed, 2 skipped
+in 27.43s; worker-pool, builder and wake-fold scripts passed. Actual compiled-runtime
+mock probes verified Sol/Astra empty resident tools. Two private live Sol turns
+verified subscription inference and restart/resume, without world access.
+The first actual Jeff input contained all 77 nonempty charter/soul/memory lines
+and the exact 6,633-character interrupted request. All 167 other saved session IDs
+were unchanged. The input contained 36,369 characters; identity references and
+canonical memory notes were unchanged. No test message entered Alex's Conversation.
+
+Jeff continued his earlier charter work: events e13637-e13643 removed redundant
+charter reads from wake strings. His recorded changes preserved the dedicated start
+hook and injected rules; this was post-activation work, not lost handover state.
+
+Backup: local/codex-residents/before-activation-20261020T213254Z, with locked world,
+170 state files, original settings and rollback evidence. Only the idle house was
+reloaded; all 18 old children exited on pipe closure, without extra termination.
+Desk, HUD and keeper stayed up. Claude residents remain quota-paused with their
+session state preserved; the reload did not switch them to Codex.
+
+Return to Claude through one explicit native property change on f5189:
+provider=claude model=claude-sonnet-5-5 handover=portable, once its allowance returns.
+The handover drains Sol and uses current world state in fresh Claude context.
+Do not restore stale world data or resurrect the old token. A source rollback
+must follow a completed return to Claude and controlled stop, preserving unrelated
+edits, provider archives and current state. Live return to Claude, new-session
+compaction and mid-effect recovery remain untested. No credentials, permissions
+or security settings changed; no paid API fallback, source commits or pushes.
+The existing missing Dynamic Desk image still fails docs checks; changed-file
+Ruff passes, with no new legacy-house/workshop diagnostics.
+
+See [the full handover/audit](../research/codex-residents/resident-provider-handoff.md)
+and [selected evidence](../research/codex-residents/resident-provider-evidence.json).
+
+## Native browser admission takeover (21 October 2026)
+
+Ran by Codex on Alex's request, using the pinned interpreter and a fresh hidden
+desktop under Guard: native WebView2 155.0.4283.62 initialized, loaded an offline
+top document and child, and self-disposed without a process kill. The final
+receipt records no remaining windows or matching processes and Guard passed.
+Messaging enabled delivered both canaries; disabled after a new document load
+delivered neither. The JavaScript object still exists and calls return normally,
+so object absence/throwing are not valid isolation criteria for this runtime.
+
+This is not public-web acceptance or an enabled browser. The original E_ABORT
+cause remains unknown. Host-object calls, network/redirect/worker/socket policy,
+permissions/downloads/popups, real input/history and authenticated/background
+reading remain unverified. No HUD, account, world viewer or live service changed.
+The new helpers are standalone and not imported by the runtime. 21 deterministic
+browsing/receipt tests and changed-source Ruff pass; docs checks still report the
+existing missing Dynamic Desk image. See the
+[takeover evidence and limits](../research/window-lab/browsing/ADMISSION-TAKEOVER.md).
+
 
 ## Adapters: outside sources as world notes (22 October 2026)
 

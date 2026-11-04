@@ -1,4 +1,11 @@
-"""Steward edits and stable bindings. Translations name the same entry."""
+"""EDITING THE KERNEL (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+The kernel changes only to give every world a general capability: a word, a check, a kind of fact any app, module or
+person can use. It never names its tenants: no app, module, person, kind or field name appears in this code except the
+kernel's own (word, rule, kind, grant, person, ...). If your change needs `if kind == "..."`, a person's name or one app's
+field, stop: the missing piece is a general word (a kind's policy, a rule step, a reading). Build that, or put it on the
+Board. Names already here are debt (research/source-edits/SOURCE-AUDIT-KERNEL.md lists them); take them out when you can.
+
+Steward edits and stable bindings. Translations name the same entry."""
 import re
 
 from .kernel import Refused, MAY_WORDS
@@ -50,7 +57,7 @@ def word_set(k, actor, st, entry, tx, group, saw=None):
     if 'help' in values and not values['help'].strip():
         raise Refused('a word with no help is not published')
     if 'may' in values and not all(x.strip() in MAY_WORDS for x in values['may'].split(' or ')):
-        raise Refused('may says anyone, members, leaders, stewards, maker or nobody, joined by or')
+        raise Refused('may says anyone, members, leaders, stewards, maker, lead or nobody, joined by or')
     if 'undo' in values and values['undo'] not in ('yes', 'no', 'external'):
         raise Refused('undo says yes, no or external')
     if 'sealed' in values and values['sealed'] not in ('yes', 'no'):

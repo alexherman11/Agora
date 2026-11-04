@@ -1,0 +1,17 @@
+# Twitch chat, read-only: an anonymous login (justinfan) cannot send. Settings: channel (lower case), into (the chat).
+# Seed text for the adapter thing named twitch; once it is in a world, the world's copy is the one that runs.
+connect wss://irc-ws.chat.twitch.tv:443
+on open
+  send "CAP REQ :twitch.tv/tags twitch.tv/commands"
+  send "PASS SCHMOOPIIE"
+  send "NICK justinfan$random"
+  send "JOIN #$channel"
+answer '^PING :(?<host>[A-Za-z0-9.-]{1,253})$' with "PONG :$host"
+ready '^(?:@\S+ )?:\S+ (?:366 \S+ #$channel|ROOMSTATE #$channel)\b' "connected to #$channel (read-only)"
+reconnect '^(?::\S+ )?RECONNECT$'
+each '^@(?<tags>\S+) :(?<login>\w+)!\S+ PRIVMSG #$channel :(?<words>.+)$'
+  pairs tags ";" "="
+  replace display-name "\s" " "
+  default display-name "$login"
+  key "$id"
+  chat.receive $into external_id="$id" speaker="$display-name" text="$words"

@@ -1,4 +1,11 @@
-"""kd_media: the media words on the new kernel, a module (SHAPE 11) over window-lab/media.py, unchanged.
+"""EDITING THE DESKTOP HOST (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+This file is a seam between the world and Windows: it turns world facts into screen effects and screen events into world
+facts, through small words. It holds no preferences and no content. Which apps, what a button opens, sizes, names, ids and
+who may do what live in settings things it reads (shell-settings, wm-settings). It does not seed the world at start
+(people, chats, pins). New behaviour is a rule over the words offered here. Before writing a Windows or browser helper,
+use the shared one (gaming_gate for full-screen and desktop tests, widget_browser for hidden pages) instead of a copy.
+
+kd_media: the media words on the new kernel, a module (SHAPE 11) over window-lab/media.py, unchanged.
 
 Claude (PROOF a13428), 24 Oct 2026. The home base's media.* host words (host_verbs.py, a6443) press through Windows'
 media session first (media.py); this module offers the same words to the kernel, so a lens, a button or an agent can
@@ -46,6 +53,10 @@ class Media:
             {"word": "media.next", "kind": "do", "takes": "", "may": "anyone", "help": "media.next: the next song."},
             {"word": "media.prev", "kind": "do", "takes": "", "may": "anyone",
              "help": "media.prev: the song before, or this one from its start."},
+            {"word": "media.shuffle", "kind": "do", "takes": "", "may": "anyone", "undo": "external",
+             "help": "media.shuffle: toggle shuffle, only when the Windows session supports it."},
+            {"word": "media.repeat", "kind": "do", "takes": "", "may": "anyone", "undo": "external",
+             "help": "media.repeat: cycle off, list, track, only when the Windows session supports it."},
             {"word": "media.now", "kind": "see", "takes": "", "may": "anyone",
              "help": "media.now: what is playing now: the player, the song, the artist, and whether it plays."},
         ]
@@ -70,14 +81,17 @@ class Media:
             from PIL import Image
             try:
                 with Image.open(path) as image:
-                    image.thumbnail((72,72))
+                    image.thumbnail((480,480))
                     output = io.BytesIO()
                     image.convert('RGB').save(output, 'JPEG', quality=85)
                     art = 'data:image/jpeg;base64,' + base64.b64encode(output.getvalue()).decode('ascii')
             except (OSError, ValueError):
                 pass
         return {"player": media.player_of(s.get("app")) or "", "title": s.get("title") or "",
-                "artist": s.get("artist") or "", "playing": bool(s.get("playing")), 'art': art,
+                "artist": s.get("artist") or "", "album": s.get("album") or "",
+                "playing": s.get("status") == "Playing", 'art': art,
+                "can": s.get("can") or {}, "shuffle": s.get("shuffle"),
+                "repeat": s.get("repeat"),
                 'position': s.get('position', 0), 'duration': s.get('end', 0), 'updated': s.get('updated', 0)}
 
     def call(self, msg):
@@ -92,6 +106,8 @@ class Media:
         # honest no-ops (P3, Alex 27 Oct): press only when it does what was asked; otherwise say nothing was pressed
         n = self.now()
         kv = (msg.get("args") or {}).get("kv") or {}
+        if action in ("shuffle", "repeat") and not (n and n.get("can", {}).get(action)):
+            return {"refused": f"the media session does not support {action}; nothing pressed"}
         if action in ("pause", "resume"):
             if not n:
                 return {"refused": "nothing is playing that Windows' media session names; nothing pressed"}

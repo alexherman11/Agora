@@ -1,3 +1,10 @@
+// EDITING THE DESKTOP HOST (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+// This file is a seam between the world and Windows: it turns world facts into screen effects and screen events into world
+// facts, through small words. It holds no preferences and no content. Which apps, what a button opens, sizes, names, ids and
+// who may do what live in settings things it reads (shell-settings, wm-settings). It does not seed the world at start
+// (people, chats, pins). New behaviour is a rule over the words offered here. Before writing a Windows or browser helper,
+// use the shared one (gaming_gate for full-screen and desktop tests, widget_browser for hidden pages) instead of a copy.
+//
 // shell.js: the desktop shell's three surfaces (top bar, dock, desktop layer) and the small parts they share.
 // Shell builder, 26 Oct 2026. Contracts: agora-wm/CONTRACTS.md section 3 (this), section 1 (the theme it reads: only
 // --ag-* variables, never a colour of its own) and section 2 (the words it speaks: wm.*).
@@ -144,6 +151,7 @@ const Shell = (() => {
 
   // ------------------------------------------------------------------------------------------------ icons
   const AGORA_APPS = {
+    viewer: ["Viewer", "window.open viewer"],
     lines: ["Lines", "window.open lines"], help: ["Help", "window.open help"], board: ["Board", "window.open board"],
     taskboard: ["Task board", "window.open taskboard-components"], appearance: ["Appearance", "window.open appearance"],
     feed: ["Feed", "window.open feed"], thing: ["Thing", "window.open thing"], tasks: ["Running windows", "window.open tasks"],
@@ -719,7 +727,7 @@ const Shell = (() => {
         g.get(k).wins.push(w);
       }
       const apps = (S.settings.dock_apps || "lines,help,board,taskboard,appearance,feed").split(/[ ,]+/).filter(Boolean)
-        .filter((n) => AGORA_APPS[n] && (["lines", "help", "thing", "tasks"].includes(n) || S.lenses.has(n) || window.__fx));
+        .filter((n) => AGORA_APPS[n] && (["viewer", "lines", "help", "thing", "tasks"].includes(n) || S.lenses.has(n) || window.__fx));
       const pinned = [];
       for (const n of apps) pinned.push({ id: "app:" + n, app: AGORA_APPS[n][0], exe: "", icon: "agora:" + n, wins: [], line: AGORA_APPS[n][1], launcher: n, pin: { id: "" } });
       const launched = new Set(pinned.map((p) => p.line));

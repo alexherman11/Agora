@@ -1,4 +1,10 @@
-"""reminders: a personal module in Python, installed for one person (SHAPE section 11, and what the desktop asked for).
+"""EDITING A MODULE (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+A module is a seam to something outside the kernel (a model provider, git, Twitch, the media session, a map server) and
+turns it into world facts and words. What the world does with them (who is told, when, in what words, how it looks)
+belongs in rules, lenses and this module's settings thing, read at each use. Names (JEFF, Alex), ids (dk...), models,
+counts, timeouts and message text in this file are debt: move them to settings when you touch them, and never add more.
+
+reminders: a personal module in Python, installed for one person (SHAPE section 11, and what the desktop asked for).
 
     reminder.add <words>    do:  a reminder only its person sees (make kind=reminder … sees=me)
     reminder.note <words>   do:  tries to make a note; its grant reaches only reminders, so the kernel refuses it

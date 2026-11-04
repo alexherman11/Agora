@@ -74,8 +74,12 @@ def test_capacity_and_duplicate_are_not_running_claims(manager):
         assert launch.call_count==1
         for target in ('dk2','dk3','dk4'):           # four Codex workers by default (Alex, 28 Oct)
             manager.start(msg(target))
-        assert 'refused' in manager.start(msg('dk5'))
+        queued=manager.start(msg('dk5'))             # 4 Nov: a full pool queues, never refuses
+        assert 'starts by itself' in queued['text'] and manager.states['dk5']['phase']=='queued'
         assert launch.call_count==4
+        manager.states['dk1']['phase']='landed'      # a slot frees: the queued one starts
+        manager.start_queued()
+        assert manager.states['dk5']['phase']=='asked' and launch.call_count==5
 
 
 def test_foreign_owner_not_stolen(manager):
@@ -111,9 +115,12 @@ def test_received_result_does_not_complete_task(manager):
 
 
 def test_only_requester_reviews_and_lands(manager):
-    state(manager)
+    s=state(manager)
     assert 'refused' in manager.request_review(msg(person='dk98'))
-    assert 'refused' in manager.land(msg())
+    assert 'refused' in manager.land(msg(person='dk98'))
+    with patch.object(B.threading.Thread,'start') as launch:     # 4 Nov: land is one step from a finished turn
+        assert manager.land(msg()).get('external')
+        assert s['phase']=='reviewing' and s['land_from']=='received' and launch.call_count==1
 
 
 def test_followup_retained_once_and_does_not_wake_paused_work(manager):
@@ -125,15 +132,15 @@ def test_followup_retained_once_and_does_not_wake_paused_work(manager):
     assert 'refused' in manager.tell(m)
     assert len(s['pending'])==1
     manager.fixture_door.task.pop('paused')
-    manager.fixture_door.task['who']='Another owner'
-    assert 'refused' in manager.tell(m)
+    manager.fixture_door.task['build_run']='kernel-another-run'      # its card moved on to another worker
+    assert 'moved on' in manager.tell(m)['refused']
 
 
-def test_correction_requires_acknowledgement_before_review(manager):
+def test_a_changed_card_goes_to_the_worker_instead_of_stopping_it(manager):
     s=state(manager);s['basis']={'text':'original'};manager.session=lambda _:manager.fixture_door
     manager.fixture_door.task['text']='corrected acceptance'
-    with pytest.raises(RuntimeError,match='instructions'):
-        manager.assert_owned(s)
+    manager.assert_owned(s)                       # 4 Nov: no block; the new card is its next instruction
+    assert 'corrected acceptance' in s['resume_note'] and s['basis']['text']=='corrected acceptance'
     m=msg();m['args']['words']='Use the corrected acceptance.'
     with patch.object(B.threading.Thread,'start') as launch:
         assert manager.tell(m).get('external')
@@ -405,12 +412,14 @@ def test_mcp_compatibility_does_not_broaden_other_tools(tmp_path):
     with pytest.raises(ValueError):W.thread_parameters(tmp_path,'gpt-6.1-sol','fixture',path)
 
 
-def test_codex_progress_never_publishes_reasoning_or_tool_arguments():
+def test_codex_progress_only_publishes_safe_activity():
     assert B.T.reduce({'type':'codex_event','method':'item/completed',
                        'data':{'item':{'type':'reasoning','text':'private'}}})==[]
     tool=B.T.reduce({'type':'codex_event','method':'item/started',
-                     'data':{'item':{'type':'commandExecution','command':'secret value'}}})
-    assert tool==[{'e':'tool','name':'commandExecution','input':{}}]
+                     'data':{'item':{'type':'commandExecution','command':'TOKEN=private git diff --check'}}})
+    assert tool==[{'e':'tool','name':'commandExecution','input':{},
+                  'activity':{'summary':'ran: TOKEN=[hidden] git diff --check',
+                              'detail':'ran: TOKEN=[hidden] git diff --check'}}]
     assert B.T.reduce({'type':'system','subtype':'init','session_id':'session'})[0]['e']=='init'
     assert B.T.reduce({'type':'system','subtype':'turn_started','turn_id':'turn'})[0]['e']=='turn_started'
 

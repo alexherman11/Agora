@@ -29,6 +29,9 @@ def install(token, port=8810):
             line(f"set {rows[0]['id']} text={source}{extra}")
         else:
             line(f'make kind={kind} name={name} text={source}{extra}')
+    # The feed on the dock and in the launcher (shell-kit.js reads `rows app`, 4 Nov): made once, never overwritten.
+    if not (line('rows app name=feed').get('rows') or []):
+        line('make kind=app name=feed label=Feed does="window.open feed"')
     # Shell controls are ordinary world things too. Install only absent slots;
     # changes/removals afterwards are the world's, never enforced at boot.
     defaults = [

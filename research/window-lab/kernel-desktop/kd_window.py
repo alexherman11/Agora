@@ -1,4 +1,11 @@
-"""kd_window: the window module. A painter's host for the desktop, speaking the module protocol (SHAPE 11).
+"""EDITING THE DESKTOP HOST (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+This file is a seam between the world and Windows: it turns world facts into screen effects and screen events into world
+facts, through small words. It holds no preferences and no content. Which apps, what a button opens, sizes, names, ids and
+who may do what live in settings things it reads (shell-settings, wm-settings). It does not seed the world at start
+(people, chats, pins). New behaviour is a rule over the words offered here. Before writing a Windows or browser helper,
+use the shared one (gaming_gate for full-screen and desktop tests, widget_browser for hidden pages) instead of a copy.
+
+kd_window: the window module. A painter's host for the desktop, speaking the module protocol (SHAPE 11).
 
 Started by the kernel (the world's module thing `window`), never by hand. It publishes:
 
@@ -11,6 +18,15 @@ Started by the kernel (the world's module thing `window`), never by hand. It pub
     window.close <window>              do    the window thing goes (undo opens it again where it was)
     window.focus <window>              do    brings it forward, or tucks it away if it is in front already
     window.opened                      hear  a window this host opened is on the screen now (a rule can act on it)
+    window.picture <view|lens|thing> [size=WxH|screen] [name=]
+                                       do    what that window would show, drawn hidden, as the caller's private picture
+                                             file ($new in the rest of the line); needs a steward's
+                                             `grant <window> words=upload only=kind:file`
+
+The wallpaper (4 Nov). Windows shows the picture `Shell settings` names (wallpaper=<file>); emptied, Alex's own wallpaper
+comes back (wallpaper.py is the seam: save, set, restore). What fills the setting is the world's business: the rule
+"Wallpaper follows my theme" (on=theme.changed: window.picture shell-desktop size=screen ; set ... wallpaper=$new), or
+Alex's own photo. AGORA_DESKTOP_LAYER=bottom brings back the old wallpaper window instead.
 
 How it works. The world holds intent: one `window` thing per window (shows=<view>, lens, target, edge). This process
 makes the screen match it, level-triggered: after every happening that touches a window thing, and every few seconds, it
@@ -53,8 +69,15 @@ HEADLESS = "--headless" in sys.argv
 PORT = int(os.environ.get("AGORA_KDESK_PORT", "8810"))
 LENS_SIZE = (1180, 1500)        # a lens window's first size, in real pixels
 VIEWS = {"lines": ("Lines", (1500, 760)), "thing": ("Thing", (1000, 820)),
+         "viewer": ("Viewer", (1280, 900)),
          "help": ("Help", (1200, 1300)), "tasks": ("Running windows", (1100, 1000)),
          "taskbar": ("Agora taskbar", (0, 0))}
+
+
+def wallpaper_window():
+    """AGORA_DESKTOP_LAYER=bottom|workerw brings back the old wallpaper window (shell_native.make_layer). By default the
+    wallpaper is Windows' own, set from `Shell settings` wallpaper=<file> (follow_wallpaper)."""
+    return os.environ.get("AGORA_DESKTOP_LAYER", "system") != "system"
 
 
 def local_page(url):
@@ -350,10 +373,10 @@ class GuiScreen(Screen):
     def open(self, wid, view, title, url, box, on_closed, on_shown, bar=False, tucked=False):
         s = scale()
         x, y, w, h = box
-        api = PageApi(self, wid)
+        api = None if view == "viewer" else PageApi(self, wid)
         glassy = view in SHELL_VIEWS and bar in ("top", "bottom")
         win = self.webview.create_window(title, url, js_api=api, x=int(x / s), y=int(y / s), width=max(200, int(w / s)),
-                                         height=max(30, int(h / s)), frameless=True, easy_drag=False, on_top=bool(bar) and bar != "layer", min_size=(120, 24),
+                                         height=max(30, int(h / s)), frameless=view != "viewer", easy_drag=False, on_top=bool(bar) and bar != "layer", min_size=(120, 24),
                                          background_color="#F6F3EC", text_select=True, hidden=True, transparent=glassy)
         rec = {"w": win, "hwnd": None, "view": view, "bar": bar}
         with self.lock:
@@ -375,6 +398,8 @@ class GuiScreen(Screen):
             on_shown()
 
         def loaded():
+            if view == "viewer":
+                return  # Viewer owns a separate native pane; the placeholder does not gate it.
             if rec["hwnd"] is None:
                 if rec.get("page_failed"):
                     return                                  # an error page is never shown; _bar_page tries again
@@ -427,6 +452,18 @@ class GuiScreen(Screen):
                 on_closed()
         win.events.loaded += loaded
         win.events.closed += closed
+        if view == "viewer":
+            import viewer
+            viewer.attach(win, f"http://127.0.0.1:{PORT}", self.module.token)
+            if tucked:
+                early = int(win.native.Handle.ToInt64())
+                user32.ShowWindow(early, 7)
+                rec["hwnd"] = early
+                user32.SetPropW(early, "Agora.Window." + wid, wt.HANDLE(1))
+                on_shown()
+            else:
+                win.show()
+                shown_once()
 
     def _make_bar(self, wid, hwnd, edge):
         view = (self.wins.get(wid) or {}).get("view")
@@ -764,7 +801,9 @@ class WindowHost:
         self.lock = threading.RLock()
         self.dirty = threading.Event()
         self.token = None
-        self.wall = None               # wallpaper.Keeper: the theme's wallpaper as Windows' own, in place of the layer window
+        self.world = None              # this world's folder (its blob store takes window.picture's bytes)
+        self.wall_want, self.wall_said = None, ""   # the file `Shell settings` names as the wallpaper, and what came of it
+        self.games_key = None          # the game lists last mirrored (follow_games)
         self.m = Module(offer=self.offer(), on_call=self.call, on_happen=self.happen, on_status=self.status,
                         on_hello=self.hello, on_off=self.off)
 
@@ -797,6 +836,12 @@ class WindowHost:
                      f"(and their agents) open windows here. A view open already is brought forward instead; new=yes opens another. undo closes it. "
                      f"window.open url=<http://127.0.0.1:port/...> [name=<title>] opens a page from another Agora door on this machine "
                      f"(the top bar's JEFF button opens JEFF's conversation this way)."},
+            {"word": "window.picture", "kind": "do", "takes": "<view|lens|thing> [size=<w>x<h>|screen] [name=<text>]",
+             "may": "anyone",
+             "help": "window.picture <what window.open takes> [size=WxH|screen] [name=<text>]: what that window would "
+                     "show, drawn hidden (nothing appears on the screen), as your own private picture file. size=screen "
+                     "is the screen's own size. In a line, $new is the picture: window.picture shell-desktop size=screen ; "
+                     "set <Shell settings> wallpaper=$new makes it the Windows wallpaper."},
             {"word": "window.move", "kind": "do", "takes": "<id> [to=<spot>] [at=<x,y>] [size=<w,h>]", "may": "anyone",
              "help": f"window.move <window> to=<spot> | at=x,y [size=w,h]: put a window somewhere ({spots}). Changes "
                      f"the screen only (where a window sits is not in the world), so nothing is recorded."},
@@ -835,10 +880,155 @@ class WindowHost:
             self.token = next(t for t, v in sessions.items() if v.get("signer") == "alex")
         except (OSError, KeyError, StopIteration, ValueError) as exc:
             log(f"no desktop session for the pages: {exc!r}")
-        import wallpaper
-        if not HEADLESS and self.token and self.wall is None and wallpaper.enabled():
-            self.wall = wallpaper.Keeper(PORT, self.token, monitor()[0][2:], scale(), log)
+        try:
+            self.world = Path(msg["world"]) if msg.get("world") else Path(msg["home"]).parents[1]
+        except (KeyError, TypeError, IndexError):
+            self.world = None
         self.dirty.set()
+
+    # -- the wallpaper: Windows shows the file `Shell settings` names (wallpaper=<file>); none, Alex's own comes back
+    def follow_wallpaper(self, want):
+        if want == self.wall_want:
+            return
+        self.wall_want = want
+        if HEADLESS or wallpaper_window():
+            return
+        threading.Thread(target=self._apply_wallpaper, args=(want,), daemon=True, name="wallpaper").start()
+
+    def _apply_wallpaper(self, want):
+        import hashlib
+        import wallpaper
+        try:
+            if wallpaper.OFF.exists():
+                self.wall_want = None                 # look again next time, so `wallpaper.py on` needs no restart
+                said = "off (wallpaper.py restore); wallpaper.py on lets the setting through again"
+                if said != self.wall_said:
+                    self.wall_said = said
+                    log("wallpaper: " + said)
+                return
+            if not want:
+                self.wall_said = wallpaper.restore()
+            else:
+                # The original picture, from this world's own store (the door serves browsers only a cleaned copy of
+                # an image; this host is on the same machine and checks the hash itself).
+                row = next((r for r in (self.m.see("rows file").get("rows") or []) if r.get("id") == want), {})
+                mime, digest = str(row.get("mime_type") or ""), str(row.get("blob_hash") or "")
+                data = (self.world / "blobs" / digest).read_bytes() if digest and self.world else b""
+                if not row or hashlib.sha256(data).hexdigest() != digest:
+                    raise ValueError(f"{want} is not a file this host can read")
+                ext = {"image/png": "png", "image/jpeg": "jpg", "image/bmp": "bmp"}.get(mime)
+                if not ext:
+                    self.wall_said = f"{want} is {mime}, not a picture Windows can show; the wallpaper is unchanged"
+                else:
+                    wallpaper.STATE.mkdir(parents=True, exist_ok=True)
+                    pic = wallpaper.STATE / f"agora-{hashlib.sha256(data).hexdigest()[:16]}.{ext}"
+                    if not pic.exists():
+                        pic.write_bytes(data)
+                    self.wall_said = f"{want} is the Windows wallpaper ({wallpaper.apply(pic)})"
+        except Exception as exc:                      # noqa: BLE001  the wallpaper never stops the window host
+            said = f"could not set {want or 'the old wallpaper'}: {exc!r}"
+            self.wall_want = None                     # try again on the next reconcile
+            if said == self.wall_said:
+                return                                # the same failure again: said once
+            self.wall_said = said
+        log("wallpaper: " + self.wall_said)
+
+    # -- the games: the world's game-settings, mirrored for every process that asks gaming_gate (door or not)
+    def follow_games(self, rows):
+        """games=<exe,...> are Alex's games (the window manager stands still and installers wait while one runs);
+        not_games=<exe,...> never count, even filling the screen. Only a game-settings thing the desktop's owner made
+        counts. Written to this machine's games.json when the lists change; a hidden test writes into its own world."""
+        import re
+        import gaming_gate
+        mine = [r for r in rows if self.owner and self.owner in (r.get("made_by"), r.get("for"))]
+
+        def names(field):
+            out = set()
+            for r in mine:
+                for x in str(r.get(field) or "").split(","):
+                    x = x.strip().lower()
+                    if re.fullmatch(r"[a-z0-9 ._()+-]{1,80}\.exe", x):
+                        out.add(x)
+            return out
+        key = (frozenset(names("games")), frozenset(names("not_games")))
+        if key == self.games_key:
+            return
+        path = None
+        if HEADLESS and not os.environ.get("AGORA_GAMES_FILE"):
+            if not self.world:
+                return
+            path = self.world / "games.json"             # never the machine's own file from a hidden test
+        gaming_gate.write_mirror(key[0], key[1], ",".join(r["id"] for r in mine), path)
+        self.games_key = key
+        log(f"games: {len(key[0])} games, {len(key[1])} never games, from {', '.join(r['id'] for r in mine) or 'nothing'}")
+
+    # -- window.picture: what window.open would show, drawn hidden, handed back as the caller's picture file
+    def picture_page(self, what, use):
+        """-> (page path, default size, name) for what window.open takes: a view, a shell view, a lens, a thing."""
+        w = (what or "").lower()
+        if w in SHELL_VIEWS:
+            return f"/desk/shell/{SHELL_VIEWS[w][1]}.html?hide=1", None, SHELL_VIEWS[w][0]
+        if w in VIEWS and w != "taskbar":
+            return f"/desk/{w}.html", VIEWS[w][1], VIEWS[w][0]
+        wr = self.m.see("rows widget name=" + w, use=use)
+        widget = next((r for r in wr.get("rows", []) if r.get("code") and r.get("on") and r.get("surface") == "window"), None)
+        if widget:
+            return f"/desk/widget.html?widget={quote(str(widget['id']))}", None, widget.get("title") or w
+        lens = self.lens_named(w, use)
+        if lens:
+            return (f"/desk/frame.html?lens={quote(w)}&name={quote(str(lens.get('title') or w))}", LENS_SIZE,
+                    lens.get("title") or w)
+        r = self.m.see(f"look {what}", use=use)
+        if r.get("refused") or not r.get("ok", True):
+            return None, None, None
+        return f"/desk/thing.html?target={quote(what)}", VIEWS["thing"][1], what
+
+    def picture_word(self, what, kv, use):
+        import re
+        if not what:
+            return {"refused": "window.picture needs what to draw: a view, a lens or a thing, as window.open takes"}
+        path, default, name = self.picture_page(what, use)
+        if path is None:
+            return {"refused": f"no view, lens or thing called {what}; rows lens lists the lenses"}
+        size, ratio = tuple(default or (1280, 800)), 1.0
+        if kv.get("size") == "screen":
+            size, ratio = tuple(monitor()[0][2:]), scale()
+        elif kv.get("size"):
+            m = re.fullmatch(r"(\d{2,5})x(\d{2,5})", str(kv["size"]))
+            if not m:
+                return {"refused": "size is WxH in pixels (size=1280x800), or size=screen"}
+            size = (int(m.group(1)), int(m.group(2)))
+        if size[0] * size[1] > 64_000_000:
+            return {"refused": "that picture would be over 64 megapixels; ask for a smaller size"}
+        if not self.world:
+            return {"refused": "this window host does not know its world's folder, so it cannot hand over a picture"}
+        sys.path.append(str(HERE.parents[1] / "kernel-lab"))
+        from kernel.blobs import put                       # the world's own content-addressed store
+        digest = put(self.world, self.picture(path, size, ratio))
+        label = kv.get("name") or f"Picture of {name}"
+        return {"lines": [f"upload name={json.dumps(label, ensure_ascii=False)} digest={digest}"], "saw": {}}
+
+    def picture(self, path, size, pixel_ratio):
+        """Draw a desktop page in the host's hidden browser (widget_browser: no window, ends with this process) as Alex,
+        at size real pixels; -> PNG bytes. Waits until the page says it is ready and its pictures stop arriving."""
+        import base64
+        import widget_browser
+        w, h = size
+        cw, ch = max(1, round(w / pixel_ratio)), max(1, round(h / pixel_ratio))
+        with widget_browser.Browser() as cdp:
+            cdp.call("Emulation.setDeviceMetricsOverride", width=cw, height=ch, deviceScaleFactor=pixel_ratio,
+                     mobile=False, screenWidth=cw, screenHeight=ch)
+            cdp.call("Page.navigate", url=f"http://127.0.0.1:{PORT}/dev/signin?token={quote(self.token or '')}"
+                                          f"&next={quote(path)}")
+            end, seen, still = time.monotonic() + 7, -1, 0
+            while time.monotonic() < end and still < 3:
+                n = cdp.js("document.readyState === 'complete' && window.__ready !== false && "
+                           "[...document.images].every(i => i.complete) ? performance.getEntriesByType('resource').length : -1")
+                still = still + 1 if n is not None and n >= 0 and n == seen else 0
+                seen = n
+                time.sleep(0.15)
+            shot = cdp.call("Page.captureScreenshot", format="png", fromSurface=True)
+        return base64.b64decode(shot["data"])
 
     def off(self):
         try:
@@ -857,7 +1047,7 @@ class WindowHost:
     def status(self):
         n = len(self.screen.wins)
         views = ", ".join(sorted(r.get("shows", "?") for r in self.rows.values()))
-        wall = f"; wallpaper: {self.wall.status()}" if self.wall and self.wall.status() else ""
+        wall = f"; wallpaper: {self.wall_said}" if self.wall_said else ""
         return f"{n} window{'' if n == 1 else 's'} on the screen ({views or 'none'}); {self.opened} opened since start{wall}"
 
     def happen(self, h):
@@ -973,6 +1163,8 @@ class WindowHost:
             if current.get("ok") is False or "rows" not in current:
                 return {"refused": "could not read current windows; try opening again"}
             open_rows = current["rows"] or []
+        if word == "window.picture":
+            return self.picture_word(target or (words[0] if words else ""), kv, use)
         if word == "window.open" and kv.get("url"):
             # A page from another Agora door on this machine in a window of its own (27 Oct: the top bar's JEFF
             # button opens JEFF's conversation, which lives in the frontier desk on 8794). Loopback http only.
@@ -1135,6 +1327,11 @@ class WindowHost:
             log(f"reconcile: {r.get('text') or r.get('refused')}")
             return
         want = {row["id"]: row for row in r.get("rows") or []}
+        settings = (self.m.see("rows shell-settings").get("rows") or [{}])[0]
+        self.follow_wallpaper(str(settings.get("wallpaper") or "").strip())
+        games = self.m.see("rows game-settings")
+        if not games.get("refused") and games.get("ok", True):
+            self.follow_games(games.get("rows") or [])
         widgets = self.m.see('rows widget')
         active = {w['id']:w['code'] for w in widgets.get('rows',[]) if w.get('on') and w.get('code') and not w.get('forgotten')}
         want = {wid:row for wid,row in want.items() if not row.get('widget') or row['widget'] in active}
@@ -1147,10 +1344,8 @@ class WindowHost:
                 return                                  # its happening brings us back here
             self.made_bar = True
             rows = want
-            if self.wall:              # the desktop layer is the Windows wallpaper itself (wallpaper.py): no window for it
-                layer = {wid for wid, row in want.items() if row.get("layer")}
-                self.wall.want(bool(layer))
-                want = {wid: row for wid, row in want.items() if wid not in layer}
+            if not wallpaper_window():  # the wallpaper is Windows' own (follow_wallpaper), so the layer row opens no window
+                want = {wid: row for wid, row in want.items() if not row.get("layer")}
             for wid in [w for w in list(self.screen.wins) if w not in want]:
                 self.screen.close(wid)
                 self.applied.pop(wid, None)

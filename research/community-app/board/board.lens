@@ -15,6 +15,10 @@ root : board-shell, title "Seabright"
       only when $view.opens = calendar and $view.search = "" and $view.queue != yes
       on add do board.post post_kind=event in=$view.channel $fields
       on rsvp do board.rsvp $target status=$value
+    asks : lens, name seabright-asks
+      only when $view.opens = asks and $view.search = "" and $view.queue != yes
+    documents : lens, name seabright-documents
+      only when $view.opens = documents and $view.search = "" and $view.queue != yes
     catchup : board-catchup, of reading:"board.catch-up in=$view.channel" as c, limit 100, each catchup-item
       only when $view.channel != "" and $view.search = "" and $view.queue != yes
       on seen do board.seen in=$view.channel
@@ -27,6 +31,7 @@ root : board-shell, title "Seabright"
       only when $view.search != ""
     queue : board-search, of reading:"board.queue in=$view.channel" as r, each catchup-item
       only when $view.queue = yes
+  map : map-panel, map Seabright, board yes, height 520px
   conversation : board-thread
     only when $view.thread != ""
     on reply do board.reply $target $fields

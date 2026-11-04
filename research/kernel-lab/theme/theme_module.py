@@ -1,4 +1,10 @@
-"""theme: the theme words, a module (SHAPE section 11). One process, any number of themes, nothing kept of its own.
+"""EDITING A MODULE (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+A module is a seam to something outside the kernel (a model provider, git, Twitch, the media session, a map server) and
+turns it into world facts and words. What the world does with them (who is told, when, in what words, how it looks)
+belongs in rules, lenses and this module's settings thing, read at each use. Names (JEFF, Alex), ids (dk...), models,
+counts, timeouts and message text in this file are debt: move them to settings when you touch them, and never add more.
+
+theme: the theme words, a module (SHAPE section 11). One process, any number of themes, nothing kept of its own.
 
     theme.list [mine=yes]                  see   the themes you may see, with what each looks like and which one you wear
     theme.get <theme>                      see   one theme in full, and its derived values
@@ -73,6 +79,9 @@ OFFER = [
              "wallpaper=preset:dusk: change a theme you made. Every value is checked; an empty value drops an override."},
     {"word": "theme.preview", "kind": "see", "takes": "<theme> path=value ...", "may": "anyone",
      "help": "theme.preview <theme> path=value ...: what theme.edit would give, as variables for a preview. Writes nothing."},
+    {"word": "theme.changed", "kind": "hear", "takes": "", "may": "anyone",
+     "help": "theme.changed: heard when the look changes (a theme used, tried, kept, reverted or edited, or a trial "
+             "ending). A rule can act on it: rule on=theme.changed do=\"...\" (the wallpaper follows the theme this way)."},
     {"word": "theme.options", "kind": "see", "takes": "[theme=<theme>]", "may": "anyone",
      "help": "theme.options: the safe fonts, radii, shadows, motion curves and wallpaper presets an editor may offer."},
     {"word": "theme.native", "kind": "see", "takes": "", "may": "anyone",

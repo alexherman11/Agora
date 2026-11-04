@@ -1,4 +1,10 @@
-"""Task-scoped native manager entry. A local startup approval is the authority.
+"""EDITING A MODULE (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+A module is a seam to something outside the kernel (a model provider, git, Twitch, the media session, a map server) and
+turns it into world facts and words. What the world does with them (who is told, when, in what words, how it looks)
+belongs in rules, lenses and this module's settings thing, read at each use. Names (JEFF, Alex), ids (dk...), models,
+counts, timeouts and message text in this file are debt: move them to settings when you touch them, and never add more.
+
+Task-scoped native manager entry. A local startup approval is the authority.
 
 World profile edits cannot expand this allowlist. Existing House words retain
 steward admission; only this guarded endpoint admits the named resident person.

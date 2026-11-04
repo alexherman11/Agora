@@ -1,0 +1,424 @@
+<title>JEFF's Governor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column, wide figures to 1100px. Same family as the Agent Wake Map. Colour = who holds the ball. */
+:root{
+  --bg:#f6f7f3; --panel:#ffffff; --fg:#1d2721; --muted:#5f6c64; --line:#dfe4dc; --soft:#eef1ea;
+  --jeff:#3f7fc4; --jeff-soft:#dce8f6; --res:#4f9a72; --res-soft:#dcefe3; --run:#9890b8; --run-soft:#e9e6f3;
+  --alex:#d0812f; --alex-soft:#f8e6d1; --warn:#c2475f; --warn-soft:#f8e0e5; --accent:#2c7a6a; --accent-soft:#d6efe9;
+  --f-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --f-body:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141a17; --panel:#1b231f; --fg:#e4ebe6; --muted:#9aa89f; --line:#2e3a34; --soft:#212b26;
+  --jeff:#7aa5e0; --jeff-soft:#1f2d40; --res:#6fbf93; --res-soft:#22382c; --run:#b1aad3; --run-soft:#2b283b;
+  --alex:#e59b52; --alex-soft:#3d2c1b; --warn:#e87a8f; --warn-soft:#3d2228; --accent:#5cc0aa; --accent-soft:#1d3833; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141a17; --panel:#1b231f; --fg:#e4ebe6; --muted:#9aa89f; --line:#2e3a34; --soft:#212b26;
+  --jeff:#7aa5e0; --jeff-soft:#1f2d40; --res:#6fbf93; --res-soft:#22382c; --run:#b1aad3; --run-soft:#2b283b;
+  --alex:#e59b52; --alex-soft:#3d2c1b; --warn:#e87a8f; --warn-soft:#3d2228; --accent:#5cc0aa; --accent-soft:#1d3833; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:16px/1.55 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 80px}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:56px}
+.prose{max-width:68ch}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(30px,5vw,44px);font-weight:700;letter-spacing:-.01em}
+h2{font-size:26px} h3{font-size:18px}
+p{margin:0}
+ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.eyebrow{font:600 12px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.sec{display:flex;flex-direction:column;gap:16px}
+.lede{font-size:18px}
+.muted{color:var(--muted)}
+code,.mono{font-family:var(--f-mono);font-size:.86em}
+.label{display:inline-block;font:600 11px/1 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;padding:4px 7px;border-radius:5px;vertical-align:2px}
+.l-read{background:var(--soft);color:var(--muted)} .l-ran{background:var(--res-soft);color:var(--res)} .l-imag{background:var(--run-soft);color:var(--run)}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.fact{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14.5px;display:flex;flex-direction:column;gap:4px}
+.fact b{font-family:var(--f-display);font-size:26px;line-height:1}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0}
+/* causes */
+.causes{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.cause{border-left:3px solid var(--warn);padding:2px 0 2px 14px;display:flex;flex-direction:column;gap:6px}
+.cause p{font-size:15px}
+/* JEFF's turns strip */
+.strip{display:flex;height:34px;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+.strip div{height:100%}
+.k-dup{background:var(--warn)} .k-list{background:var(--alex)} .k-talk{background:var(--jeff)} .k-other{background:var(--run)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:13px;height:13px;border-radius:3px;display:inline-block}
+/* balls */
+.holders{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.holder{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--panel);min-width:0}
+.holder h3{display:flex;justify-content:space-between;align-items:baseline;font-size:16px}
+.holder h3 small{font:600 12px var(--f-mono);color:var(--muted)}
+.balls{display:flex;flex-wrap:wrap;gap:5px}
+.ball{width:16px;height:16px;border-radius:50%;display:inline-block}
+.b-fin{background:var(--res)} .b-start{background:var(--jeff)} .b-stuck{background:var(--warn)} .b-mgr{background:var(--alex)}
+.holder ul{font-size:13px;padding-left:16px;gap:3px;color:var(--fg)}
+.invariant{background:var(--accent-soft);border-radius:12px;padding:16px 18px;font-size:17px;font-family:var(--f-display);font-weight:500}
+/* flow diagram */
+.flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:stretch}
+@media (max-width:820px){.flow{grid-template-columns:1fr 1fr}}
+@media (max-width:480px){.flow{grid-template-columns:1fr}}
+.step{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--panel);display:flex;flex-direction:column;gap:6px;position:relative}
+.step .n{font:700 12px var(--f-mono);color:var(--accent)}
+.step h3{font-size:16px}
+.step p,.step li{font-size:13.5px}
+.rules{counter-reset:r;list-style:none;padding:0;gap:0;border-top:1px solid var(--line)}
+.rules li{display:grid;grid-template-columns:40px minmax(0,1fr);gap:2px 12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.rules li::before{counter-increment:r;content:counter(r);font:700 15px var(--f-mono);color:var(--accent);grid-row:span 2}
+.rules b{font-family:var(--f-display);font-size:16px}
+.rules span{font-size:14.5px;color:var(--muted)}
+/* replay */
+.replay{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:18px}
+@media (max-width:860px){.replay{grid-template-columns:1fr}}
+.rctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{font:600 14px var(--f-body);border:1px solid var(--line);background:var(--panel);color:var(--fg);padding:8px 14px;border-radius:999px;cursor:pointer}
+.btn.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dots{display:flex;gap:6px;margin-left:auto}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--line)}
+.dot.on{background:var(--accent)}
+.time{font:600 13px var(--f-mono);color:var(--accent)}
+.slate{font:12.5px/1.55 var(--f-mono);background:var(--soft);border-radius:10px;padding:12px;white-space:pre-wrap;word-break:break-word;margin:0}
+.msg{font:12.5px/1.55 var(--f-mono);background:var(--accent-soft);border-radius:10px;padding:12px;white-space:pre-wrap;word-break:break-word;margin:0}
+.msg.to-jeff{background:var(--jeff-soft)} .msg.to-res{background:var(--res-soft)} .msg.to-alex{background:var(--alex-soft)} .msg.quiet{background:var(--soft);color:var(--muted)}
+.who-tag{font:600 12px var(--f-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.slots{display:flex;flex-direction:column;gap:6px}
+.slotrow{display:grid;grid-template-columns:62px repeat(4,minmax(0,1fr));gap:5px;align-items:center;font:12px var(--f-mono);color:var(--muted)}
+.slot{height:26px;border-radius:6px;border:1px dashed var(--line);font:600 11px/26px var(--f-mono);padding:0 6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:#fff}
+.slot.big{background:var(--run);border-style:solid;border-color:var(--run)}
+.slot.small{background:var(--res);border-style:solid;border-color:var(--res)}
+/* who gets what */
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;min-width:820px;font-size:14px}
+th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+thead th{font:600 12px var(--f-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);background:var(--soft)}
+td:first-child{font-weight:700;width:13%}
+td ul{padding-left:16px;gap:4px;font-size:13.5px}
+td.never{color:var(--muted)}
+/* lanes */
+.lanes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.lanes{grid-template-columns:1fr}}
+.lane{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--panel);display:flex;flex-direction:column;gap:6px}
+.lane b{font-family:var(--f-display);font-size:16px}
+.lane p{font-size:14px}
+.alts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.alt{border:1px solid var(--line);border-radius:12px;padding:14px;font-size:14px;display:flex;flex-direction:column;gap:6px;background:var(--panel)}
+.alt b{font-family:var(--f-display);font-size:15.5px}
+.alt .v{font:600 12px var(--f-mono);color:var(--muted)}
+.qs{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.q{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;font-size:14.5px;display:flex;flex-direction:column;gap:6px}
+.q b{font-family:var(--f-display);font-size:15.5px}
+.q .lean{color:var(--accent);font-size:13.5px}
+.order{counter-reset:o;list-style:none;padding:0;gap:10px}
+.order li{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;font-size:15px}
+.order li::before{counter-increment:o;content:counter(o);font:700 14px/1.6 var(--f-mono);color:var(--accent)}
+.mind{background:var(--soft);border-radius:12px;padding:16px;font-size:15px}
+</style>
+
+<div class="wrap">
+
+<header class="sec prose" style="gap:14px">
+  <div class="eyebrow">Harness workshop · 4 Nov 2026 · design by Claude for Alex</div>
+  <h1>A governor that keeps the House moving</h1>
+  <p class="lede">A small piece of the House that runs whenever any turn ends. It looks at the board, the free worker slots and who is free, then hands each free agent its next move. JEFF manages; residents pull their own next card while a worker runs; nothing waits on a message that never comes.</p>
+  <p class="muted" style="font-size:14px"><span class="label l-ran">ran</span> measured through the door this morning, 4 Nov 10:40. <span class="label l-read">read</span> from the source or the chats. <span class="label l-imag">imagined</span> the design.</p>
+</header>
+
+<section class="sec">
+  <div class="prose sec" style="gap:8px"><div class="eyebrow">1 · Right now <span class="label l-ran">ran</span></div><h2>The House has been still for 22 hours</h2></div>
+  <div class="facts">
+    <div class="fact"><b>22 h</b>since any agent took a turn. JEFF's last was 12:48 yesterday, Pike's 12:49.</div>
+    <div class="fact"><b>0 of 8</b>worker slots in use. All four Claude and all four Codex slots are free.</div>
+    <div class="fact"><b>24</b>workers not finished. 10 are done and untouched, the oldest since 27 Oct.</div>
+    <div class="fact"><b>47</b>cards in "Now". Most landed long ago and were never closed.</div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="prose sec" style="gap:8px"><div class="eyebrow">2 · Why it stops</div><h2>Three reasons, all visible yesterday</h2></div>
+  <div class="causes">
+    <div class="cause"><h3>Nothing asks "and then?"</h3><p>Every wake today is a message. When the last turn ends and nobody speaks, nothing happens again. In our chat, you are the "and then". JEFF has no one in that seat, so he reacts and stops.</p><span class="label l-read" style="align-self:start">read</span></div>
+    <div class="cause"><h3>Hand-offs travel by @name, and get lost</h3><p>At 12:49 Pike told JEFF in Shop talk: "JEFF, both picked up, no workers started", waiting on a go for a worker. That line has no recipient, so JEFF never woke. JEFF's own "@Pike: …" line before it also reached nobody, and he had to use house.wake.</p><span class="label l-ran" style="align-self:start">ran</span></div>
+    <div class="cause"><h3>Finished work has nobody whose move it is</h3><p>Ten workers are done and waiting for review, some since 28 Oct. JEFF still owns ten workers from before he became manager. A card can be marked Done while its worker still says "received".</p><span class="label l-ran" style="align-self:start">ran</span></div>
+  </div>
+  <div class="panel">
+    <h3>What JEFF's last 157 replies outside a chat were about</h3>
+    <div class="strip" aria-label="143 duplicate worker notices, 5 task-list recounts, 9 other">
+      <div class="k-dup" style="width:91.1%"></div><div class="k-list" style="width:3.2%"></div><div class="k-other" style="width:5.7%"></div>
+    </div>
+    <div class="legend">
+      <span><i class="sw k-dup"></i>143 the same worker notice repeating (128 say "Duplicate notice")</span>
+      <span><i class="sw k-list"></i>5 "your task list changed" recounts ("65 items… 63… 61")</span>
+      <span><i class="sw k-other"></i>9 everything else</span>
+    </div>
+    <p class="muted" style="font-size:14px"><span class="label l-ran">ran</span> house.log for JEFF, last 300 entries. JEFF has taken 529 turns, but the ones that moved work were his 59 lines in chats. The House woke him a lot, about the wrong things, and then not at all.</p>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="prose sec" style="gap:8px"><div class="eyebrow">3 · The idea under it <span class="label l-imag">imagined</span></div><h2>Every piece of work has one ball, and one person holds it</h2>
+  <p>The ball is "whose move is it". A finished worker's ball is with its owner, to review it. A landed change's ball is with its owner, to check it live. An unowned card's ball is with JEFF, to give it to someone. A design question's ball is with you. Today the ball lives in prose (<code>next_action</code>, a Shop talk line). The governor makes it a fact it can read, and the agents can set it with one word.</p></div>
+  <div class="invariant">The rule the governor keeps: the House may only go quiet when every ball is with Alex or with a running worker.</div>
+  <div class="panel">
+    <h3>Where the balls sit this morning</h3>
+    <div class="legend">
+      <span><i class="ball b-fin"></i>finish (review, land, check)</span>
+      <span><i class="ball b-stuck"></i>stuck (blocked, cut off)</span>
+      <span><i class="ball b-start"></i>start (a ready card)</span>
+      <span><i class="ball b-mgr"></i>manager move (hand on, assign)</span>
+    </div>
+    <div class="holders" id="holders"></div>
+    <p class="muted" style="font-size:14px"><span class="label l-ran">ran</span> house.who and the cards, 10:40. All four agents are idle and hold 26 balls between them. No ball is with a running worker. Your column holds the ones only you can move.</p>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="prose sec" style="gap:8px"><div class="eyebrow">4 · How it works <span class="label l-imag">imagined</span></div><h2>The governor, step by step</h2>
+  <p>It is code in the House, not another model. It costs nothing to run, does the same thing every time, and has an off switch. The judgement stays with JEFF and the residents. The governor decides who should be thinking, and what about.</p></div>
+  <div class="flow">
+    <div class="step"><span class="n">WHEN</span><h3>A turn ends, or work moves</h3><p>Any agent's turn ends. A worker finishes a turn, passes review, lands or fails. A card changes owner or lane. A slot frees up. Never on a clock.</p></div>
+    <div class="step"><span class="n">LOOK</span><h3>It reads one slate</h3><p>Slots in use per provider. Who is busy, idle or down. Every ball: who holds it, what kind, since when. Ready cards with their size.</p></div>
+    <div class="step"><span class="n">DECIDE</span><h3>It applies your rules, in order</h3><p>The rules below, as a section of the Agent Book you can edit. Each free agent gets at most one nudge, listing at most three balls.</p></div>
+    <div class="step"><span class="n">ACT</span><h3>Nudge, file, or rest</h3><p>It wakes an agent with its moves, puts your balls in Needs Me, or stays quiet. It never starts workers, restarts anything or changes cards itself.</p></div>
+  </div>
+  <ol class="rules">
+    <li><b>No ball sits with a free agent.</b><span>A free agent holding balls is woken with them, oldest first.</span></li>
+    <li><b>Finish before starting.</b><span>Review, land, check and close come before new cards. Ten finished workers come before a new one.</span></li>
+    <li><b>Fill free slots, small first.</b><span>A free resident with no finish-balls gets its next ready card. While a large job runs, one Claude and one Codex slot stay open for small cards.</span></li>
+    <li><b>A card that is yours needs no go.</b><span>JEFF's assignment is the go. A resident who would wait for permission is told to start.</span></li>
+    <li><b>Manager moves go to JEFF.</b><span>Ready cards with no owner, balls held by an agent that is down, a ball that didn't move after its holder's turn, and your asks that have no card.</span></li>
+    <li><b>Your balls go to Needs Me, never to a chat.</b><span>The governor never wakes you. JEFF tells you only what needs you.</span></li>
+    <li><b>The same picture never wakes anyone twice.</b><span>If a nudge changes nothing, that ball goes to JEFF as stalled. If JEFF can't move it either, it goes to you. No loops.</span></li>
+    <li><b>A budget, and an off switch.</b><span>At most 12 nudges an hour across the House by default, and <code>governor=off</code> on the House settings stops it.</span></li>
+  </ol>
+</section>
+
+<section class="sec">
+  <div class="prose sec" style="gap:8px"><div class="eyebrow">5 · Replay <span class="label l-imag">imagined</span>, from the real state</div><h2>Yesterday at 12:49, with a governor</h2>
+  <p>The real board and workers at the moment Pike's turn ended. Step through what the governor would have sent. Without it, the next thing that happened was this page.</p></div>
+  <div class="panel">
+    <div class="rctl">
+      <button class="btn" id="prev">Back</button>
+      <button class="btn primary" id="next">Next</button>
+      <span class="time" id="rtime"></span>
+      <div class="dots" id="dots"></div>
+    </div>
+    <div class="replay">
+      <div class="sec" style="gap:10px;min-width:0">
+        <div class="who-tag">What the governor sees</div>
+        <pre class="slate" id="rslate"></pre>
+        <div class="slots" id="rslots"></div>
+      </div>
+      <div class="sec" style="gap:10px;min-width:0">
+        <div class="who-tag" id="rto"></div>
+        <pre class="msg" id="rmsg"></pre>
+        <p id="rnote" style="font-size:14.5px"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="prose sec" style="gap:8px"><div class="eyebrow">6 · What reaches whom, and when <span class="label l-imag">imagined</span></div><h2>Each agent hears about its own balls, and nothing else</h2>
+  <p>This is the core of keeping the House moving without noise. A wake must carry a move that is that agent's to make. Everything else is either batched to the end of their turn or never sent.</p></div>
+  <div class="scroll"><table>
+    <thead><tr><th></th><th>At once</th><th>At the end of their turn, batched</th><th>When the governor sees a move</th><th>Never</th></tr></thead>
+    <tbody>
+      <tr><td>JEFF</td>
+        <td><ul><li>Your words in Conversation</li><li>A line with @JEFF in Shop talk</li></ul></td>
+        <td><ul><li>Residents' reports (what got done, what's stuck)</li></ul></td>
+        <td><ul><li>Manager moves: assign, hand on, unstick, re-rank Now, ask you</li><li>A ball that stalled with a resident</li><li>An ask of yours with no card</li></ul></td>
+        <td class="never"><ul><li>Residents' worker events</li><li>"Your task list changed"</li><li>Duplicate notices</li><li>The full task list each wake</li></ul></td></tr>
+      <tr><td>A resident</td>
+        <td><ul><li>A line with its @name</li><li>Its worker asks a question</li></ul></td>
+        <td><ul><li>Its other workers' events, one line each</li></ul></td>
+        <td><ul><li>"You're free. You hold: …" (finish first, then its next ready card)</li><li>A card JEFF gave it</li></ul></td>
+        <td class="never"><ul><li>Other residents' workers</li><li>Board churn</li><li>Instructions repeated in every message</li></ul></td></tr>
+      <tr><td>A worker</td>
+        <td><ul><li>Its brief, once</li><li>Its owner's words</li></ul></td>
+        <td></td><td></td>
+        <td class="never"><ul><li>Anything else. It finishes its task and reports once.</li></ul></td></tr>
+      <tr><td>You</td>
+        <td><ul><li>JEFF, when something needs you</li></ul></td>
+        <td></td>
+        <td><ul><li>A Needs Me item: a ball only you can move</li></ul></td>
+        <td class="never"><ul><li>Anything you would just have to pass on</li></ul></td></tr>
+    </tbody>
+  </table></div>
+  <div class="replay">
+    <div class="sec" style="gap:8px;min-width:0"><div class="who-tag">A nudge to JEFF</div>
+<pre class="msg to-jeff">~ it is Wed 04 Nov, 10:40 · slots: Claude 4 free, Codex 4 free
+~ Free and waiting for work: Sable, Pike
+~ Your moves:
+  1. Dock unpin, Twitch, Screenshot paste: finished, no owner. Hand them on.
+  2. You still own 10 old workers. Hand on or release.
+  3. "Now" holds 47 cards. 9 are moving. Cut it to those.</pre></div>
+    <div class="sec" style="gap:8px;min-width:0"><div class="who-tag">A nudge to a resident</div>
+<pre class="msg to-res">~ it is Wed 04 Nov, 10:40 · you're free
+~ You hold, finish first:
+  1. Old-world audit: finished 3 Nov, review it
+  2. Fullscreen fix delivery: the card block is fixed, carry on
+~ Then yours to start, small: Worker activity shows the commands</pre></div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="prose sec" style="gap:8px"><div class="eyebrow">7 · Picking up work while waiting <span class="label l-imag">imagined</span></div><h2>Small things flow past big ones</h2>
+  <p>A resident whose worker is running is free. It doesn't sit and wait. The governor hands it the next thing it can move, so small jobs finish while a long one runs. Three sizes, set when a card is scoped:</p></div>
+  <div class="lanes">
+    <div class="lane"><b>Tiny</b><p>Done inside the agent's own turn: close a card, answer an ask, look something up, hand something on. No worker.</p></div>
+    <div class="lane"><b>Small</b><p>One worker turn, about half an hour or less. These get the open slot while a large job runs.</p></div>
+    <div class="lane"><b>Large</b><p>Several worker turns, or a story. At most one large job per resident at a time, so each resident can keep track.</p></div>
+  </div>
+  <div class="panel">
+    <h3>Slots on a busy afternoon (example)</h3>
+    <div class="slots">
+      <div class="slotrow"><span>Claude</span><div class="slot big">Large · Seabright folders (Sable)</div><div class="slot big">Large · Writing as one doc (Pike)</div><div class="slot small">Small · show commands (Pike)</div><div class="slot"></div></div>
+      <div class="slotrow"><span>Codex</span><div class="slot big">Large · smart search (Sable)</div><div class="slot small">Small · readout under bar (Rowan)</div><div class="slot small">Small · Enter sends (Rowan)</div><div class="slot"></div></div>
+    </div>
+    <p class="muted" style="font-size:14px">The empty slot in each row is the kept-open one. A small card can always start, even when the large jobs are long.</p>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="prose sec" style="gap:8px"><div class="eyebrow">8 · Other ways I weighed</div><h2>Why code, why turn ends, why not a timer</h2></div>
+  <div class="alts">
+    <div class="alt"><b>A small model as governor</b><span>More flexible on messy cards. But it is a model call on every turn end, another prompt to keep right, and it can talk itself into loops.</span><span class="v">Not first. Maybe later, only to size and tidy cards once.</span></div>
+    <div class="alt"><b>A heartbeat timer</b><span>Simple. But it breaks your no-timers rule, spends usage while nothing has changed, and still wouldn't know whose move it is.</span><span class="v">No.</span></div>
+    <div class="alt"><b>Tell JEFF to keep going</b><span>A prompt can't outlast the end of a turn. He also can't see what changed since, and the old header teaches him to hold.</span><span class="v">Needed anyway (Agent Book), not enough alone.</span></div>
+    <div class="alt"><b>Residents pull, no manager</b><span>Fast for cards that already have an owner. But nobody assigns new work, rebalances, or notices someone is down.</span><span class="v">Part of it: residents pull, JEFF assigns.</span></div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="prose sec" style="gap:8px"><div class="eyebrow">9 · Your calls</div><h2>What I need from you</h2></div>
+  <div class="qs">
+    <div class="q"><b>Residents start their own cards without a go?</b><span>Today Pike waits for JEFF's go on a card that is already his.</span><span class="lean">I lean: yes. JEFF's assignment is the go.</span></div>
+    <div class="q"><b>Card sizes: tiny, small, large?</b><span>Set by whoever scopes the card. The governor asks for one when it is missing.</span><span class="lean">I lean: yes, those three.</span></div>
+    <div class="q"><b>Budget</b><span>12 nudges an hour across the House, on by default, one switch to turn it off.</span><span class="lean">I lean: start at 12 and watch a day.</span></div>
+    <div class="q"><b>What "Now" means</b><span>47 cards in Now. If Now meant "a ball is moving on it", the rest would go to Done or Backlog.</span><span class="lean">I lean: yes. JEFF's first nudge cleans it up.</span></div>
+  </div>
+  <div class="sec" style="gap:10px">
+    <h3>How I'd bring it in</h3>
+    <ol class="order">
+      <li>The ball as a fact. Derive it from worker phases and cards, add one word to set it by hand (<code>ball &lt;card&gt; &lt;who&gt;</code>), and show it in the Work panel. It wakes nobody yet.</li>
+      <li>Watch the slate for a day next to what the agents actually do, and check that it names the right holder.</li>
+      <li>Turn on nudges with a low budget (6 an hour), together with the Agent Book messages, so every nudge is one line in one voice.</li>
+      <li>Raise the budget once a day of logs shows no loops and fewer wasted turns than today's 143 duplicates.</li>
+    </ol>
+  </div>
+  <p class="mind"><b>What would change my mind:</b> if the governor's picture is wrong often, waking someone for a ball that isn't theirs, then the ball needs to be set by the agents rather than inferred, and step 1 grows. If turns per day go up and finished cards don't, the budget is too high or the rules start too much. In that case "finish before starting" should become "finish only" until the backlog is clear.</p>
+</section>
+
+</div>
+
+<script>
+// ---- ball holders (4 Nov 10:40, from house.who and the cards)
+const HOLD=[
+ {who:'JEFF',sub:'manager',balls:[['mgr',10,'10 old workers he still owns (5 cut off, 4 blocked, 1 finished)'],['mgr',5,'5 finished workers with no owner (Dock unpin, Twitch, Screenshot paste, Docs import, FPS readout)'],['mgr',1,'"Now" holds 47 cards']]},
+ {who:'Sable',sub:'resident',balls:[['fin',2,'2 finished: smart search check, Work panel activation (card already Done)'],['stuck',2,'2 blocked by the card bug, fixed 11:59 yesterday']]},
+ {who:'Pike',sub:'resident',balls:[['fin',2,'2 finished: old-world audit, docs list'],['stuck',1,'Fullscreen fix delivery, blocked by the same fixed bug'],['start',1,'Worker activity shows the commands: ready, waiting on a go']]},
+ {who:'Rowan',sub:'resident',balls:[['fin',2,'Seabright folders (finished 29 Oct), Seabright follow-through (reviewed, ready to land)']]},
+ {who:'Alex',sub:'you',balls:[['mgr',1,'Writing as one document: the design waits on your answer']]},
+];
+const cls={fin:'b-fin',stuck:'b-stuck',start:'b-start',mgr:'b-mgr'};
+document.getElementById('holders').innerHTML=HOLD.map(h=>{
+  const n=h.balls.reduce((t,b)=>t+b[1],0);
+  return `<div class="holder"><h3>${h.who}<small>${h.sub} · ${n}</small></h3><div class="balls">${h.balls.map(b=>`<i class="ball ${cls[b[0]]}"></i>`.repeat(b[1])).join('')}</div><ul>${h.balls.map(b=>`<li>${b[2]}</li>`).join('')}</ul></div>`;
+}).join('');
+
+// ---- replay
+const S=[
+ {t:'Tue 3 Nov · 12:49',slate:`Pike's turn just ended.
+Busy: nobody · Down: nobody
+Slots: Claude 0/4 · Codex 0/4
+Balls with free agents: 26
+  JEFF 16 · Sable 4 · Pike 4 · Rowan 2
+Balls with running workers: 0
+Balls with Alex: 1`,slots:[[],[]],to:'Today',cls:'quiet',
+  msg:`(nothing is sent)
+
+Pike's line to JEFF has no @, so it reaches nobody.
+Next turn anyone takes: none for 22 hours.`,
+  note:'Rule 1 is broken in 26 places: every ball is with someone free. The governor runs because a turn ended.'},
+ {t:'12:49 · governor runs',slate:`Rule 2, finish first: 10 finished workers
+Rule 4: Pike waits on a go for a card that is his
+Rule 5: JEFF holds 16 manager balls
+Budget: 0 of 12 this hour`,slots:[[],[]],to:'To Pike',cls:'to-res',
+  msg:`~ it is Tue 03 Nov, 12:49 · you're free
+~ You hold, finish first:
+  1. Old-world audit: finished, review it
+  2. Docs list for the import: finished, review it
+  3. Fullscreen fix delivery: the card block was fixed at 11:59, carry on
+~ Then yours to start, small: Worker activity shows the commands.
+  It's yours: no go needed.`,
+  note:'Pike gets his own balls, oldest finish first. The go he was waiting for is answered by rule 4, not by a message JEFF never saw.'},
+ {t:'12:49 · same pass',slate:`Sable: 2 finished, 2 unblocked by the 11:59 fix
+Rowan: 2 finished (one reviewed, ready to land)`,slots:[[],[]],to:'To Sable and Rowan',cls:'to-res',
+  msg:`~ Sable · you hold, finish first:
+  1. Smart search check: finished 3 Nov, review it
+  2. Work panel activation: its card is Done; release the worker
+  3. Smart search research, One work board: unblocked at 11:59, carry on
+
+~ Rowan · you hold, finish first:
+  1. Seabright follow-through: reviewed, land it
+  2. Seabright folders: finished 29 Oct, review it`,
+  note:'Three residents wake at once, each with only its own balls. They work in parallel, the way you and I would split it.'},
+ {t:'12:49 · same pass',slate:`JEFF: 10 old workers, 5 ownerless finished
+"Now": 47 cards, 9 with a live ball`,slots:[[],[]],to:'To JEFF',cls:'to-jeff',
+  msg:`~ it is Tue 03 Nov, 12:49 · Sable, Pike and Rowan are busy finishing
+~ Your moves:
+  1. Dock unpin, Twitch, Screenshot paste, Docs import, FPS readout:
+     finished, no owner. Hand each to a resident, or release it.
+  2. You still own 10 workers from before. Hand on or release.
+  3. Cut "Now" to the 9 cards that are moving.`,
+  note:'JEFF gets manager moves only. No worker events, no task-list recount.'},
+ {t:'13:05 · turns end, work moves',slate:`Pike reviewed the audit, released the docs list,
+  restarted the fullscreen worker, started "show commands"
+Rowan landed Seabright follow-through
+Slots: Claude 1/4 · Codex 3/4`,slots:[['Small · show commands (Pike)'],['Large · fullscreen fix (Pike)','Large · smart search (Sable)','Small · Seabright folders fix (Rowan)']],to:'To Rowan',cls:'to-res',
+  msg:`~ Seabright follow-through landed. Check it live, then close the card.`,
+  note:'Each turn end runs the governor again. It only wakes whoever has a new move. Rowan checks the landing. Everyone else is waiting on running workers, which is allowed.'},
+ {t:'13:20 · a nudge that changed nothing',slate:`Sable's turn ended. "Smart search check" did not move.
+Rule 7: same picture, don't nudge again
+→ stalled ball goes to JEFF`,slots:[['Small · show commands (Pike)'],['Large · fullscreen fix (Pike)','Large · smart search (Sable)','Small · Seabright folders fix (Rowan)']],to:'To JEFF',cls:'to-jeff',
+  msg:`~ Stalled with Sable: Smart search check (finished 3 Nov).
+  Her note: "needs a design answer on what counts as private."
+~ Yours to move: answer it, hand it on, or put it in Needs Me.`,
+  note:'No loop. A ball that doesn’t move goes up one level: resident, then JEFF, then you.'},
+ {t:'13:25 · JEFF puts it with you',slate:`Balls with free agents: 0
+Balls with running workers: 4
+Balls with Alex: 2`,slots:[['Small · show commands (Pike)'],['Large · fullscreen fix (Pike)','Large · smart search (Sable)','Small · Seabright folders fix (Rowan)']],to:'To you (Needs Me)',cls:'to-alex',
+  msg:`Needs Me · Smart search: what counts as private? (Sable)
+Needs Me · Writing as one document: your answer on the design`,
+  note:'Now the House may rest: every ball is with you or a running worker. The next worker to finish wakes its owner, and the loop goes on.'},
+];
+let i=0;
+const $=id=>document.getElementById(id);
+$('dots').innerHTML=S.map(()=>'<i class="dot"></i>').join('');
+function slotRow(name,arr){
+  const cells=[0,1,2,3].map(k=>{const v=arr[k];if(!v)return '<div class="slot"></div>';return `<div class="slot ${v.startsWith('Small')?'small':'big'}">${v}</div>`}).join('');
+  return `<div class="slotrow"><span>${name}</span>${cells}</div>`;
+}
+function render(){
+  const s=S[i];
+  $('rtime').textContent=s.t; $('rslate').textContent=s.slate; $('rto').textContent=s.to;
+  const m=$('rmsg'); m.textContent=s.msg; m.className='msg '+s.cls;
+  $('rnote').textContent=s.note;
+  $('rslots').innerHTML=slotRow('Claude',s.slots[0])+slotRow('Codex',s.slots[1]);
+  [...$('dots').children].forEach((d,k)=>d.classList.toggle('on',k===i));
+  $('prev').disabled=i===0; $('next').disabled=i===S.length-1;
+}
+$('prev').onclick=()=>{if(i>0){i--;render()}};
+$('next').onclick=()=>{if(i<S.length-1){i++;render()}};
+render();
+</script>

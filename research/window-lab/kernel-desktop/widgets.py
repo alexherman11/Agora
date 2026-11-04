@@ -1,4 +1,11 @@
-"""Trusted widget broker. Never send its instance capability into the iframe."""
+"""EDITING THE DESKTOP HOST (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+This file is a seam between the world and Windows: it turns world facts into screen effects and screen events into world
+facts, through small words. It holds no preferences and no content. Which apps, what a button opens, sizes, names, ids and
+who may do what live in settings things it reads (shell-settings, wm-settings). It does not seed the world at start
+(people, chats, pins). New behaviour is a rule over the words offered here. Before writing a Windows or browser helper,
+use the shared one (gaming_gate for full-screen and desktop tests, widget_browser for hidden pages) instead of a copy.
+
+Trusted widget broker. Never send its instance capability into the iframe."""
 import secrets
 import re
 import threading
@@ -122,11 +129,14 @@ class Widgets:
                 with self.k.lock:
                     happenings = self.k.happenings[i['cursor']:]
                     i['cursor'] = len(self.k.happenings)
-                    events = [self.k.happening_for(actor.person, h) for h in happenings
-                              if h['word'] in i['words'] and p.hears(h['word']) and self.k.may_hear(actor.person, h)]
-                    for e in events:
-                        if e['word'] != 'guy.say':
-                            e.pop('text', None)  # no unrelated field values hidden inside command text
+                    heard = [h for h in happenings
+                             if h['word'] in i['words'] and p.hears(h['word']) and self.k.may_hear(actor.person, h)]
+                    events = [self.k.happening_for(actor.person, h) for h in heard]
+                    for e, h in zip(events, heard):
+                        # no unrelated field values hidden inside command text; a happening addressed to this reader
+                        # alone (`only`, such as their window's view) is theirs to read
+                        if e['word'] != 'guy.say' and h.get('only') != actor.person:
+                            e.pop('text', None)
                 return dict(ok=True, events=events)
             now = time.monotonic()
             i['calls'] = [t for t in i['calls'] if now - t < 1]
@@ -169,6 +179,9 @@ class Widgets:
         return None
 
     def _call(self, actor, i, p, op, body):
+        if op == 'tiling':
+            from kernel.tiling import preview
+            return {'ok': True, **preview(body.get('geometry') or {}, self.k, actor)}
         if op == 'project':
             import json
             from painter.arrangement import compile_view

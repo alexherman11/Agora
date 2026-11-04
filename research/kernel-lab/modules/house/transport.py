@@ -1,4 +1,10 @@
-"""The house's transports: one long-lived model process per agent, speaking newline JSON on stdin and stdout.
+"""EDITING A MODULE (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+A module is a seam to something outside the kernel (a model provider, git, Twitch, the media session, a map server) and
+turns it into world facts and words. What the world does with them (who is told, when, in what words, how it looks)
+belongs in rules, lenses and this module's settings thing, read at each use. Names (JEFF, Alex), ids (dk...), models,
+counts, timeouts and message text in this file are debt: move them to settings when you touch them, and never add more.
+
+The house's transports: one long-lived model process per agent, speaking newline JSON on stdin and stdout.
 
 Ported from the old desk's house (research/text-desk-lab/notation/house.py, Resident.start/send/turns_ended) with only
 the provider-agnostic parts: the Claude `-p` stream-json process, compaction at the house's compact_at (400k), the
@@ -21,6 +27,7 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
+import worker_activity
 
 HERE = Path(__file__).resolve().parent
 LAB = HERE.parents[1]
@@ -150,7 +157,19 @@ def reduce(ev):
             return [{"e": "text", "text": item.get("text", "")}]
         if ev.get("method") == "item/started" and item.get("type") in (
                 "commandExecution", "mcpToolCall", "dynamicToolCall", "fileChange", "webSearch"):
-            return [{"e": "tool", "name": str(item.get("tool") or item.get("type")), "input": {}}]
+            if item.get("type") == "fileChange":
+                return []  # paths are final on completion
+            out = {"e": "tool", "name": str(item.get("tool") or item.get("type")), "input": {}}
+            activity = worker_activity.codex(item)
+            if activity:
+                out["activity"] = activity
+            return [out]
+        if ev.get("method") == "item/completed" and item.get("type") == "fileChange":
+            out = {"e": "tool", "name": "fileChange", "input": {}}
+            activity = worker_activity.codex(item)
+            if activity:
+                out["activity"] = activity
+            return [out]
         return []  # reasoning and raw tool arguments/results never become public activity
     if t == "system" and ev.get("subtype") == "init" and ev.get("session_id"):
         return [{"e": "init", "session": ev["session_id"]}]

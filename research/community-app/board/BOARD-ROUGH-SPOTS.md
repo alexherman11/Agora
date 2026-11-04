@@ -49,3 +49,27 @@ Seen, not fixed: the `catch-up` verb (install.py, `steps='board.catch-up'`) does
 `catch-up in=<group>` silently answers for the whole board. Kernel line keys are lowercase only
 (`kernel/lines.py` KEY), so no component's camelCase setting (`weekStart`, `previewCount`) can be named in
 `personal-view`; lowercase settings (`view`, `label`) work.
+
+## Scoped Documents metadata admission (Codex, existing dk1614 follow-through)
+
+Missing world capability: a provider's make/set grant could limit kinds or
+existing thing ids/fields, but could not bind new folder/entry metadata to one
+document library. Source draft adds `only=...;library:<id>` admission in
+`kernel/document_scope.py`, called by `Kernel.reaches`, and passes the full make
+shape before any post delegation in `words.py`. The clause requires inherited
+library visibility, one matching group and metadata-only writes; unrelated file,
+policy and cross-library writes refuse. Regression cases are in `test_shapes.py`.
+No grants, root creation, live source publication, activation or migration.
+See DOCUMENTS-SCOPE-REVIEW.md for held resolver decisions and unexecuted tests.
+
+## Documents outer call and provider read selection (dk1614)
+
+Missing world capability: `grant ... only=library:<id>` did not constrain an
+outer Documents word or the rows a provider received while answering it.
+`Kernel.module_word/module_see` now enforce a per-call library context, using
+`document_scope.selection/read_rows`; atomic answer admission retains that
+selection. Grant scope matching checks location/issuer and bound aliases.
+Recovered exact dk1561 source adds inherited metadata creation and restores
+provider word offers. No installer permission expansion or live publication.
+Memory checks passed; persisted-world and UI review remain held. See
+DOCUMENTS-ISSUANCE.md for exact principals, clauses, evidence and resolvers.

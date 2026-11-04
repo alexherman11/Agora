@@ -1,4 +1,11 @@
-"""Chats: a kind of thing people talk in, and the `say` word (MOVING-IN D4, Alex 27 Oct: "A kind, chat is a great idea").
+"""EDITING THE KERNEL (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+The kernel changes only to give every world a general capability: a word, a check, a kind of fact any app, module or
+person can use. It never names its tenants: no app, module, person, kind or field name appears in this code except the
+kernel's own (word, rule, kind, grant, person, ...). If your change needs `if kind == "..."`, a person's name or one app's
+field, stop: the missing piece is a general word (a kind's policy, a rule step, a reading). Build that, or put it on the
+Board. Names already here are debt (research/source-edits/SOURCE-AUDIT-KERNEL.md lists them); take them out when you can.
+
+Chats: a kind of thing people talk in, and the `say` word (MOVING-IN D4, Alex 27 Oct: "A kind, chat is a great idea").
 
     make kind=chat name="Shop talk"                       an open chat: the place sees it, anyone in it may say
     make kind=chat name=Conversation with="Alex, JEFF"    a closed chat: only those people see it and say in it
@@ -63,6 +70,8 @@ def say(k, actor, st, entry, tx, group, saw=None):
     chat = st.target
     if not chat or k.state.get(chat, "kind") != "chat":
         raise Refused("say <chat> <words>: say which chat (rows chat lists them), then your words")
+    if k.state.get(chat, "read_only"):
+        raise Refused(f"{k.name(chat)} is read-only")
     text = str(st.kv.get("text") or st.words).strip()
     if not text:
         raise Refused(f"say {k.name(chat)} <words>: there were no words")
@@ -98,7 +107,9 @@ def say(k, actor, st, entry, tx, group, saw=None):
         tx.set(t, "acts", str(st.kv["acts"])[:2000])     # what the speaker did around this line: small receipts
     a = st.kv.get("about")
     if a:
-        if k.shown(actor.person, a) is None:
+        # a line may be about what an earlier step of the same act made (a verb's `as=` handle): not yet in the world,
+        # but made by this speaker in this act (Ask, 3 Nov 2026: the request and Alex's line to JEFF are one act)
+        if a not in tx.made and k.shown(actor.person, a) is None:
             raise k.no_such(a)
         tx.set(t, "about", a)
     tx.set(t, "made_by", actor.id)
@@ -116,9 +127,34 @@ def say(k, actor, st, entry, tx, group, saw=None):
             "rows": [{"id": t, "kind": "said", "chat": chat, "to": to}]}
 
 
+def receive(k, actor, st, entry, tx, group, saw=None):
+    """Import from a chat's source module; outside speakers and mentions are data."""
+    c = st.target
+    if (actor.kind != "module" or not actor.module
+            or k.state.get(c, "kind") != "chat"
+            or k.state.get(c, "source") != actor.module
+            or not k.state.get(c, "read_only")):
+        raise Refused("chat.receive is only for this read-only chat's source module")
+    k.reaches(actor, "chat.receive", "said", c)
+    text, speaker, key = (str(st.kv.get(x) or "") for x in ("text", "speaker", "external_id"))
+    if not text or not speaker or not key or len(text) > 4000 or len(speaker) > 100 or len(key) > 200:
+        raise Refused("chat.receive needs text, speaker and external_id within chat limits")
+    if any(k.state.get(t, "chat") == c and k.state.get(t, "external_id") == key
+           for t in k.things("said")):
+        return {"text": "already received", "rows": []}
+    t = tx.mint()
+    for a, v in (("kind", "said"), ("chat", c), ("visibility_of", c),
+                 ("text", text), ("speaker", speaker), ("external_id", key),
+                 ("from", k.state.get(actor.module, "name")),
+                 ("made_by", actor.module), (f"in:{group}", len(k.log.records) + 1)):
+        tx.set(t, a, v)
+    return {"text": f"received a line in {k.name(c)}", "rows": [{"id": t, "kind": "said", "chat": c}]}
+
+
 def said_row(k, t, a):
     by = a.get("made_by")
-    return {"id": t, "kind": "said", "chat": a.get("chat"), "by": k.name(a.get("for") or by) if by else "",
+    return {"id": t, "kind": "said", "chat": a.get("chat"), "by": a.get("speaker") or (k.name(a.get("for") or by) if by else ""),
+            "from": a.get("from", ""),
             "acts": a.get("acts", ""),
             "via": k.name(by) if a.get("for") else "", "text": a.get("text", ""), "at": a.get("made", ""),
             "to": [k.name(p) for p in str(a.get("to") or "").split()], "reply_to": a.get("reply_to", ""),
