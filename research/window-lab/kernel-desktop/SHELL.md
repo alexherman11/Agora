@@ -435,3 +435,13 @@ Claude, 4 Nov (Alex: "do we really need wallpaper.py?"; the pilot for research/s
     longer a flag. The behaviour is the world's: the rule `Wallpaper follows my theme`, or `set <Shell settings>
     wallpaper=<photo>`. Missing word, still: a way to replace a file thing's content (each theme change makes a new
     picture file).
+
+22. `gaming_gate.py`, `agora-wm/win32_host.py`, `kd_window.follow_games` (4 Nov). Alex's games (`KNOWN`) and his NVIDIA
+    overlay (in `SHELL_OVERLAYS`) were lists in source, so a new game was a code edit. They are now the world thing
+    `Games` (kind=game-settings: `games=`, `not_games=`). The window host mirrors it to this machine's
+    `%LOCALAPPDATA%/Agora/games.json`, so every process that asks the gate (the WM, installers, proofs) reads it with or
+    without the door. In code stays only what is a fact about Windows: Game Bar's helpers and Windows' own shell
+    windows (`WINDOWS_OVERLAYS`, now one list in `gaming_gate`, used by the WM). **Ran:** set a running program as a game
+    in the world; the gate named it within 5 s, and named it no more once the list was set back.
+    Missing word: settings mirrored for programs that run without the door. The theme module's `theme-native.json` is
+    the same need, solved a second time.

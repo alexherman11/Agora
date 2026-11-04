@@ -207,6 +207,20 @@ class DesktopTest(unittest.TestCase):
         self.assertEqual((320, 200), struct.unpack(">II", data[16:24]))     # the PNG's own width and height
         self.assertIn("no view, lens or thing", d.say("window.picture nothing-called-this", "alex")["text"])
 
+    def test_the_games_the_owner_names_are_mirrored_for_the_gate(self):
+        # 4 Nov: Alex's games are a world thing, not a list in gaming_gate.py. The window host mirrors the owner's
+        # game-settings to a file every process can read; a hidden test's mirror is its own world's games.json.
+        d = self.d
+        mirror = Path(d.dir) / "world" / "games.json"
+        d.say('make kind=game-settings name=Mine games="Cs2.exe, notanexe, rocketleague.exe" not_games="NVIDIA Overlay.exe"', "alex")
+        d.wait(lambda: mirror.is_file() and "cs2.exe" in mirror.read_text(encoding="utf-8"), 15)
+        got = json.loads(mirror.read_text(encoding="utf-8"))
+        self.assertEqual((["cs2.exe", "rocketleague.exe"], ["nvidia overlay.exe"]), (got["games"], got["not_games"]))
+        d.say('make kind=game-settings name=Theirs games="sneaky.exe"', "jeff")      # not the desktop owner's
+        d.say('make kind=window shows=help name=Nudge', "alex")                        # any window act: a reconcile
+        time.sleep(2)
+        self.assertNotIn("sneaky.exe", mirror.read_text(encoding="utf-8"))
+
     def test_off_window_closes_all_and_undo_brings_them_back(self):
         d = self.d
         d.say("window.open lines")

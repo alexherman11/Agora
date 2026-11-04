@@ -803,6 +803,7 @@ class WindowHost:
         self.token = None
         self.world = None              # this world's folder (its blob store takes window.picture's bytes)
         self.wall_want, self.wall_said = None, ""   # the file `Shell settings` names as the wallpaper, and what came of it
+        self.games_key = None          # the game lists last mirrored (follow_games)
         self.m = Module(offer=self.offer(), on_call=self.call, on_happen=self.happen, on_status=self.status,
                         on_hello=self.hello, on_off=self.off)
 
@@ -931,6 +932,35 @@ class WindowHost:
                 return                                # the same failure again: said once
             self.wall_said = said
         log("wallpaper: " + self.wall_said)
+
+    # -- the games: the world's game-settings, mirrored for every process that asks gaming_gate (door or not)
+    def follow_games(self, rows):
+        """games=<exe,...> are Alex's games (the window manager stands still and installers wait while one runs);
+        not_games=<exe,...> never count, even filling the screen. Only a game-settings thing the desktop's owner made
+        counts. Written to this machine's games.json when the lists change; a hidden test writes into its own world."""
+        import re
+        import gaming_gate
+        mine = [r for r in rows if self.owner and self.owner in (r.get("made_by"), r.get("for"))]
+
+        def names(field):
+            out = set()
+            for r in mine:
+                for x in str(r.get(field) or "").split(","):
+                    x = x.strip().lower()
+                    if re.fullmatch(r"[a-z0-9 ._()+-]{1,80}\.exe", x):
+                        out.add(x)
+            return out
+        key = (frozenset(names("games")), frozenset(names("not_games")))
+        if key == self.games_key:
+            return
+        path = None
+        if HEADLESS and not os.environ.get("AGORA_GAMES_FILE"):
+            if not self.world:
+                return
+            path = self.world / "games.json"             # never the machine's own file from a hidden test
+        gaming_gate.write_mirror(key[0], key[1], ",".join(r["id"] for r in mine), path)
+        self.games_key = key
+        log(f"games: {len(key[0])} games, {len(key[1])} never games, from {', '.join(r['id'] for r in mine) or 'nothing'}")
 
     # -- window.picture: what window.open would show, drawn hidden, handed back as the caller's picture file
     def picture_page(self, what, use):
@@ -1299,6 +1329,9 @@ class WindowHost:
         want = {row["id"]: row for row in r.get("rows") or []}
         settings = (self.m.see("rows shell-settings").get("rows") or [{}])[0]
         self.follow_wallpaper(str(settings.get("wallpaper") or "").strip())
+        games = self.m.see("rows game-settings")
+        if not games.get("refused") and games.get("ok", True):
+            self.follow_games(games.get("rows") or [])
         widgets = self.m.see('rows widget')
         active = {w['id']:w['code'] for w in widgets.get('rows',[]) if w.get('on') and w.get('code') and not w.get('forgotten')}
         want = {wid:row for wid,row in want.items() if not row.get('widget') or row['widget'] in active}

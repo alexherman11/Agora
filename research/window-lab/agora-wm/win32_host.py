@@ -170,7 +170,7 @@ def gate():
     hr=shell.SHQueryUserNotificationState(C.byref(state))
     if hr!=0:reasons.append('notification state unavailable')
     elif state.value in (1,3,4,7):reasons.append(f'notification gate {state.value}')
-    elif (state.value==2 and _foreground_exe().lower() not in SHELL_OVERLAYS
+    elif (state.value==2 and not gaming_gate.never_game(_foreground_exe())
           and not gaming_gate.is_desktop(u.GetForegroundWindow()) and _foreground_covers_monitor()):
         # "Busy" alone is not a game: on 26 Oct Windows reported it with Claude (an ordinary window) in front while
         # Agora's own desktop layer and the Claude app's screen overlay were screen-sized. Gate only when the window
@@ -204,10 +204,9 @@ def _foreground_covers_monitor():
     return r.left<=m.left and r.top<=m.top and r.right>=m.right and r.bottom>=m.bottom
 
 
-# Screen-sized shell windows that make Windows report "busy" (QUNS 2) with no full-screen program running.
-# Seen 26 Oct 2026: TextInputHost.exe (touch keyboard / emoji panel) held the foreground at 3840x2160.
-SHELL_OVERLAYS={'textinputhost.exe','nvidia overlay.exe','explorer.exe','shellexperiencehost.exe',
-                'startmenuexperiencehost.exe','searchhost.exe','lockapp.exe'}
+# Screen-sized windows that make Windows report "busy" (QUNS 2) with no game running (26 Oct: TextInputHost.exe
+# held the foreground at 3840x2160) are gaming_gate.never_game: Windows' own there, Alex's in the world's
+# game-settings not_games (4 Nov; the list lived here before).
 
 
 def _foreground_exe():
