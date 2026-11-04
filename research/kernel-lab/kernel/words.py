@@ -28,11 +28,12 @@ def _k(word, kind, takes, may, undo, help, **more):
 from hosts.web.layout import HELP as PANE_HELP, panes, arrange
 
 KERNEL_ENTRIES = [
-    _k("task.signal", "do", "<id> mode=<waiting|notify|reporter> event=<landed|done>",
+    _k("task.signal", "do", "<id> mode=<waiting|notify|reporter> event=<landed|done> [route=<field>:<person>]",
        "members", "yes",
-       help="task.signal <card> mode=waiting|notify|reporter event=landed|done: "
-            "write deduplicated addressed card notes for world rules; undo removes them. "
-            "No execution or completion permission is granted."),
+       help="task.signal <card> mode=waiting|notify|reporter event=landed|done [route=<field>:<person>]: "
+            "write deduplicated addressed card notes for world rules; undo removes them. A note reaches the card's "
+            "owner, lead or who (notify_on_land, reporter); route= sends a card that carries <field> to that person "
+            "instead. No execution or completion permission is granted."),
     *[_k("task." + action, "do", "<id> " + takes, "members", "yes", help=help_,
          bound="task-" + action, aliases="task-" + action)
       for action, takes, help_ in [

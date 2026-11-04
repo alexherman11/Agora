@@ -99,6 +99,19 @@ class CardRules(unittest.TestCase):
         note = self.k.state.things[self.notes()[0]]
         self.assertEqual((note["about"], note["to"]), (dependent, self.j.person))
 
+    def test_without_a_route_the_kernel_routes_nobody(self):
+        # Who an asked card reaches is the world's rule (route=alex_ask:JEFF in card-rules.lines), not the kernel's.
+        self.assertNotIn("JEFF", (LAB / "kernel/card_signals.py").read_text(encoding="utf-8"))
+        source = self.card()
+        dependent = self.card(waiting_on=source, alex_ask="original-ask", owner="Worker")
+        self.say(f"task.signal {source} mode=waiting event=done")
+        self.assertEqual(self.notes(), [])
+        self.say(f"look {source}; set {source} lane=Done")
+        self.say(f"task.signal {source} mode=waiting event=done")
+        note = self.k.state.things[self.notes()[0]]
+        self.assertEqual((note["about"], note["to"]), (dependent, self.w.person))
+        self.assertFalse(self.k.run(self.a, f"task.signal {source} mode=waiting event=done route=alex_ask")["ok"])
+
     def test_notify_on_land_and_reporter_once(self):
         source = self.card(notify_on_land="Worker", reporter="JEFF")
         self.card(notify_on_land="JEFF", reporter="Worker")

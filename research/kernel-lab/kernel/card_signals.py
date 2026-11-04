@@ -5,7 +5,11 @@ kernel's own (word, rule, kind, grant, person, ...). If your change needs `if ki
 field, stop: the missing piece is a general word (a kind's policy, a rule step, a reading). Build that, or put it on the
 Board. Names already here are debt (research/source-edits/SOURCE-AUDIT-KERNEL.md lists them); take them out when you can.
 
-Card-rule vocabulary, not a scheduler. Notes and their deduplication undo together."""
+Card-rule vocabulary, not a scheduler. Notes and their deduplication undo together.
+
+Who a note reaches is the card's (owner, lead, who; notify_on_land; reporter), unless the rule says otherwise:
+route=<field>:<person> sends a card that carries <field> to that person instead (4 Nov: which field and which person
+are the world's, in its card rules; before, a person's name and a field were written here). The kernel names no one."""
 from .kernel import Refused
 from .next_steps import KINDS, person
 
@@ -16,7 +20,13 @@ def signal(k, actor, st, entry, tx, group, saw=None):
     mode = st.kv.get("mode")
     event = st.kv.get("event")
     if mode not in ("waiting", "notify", "reporter") or event not in ("landed", "done"):
-        raise Refused("task.signal <card> mode=waiting|notify|reporter event=landed|done")
+        raise Refused("task.signal <card> mode=waiting|notify|reporter event=landed|done [route=<field>:<person>]")
+    route_field, _, route_to = str(st.kv.get("route") or "").partition(":")
+    if st.kv.get("route") and not (route_field and route_to):
+        raise Refused("route=<field>:<person>: a card that carries <field> reaches that person instead")
+
+    def routed(row, ref):
+        return route_to if route_field and row.get(route_field) else ref
     if mode == "reporter" and card and card.get("status") == "curing" and card.get("curing_via"):
         source = card["curing_via"]
         card = k.shown(actor.person, source)
@@ -39,8 +49,7 @@ def signal(k, actor, st, entry, tx, group, saw=None):
         for target in list(k.state.things):
             row = k.shown(actor.person, target)
             if row and row.get("kind") in KINDS and row.get("waiting_on") == source:
-                recipient = "JEFF" if row.get("alex_ask") else next(
-                    (p for field in ("owner", "lead", "who") if (p := person(k, row.get(field)))), None)
+                recipient = next((p for field in ("owner", "lead", "who") if (p := person(k, row.get(field)))), None)
                 destinations.append((target, row, recipient))
     elif mode == "notify":
         destinations.append((source, card, card.get("notify_on_land")))
@@ -56,7 +65,7 @@ def signal(k, actor, st, entry, tx, group, saw=None):
     count = 0
     keys = {k.state.get(t, "card_signal") for t in k.things("taskboard-event")}
     for target, row, ref in destinations:
-        recipient = person(k, "JEFF" if row.get("alex_ask") else ref)
+        recipient = person(k, routed(row, ref))
         if not recipient or k.shown(recipient, target) is None or k.shown(recipient, source) is None:
             continue
         # Use the recipient's projection, including field privacy, for every word
