@@ -17,6 +17,7 @@ import time
 import uuid
 from engine import Rect,solve
 from manager import Manager,DEFAULTS
+from policy_reload import PolicyStatus,REFUSAL
 
 HERE=Path(__file__).resolve().parent
 sys.path.insert(0,str(HERE.parent/'kernel-desktop'))
@@ -24,6 +25,7 @@ from modproto import Module,log
 
 HELP={
  'windows':('see','','Current windows: app, exe/icon reference, state, focus and geometry; never titles.'),
+ 'policy':('see','','Startup imported policy code snapshot, scoped to Manager/Native and their local module functions; hot reload is unavailable.'),
  'focus':('do','<key>','Ask Windows to focus a current manageable window; foreground lock may refuse.'),
  'minimise':('do','<key>','Really minimise a manageable unpinned window; never cloak.'),
  'restore':('do','<key>','Restore a manageable window and place it without overlap.'),
@@ -31,6 +33,8 @@ HELP={
  'pin':('do','<key>','Keep this window fixed. Screen state, kept by this window manager, never in the world.'),
  'unpin':('do','<key>','Let this pinned window move again. Screen state, never in the world.'),
  'arrange':('do','[expect=<exe>]','Re-solve the layout; expect arms one bar-requested shared layout for a new executable window, for at most five seconds. Exclusive fullscreen is unsupported.'),
+ 'reload':('do','sha256=<reviewed digest>','Unavailable: refuses before source/native/lease operations. Existing watchdog cannot guarantee a bounded live handoff.'),
+ 'rollback':('do','sha256=<previous digest>','Unavailable: no retained code generation; requires a separately authorized WM lifecycle, with geometry/claim release.'),
  'mode':('do','live|shadow|off','Shadow computes only; live needs rollout arming; off releases every saved placement.'),
  'leave-alone':('do','<app>','Treat this app as fixed obstacles. Undoable world intent.'),
  'manage':('do','<app>','Remove an app exclusion (undoable); in adopted mode also adopts its current windows (screen state, kept locally).'),
@@ -67,6 +71,7 @@ class WMModule:
         self.said={}            # topic -> last line said on stderr: a refusal is said once, not every second
         self.backlog=[]         # hook events drained during the 60 Hz drag path, handed to the next full tick
         self.full_at=0.0        # last full tick: during a drag one still runs each second (closes, the game gate)
+        self.policy_reload=None
         self.m=Module(offers(),self.call,on_hello=self.hello,on_off=self.stop.set,
             on_status=lambda:f'{self.manager.mode if self.manager else "starting"}; {len(self.manager.rows) if self.manager else 0} windows')
 
@@ -79,6 +84,11 @@ class WMModule:
         else:
             from win32_host import Native
             self.manager=Manager(Native(),self.home,allow_live=self.allow_live)
+            import manager as manager_module
+            import win32_host as native_module
+            # Before intent_loop can arm live: no fingerprint work on the
+            # lease-owning tick or request path.
+            self.policy_reload=PolicyStatus(manager_module,native_module)
         self.manager.theme_path=self.theme_native or self.home.parent/'theme'/'theme-native.json'
         threading.Thread(target=self.intent_loop,daemon=True).start()
 
@@ -128,6 +138,13 @@ class WMModule:
         words=str(args.get('words') or '').split();target=kv.get('key') or args.get('target') or (words[0] if words else None)
         if word=='windows':
             with self.lock:return {'rows':self.manager.reading(),'text':f'{len(self.manager.rows)} windows; {self.manager.mode}'}
+        if word=='policy':
+            r=self.policy_reload
+            return r.reading() if r else {'rows':[],'text':'imported policy snapshot unavailable'}
+        if word in ('reload','rollback'):
+            if caller.get('person') not in self.stewards:
+                return {'refused':'WM policy handoff requires a desktop steward'}
+            return {'refused':REFUSAL}
         if word in ('focus','minimise','restore','close'):
             return self._request('action',word,target,kv.get('share')=='yes')
         if word=='arrange':return self._request('arrange',kv.get('expect'))
