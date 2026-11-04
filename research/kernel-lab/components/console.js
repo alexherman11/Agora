@@ -1,6 +1,7 @@
 // console: a live monospaced log, newest at the bottom, with an optional prompt line under it (a coder's terminal).
 // value: one entry per line, `kind<TAB>time<TAB>who<TAB>text` (a line without tabs is plain); kinds: said (the log's
 // own person), heard (someone else), act (a receipt of what was done), own (outside any chat), now (doing now), error.
+// act-detail carries JSON {summary, detail}; both are sanitized by the House before persistence.
 // Settings: value, label, hint (the prompt's placeholder), empty. Gesture: say {value}, when the prompt is authored.
 export default {css:`
 .console{display:flex;flex-direction:column;width:100%;box-sizing:border-box;height:max(280px,calc(100vh - var(--console-offset,104px)));border-radius:12px;overflow:hidden;border:1px solid var(--console-rule)}
@@ -8,6 +9,9 @@ export default {css:`
 .console-line{display:grid;grid-template-columns:5.2ch 9ch 1fr;column-gap:1ch;white-space:pre-wrap;word-break:break-word}
 .console-line.plain{display:block}
 .console-time,.console-who{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.console-detail{min-width:0}
+.console-detail summary{cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.console-detail pre{white-space:pre-wrap;word-break:break-word;font:inherit;margin:4px 0}
 .console-prompt{display:flex;align-items:center;gap:1ch;padding:9px 14px;border-top:1px solid var(--console-rule);font:13px/1.4 var(--ag-font-mono,ui-monospace,"Cascadia Code",Consolas,monospace)}
 .console-prompt input{all:unset;flex:1;min-width:0;font:inherit}
 `,mount(api,s){
@@ -20,11 +24,22 @@ export default {css:`
   for(const raw of lines){
     const parts=raw.split('\t');
     if(parts.length<4){log.append(P.node('div',{class:'console-line plain'},raw));continue}
-    const [kind,time,who,...rest]=parts,text=rest.join('\t');
+    let [kind,time,who,...rest]=parts;
+    const text=rest.join('\t');
+    let body=P.node('span',{},text);
+    if(kind==='act-detail'){
+      kind='act';
+      try{
+        const entry=JSON.parse(text);
+        body=P.node('details',{class:'console-detail'},
+          P.node('summary',{'aria-label':'Expand full activity: '+entry.summary},entry.summary),
+          P.node('pre',{},entry.detail));
+      }catch{}
+    }
     log.append(P.node('div',{class:'console-line '+kind,style:{color:colour[kind]||t.ink}},
       P.node('span',{class:'console-time',style:{color:t.muted}},time),
       P.node('span',{class:'console-who',style:{color:kind==='act'?t.muted:colour[kind]||t.ink}},kind==='act'?'  ↳':who),
-      P.node('span',{},text)));
+      body));
   }
   if(!lines.length)log.append(P.node('div',{class:'console-line plain',style:{color:t.muted}},s.empty||'Nothing yet.'));
   root.append(log);

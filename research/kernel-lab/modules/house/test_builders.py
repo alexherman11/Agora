@@ -405,12 +405,14 @@ def test_mcp_compatibility_does_not_broaden_other_tools(tmp_path):
     with pytest.raises(ValueError):W.thread_parameters(tmp_path,'gpt-6.1-sol','fixture',path)
 
 
-def test_codex_progress_never_publishes_reasoning_or_tool_arguments():
+def test_codex_progress_only_publishes_safe_activity():
     assert B.T.reduce({'type':'codex_event','method':'item/completed',
                        'data':{'item':{'type':'reasoning','text':'private'}}})==[]
     tool=B.T.reduce({'type':'codex_event','method':'item/started',
-                     'data':{'item':{'type':'commandExecution','command':'secret value'}}})
-    assert tool==[{'e':'tool','name':'commandExecution','input':{}}]
+                     'data':{'item':{'type':'commandExecution','command':'TOKEN=private git diff --check'}}})
+    assert tool==[{'e':'tool','name':'commandExecution','input':{},
+                  'activity':{'summary':'ran: TOKEN=[hidden] git diff --check',
+                              'detail':'ran: TOKEN=[hidden] git diff --check'}}]
     assert B.T.reduce({'type':'system','subtype':'init','session_id':'session'})[0]['e']=='init'
     assert B.T.reduce({'type':'system','subtype':'turn_started','turn_id':'turn'})[0]['e']=='turn_started'
 

@@ -178,9 +178,12 @@ class Builders:
             tmp.write_text(json.dumps(state, indent=2), encoding='utf-8')
             os.replace(tmp, folder / 'state.json')
 
-    def event(self, state, what, text):
+    def event(self, state, what, text, detail=None):
         with self.lock:
-            state.setdefault('activity', []).append(dict(at=stamp(), what=what, text=str(text)[:4000]))
+            entry = dict(at=stamp(), what=what, text=str(text)[:4000])
+            if detail is not None:
+                entry['detail'] = detail
+            state.setdefault('activity', []).append(entry)
             state['activity'] = state['activity'][-100:]
             self.save(state)
         self.h.m.happen('house.doing', state['task'], str(text)[:200])
@@ -408,7 +411,9 @@ class Builders:
                     state['turn_id'] = e.get('turn')
                     self.phase(state, 'working', f'authenticated {label} turn running')
                 elif kind == 'tool':
-                    self.event(state, 'act', e.get('name', 'tool'))
+                    activity = T.worker_activity.tool(e)
+                    self.event(state, 'act', activity['summary'] if activity else e.get('name', 'tool'),
+                               activity['detail'] if activity else None)
                 elif kind == 'text':
                     self.event(state, 'said', e['text'])
                     said.append(e['text'])
@@ -1238,7 +1243,16 @@ left. Then end your turn with a short summary for {boss}: done, or what you need
     def log(self, task):
         state = self.states[task]
         lines = [f"{e['what']}\t{e['at'][11:16]}\t{state['name']}\t{e['text']}" for e in state['activity']]
-        return {'text':'\n'.join(lines), 'rows':[dict(person=task, name=state['name'], log='\n'.join(lines), lines=len(lines))]}
+        rendered = [
+            f"act-detail\t{e['at'][11:16]}\t{state['name']}\t" +
+            json.dumps(dict(summary=e['text'], detail=e['detail']), ensure_ascii=False)
+            if e.get('detail') else line
+            for e, line in zip(state['activity'], lines)]
+        if any(e['what'] == 'act' and not e.get('detail') for e in state['activity']):
+            note = 'info\t\t\tOlder or unsupported activity has no saved command or paths; shown as recorded.'
+            lines.append(note)
+            rendered.append(note)
+        return {'text':'\n'.join(lines), 'rows':[dict(person=task, name=state['name'], log='\n'.join(rendered), lines=len(lines))]}
 
     def off(self):
         self.stopping = True

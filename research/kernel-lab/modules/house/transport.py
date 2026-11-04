@@ -21,6 +21,7 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
+import worker_activity
 
 HERE = Path(__file__).resolve().parent
 LAB = HERE.parents[1]
@@ -150,7 +151,19 @@ def reduce(ev):
             return [{"e": "text", "text": item.get("text", "")}]
         if ev.get("method") == "item/started" and item.get("type") in (
                 "commandExecution", "mcpToolCall", "dynamicToolCall", "fileChange", "webSearch"):
-            return [{"e": "tool", "name": str(item.get("tool") or item.get("type")), "input": {}}]
+            if item.get("type") == "fileChange":
+                return []  # paths are final on completion
+            out = {"e": "tool", "name": str(item.get("tool") or item.get("type")), "input": {}}
+            activity = worker_activity.codex(item)
+            if activity:
+                out["activity"] = activity
+            return [out]
+        if ev.get("method") == "item/completed" and item.get("type") == "fileChange":
+            out = {"e": "tool", "name": "fileChange", "input": {}}
+            activity = worker_activity.codex(item)
+            if activity:
+                out["activity"] = activity
+            return [out]
         return []  # reasoning and raw tool arguments/results never become public activity
     if t == "system" and ev.get("subtype") == "init" and ev.get("session_id"):
         return [{"e": "init", "session": ev["session_id"]}]
