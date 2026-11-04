@@ -73,6 +73,14 @@ class WidgetsTest(unittest.TestCase):
             with urllib.request.urlopen(urllib.request.Request(d.url+'/desk/widget/'+action,json.dumps(body).encode(),headers)) as r:return json.load(r)
         opened=request('open',{'widget':m});self.assertTrue(opened['ok'],opened)
         instance=opened['instance']
+        before=len(d.k.log.records)
+        geometry=dict(start=[0,0,200,160],moving=[301,0,200,160],
+                      landing=[300,0,200,160],neighbours=[[300,0,200,160]])
+        preview=request('call',{'instance':instance,'op':'tiling','geometry':geometry})
+        self.assertTrue(preview['ok'] and preview['allowed'],preview)
+        self.assertEqual(len(d.k.log.records),before,'geometry must never be a world act')
+        geometry['moving'][0]='bad'
+        self.assertFalse(request('call',{'instance':instance,'op':'tiling','geometry':geometry})['ok'])
         self.assertFalse(request('call',{'instance':instance,'op':'hear','word':'set'})['ok'])
         self.assertTrue(request('call',{'instance':instance,'op':'hear','word':'post'})['ok'])
         d.say('post A public happening')

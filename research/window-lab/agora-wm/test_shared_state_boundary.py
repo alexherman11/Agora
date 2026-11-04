@@ -43,5 +43,22 @@ class SharedStateBoundary(unittest.TestCase):
         self.api.PostMessageW.assert_called_once_with(71,0x112,0xF120,0)
 
 
+class GlassBoundary(unittest.TestCase):
+    def test_shipped_glass_is_click_through_noactivate_tool_window(self):
+        source=ast.parse(Path(__file__).with_name('ghost.py').read_text(encoding='utf-8'))
+        method=next(n for n in source.body if isinstance(n,ast.FunctionDef) and n.name=='_make')
+        api=SimpleNamespace(CreateWindowExW=Mock(return_value=17),SetLayeredWindowAttributes=Mock())
+        scope={'u':api}
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[method],type_ignores=[])),
+                     '<shipped glass boundary>','exec'),scope)
+        scope['_make'](70,selected=True)
+        args=api.CreateWindowExW.call_args.args
+        self.assertEqual(args[0],0x80000|0x20|0x80|0x08000000)
+        self.assertEqual(args[3],0x80000000|6)
+        api.SetLayeredWindowAttributes.assert_called_once_with(17,0,70,2)
+        api.CreateWindowExW.return_value=0
+        with self.assertRaises(OSError):scope['_make'](40)
+
+
 if __name__=='__main__':
     unittest.main()

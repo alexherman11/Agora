@@ -176,6 +176,9 @@ class Widgets:
         return None
 
     def _call(self, actor, i, p, op, body):
+        if op == 'tiling':
+            from kernel.tiling import preview
+            return {'ok': True, **preview(body.get('geometry') or {}, self.k, actor)}
         if op == 'project':
             import json
             from painter.arrangement import compile_view

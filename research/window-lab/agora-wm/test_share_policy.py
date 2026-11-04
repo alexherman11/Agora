@@ -4,18 +4,20 @@ Run alongside the controller/dock tests after House resolves fixture admission.
 These do not establish native Electron fullscreen or owner acceptance.
 """
 from itertools import permutations
+import json
+from pathlib import Path
 import unittest
 
 from engine import Rect, State, Window, solve, valid
-from manager import browser_class, minimum_size
+from size_policy import dimensions, resolve
+
+RULES=json.loads(Path(__file__).with_name('size-policies.json').read_text(encoding='utf-8'))
 
 
 class SharePolicy(unittest.TestCase):
     def window(self,key,work):
-        browser=key in ('claude','chrome')
-        return Window(key,preferred=(1200,800) if browser else (700,600),
-            minimum=minimum_size({'exe':key+'.exe','agora':key=='chat'},work),
-            rect=Rect(16,16,1200 if browser else 700,800 if browser else 600))
+        preferred,minimum=dimensions({'exe':key+'.exe','agora':key=='chat'},work,RULES,(700,600),(16,16))
+        return Window(key,preferred=preferred,minimum=minimum,rect=Rect(16,16,*preferred))
 
     def assert_usable(self,state):
         self.assertTrue(valid(state))
@@ -24,7 +26,7 @@ class SharePolicy(unittest.TestCase):
             self.assertGreaterEqual(w.rect.w,w.minimum[0],key)
             self.assertGreaterEqual(w.rect.h,w.minimum[1],key)
             if key in ('claude','chrome'):
-                self.assertGreaterEqual(w.rect.w,(state.work.w+1)//2)
+                self.assertGreaterEqual(w.rect.w,(state.bounds.w-state.gap_inner)//2)
 
     def test_three_apps_all_six_bar_orders_at_common_screen_sizes(self):
         for width,height in ((1920,1080),(2560,1440),(3840,2160)):
@@ -98,11 +100,11 @@ class SharePolicy(unittest.TestCase):
         self.assertTrue(valid(result.state))
 
     def test_browser_classification_including_generic_electron_and_small_apps(self):
-        for exe in ('Chrome.exe','Claude.exe','ChatGPT.exe','firefox.exe','Discord.exe'):
-            self.assertTrue(browser_class({'exe':'C:/Apps/'+exe}))
-        self.assertTrue(browser_class({'exe':'other.exe','browser_class':True}))
-        self.assertFalse(browser_class({'exe':'Spotify.exe','browser_class':True}))
-        self.assertFalse(browser_class({'exe':'python.exe','browser_class':True,'agora':'chat'}))
+        for exe in ('Chrome.exe','Claude.exe','ChatGPT.exe','firefox.exe'):
+            self.assertEqual(resolve({'exe':'C:/Apps/'+exe},RULES)['min_width'],.5)
+        self.assertEqual(resolve({'exe':'other.exe','browser_class':True},RULES)['min_width'],.5)
+        self.assertTrue(resolve({'exe':'Spotify.exe','browser_class':True},RULES)['compact'])
+        self.assertTrue(resolve({'exe':'python.exe','browser_class':True,'agora':'chat'},RULES)['compact'])
 
     def test_chrome_keeps_half_width_through_pressure_and_close(self):
         state=State(work=Rect(0,0,1921,1080))
@@ -114,11 +116,11 @@ class SharePolicy(unittest.TestCase):
             if key in ('chrome','spotify','chat'):
                 self.assertFalse(state.windows['chrome'].minimised)
             if not state.windows['chrome'].minimised:
-                self.assertGreaterEqual(state.windows['chrome'].rect.w,961)
+                self.assertGreaterEqual(state.windows['chrome'].rect.w,(state.bounds.w-state.gap_inner)//2)
         state=solve(state,{'type':'close','key':'last'}).state
         self.assertTrue(valid(state))
         if not state.windows['chrome'].minimised:
-            self.assertGreaterEqual(state.windows['chrome'].rect.w,961)
+            self.assertGreaterEqual(state.windows['chrome'].rect.w,(state.bounds.w-state.gap_inner)//2)
 
     def test_fullscreen_participant_is_never_lru_fallback(self):
         state=State(work=Rect(0,0,1200,800))

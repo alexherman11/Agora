@@ -55,6 +55,17 @@ no longer hearable and reevaluates time conditions. Identical projections do not
 repaint. Components share this page and the core's spring
 drag. They have no native bridge, credential, network connection or direct store.
 
+Carried items use the window tiling engine's centre-crossing rule: overlap or
+waiting alone does not move a neighbour. A translucent landing area previews
+the drop, and displaced items animate from their current positions. A sorted
+repeat keeps its authored `by` order; its compiler supplies the displayed
+items' sort tuples and stable tie order so the preview agrees with the next
+reading. Dragging does not rewrite sort fields. The geometry preview is a
+read-only host operation; the declared drop gesture still owns the world act
+and its revision checks.
+The host reads `wm-settings motion_ms` for each preview, shared with native
+window motion; no component installation is needed to change that timing.
+
 `look-view <lens/widget/window>` returns the fresh arrangement, rendered counts,
 typed settings, bound visible facts, declared parts and gesture lines. The painter
 builds this reading without executing component modules. It describes authored

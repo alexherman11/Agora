@@ -64,17 +64,17 @@ class DragFeel(unittest.TestCase):
         self.assertEqual(r.placements['chat'], Rect(*CHAT))
         self.assertEqual(r.placements['notes'], Rect(*NOTES))
 
-    def test_dwell_then_yield_eases_and_settles_back(self):
-        s = desk(browser=BROWSER, chat=CHAT, notes=NOTES)
-        g = Gesture(s, 'notes', NOTES, 0, FEEL)
-        edge = (14, 1200, 1000, 637)                       # 183 px into the browser's bottom
-        t, approach = glide(g, NOTES, edge, 0, 300)
+    def test_centre_crossing_eases_and_settles_back(self):
+        a, b = (14, 71, 1200, 900), (1226, 71, 1200, 900)
+        s = desk(browser=b, notes=a)
+        g = Gesture(s, 'notes', a, 0, FEEL)
+        edge = (1230, 71, 1200, 900)
+        t, approach = glide(g, a, edge, 0, 300)
         t, frames = hold(g, edge, t, 800)
         timeline = approach + frames
         touched = next(i for i, f in enumerate(timeline) if 'browser' in f.held)
         gave = next(i for i, f in enumerate(timeline) if 'browser' in f.ghosts)
-        self.assertGreaterEqual((gave - touched) * 16, FEEL.dwell_ms, 'rests a full dwell before giving way')
-        self.assertLessEqual((gave - touched) * 16, FEEL.dwell_ms + 32)
+        self.assertGreater(gave, touched, 'overlap first; crossing, then eased movement')
         moved = [i for i, f in enumerate(frames) if 'browser' in f.ghosts]
         # eased: distance to the final ghost shrinks every frame and is reached within motion_ms
         final = frames[-1].ghosts['browser']
@@ -84,22 +84,22 @@ class DragFeel(unittest.TestCase):
         self.assertLessEqual(arrive * 16, FEEL.motion_ms + 16)
         self.assertGreater(gaps[0], 0, 'first yielded frame is mid-flight, not a jump')
         # leave: the browser waits return_ms, then eases home
-        t, away = glide(g, edge, NOTES, t, 64)
-        t, after = hold(g, NOTES, t, 700)
+        t, away = glide(g, edge, a, t, 64)
+        t, after = hold(g, a, t, 700)
         timeline = away + after
         still_away = [i for i, f in enumerate(timeline) if 'browser' in f.ghosts]
         self.assertTrue(still_away and still_away[0] == 0)
         self.assertEqual(timeline[-1].ghosts, {})
-        r = g.release(NOTES, t)
-        self.assertEqual(r.placements['browser'], Rect(*BROWSER))
+        r = g.release(a, t)
+        self.assertEqual(r.placements['browser'], Rect(*b))
 
-    def test_fast_sweep_across_two_windows_moves_neither(self):
+    def test_fast_centre_crossing_also_yields(self):
         s = desk(browser=BROWSER, chat=CHAT, notes=NOTES)
         g = Gesture(s, 'notes', NOTES, 0, FEEL)
         t, a = glide(g, NOTES, (600, 400, 1000, 637), 0, 250)          # up through the browser...
         t, b = glide(g, (600, 400, 1000, 637), (2700, 400, 1000, 637), t, 500)   # ...across into the chat...
         t, c = glide(g, (2700, 400, 1000, 637), (2700, 1383, 1000, 637), t, 250)  # ...down into free space
-        self.assertTrue(all(f.ghosts == {} for f in a + b + c), 'a sweep in transit never shuffles windows')
+        self.assertTrue(any(f.ghosts for f in a + b + c), 'crossing does not require a dwell')
         r = g.release((2700, 1383, 1000, 637), t)
         self.assertEqual(r.placements['browser'], Rect(*BROWSER))
         self.assertEqual(r.placements['chat'], Rect(*CHAT))
@@ -108,13 +108,13 @@ class DragFeel(unittest.TestCase):
     def test_slow_drag_across_both_shuffles_and_ends_legal(self):
         s = desk(browser=BROWSER, chat=CHAT, notes=NOTES)
         g = Gesture(s, 'notes', NOTES, 0, FEEL)
-        t, a = glide(g, NOTES, (600, 700, 1000, 637), 0, 1500)
-        t, b = glide(g, (600, 700, 1000, 637), (2600, 700, 1000, 637), t, 4000)
+        t, a = glide(g, NOTES, (600, 300, 1000, 637), 0, 1500)
+        t, b = glide(g, (600, 300, 1000, 637), (2600, 300, 1000, 637), t, 4000)
         self.assertTrue(any(f.ghosts for f in a + b), 'a slow drag that rests gets room')
-        r = g.release((2600, 700, 1000, 637), t)
+        r = g.release((2600, 300, 1000, 637), t)
         self.assertTrue(valid(r.state), r.notes)
 
-    def test_a_neighbour_that_cannot_slide_shrinks_its_own_side_not_a_third_window(self):
+    def test_overlap_without_crossing_does_not_shrink_a_neighbour(self):
         # Found in the hidden-desktop proof: the browser slid right and squeezed the chat from 1992 px to 776 px.
         s = desk(browser=BROWSER, chat=CHAT, notes=NOTES)
         g = Gesture(s, 'notes', NOTES, 0, FEEL)
@@ -125,7 +125,7 @@ class DragFeel(unittest.TestCase):
         self.assertEqual(r.placements['chat'], Rect(*CHAT), 'the chat is not part of this')
         b = r.placements['browser']
         self.assertEqual((b.x, b.y, b.w), BROWSER[:3])
-        self.assertEqual(b.bottom, 1100 - GAP, 'the browser\'s bottom edge gave way')
+        self.assertEqual(b, Rect(*BROWSER), 'overlap and dwell cannot move or resize the browser')
         self.assertTrue(valid(r.state))
 
     def test_shallow_drop_pushes_the_dragged_window_back_and_snaps(self):
@@ -182,15 +182,18 @@ class DragFeel(unittest.TestCase):
         far = (14 + 1800 + GAP + 40, 380, 900, 700)
         g = Gesture(s, 'spotify', start, 0, FEEL)
         t, _ = glide(g, start, far, 0, 300)
-        self.assertEqual(g.release(far, t).placements['spotify'].x, far[0], 'past the radius: free placement')
+        result=g.release(far, t)
+        self.assertEqual(result.placements['spotify'],g.frame.landing,'release fills the vacant area')
+        self.assertFalse(result.placements['spotify'].near(Rect(14,71,1800,1300),GAP))
 
     def test_screen_edge_snap_and_rubber_band(self):
         s = desk(spotify=(2400, 400, 900, 700))
         g = Gesture(s, 'spotify', (2400, 400, 900, 700), 0, FEEL)
         out = (3100, 60, 900, 700)                          # partly off the right and top
         t, frames = glide(g, (2400, 400, 900, 700), out, 0, 300)
-        self.assertEqual(frames[-1].landing, Rect(3826 - 900, 71, 900, 700), 'held at the outer gap')
-        self.assertEqual(g.release(out, t).placements['spotify'], Rect(3826 - 900, 71, 900, 700))
+        self.assertEqual(frames[-1].landing.right,3826,'column keeps the outer gap')
+        self.assertEqual(frames[-1].landing.h,1949,'edge drop fills a column')
+        self.assertEqual(g.release(out, t).placements['spotify'], frames[-1].landing)
 
     def test_pin_is_a_wall(self):
         s = desk(browser=(14, 71, 1800, 1300), spotify_pin=(2600, 71, 1226, 1300))

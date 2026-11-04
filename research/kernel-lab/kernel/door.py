@@ -235,6 +235,17 @@ def make_handler(kernel, entry, secret):
         def do_POST(self):
             if self._cross_site():
                 return self._send(403, {"error": "the door answers only its own pages"})
+            if self.path == '/api/tiling':
+                actor, why = self._actor()
+                if actor is None:
+                    return self._send(401, {'error': why})
+                if int(self.headers.get('Content-Length') or 0) > 40000:
+                    return self._send(413, {'error': 'tiling geometry too large'})
+                from .tiling import preview
+                try:
+                    return self._send(200, preview(self._body() or {}, kernel, actor))
+                except (ValueError, KeyError, TypeError) as exc:
+                    return self._send(400, {'error': str(exc)})
             if self.path.split('?')[0] == '/upload':
                 actor, why = self._actor()
                 if actor is None:

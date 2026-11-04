@@ -12,8 +12,9 @@ from copy import deepcopy
 import json
 from pathlib import Path
 import time
-from engine import State,Window,Rect,solve,valid
-from feel import Feel,Gesture,from_settings
+from engine import State,Window,Rect,solve,valid,stacked_pair
+from feel import Feel,Gesture,from_settings,ease,lerp
+from size_policy import validate as size_rules, resolve as size_rule, dimensions
 
 
 DEFAULTS={'when_full':'minimise-oldest','manage':'all','drag':'ghost','never':[], 'reflow':'gentle','mode':'shadow',
@@ -35,20 +36,6 @@ def public_rows(rows,pins=()):
         'state':'pinned' if row['key'] in pins and row['state']!='minimised' else row['state']} for row in rows]
 
 
-def browser_class(row):
-    """Browser/Electron host windows, excluding small native/chat surfaces."""
-    exe=str(row.get('exe','')).replace('\\','/').rsplit('/',1)[-1].lower()
-    if row.get('agora') or exe in ('spotify.exe',):return False
-    return bool(row.get('browser_class') or exe in (
-        'chrome.exe','msedge.exe','firefox.exe','brave.exe','vivaldi.exe',
-        'opera.exe','claude.exe','chatgpt.exe','discord.exe'))
-
-
-def minimum_size(row,work):
-    return ((work.w+1)//2 if browser_class(row) else min(480,max(0,work.w-32)),
-            min(320,max(0,work.h-32)))
-
-
 def colorref(value):
     if not isinstance(value,str) or len(value)!=7 or not value.startswith('#'):raise ValueError('native color must be #RRGGBB')
     r,g,b=(int(value[i:i+2],16) for i in (1,3,5));return r|(g<<8)|(b<<16)
@@ -63,9 +50,12 @@ class Manager:
         self.theme={};self.theme_path=None;self.theme_stamp=None;self.gated=False;self.boot=True
         self.styled={};self.feel=Feel(scale=self._scale());self.gesture_ref=None;self.released=None
         self.logged=None;self.gate_cache=(None,-1.0)
+        self.gate_token=None
         self.share=None;self.borderless=set()
         self.share_floats={};self.share_note=''
         self.remembered={};self.recency={};self.use_clock=0;self.policy_minima={}
+        self.motion={};self.drift={}  # native trajectories and last issued geometry
+        self.sizes={};self.user_sized=set();self.size_signature={}
         if gate_fn is None:
             from win32_host import gate
             gate_fn=gate
@@ -84,6 +74,8 @@ class Manager:
         candidate={**DEFAULTS,**settings,'never':never}
         if candidate['drag']=='live':raise ValueError('live drag has not passed the smoothness gate; use ghost')
         feel=from_settings(candidate,self._scale())     # dwell_ms, snap_px, deadzone_px, motion_ms, pin_min, edges
+        sizes=size_rules(candidate.get('sizes',{}))
+        self.sizes=sizes
         self.settings=candidate;self.feel=feel;self.state.pin_min=feel.pin_min
         self.changed.update(self.pins^set(pins))
         new_pins=set(pins)
@@ -106,6 +98,10 @@ class Manager:
 
     def gated_now(self):
         """The gate, asked at most every GATE_TTL seconds (it snapshots processes)."""
+        read=getattr(self.native,'gate_token',None)
+        token=read() if read else None
+        if isinstance(token,tuple) and token!=self.gate_token:
+            self.gate_cache=(None,-1.0);self.gate_token=token
         reasons,at=self.gate_cache;now=time.monotonic()
         if reasons is None or now-at>=GATE_TTL:
             reasons=list(self.gate_fn());self.gate_cache=(reasons,now)
@@ -118,8 +114,14 @@ class Manager:
         # gate. D3D/exclusive, presentation, lock and inspection failures stay
         # closed. Win32 geometry cannot prove that a game is composited.
         return [r for r in reasons if not (
-            r=='full-screen foreground application' or r=='notification gate 2'
-            or str(r).lower().endswith('.exe'))]
+            r=='full-screen foreground application' or r=='notification gate 2')]
+
+    def _sizes(self,row,work):
+        return dimensions(row,work,self.sizes,self.remembered.get(row['key'],row['rect'][2:]),
+                          (self.state.gap_outer,self.state.gap_inner))
+
+    def minimum_size(self,row,work):
+        return self._sizes(row,work)[1]
 
     def request_share(self,key=None,expect=None):
         """One bar request; never a standing exemption from the gaming gate."""
@@ -205,7 +207,7 @@ class Manager:
             self.native.mutating=False
         self.mode=mode;self.pending.clear()
         self.styled.clear()
-        if mode=='off':self.gesture=None;self.preview=None
+        if mode!='live':self._drop_gesture()
 
     def ingest(self,rows,work,events=()):
         """Polling reconciles missing hooks, size refusals and work-area changes."""
@@ -217,13 +219,19 @@ class Manager:
             if key not in self.remembered:
                 normal=row.get('_normal')
                 size=row.get('_preferred',row['rect'][2:])
-                if not normal and (row.get('share_candidate') or row.get('display_mode','').startswith('screen-sized')):
-                    size=(1200,800)  # no normal bounds known for app-owned fullscreen
                 self.remembered[key]=tuple(normal[2:] if normal else size)
+            rule=size_rule(row,self.sizes)
+            signature=(rule,work.w,work.h,self.state.gap_outer,self.state.gap_inner)
+            if self.size_signature.get(key)!=signature:
+                if key not in self.user_sized:
+                    self.remembered[key]=self._sizes(row,work)[0]
+                self.size_signature[key]=signature
         present={r['key'] for r in rows}
         self.remembered={k:v for k,v in self.remembered.items() if k in present}
         self.recency={k:v for k,v in self.recency.items() if k in present}
         self.policy_minima={k:v for k,v in self.policy_minima.items() if k in present}
+        self.user_sized.intersection_update(present)
+        self.size_signature={k:v for k,v in self.size_signature.items() if k in present}
         if set(self.share_floats)-present:self.share_floats.clear()
         if self.mode=='off':
             current={r['key']:r for r in rows}
@@ -244,8 +252,7 @@ class Manager:
         if sharing and not sharing['ready']:gates=gates or ['waiting for requested window']
         if gates:
             self.gated=True
-            if self.ghost:self.ghost.clear()
-            self.gesture=None;self.preview=None;self.gesture_ref=None
+            self._drop_gesture()
             return {'at':time.time(),'gated':gates,'observed_apps':sorted(set(r['app'] for r in rows)),
                 'plan':[],'minimise':[]}
         if sharing and sharing['ready'] and self.mode=='live':
@@ -300,11 +307,17 @@ class Manager:
                     size=row.get('_preferred',(r.w,r.h))
                     r=Rect(*normal) if normal else Rect(r.x,r.y,*size)
                 self.state.windows[row['key']]=Window(row['key'],self.remembered[row['key']],
-                    minimum=minimum_size(row,work),rect=r,last_used=self.recency[row['key']],
+                    minimum=self.minimum_size(row,work),rect=r,last_used=self.recency[row['key']],
                     managed=self._managed(row),pinned=pinned,home=r if pinned else None,minimised=row['state']=='minimised',
-                    no_evict=bool(sharing and row['key'] in sharing['probed']))
+                    no_evict=bool(sharing and row['key'] in sharing['probed']),
+                    compact=size_rule(row,self.sizes).get('compact',False))
             self.state.clock=self.use_clock;self.boot=False
-            if not sharing:self.state=solve(self.state,{'type':'arrange'}).state
+            if not sharing:
+                if stacked_pair(self.state):
+                    newest=max((w for w in self.state.windows.values() if not w.minimised),
+                               key=lambda w:(w.last_used,w.key))
+                    self.state=solve(self.state,{'type':'share','key':newest.key}).state
+                else:self.state=solve(self.state,{'type':'arrange'}).state
         for key in sorted(set(self.state.windows)-set(current)):
             self.changed.add(key);self.pending.pop(key,None)
             if self.gesture and self.gesture.key==key:self._drop_gesture()
@@ -323,6 +336,7 @@ class Manager:
             kind=e['type']
             if kind=='focus':self.state=solve(self.state,{'type':'focus','key':key}).state
             if kind=='drag-start' and not w.minimised and current[key]['state']!='minimised':
+                self.motion.clear();self.drift.clear()
                 self.gesture=Gesture(self.state,key,Rect(*current[key]['rect']),now*1000,self.feel)
                 self.gesture_ref=current[key]['ref']
             elif kind=='drag-end' and self.gesture and self.gesture.key==key:
@@ -334,16 +348,18 @@ class Manager:
             if w is None:
                 size=self.remembered[key];pref=(min(size[0],self.state.bounds.w),min(size[1],self.state.bounds.h))
                 if row['state']=='minimised':
-                    self.state.windows[key]=Window(key,pref,minimum=minimum_size(row,work),rect=r,managed=self._managed(row),pinned=key in self.pins,
-                        home=r if key in self.pins else None,minimised=True)
+                    self.state.windows[key]=Window(key,pref,minimum=self.minimum_size(row,work),rect=r,managed=self._managed(row),pinned=key in self.pins,
+                        home=r if key in self.pins else None,minimised=True,compact=size_rule(row,self.sizes).get('compact',False))
                 else:
                     self.state=solve(self.state,{'type':'open','key':key,'window':{'preferred':pref,
-                        'minimum':minimum_size(row,work),'rect':r.values(),'managed':self._managed(row),'pinned':key in self.pins,
-                        'home':r if key in self.pins else None}}).state
+                        'minimum':self.minimum_size(row,work),'rect':r.values(),'managed':self._managed(row),'pinned':key in self.pins,
+                        'home':r if key in self.pins else None,'compact':size_rule(row,self.sizes).get('compact',False)}}).state
                 w=self.state.windows[key]
                 if row['state']=='minimised':w.minimised=True
             w.managed=self._managed(row) and not self.failures.get(key,0)>=3
-            floor=minimum_size(row,work)
+            w.preferred=self.remembered[key]
+            w.compact=size_rule(row,self.sizes).get('compact',False)
+            floor=self.minimum_size(row,work)
             previous=self.policy_minima.get(key,(0,0))
             w.minimum=tuple(max(floor[i],w.minimum[i] if w.minimum[i]>previous[i] else 0) for i in (0,1))
             self.policy_minima[key]=floor
@@ -353,6 +369,7 @@ class Manager:
             if key in self.pins and not w.pinned:w.rect=r;w.pinned=True;w.home=r
             elif key not in self.pins:w.pinned=False;w.home=None
             pending=self.pending.get(key)
+            moving_by_us=key in self.motion or (self.gesture and key in self.drift)
             if old and old['state']=='minimised' and row['state']!='minimised' and w.minimised:
                 # A new external restore supersedes layout work, even inside
                 # its acknowledgement interval. Do not lose this transition or
@@ -370,7 +387,7 @@ class Manager:
                     and row['state']!='minimised' and old['state']!='minimised':
                 self.state.displacement.pop(key,None)
                 w.rect=r;w.home=r   # you moved your pin: that is its new place (the WM only narrows or regrows it)
-            if pending and self.mode=='live' and now-pending['at']>=.35:
+            if pending and not moving_by_us and self.mode=='live' and now-pending['at']>=.35:
                 if pending.get('kind')=='minimise':
                     if row['state']!='minimised':
                         self.failures[key]=3;w.managed=False;w.minimised=False;w.rect=r
@@ -399,8 +416,8 @@ class Manager:
                     if dragging:self._drop_gesture();dragging=False
                     self.state=solve(self.state,{'type':'minimise','key':key}).state
             if dragging and self.gesture:
-                self._show(self.gesture.step(r,now*1000),r)
-            elif old and old['rect']!=row['rect'] and not pending and not w.pinned and key!=self.released \
+                self._show(self.gesture.step(r,now*1000,self._pointer()),r)
+            elif old and old['rect']!=row['rect'] and not pending and not moving_by_us and not w.pinned and key!=self.released \
                     and row['state']!='minimised' and old['state']!='minimised':
                 # A restore changes geometry too; it is not a manual drag.
                 # A self-resizer or move without native modal hooks still gets reconciled.
@@ -457,28 +474,83 @@ class Manager:
         return result
 
     def drag_tick(self,rect,now=None):
-        """The 60 Hz path while a drag is on: only the dragged window's rectangle; no enumeration, no gate."""
+        """The fast drag path reads geometry and pointer; no window enumeration."""
         if not self.gesture or self.mode=='off':return None
+        if self.layout_gates():
+            self.gated=True;self._drop_gesture();return None
         now=time.monotonic() if now is None else now
-        frame=self.gesture.step(rect,now*1000);self._show(frame,rect);return frame
+        frame=self.gesture.step(rect,now*1000,self._pointer());self._show(frame,rect);return frame
+
+    def _pointer(self):
+        read=getattr(self.native,'cursor',None)
+        point=read() if read else None
+        return point if isinstance(point,(tuple,list)) and len(point)==2 else None
 
     def _show(self,frame,actual):
-        """Ghosts for neighbours that gave way, and a fainter outline where the dragged window will land."""
+        """The hand's landing glass, and real neighbours following eased geometry."""
         if self.mode!='live':return
+        if self.layout_gates():
+            self.gated=True;self._drop_gesture();return
         if not self.ghost:
             if self.ghost_factory:self.ghost=self.ghost_factory()
             else:
                 from ghost import Ghost
                 self.ghost=Ghost()
-        landing=frame.landing if max(abs(a-b) for a,b in zip(frame.landing.values(),actual.values()))>2 else None
-        self.ghost.update(list(frame.ghosts.values()),landing)
+        self.ghost.update([q for q in frame.spaces if q!=frame.landing],frame.landing)
+        rows={r['key']:r for r in self.rows}
+        for key in set(frame.ghosts)|set(self.drift):
+            if not self.gesture or key==self.gesture.key:continue
+            row=rows.get(key)
+            if not row or not self._managed(row) or key in self.pins:continue
+            target=frame.ghosts.get(key,self.gesture.home(key))
+            if target is None or target==self.drift.get(key,Rect(*row['rect'])):continue
+            try:
+                self.lease.heartbeat();self.lease.save(row['ref'])
+                self.native.place(row['ref'],target);self.drift[key]=target
+            except (OSError,PermissionError):
+                self.failures[key]=3
+                self._drop_gesture()
+                break
 
     def _release(self,rect,now_ms):
-        result=self.gesture.release(rect,now_ms);self.released=self.gesture.key
+        result=self.gesture.release(rect,now_ms,self._pointer());self.released=self.gesture.key
+        chosen=result.placements.get(self.released)
+        if chosen:
+            self.remembered[self.released]=(chosen.w,chosen.h);self.user_sized.add(self.released)
+        starts={r['key']:self.drift.get(r['key'],Rect(*r['rect'])) for r in self.rows}
+        starts[self.released]=rect
         self.state=result.state;self._drop_gesture()
+        if self.mode=='live':
+            self.motion={k:(starts[k],q,now_ms) for k,q in result.placements.items()
+                         if k in starts and starts[k]!=q}
+
+    def motion_tick(self,now=None):
+        """Complete a release without a one-frame SetWindowPos jump or focus call."""
+        if not self.motion or self.mode!='live':return
+        if self.layout_gates():
+            self.gated=True;self.motion.clear();self.drift.clear();return
+        now=time.monotonic() if now is None else now
+        rows={r['key']:r for r in self.rows}
+        self.lease.heartbeat()
+        for key,(start,target,at) in list(self.motion.items()):
+            row=rows.get(key)
+            if not row or not self._managed(row) or row['state']=='minimised':
+                self.motion.pop(key,None);continue
+            progress=1 if self.feel.motion_ms<=0 else (now*1000-at)/self.feel.motion_ms
+            q=lerp(start,target,ease(progress))
+            try:
+                if q!=self.drift.get(key,start):
+                    self.lease.save(row['ref']);self.native.place(row['ref'],q);self.drift[key]=q
+                if progress>=1:
+                    self.motion.pop(key,None)
+                    self.pending[key]={'rect':target,'at':now}
+            except (OSError,PermissionError):
+                self.motion.pop(key,None);self.failures[key]=3
+        if not self.motion:self.drift.clear()
 
     def _drop_gesture(self):
         self.gesture=None;self.gesture_ref=None;self.preview=None
+        self.motion.clear();self.drift.clear()
         if self.ghost:self.ghost.clear()
 
     def _log(self,result):
@@ -523,6 +595,7 @@ class Manager:
         for key,target in plan.placements.items():
             row=current.get(key)
             if not row or not self._managed(row):continue
+            if key in self.motion:continue
             if self.share and key==self.share['target'] and self.share_note.startswith('Requested window shown in front') and not self.share.get('front'):
                 self.lease.save(row['ref']);self.native.focus(row['ref']);self.share['front']=True
             role='pinned' if self.state.windows[key].pinned else ('focused' if row['focused'] else 'unfocused')

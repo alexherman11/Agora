@@ -24,6 +24,7 @@ import time
 import uuid
 from engine import Rect,solve
 from manager import Manager,DEFAULTS
+from size_policy import validate as size_rules, FRACTIONS
 from policy_reload import PolicyStatus,REFUSAL
 
 HERE=Path(__file__).resolve().parent
@@ -31,6 +32,9 @@ sys.path.insert(0,str(HERE.parent/'kernel-desktop'))
 from modproto import Module,log
 
 HELP={
+ 'sizes':('see','','Editable window-kind defaults from wm-settings sizes; later matching kinds override earlier kinds.'),
+ 'size':('do','<kind> [match=<json>] [width=<fraction>] [height=<fraction>] [min_width=<fraction>] [min_height=<fraction>] [compact=yes|no] [remove=yes]',
+         'Set a named window-kind size rule. Fractions use usable work area, half width includes its gutter share. Changes are undoable world facts.'),
  'windows':('see','','Current windows: app, exe/icon reference, state, focus and geometry; never titles.'),
  'policy':('see','','Startup imported policy code snapshot, scoped to Manager/Native and their local module functions; hot reload is unavailable.'),
  'focus':('do','<key>','Ask Windows to focus a current manageable window; foreground lock may refuse.'),
@@ -52,7 +56,7 @@ HELP={
 
 def offers():
     return [{'word':'wm.'+name,'kind':kind,'takes':takes,'help':'wm.'+name+': '+help,
-        'may':'anyone','undo':'yes' if name in ('mode','leave-alone','manage') else ('external' if name=='close' else 'no')}
+        'may':'anyone','undo':'yes' if name in ('mode','leave-alone','manage','size') else ('external' if name=='close' else 'no')}
     # Focus, minimise, restore, pin and arrange change only this screen: not records (Alex, 26 Oct: "visual state should
     # not live in the world"; every dock click used to write one). close asks an app to close, so it stays recorded.
         for name,(kind,takes,help) in HELP.items()]
@@ -156,6 +160,27 @@ class WMModule:
             return self._request('action',word,target,kv.get('share')=='yes')
         if word=='arrange':return self._request('arrange',kv.get('expect'))
         settings=self.read_intent(msg.get('use'));sid=settings['id'];saw={sid:settings['rev']}
+        if word in ('size','sizes'):
+            rules=size_rules(settings.get('sizes',{}))
+            if word=='sizes':
+                return {'rows':[{'name':name,**rule} for name,rule in rules.items()],
+                        'text':json.dumps(rules,ensure_ascii=False)}
+            if not target:return {'refused':'give a window-kind name'}
+            try:
+                if set(kv)-FRACTIONS-{'match','compact','remove','key'}:
+                    raise ValueError('unknown size rule option')
+                if kv.get('remove')=='yes':rules.pop(target,None)
+                else:
+                    rule=dict(rules.get(target,{}))
+                    if 'match' in kv:rule['match']=json.loads(kv['match'])
+                    for key in FRACTIONS & kv.keys():rule[key]=float(kv[key])
+                    if 'compact' in kv:
+                        if kv['compact'] not in ('yes','no'):raise ValueError('compact is yes|no')
+                        rule['compact']=kv['compact']=='yes'
+                    rules[target]=rule
+                size_rules(rules)
+            except (ValueError,TypeError) as exc:return {'refused':str(exc)}
+            return {'lines':[f'set {sid} sizes={quote(json.dumps(rules))}'],'saw':saw}
         if word=='mode':
             mode=target
             if mode not in ('live','shadow','off'):return {'refused':'mode is live|shadow|off'}
@@ -242,6 +267,8 @@ class WMModule:
                 events=self.backlog+(feed.drain() if feed else []);self.backlog=[]
                 g=manager.gesture;ref=manager.gesture_ref
                 now=time.monotonic()
+                if manager.motion and not events and now-self.full_at<.1:
+                    manager.motion_tick(now);return
                 if g and ref and manager.mode!='off' and now-self.full_at<1 and not g.idle(now*1000) and not any(
                         e['hwnd']==ref.hwnd and e['type'] in ('drag-end','minimise','close','hide') for e in events):
                     # Drag path: just the dragged window's rectangle (~0.05 ms), not a full enumeration (~7-12 ms,
@@ -252,6 +279,7 @@ class WMModule:
                 from win32_host import work_area
                 work=work_area();rows=manager.native.windows();self.full_at=now
             manager.ingest(rows,work,events)
+            manager.motion_tick()
             now=time.monotonic()
             if manager.changed and now-manager.last_change>=.1:
                 manager.changed.clear();manager.last_change=now   # screen churn stays here, never in the world's stream
@@ -264,7 +292,7 @@ class WMModule:
         self.m.run_reader()
         try:
             while not self.stop.is_set():
-                self.tick(feed);self.stop.wait(1/60 if self.manager and self.manager.gesture else .1)
+                self.tick(feed);self.stop.wait(1/60 if self.manager and (self.manager.gesture or self.manager.motion) else .1)
         finally:
             if self.manager:self.manager.switch('off')
             if feed:feed.close()

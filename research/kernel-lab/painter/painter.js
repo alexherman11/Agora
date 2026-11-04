@@ -102,6 +102,8 @@ function render(node){return renderBoundary(node)}
 function renderTrusted(node){
   if(['column','row','text','grid','wrap','split','layers','absolute','scroll'].includes(node.component)){
     const n=part(node,node.name,'div',{class:node.component});
+    n._tilingOrder=node.tiling_order;
+    if(node.collection)n.dataset.tilingList='true';
     if(node.role&&/^[\w-]+$/.test(node.role))n.classList.add(node.role);
     if(node.component!=='text'){
       n.dataset.layout=node.component==='column'?'stack':node.component;
@@ -153,22 +155,48 @@ function renderTrusted(node){
     beginDrag:(event,card)=>beginDrag(event,card,node),
     latest:()=>findNode(currentPlan.tree,node.path)||node,
     redraw:refresh};
-  const n=module.mount(api,node.settings);n.dataset.component=node.component;n.dataset.path=node.path;n.dataset.root='true';return n;
+  const n=module.mount(api,node.settings);n.dataset.component=node.component;n.dataset.path=node.path;n.dataset.root='true';n._tilingOrder=node.tiling_order;return n;
 }
 function findNode(node,path){if(node.path===path)return node;for(const c of node.children){const n=findNode(c,path);if(n)return n}}
+let carryHandoff=null;
+const tileIdentity=el=>el.dataset.component+':'+el.dataset.factId;
+const tileRoots=()=>[...document.querySelectorAll('[data-root][data-fact-id]')].filter(el=>!el.closest('.dragging'));
+const tilePositions=()=>new Map(tileRoots().map(el=>[tileIdentity(el),el.getBoundingClientRect()]));
 function beginDrag(e,card,node){
   if(e.button!==0||e.target.closest('button,input,textarea'))return;
-  const start={x:e.clientX,y:e.clientY},bounds=card.getBoundingClientRect();let ghost,target,active=false,spring;
+  const start={x:e.clientX,y:e.clientY},bounds=card.getBoundingClientRect();let ghost,target,active=false,spring,drift,glass;
   card.setPointerCapture(e.pointerId);
   const move=ev=>{
-    if(!active&&Math.hypot(ev.clientX-start.x,ev.clientY-start.y)>5){active=dragging=true;ghost=card.cloneNode(true);ghost.classList.add('dragging');ghost.style.width=bounds.width+'px';document.body.append(ghost);card.style.opacity='.25';spring=P.spring((x,y)=>{ghost.style.left=x+'px';ghost.style.top=y+'px'},{x:bounds.x,y:bounds.y})}
+    if(!active&&Math.hypot(ev.clientX-start.x,ev.clientY-start.y)>5){active=dragging=true;ghost=card.cloneNode(true);ghost.classList.add('dragging');ghost.style.width=bounds.width+'px';document.body.append(ghost);card.style.opacity='.25';spring=P.spring((x,y)=>{ghost.style.left=x+'px';ghost.style.top=y+'px'},{x:bounds.x,y:bounds.y});
+      drift=CarryTargets.drift(card,'[data-component="card"]',body=>agora.tiling(body));
+      glass=document.createElement('div');Object.assign(glass.style,{position:'fixed',pointerEvents:'none',zIndex:'89',background:'var(--accent,#54745d)',opacity:'.18',border:'1px solid currentColor',borderRadius:'12px'});glass.hidden=true;document.body.append(glass);
+    }
     if(!active)return;spring.to(bounds.x+ev.clientX-start.x,bounds.y+ev.clientY-start.y);
     target=[...document.querySelectorAll('[data-drop]')].find(l=>{const r=l.getBoundingClientRect();return ev.clientX>=r.left&&ev.clientX<=r.right&&ev.clientY>=r.top&&ev.clientY<=r.bottom});document.querySelectorAll('[data-drop]').forEach(l=>l.classList.toggle('over',l===target));
+    if(target?.contains(card))target=null;
+    glass.hidden=true;
+    drift.move(target,{clientX:ev.clientX,clientY:ev.clientY,startX:start.x,startY:start.y},out=>{
+      glass.hidden=!out.allowed;
+      if(out.allowed)['left','top','width','height'].forEach((k,i)=>glass.style[k]=out.landing[i]+'px');
+    });
   };
   const finish=async ev=>{
-    card.removeEventListener('pointermove',move);card.removeEventListener('pointerup',finish);card.removeEventListener('pointercancel',finish);spring?.stop();ghost?.remove();card.style.opacity='';document.querySelectorAll('.over').forEach(l=>l.classList.remove('over'));dragging=false;
-    if(active&&ev.type!=='pointercancel'&&target){const receiver=target._node;try{await fire(receiver,'drop card',{carried:node.facts.id,saw:node.saw})}catch(e){tell(e)}}
-    await refresh();
+    card.removeEventListener('pointermove',move);card.removeEventListener('pointerup',finish);card.removeEventListener('pointercancel',finish);
+    if(active&&ev.type!=='pointercancel')move(ev);
+    const allowed=ev.type!=='pointercancel'&&(await drift?.flush())?.allowed;
+    spring?.stop();document.querySelectorAll('.over').forEach(l=>l.classList.remove('over'));
+    const handoff=immediate=>{
+      const positions=tilePositions();
+      positions.duration=drift?.duration;
+      if(ghost)positions.set(tileIdentity(card),ghost.getBoundingClientRect());
+      drift?.close(immediate);ghost?.remove();glass?.remove();card.style.opacity='';
+      return positions;
+    };
+    if(allowed&&ghost)carryHandoff=handoff;
+    else handoff(false);
+    if(active&&allowed&&target){const receiver=target._node;try{await fire(receiver,'drop card',{carried:node.facts.id,saw:node.saw})}catch(e){tell(e)}}
+    dragging=false;
+    try{await refresh()}finally{if(carryHandoff===handoff){carryHandoff=null;handoff(false)}}
   };
   card.addEventListener('pointermove',move);card.addEventListener('pointerup',finish);card.addEventListener('pointercancel',finish);
 }
@@ -231,7 +259,7 @@ async function refreshOnce(){
   // that captured DOM; its old facts must survive until the fenced drop.
   if(dragging)return;
   const fingerprint=p=>JSON.stringify(p,(key,value)=>key==='parts'?undefined:key==='health'?{quarantined:value.quarantined,action_epoch:value.action_epoch}:value);
-  if(currentPlan&&!repaintAll&&fingerprint(plan)===fingerprint(currentPlan)){currentPlan=plan;return}
+  if(currentPlan&&!repaintAll&&fingerprint(plan)===fingerprint(currentPlan)){currentPlan=plan;if(carryHandoff){carryHandoff(false);carryHandoff=null}return}
   repaintAll=false;
   for(const c of plan.components){
     const old=moduleCache.get(c.name);if(old?._source===c.code)continue;
@@ -246,6 +274,7 @@ async function refreshOnce(){
   const previousPlan=currentPlan;currentPlan=plan;renderReadings=new Map((plan.watches||[]).map(w=>[w.line,Promise.resolve(w.rows)]));
   const focus=document.activeElement;const focused=focus?.dataset.path;const focusedPart=focus?.dataset.part;const selection=focus?.selectionStart;const value=focus?.value;
   const passage=keepTextSelection();
+  const was=carryHandoff?carryHandoff(true):tilePositions();carryHandoff=null;
   const next=render(plan.tree);mounted?.remove();document.body.append(next);mounted=next;
   mounted.dataset.view=JSON.stringify(plan.view||{});
   applyTokens(plan);
@@ -253,6 +282,11 @@ async function refreshOnce(){
   if(focused){const n=[...document.querySelectorAll('[data-path]')].find(n=>n.dataset.path===focused&&n.dataset.part===focusedPart);if(n){if(value!==undefined)n.value=value;n.focus();if(typeof selection==='number'&&n.setSelectionRange)n.setSelectionRange(selection,selection)}}
   restoreTextSelection(passage);
   applyStyles(plan);
+  for(const el of tileRoots()){
+    const before=was.get(tileIdentity(el));if(!before)continue;
+    const after=el.getBoundingClientRect(),dx=before.x-after.x,dy=before.y-after.y;
+    if(Math.abs(dx)>.5||Math.abs(dy)>.5)P.motion(el,{from:{transform:`translate(${dx}px,${dy}px)`},to:{transform:'none'},duration:was.duration});
+  }
   for(const owner of componentOwners.values())if(owner.element?.isConnected){
     if(!owner.failed&&!owner.node.disabled){
       if(owner.worker&&!owner.workerPainted)continue;

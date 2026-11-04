@@ -35,6 +35,127 @@ class Rect:
 
 SQUASH = 0.6      # an arrange never shrinks a window below this share of its usual width or height
 PIN_MIN = 0.5     # a pin may be narrowed to this share of its pinned width when something big opens (wm-settings pin_min)
+MOTION_MS = 250   # existing WM default; hosts read wm-settings motion_ms
+
+
+def crossed_centre(start, moving, other):
+    """A centre passes a neighbour's centre along the approach axis.
+
+    Test original geometry, never an animated rectangle. Equality is not a
+    crossing; overlap alone, elapsed time and pointer position cannot yield.
+    """
+    sx, sy = start.x + start.w / 2, start.y + start.h / 2
+    mx, my = moving.x + moving.w / 2, moving.y + moving.h / 2
+    ox, oy = other.x + other.w / 2, other.y + other.h / 2
+    dx, dy = ox - sx, oy - sy
+    if abs(dx) / max(1, other.w) >= abs(dy) / max(1, other.h):
+        return other.y < moving.bottom and moving.y < other.bottom and (mx - ox) * dx > 0
+    return other.x < moving.right and moving.x < other.right and (my - oy) * dy > 0
+
+
+def drop_spaces(bounds, blockers, gap, minimum=(0, 0)):
+    """Maximal vacant areas plus half-screen and column subdivisions."""
+    free = free_rectangles(bounds, blockers, gap)
+    spaces = list(free)
+    # Halves and thirds are geometric partitions, not app-specific sizes.
+    for count in (2, 3):
+        width = (bounds.w - gap * (count - 1)) // count
+        for i in range(count):
+            x = bounds.x + i * (width + gap)
+            q = Rect(x, bounds.y, bounds.right - x if i == count - 1 else width, bounds.h)
+            if any(f.contains(q) for f in free):
+                spaces.append(q)
+    return sorted({q for q in spaces if q.w >= minimum[0] and q.h >= minimum[1]},
+                  key=lambda q: (-q.w * q.h, q.values()))
+
+
+def choose_space(moving, spaces, bounds, pointer=None):
+    """Cursor selects glass; the carried centre remains the displacement threshold.
+
+    Nested zones use their horizontal centres as hit targets: the half-screen
+    centre selects the side, nearer the edge selects the column. Geometry-only
+    callers without a pointer retain their centre-based selection.
+    """
+    cx, cy = pointer if pointer is not None else (moving.x + moving.w / 2, moving.y + moving.h / 2)
+    candidates = [q for q in spaces if q.x <= cx <= q.right and q.y <= cy <= q.bottom]
+    if not candidates:
+        return None
+    if pointer is not None:
+        if bounds in candidates and len(candidates) > 1:
+            candidates.remove(bounds)
+        return min(candidates, key=lambda q: (
+            abs(cx - (q.x + q.w / 2)), -q.w * q.h, q.values()))
+    at_edge = moving.x < bounds.x or moving.right > bounds.right
+    if not at_edge and bounds in candidates and len(candidates) > 1:
+        candidates.remove(bounds)
+    return min(candidates, key=lambda q: (q.w * q.h if at_edge else -q.w * q.h, q.values()))
+
+
+def card_drop(body):
+    """Browser adapter to the same centre/space engine; geometry only, no world acts.
+
+    A lane supplies rectangles and, when sorted, the compiler's sort tuples.
+    The carried card's world drop verb still owns the actual relationship.
+    """
+    def box(value):
+        import math
+        if not isinstance(value, list) or len(value) != 4 or any(
+                isinstance(v, bool) or not isinstance(v, (int, float)) or
+                not math.isfinite(v) or abs(v) > 100000 for v in value):
+            raise ValueError('invalid tiling rectangle')
+        if value[2] <= 0 or value[3] <= 0:
+            raise ValueError('empty tiling rectangle')
+        return Rect(*value)
+    start, moving, landing = (box(body[n]) for n in ('start', 'moving', 'landing'))
+    neighbours = body.get('neighbours', [])
+    if not isinstance(neighbours, list) or len(neighbours) > 256:
+        raise ValueError('too many tiling neighbours')
+    rectangles = [box(q) for q in neighbours]
+    gap = body.get('gap', 0)
+    if isinstance(gap, bool) or not isinstance(gap, (float, int)) or not 0 <= gap <= 128:
+        raise ValueError('invalid tiling gap')
+    index = 0
+    orders = body.get('orders')
+    if orders is not None:
+        import math
+        def ordering(o):
+            if not isinstance(o, dict):
+                raise ValueError('invalid tiling order')
+            keys, values, tie = o.get('keys'), o.get('values'), o.get('tie')
+            if (not isinstance(keys, list) or not 1 <= len(keys) <= 16 or
+                    any(not isinstance(k, str) or len(k) > 128 for k in keys) or
+                    not isinstance(values, list) or len(values) != len(keys) or
+                    not isinstance(tie, int) or isinstance(tie, bool)):
+                raise ValueError('invalid tiling order')
+            for v in values:
+                if (not isinstance(v, list) or len(v) != 3 or v[0] not in (0, 1, 2) or
+                        not isinstance(v[1], (int, float)) or not math.isfinite(v[1]) or
+                        not isinstance(v[2], str) or len(v[2]) > 4096):
+                    raise ValueError('invalid tiling order')
+            return keys, values, tie
+        if not isinstance(orders, list) or len(orders) != len(rectangles) + 1:
+            raise ValueError('invalid tiling orders')
+        source, *others = [ordering(o) for o in orders]
+        def before(other):
+            if other[0] != source[0]:
+                raise ValueError('incompatible tiling orders')
+            for key, a, b in zip(source[0], source[1], other[1]):
+                if a == b:
+                    continue
+                if a[0] == 2 or b[0] == 2:
+                    return b[0] == 2
+                return a > b if key.startswith('-') else a < b
+            return source[2] < other[2]
+        index = next((i for i, o in enumerate(others) if before(o)), len(others))
+        if rectangles:
+            first = rectangles[0]
+            y = rectangles[index].y if index < len(rectangles) else rectangles[-1].bottom + gap
+            landing = Rect(first.x, y, first.w, landing.h)
+    # Only crossing the actual insertion boundary can start a lane's slide.
+    allowed = index == len(rectangles) or crossed_centre(start, moving, rectangles[index])
+    return {'allowed': allowed, 'landing': landing.values(), 'motion_ms': MOTION_MS,
+            'placements': [Rect(q.x, q.y + landing.h + gap, q.w, q.h).values()
+                           if allowed and i >= index else q.values() for i, q in enumerate(rectangles)]}
 
 
 @dataclass
@@ -49,6 +170,7 @@ class Window:
     minimised: bool = False
     home: Rect | None = None   # a pin's chosen rectangle; it may be narrowed from it, and grows back to it
     no_evict: bool = False     # a fullscreen participant must not be the share fallback victim
+    compact: bool = False      # world policy: retain preferred size rather than fill spare area
 
 
 @dataclass
@@ -113,6 +235,7 @@ def free_rectangles(bounds, blocks, gap):
 def fit(s, w, fill=False, least=None):
     """Best free spot. least=(w,h): accept a smaller spot, down to that size (a big window opening onto a full screen)."""
     candidates = []
+    others=[v for k,v in s.windows.items() if k!=w.key and v.rect and not v.minimised]
     for r in free_rectangles(s.bounds, occupied(s,(w.key,)),s.gap_inner):
         width,height = (r.w,r.h) if fill else tuple(max(p,m) for p,m in zip(w.preferred,w.minimum))
         reduced=bool(least) and not fill and r.w>=least[0] and r.h>=least[1]
@@ -121,6 +244,10 @@ def fit(s, w, fill=False, least=None):
         x = min(max(w.rect.x if w.rect else r.x,r.x),r.right-width)
         y = min(max(w.rect.y if w.rect else r.y,r.y),r.bottom-height)
         box = Rect(x,y,width,height)
+        if len(others)==1 and others[0].managed and not others[0].pinned:
+            other=others[0].rect
+            if box.x<other.right+s.gap_inner and other.x<box.right+s.gap_inner:
+                continue
         distance = abs(x-w.rect.x)+abs(y-w.rect.y) if w.rect else 0
         # fill, or a window that cannot have its preferred size: the biggest spot first, then the nearest
         score = (-width*height,distance,y,x) if fill or least else (distance,r.w*r.h-width*height,y,x)
@@ -252,6 +379,22 @@ def adaptive(s, incoming):
     fixed=list(s.obstacles)+[w.rect for w in s.windows.values()
         if not w.minimised and w.rect and (w.pinned or not w.managed)]
     if not movable or len(movable)>16:return False
+    # Two ordinary windows are columns, even on a portrait display. Do not
+    # silently fall back to top/bottom when their minimum widths cannot fit.
+    if len(movable)==2 and not fixed:
+        a,b=sorted(movable,key=lambda w:((w.rect.x if w.rect else s.bounds.x),w.key))
+        available=s.bounds.w-s.gap_inner
+        if a.minimum[0]+b.minimum[0]>available or max(a.minimum[1],b.minimum[1])>s.bounds.h:
+            return False
+        width=max(a.minimum[0],min(available-b.minimum[0],available//2))
+        if a.compact:width=max(a.minimum[0],min(width,a.preferred[0]))
+        elif b.compact:width=available-max(b.minimum[0],min(available-width,b.preferred[0]))
+        a.rect=Rect(s.bounds.x,s.bounds.y,width,s.bounds.h)
+        b.rect=Rect(a.rect.right+s.gap_inner,s.bounds.y,available-width,s.bounds.h)
+        for w in (a,b):
+            if w.compact:
+                w.rect=replace(w.rect,h=max(w.minimum[1],min(s.bounds.h,w.preferred[1])))
+        return True
     for scale in (1, .85, .7, .6, .45, 0):
         budget=[300]
         sizes={w.key:tuple(max(m,round(p*scale)) for p,m in zip(w.preferred,w.minimum)) for w in movable}
@@ -280,12 +423,24 @@ def adaptive(s, incoming):
     return False
 
 
-def fill_space(s):
+def stacked_pair(s):
+    """Two movable tiles whose horizontal intervals overlap."""
+    visible=[w for w in s.windows.values() if w.rect and not w.minimised]
+    if s.obstacles or len(visible)!=2 or any(w.pinned or not w.managed for w in visible):
+        return False
+    a,b=visible
+    return a.rect.x<b.rect.right+s.gap_inner and b.rect.x<a.rect.right+s.gap_inner
+
+
+def fill_space(s, keep_compact=False):
     """Grow shared tiles into adjacent free space without moving fixed windows."""
+    if stacked_pair(s):
+        adaptive(s,None)
     movable=sorted((w for w in s.windows.values()
         if w.rect and w.managed and not w.pinned and not w.minimised),
         key=lambda w:(-w.minimum[0],-w.last_used,w.key))
     for w in movable:
+        if keep_compact and w.compact:continue
         choices=[r for r in free_rectangles(s.bounds,occupied(s,(w.key,)),s.gap_inner)
                  if r.contains(w.rect)]
         if choices:w.rect=max(choices,key=lambda r:(r.w*r.h,r.w,r.h,-r.y,-r.x))
@@ -332,6 +487,15 @@ def share_layout(s, incoming):
         if not any(r.w>=target.minimum[0] and r.h>=target.minimum[1]
                    for r in free_rectangles(s.bounds,list(s.obstacles)+fixed,s.gap_inner)):
             return foreground()
+    # A request which already fits in free space leaves every neighbour alone.
+    # The preferred rectangle comes from the world's size policy or remembered
+    # user size. Do not expand a compact arrival across all the remaining area.
+    found=fit(s,target)
+    if found is not None:
+        before=target.rect
+        target.rect=found
+        if valid(s):return []
+        target.rect=before
     while not adaptive(s,incoming):
         if not victims:
             # Fixed/unmovable fullscreen can occupy the entire work area.
@@ -339,7 +503,7 @@ def share_layout(s, incoming):
             # a minimised request. Manager holds only this overlap as floating.
             return foreground()
         victims.pop(0).minimised=True
-    fill_space(s)
+    fill_space(s,keep_compact=True)
     return []
 
 

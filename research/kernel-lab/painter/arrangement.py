@@ -160,6 +160,7 @@ def compile_view(k, actor, target, _trail=(), reader=None, view=None):
         a = k.shown(actor.person, tid)
         if a is not None and not a.get('forgotten'):
             visible[tid] = dict(a, id=tid, rev=k.state.rev.get(tid, 0))
+    tiling_ordinals = {tid: n for n, tid in enumerate(visible)}
     lens = visible.get(target) or next((a for a in visible.values() if a.get('name') == target and a.get('kind') == 'lens'), None)
     if lens and lens.get('kind') in ('window', 'widget'):
         target = lens.get('component_lens') or lens.get('lens') or lens.get('shows', '')
@@ -277,7 +278,14 @@ def compile_view(k, actor, target, _trail=(), reader=None, view=None):
             for index, item in enumerate(items):
                 next_env = dict(env, **{alias or 'item':item, 'item':item})
                 child = expand(template, next_env, path+'/'+str(item.get('id') or index), level+1, scope)
-                if child: kids.append(child)
+                if child:
+                    if not selector.startswith('reading:'):
+                        value = order(item)
+                        child['tiling_order'] = dict(keys=[node.get('by', 'order')],
+                            values=[[value[0], value[1] if value[0] == 0 else 0,
+                                     value[1] if value[0] == 1 else '']],
+                            tie=tiling_ordinals[item['id']])
+                    kids.append(child)
             query_children = kids
         kind = node['component']
         component = components.get(kind)

@@ -1,0 +1,35 @@
+{
+  "ordinary": {
+    "match": {},
+    "width": 0.5,
+    "height": 0.8,
+    "min_width": 0.16,
+    "min_height": 0.18
+  },
+  "browser-host": {
+    "match": {"browser_class": true},
+    "width": 0.5,
+    "min_width": 0.5
+  },
+  "browser": {
+    "match": {"exe": ["chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "vivaldi.exe", "opera.exe", "claude.exe", "chatgpt.exe"]},
+    "width": 0.5,
+    "min_width": 0.5
+  },
+  "compact-app": {
+    "match": {"exe": ["spotify.exe", "discord.exe"]},
+    "width": 0.25,
+    "height": 0.5,
+    "min_width": 0.16,
+    "min_height": 0.18,
+    "compact": true
+  },
+  "agora": {
+    "match": {"agora": true},
+    "width": 0.25,
+    "height": 0.5,
+    "min_width": 0.16,
+    "min_height": 0.18,
+    "compact": true
+  }
+}

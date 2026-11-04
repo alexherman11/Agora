@@ -109,6 +109,12 @@ class FullscreenController(unittest.TestCase):
         self.native=NativeFixture(rows)
         self.work=work
         self.m = Manager(self.native, self.tmp.name, allow_live=True, gate_fn=lambda: self.gates)
+        # These fixtures exercise remembered normal sizes and explicit floors.
+        # Application preferences now come from world intent, never Manager.
+        self.m.configure({'sizes':{
+            'ordinary':{'min_width':480/(work.w-48),'min_height':320/(work.h-32)},
+            'browser':{'match':{'exe':'claude.exe'},'min_width':.5},
+        }})
         self.m.mode = 'live'
         self.m.lease = Mock()
         self.m.ingest(self.native.windows(), work)
@@ -149,11 +155,11 @@ class FullscreenController(unittest.TestCase):
         self.assertTrue(WORK.contains(a) and WORK.contains(b))
         self.assertTrue(valid(self.m.state))
         self.assertEqual(self.m.state.windows['music'].preferred, (950, 700))
-        self.assertGreaterEqual(a.w, WORK.w//2)
+        self.assertGreaterEqual(a.w, (WORK.w-48)//2)
         self.assertGreaterEqual(b.w, 480)
         self.assertGreaterEqual(b.h, 320)
         if remembered:
-            self.assertEqual(self.m.remembered['claude'], (1200, 800))
+            self.assertEqual(self.m.remembered['claude'], ((WORK.w-48)//2, 800))
         before = [r['rect'] for r in rows]
         mutations = len(self.native.calls)
         for _ in range(4):
@@ -282,7 +288,7 @@ class FullscreenController(unittest.TestCase):
                     self.assertTrue(all(r['state']=='normal' for r in self.native.rows))
                     self.assertTrue(valid(self.m.state))
                     for r in self.native.rows:
-                        if r['key']=='claude':self.assertGreaterEqual(r['rect'][2],960)
+                        if r['key']=='claude':self.assertGreaterEqual(r['rect'][2],936)
                     self.assertFalse(any(c[0]=='minimise' for c in self.native.calls))
                 self.gates.clear();self.m.gate_cache=(None,-1)
                 before=sum(r['rect'][2]*r['rect'][3] for r in self.native.rows if r['key']!='chat')
@@ -290,7 +296,7 @@ class FullscreenController(unittest.TestCase):
                 for _ in range(8):self.tick()
                 self.assertGreater(sum(r['rect'][2]*r['rect'][3] for r in self.native.rows),before)
                 self.assertTrue(valid(self.m.state))
-                self.assertGreaterEqual(next(r for r in self.native.rows if r['key']=='claude')['rect'][2],960)
+                self.assertGreaterEqual(next(r for r in self.native.rows if r['key']=='claude')['rect'][2],936)
                 self.m.lease.release.assert_not_called()
 
     def test_lru_fallback_minimises_oldest_never_request(self):

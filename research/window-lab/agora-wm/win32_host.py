@@ -38,6 +38,7 @@ sig(u,'GetWindowLongPtrW',C.c_ssize_t,W.HWND,C.c_int)
 for name in ('IsWindow','IsWindowVisible','IsIconic','IsZoomed'):
     sig(u,name,W.BOOL,W.HWND)
 sig(u,'GetForegroundWindow',W.HWND)
+sig(u,'GetCursorPos',W.BOOL,C.POINTER(W.POINT))
 sig(u,'GetWindow',W.HWND,W.HWND,W.UINT)
 sig(u,'MonitorFromPoint',W.HMONITOR,W.POINT,W.DWORD)
 sig(u,'SetWindowPos',W.BOOL,W.HWND,W.HWND,C.c_int,C.c_int,C.c_int,C.c_int,W.UINT)
@@ -267,7 +268,7 @@ class Native:
                 'agora':agora,'state':'minimised' if u.IsIconic(hwnd) else 'normal','focused':hwnd==front,
                 'rect':r.values(),'space':'primary','managed':not why,'why':why,'ref':ref,'_preferred':preferred,
                 '_normal':normal,'owned':owned,'maximised':maximised,
-                'browser_class':ref.cls.startswith('Chrome_WidgetWin_'),
+                'browser_class':ref.cls.startswith('Chrome_WidgetWin_'),'window_class':ref.cls,
                 'share_candidate':screen_sized and why=='frameless; no app rule',
                 'display_mode':'maximised' if maximised else 'screen-sized (exclusive unknown)' if screen_sized else 'windowed'})
             return True
@@ -275,6 +276,18 @@ class Native:
         return rows
 
     def scale(self):return dpi_scale()
+
+    def cursor(self):
+        """Read the pointer on this thread's desktop. Never synthesize input."""
+        point=W.POINT()
+        if not u.GetCursorPos(C.byref(point)):return None
+        return (point.x,point.y)
+
+    def gate_token(self):
+        """Cheap foreground/fullscreen changes invalidate the process-gate cache."""
+        state=C.c_int()
+        hr=shell.SHQueryUserNotificationState(C.byref(state))
+        return (u.GetForegroundWindow(),hr,state.value,_foreground_covers_monitor())
 
     def rect_of(self,ref):
         """One window's visible rectangle, for the 60 Hz drag path (no enumeration). Read-only."""

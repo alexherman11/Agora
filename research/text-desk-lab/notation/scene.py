@@ -3152,6 +3152,10 @@ def painter_view(node):
         out["fence"] = node["fence"]
     if node.get("part"):
         out["part"] = node["part"]
+    if node.get("tiling_order"):
+        out["tiling_order"] = node["tiling_order"]
+    if node.get("members") and node.get("by"):
+        out["tiling_list"] = True
     return out
 
 
