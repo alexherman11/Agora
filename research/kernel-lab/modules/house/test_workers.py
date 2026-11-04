@@ -103,11 +103,25 @@ def test_asking_for_review_drops_what_was_said_in_the_same_turn(manager):
     assert s['pending'] == [] and s['phase'] == 'reviewing'
 
 
-def test_a_worker_has_at_most_its_turns(manager):
-    s = state(manager); s['turns'] = B.MAX_TURNS
+def test_no_turn_limit_unless_house_settings_sets_one(manager):
+    s = state(manager); s['turns'] = 500                     # Alex, 4 Nov: no limit on a worker's turns
     manager.session = lambda person: manager.fixture_door
+    with patch('builders.threading', SimpleNamespace(Thread=Mock())):
+        assert manager.tell(dict(args=dict(target='dk1', words='more'), caller=dict(person='dk99'))).get('external')
+    s = state(manager); s['turns'] = 3
+    settings(manager, max_turns='3')
     out = manager.tell(dict(args=dict(target='dk1', words='more'), caller=dict(person='dk99')))
-    assert f'{B.MAX_TURNS} turns' in out['refused']
+    assert '3 turns' in out['refused']
+
+
+def test_worker_models_and_limits_come_from_house_settings(manager):
+    assert manager.worker_model('codex') == ('gpt-6.1-sol', 'medium')          # no setting: the fallback
+    assert manager.limit('worker_timeout') is None and manager.limit('max_turns') is None
+    settings(manager, codex_model='gpt-6-astra', codex_reasoning='high', worker_timeout='0')
+    assert manager.worker_model('codex') == ('gpt-6-astra', 'high')
+    assert manager.limit('worker_timeout') is None                            # 0 means none
+    settings(manager, codex_reasoning='enormous')
+    assert manager.worker_model('codex')[1] == 'medium'                        # an unknown level falls back
 
 
 def test_a_claude_worker_runs_the_claude_cli_in_its_worktree(manager, tmp_path):

@@ -20,7 +20,7 @@ upsert, widget_source, Q = painter_install.upsert, painter_install.widget_source
 
 GRANTS = ("window.surface rows look look-view history components help component-health component-action "
           "theme.* clock make set undo upload files.convert attach board.post "
-          "hear:make hear:set hear:forget hear:undo hear:component hear:component-action hear:theme.changed hear:upload hear:attach")
+          "hear:make hear:set hear:forget hear:undo hear:component hear:component-action hear:view hear:theme.changed hear:upload hear:attach")
 
 
 def card():

@@ -98,6 +98,33 @@ def parse(text):
                 node.setdefault('motions',[]).append(dict(trigger=trigger,token=token))
             elif line.startswith('watch '):
                 node.setdefault('watches',[]).append(literal(line[6:].removeprefix('reading:')))
+            # Panels and sizes (Alex, 4 Nov): a part may be a side panel the window opens and shuts from its top bar,
+            # and a lens names its window's widths. Which panels are open is the window's own view, never recorded.
+            elif line.startswith('panel '):
+                clauses = [c.strip() for c in pieces(line[6:])]
+                side = clauses.pop(0)
+                if side not in ('left', 'right'):
+                    raise Refused(f'lens line {number}: panel left or panel right, then icon, label, width')
+                panel = dict(node.get('panel') or {}, side=side)
+                for clause in clauses:
+                    key, _, value = clause.partition(' ')
+                    if key not in ('icon', 'label', 'width') or not value.strip():
+                        raise Refused(f'lens line {number}: a panel takes icon <name>, label "<words>" and width <px>')
+                    panel[key] = literal(value.strip())
+                node['panel'] = panel
+            elif line.startswith('shut when '):
+                # size names (shut when narrow middle), or a condition in only-when's form (shut when $view.open = "")
+                text = line[10:].strip()
+                if not text: raise Refused(f'lens line {number}: shut when <sizes> or shut when <condition>')
+                node.setdefault('panel', {})['shut'] = text
+            elif line.startswith('sizes '):
+                sizes = []
+                for clause in pieces(line[6:]):
+                    name, _, start = clause.strip().partition(' ')
+                    if not re.fullmatch(r'[\w-]+', name) or not start.strip().isdigit():
+                        raise Refused(f'lens line {number}: sizes <name> <from px>, ... (sizes narrow 0, wide 1200)')
+                    sizes.append([name, int(start)])
+                node['sizes'] = sorted(sizes, key=lambda s: s[1])
             else:
                 raise Refused(f'lens line {number}: unknown arrangement word {line}')
         else:
@@ -134,6 +161,13 @@ def resolve_line(text, env):
         escaped_value = value.replace('\\', '\\\\').replace('"', '\\"')
         return escaped_value if quoted else '"' + escaped_value + '"'
     return REF.sub(replace, text)
+
+
+def shut_now(text, env):
+    """Whether a panel's layout wants it shut now: size names (the window's $view.size is one of them) or a condition."""
+    if not text: return False
+    if re.search(r'[$=<>]', text): return condition(text, env)
+    return str((env.get('view') or {}).get('size', '')) in text.replace(',', ' ').split()
 
 
 def condition(text, env):
@@ -365,7 +399,11 @@ def compile_view(k, actor, target, _trail=(), reader=None, view=None):
         if error:health.update(health='stopped',last_error=error)
         settings_seen.append(dict(part=path, name=node['name'],component=kind, settings=settings, display=displays,labels=labels.get('ui',{}),facts=facts,health=health,
                                  parts=declared_parts,gestures=[g['event'] for g in node['gestures']]))
-        return dict(component=kind, name=node['name'], path=path, role=node.get('role',''), settings=settings, facts=facts, saw=reads,viewer=env.get('viewer',{}),
+        panel = node.get('panel')
+        if panel:
+            if 'side' not in panel: raise Refused(f'{path}: shut when needs a panel line (panel left or panel right)')
+            panel = dict(panel, shut_now=shut_now(panel.get('shut', ''), env))
+        return dict(component=kind, name=node['name'], path=path, role=node.get('role',''), panel=panel, settings=settings, facts=facts, saw=reads,viewer=env.get('viewer',{}),
                     collection=dict(total=total, offset=offset, limit=limit) if query else None,
                     definition=component['id'] if component else None,error=error,display=displays,formats=formats,labels=labels.get('ui',{}),health=health,
                     disabled=str(enabled).lower() in ('no','false','0') or bool(health['disabled']),motions=node.get('motions',[]),
@@ -381,6 +419,8 @@ def compile_view(k, actor, target, _trail=(), reader=None, view=None):
     if reader:
         if not hasattr(actor, '_component_projection'): actor._component_projection = {}
         actor._component_projection[lens['id']] = dict(view=view, readings=reading_cache)
+        # what this person's running window shows, so look-view and view can read it from Lines (screen state)
+        if actor.kind == 'module' and actor.module: windows(k)[(actor.module, actor.person)] = dict(view)
     used = [dict(components[name],trusted=components[name].get('reviewed_code')==hashlib.sha256(components[name].get('code','').encode()).hexdigest()) for name in counts if name in components]
     for a in [lens, *nested, *used, *styles, *preferences, *shown.values()]: k.mark(actor, a['id'], a)
     text = f"{lens.get('title') or lens.get('name')}: " + ', '.join(f'{n} {kind}' for kind,n in counts.items())
@@ -397,22 +437,78 @@ def compile_view(k, actor, target, _trail=(), reader=None, view=None):
     if style_errors:text+='; paint refusals: '+ '; '.join(e['error'] for e in style_errors)
     return dict(text=text, rows=[dict(kind='view-description', lens=lens['id'], tree=tree, counts=dict(counts), parts=settings_seen,
                                     components=used, styles=paint_styles,tokens=tokens,style_errors=style_errors,
-                                    readings=reading_sources, watches=watch_values, view=view,
+                                    readings=reading_sources, watches=watch_values, view=view, sizes=definitions['root'].get('sizes', []),
                                     # Lens-wide painter handles: how often to reread as a safety net (500..60000 ms,
                                     # default 1500) and whether right-clicking any part opens the ask menu.
                                     options=dict(reconcile_ms=lens.get('reconcile_ms',''),right_click=lens.get('right_click','')))])
 
 
+def panels_of(plan):
+    """The side panels in a plan and whether this window has each open: its view says, open unless shut."""
+    found, view = [], plan.get('view', {})
+    def walk(node):
+        if node.get('panel'):
+            found.append(dict(name=node['name'], path=node['path'], side=node['panel']['side'], shut_when=node['panel'].get('shut', ''),
+                              layout_shuts=node['panel'].get('shut_now', False), state=view.get(node['name']) or 'open'))
+        for child in node.get('children', []): walk(child)
+    if plan.get('tree'): walk(plan['tree'])
+    return found
+
+
+def windows(k):
+    """{(widget id, person): the view that person's running window last painted}. Kept in the kernel process's memory,
+    like paint health: screen state, never in k.state or the log; a restart forgets it until the window paints again."""
+    table = getattr(k, '_window_views', None)
+    if table is None:
+        table = k._window_views = {}
+    return table
+
+
+def window_of(k, actor, target):
+    """The widget a line names (by id, name or lens), when this person can see it."""
+    shown = lambda t: k.state.get(t, 'kind') == 'widget' and not k.state.get(t, 'forgotten') and k.shown(actor.person, t) is not None
+    if target in k.state.things and shown(target): return target
+    return next((t for t in k.state.things if shown(t) and target in (k.state.get(t, 'name'), k.state.get(t, 'component_lens'))), None)
+
+
 def look_view(k, actor, st, entry, tx, group, saw=None):
-    out=compile_view(k, actor, st.target or st.words.strip())
+    target = st.target or st.words.strip()
+    w = window_of(k, actor, target) if actor.kind != 'module' else None
+    seen = windows(k).get((w, actor.person)) if w else None
+    out=compile_view(k, actor, w or target, view=seen)
     if st.kv.get('plan') not in ('yes','true','1'):
         full=out['rows'][0]
         parts=[{key:value for key,value in p.items() if key!='facts'} for p in full['parts']]
         out['rows']=[dict(kind=full['kind'],lens=full['lens'],counts=full['counts'],parts=parts,style_errors=full['style_errors'],
-                          readings=full.get('readings',[]),view=full.get('view',{}),
+                          readings=full.get('readings',[]),view=full.get('view',{}),panels=panels_of(full),
                           observation='Paint health of this screen, private to this viewer and never recorded; unobserved is not proof of paint. plan=yes returns the full plan.')]
+        panels = out['rows'][0]['panels']
+        if panels or seen:
+            out['text'] += '\n' + ('window: ' + ', '.join(f'{key}={value}' for key, value in sorted(seen.items()) if key != 'target')
+                                   if seen else 'window: not open (the lens defaults below)')
+        if panels:
+            out['text'] += '\npanels: ' + ' · '.join(f"{p['name']} {p['state']} ({p['side']}" + (', shuts when ' + p['shut_when'] if p['shut_when'] else '') + ')' for p in panels)
         out['text']+='\n'+ '\n'.join(p['name']+' ('+p['component']+'): '+p['health']['health']+(' · '+p['health']['last_error'] if p['health']['last_error'] else '') for p in parts if p['health']['health']!='unobserved')
     return out
+
+
+def window_view(k, actor, st, entry, tx, group, saw=None):
+    """view <window> key=value ...: change what your running window shows, its open panels or its open thing. The
+    window's own view is screen state: it is told, not recorded, and only your own window listens."""
+    w = window_of(k, actor, st.target or st.words.strip())
+    if not w: raise Refused('view <window> key=value: name a window you can see, by its name or lens')
+    values = {key: str(value) for key, value in st.kv.items()}
+    if not values: raise Refused('view <window> key=value: say what to change, for example rail=open')
+    for key, value in values.items():
+        if not re.fullmatch(r'[a-z_][\w.-]{0,40}', key) or key in ('size', 'width'):
+            raise Refused(f'view: {key} is not a view key (size and width are the window\'s own)')
+        if len(value) > 200: raise Refused('view: a value is at most 200 characters')
+    k._happen({'word': 'view', 'entry': entry.get('id') if isinstance(entry, dict) else None, 'target': w,
+               'by': actor.person, 'for': actor.person, 'only': actor.person, 'text': json.dumps(values)})
+    seen = windows(k).get((w, actor.person))
+    if seen is not None: seen.update(values)
+    told = ', '.join(f'{key}={value}' for key, value in values.items())
+    return dict(text=f'ok view {k.name(w)} · {told}' + ('' if seen is not None else ' (no window of yours shows it now; it applies when one listens)'))
 
 
 def component(k, actor, st, entry, tx, group, saw=None):

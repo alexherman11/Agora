@@ -62,6 +62,8 @@ KERNEL_ENTRIES = [
        help='component <thing>: review the current inline JavaScript bytes for trusted in-page execution. Changed or unreviewed code starts in Worker quarantine. Repeated failures also quarantine a part; component-action <lens> path=<part> action=clear is steward-only. Component gestures retain viewer-narrowed widget grants.'),
     _k('look-view', 'see', '<window or lens>', 'anyone', 'no',
        help="look-view <window, widget or component lens> [plan=yes]: compact settings, parts, gestures and this screen's paint health (kept on the screen, never in the world); plan=yes adds full bindings/modules/tree. help personal-view explains just for me; help part-style explains validated styles."),
+    _k('view', 'do', '<window> key=value ...', 'anyone', 'no',
+       help='view <window> rail=open comments=shut: change what your own running window shows: its side panels (open or shut) or any other $view key, such as open=<thing>. Screen state: the window is told, nothing is recorded, and only your own windows listen. look-view <window> shows what it shows now.'),
     _k('component-health', 'do', '<lens> data=<JSON>', 'anyone', 'no',
        help='Painter instance reports its own failures and recovery. Kept on this screen (the kernel process memory, per viewer), never recorded: no painted text, no styles, no log line. A restart forgets it.'),
     _k('component-action', 'do', '<lens> path=<part> action=retry|previous|off|clear', 'anyone', 'yes',
@@ -1219,7 +1221,7 @@ from .chat import say, receive as chat_receive, chat as chat_word, closed_sees
 from .store import GONE
 from .next_steps import change as task_change
 from .card_signals import signal as card_signal
-from painter.arrangement import component, look_view, components, component_card
+from painter.arrangement import component, look_view, components, component_card, window_view
 from painter.health import component_health, component_action, personal_view, personal_style, paint_clear
 
 KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant": grant, "widget": widget, "describe": describe,
@@ -1227,7 +1229,7 @@ KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant":
           **{"task-" + action: task_change for action in ("next", "revise", "review", "verify", "followup")},
           'upload': upload, 'attach': attach, 'file-result': file_result, 'file-read': file_read,
           'dictionary-copy': dictionary_copy, 'group': group_word, 'clock': clock, 'forgotten': forgotten,
-          'component': component, 'look-view': look_view, 'components': components,
+          'component': component, 'look-view': look_view, 'view': window_view, 'components': components,
           'component-health': component_health, 'component-action': component_action, 'paint-clear': paint_clear,
           'personal-view': personal_view, 'personal-style': personal_style,
           'word-set': word_set, 'word-rename': word_rename, 'history': history, 'rule': rule,

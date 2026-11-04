@@ -1102,7 +1102,10 @@ class Kernel:
         return [g for g in self._grants_to(who) if self._matches(self.state.get(g, "words"), word)]
 
     def may_hear(self, person, h):
-        """Who-sees for a happening: its thing must be one the reader may see."""
+        """Who-sees for a happening: its thing must be one the reader may see. A happening addressed to one person
+        (`only`, screen state such as a window's view) reaches that person alone."""
+        if h.get("only") and h["only"] != person:
+            return False
         return h.get("target") is None or self.shown(person, h["target"]) is not None
 
     def happening_for(self, person, h):

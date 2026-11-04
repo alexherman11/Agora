@@ -1,0 +1,282 @@
+<title>Panels and Sizes</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column of reading, with a live window you resize, the lens it obeys, and what look-view says. */
+:root{
+  --paper:#f6f4ee; --raised:#ffffff; --ink:#2b3631; --muted:#6c7771; --line:#e1ddd2;
+  --accent:#3f7564; --accent-soft:#e3eee8; --warm:#b4692f; --warm-soft:#f6e7d8; --code:#f0eee7;
+  --shadow:0 1px 0 #0000000a,0 16px 40px #00000014;
+  --f-display:"Fraunces",Georgia,serif; --f-body:"IBM Plex Sans",system-ui,sans-serif;
+  --f-doc:"Source Serif 4",Georgia,serif; --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#1b201e; --raised:#242b28; --ink:#e6ebe7; --muted:#9aa6a0; --line:#36403b;
+  --accent:#7fb8a3; --accent-soft:#2b3c35; --warm:#e0a26c; --warm-soft:#3d3024; --code:#202724;
+  --shadow:0 1px 0 #0000002a,0 16px 40px #00000055; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#1b201e; --raised:#242b28; --ink:#e6ebe7; --muted:#9aa6a0; --line:#36403b;
+  --accent:#7fb8a3; --accent-soft:#2b3c35; --warm:#e0a26c; --warm-soft:#3d3024; --code:#202724;
+  --shadow:0 1px 0 #0000002a,0 16px 40px #00000055; color-scheme:dark}
+body{background:var(--paper);color:var(--ink);font:15px/1.55 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 64px}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1{font:600 clamp(30px,4.4vw,44px)/1.08 var(--f-display);letter-spacing:-.01em;margin:0;text-wrap:balance}
+h2{font:600 22px/1.2 var(--f-display);margin:0 0 10px;text-wrap:balance}
+p{margin:0;max-width:66ch}
+.lede{color:var(--muted);font-size:16.5px}
+.eyebrow{font:500 11.5px/1 var(--f-body);letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
+code,.mono{font-family:var(--f-mono);font-size:.9em}
+code{background:var(--code);padding:1px 5px;border-radius:5px}
+.draft{display:inline-block;font-size:12px;color:var(--warm);background:var(--warm-soft);padding:3px 9px;border-radius:99px}
+
+/* the live window */
+.stage{background:var(--raised);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.controls label{font-size:13px;color:var(--muted)}
+#w{flex:1 1 220px;accent-color:var(--accent)}
+.wnum{font:500 14px var(--f-mono);font-variant-numeric:tabular-nums;min-width:8ch}
+.sizechip{font:500 12.5px var(--f-mono);padding:3px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent)}
+.viewport{position:relative;width:100%;overflow:hidden;border-radius:12px;background:var(--paper);border:1px solid var(--line)}
+.win{position:absolute;left:0;top:0;transform-origin:0 0;height:560px;background:var(--paper);display:grid;grid-template-rows:46px 1fr;
+  border-right:2px dashed var(--accent);font-family:var(--f-body)}
+.bar{display:flex;align-items:center;gap:6px;padding:0 12px;border-bottom:1px solid var(--line);background:var(--paper)}
+.ib{width:32px;height:32px;border-radius:8px;border:0;background:none;color:var(--ink);display:grid;place-items:center;cursor:pointer}
+.ib:hover{background:var(--accent-soft)}
+.ib[aria-pressed=true]{background:var(--accent-soft);color:var(--accent)}
+.ib:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.ib svg{width:18px;height:18px}
+.brand{font:600 12px var(--f-body);letter-spacing:.12em;color:var(--accent);margin:0 10px 0 4px}
+.sp{flex:1}
+.new{font:500 13px var(--f-body);color:#fff;background:var(--accent);border-radius:99px;padding:6px 14px;margin-left:6px}
+.body{position:relative;display:flex;min-height:0;overflow:hidden}
+.panel{flex:0 0 auto;overflow:hidden;transition:width .2s ease;background:var(--paper)}
+.panel>.in{padding:14px 12px;display:flex;flex-direction:column;gap:6px}
+.panel.left{border-right:1px solid var(--line)}
+.panel.right{border-left:1px solid var(--line)}
+.panel.shut{width:0!important;border:0}
+.panel.over{position:absolute;top:0;bottom:0;z-index:3;box-shadow:var(--shadow);background:var(--raised)}
+.panel.over.left{left:0}.panel.over.right{right:0}
+.ph{font:600 11px var(--f-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:2px 4px 6px}
+.row{padding:7px 9px;border-radius:8px;font-size:13.5px}
+.row.cur{background:var(--accent-soft)}
+.row small{display:block;color:var(--muted);font-size:11.5px}
+.cm{border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13px;background:var(--raised)}
+.cm b{font-weight:600}.cm q{color:var(--muted);display:block;font-size:12px;margin-top:4px}
+.center{flex:1 1 auto;min-width:0;overflow:hidden;padding:26px 28px}
+.sheet{max-width:780px;margin:0 auto;background:var(--raised);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:30px 40px;
+  font:17px/1.6 var(--f-doc)}
+.sheet h3{font:600 26px/1.2 var(--f-doc);margin:0 0 12px}
+.sheet p{margin:0 0 12px;max-width:none}
+.sheet mark{background:var(--warm-soft);color:inherit;border-radius:3px}
+.scrim{position:absolute;inset:0;z-index:2;background:#0000000d;border:0}
+
+/* lens + readout */
+.pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+.pane{background:var(--raised);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.pane h3{font:600 12px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+pre{margin:0;font:13px/1.65 var(--f-mono);overflow-x:auto;white-space:pre}
+pre .ln{display:block;padding:0 6px;border-radius:5px;transition:background .15s}
+pre .ln.hot{background:var(--accent-soft);color:var(--accent)}
+pre .ln.new{box-shadow:inset 3px 0 0 var(--warm)}
+pre .c{color:var(--muted)}
+.cmds{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.cmd{font:12.5px var(--f-mono);border:1px solid var(--line);background:var(--code);color:var(--ink);border-radius:8px;padding:5px 10px;cursor:pointer}
+.cmd:hover{border-color:var(--accent)}
+.cmd:focus-visible{outline:2px solid var(--accent)}
+
+/* sections */
+.words{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
+.word{background:var(--raised);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.word .mono{font-size:14px;color:var(--accent);font-weight:500}
+.word p{font-size:14px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:600 12px var(--f-body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tbl{overflow-x:auto;background:var(--raised);border:1px solid var(--line);border-radius:14px;padding:4px 8px}
+ol.q{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:8px;max-width:72ch}
+ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;max-width:72ch}
+@media (prefers-reduced-motion:reduce){.panel,pre .ln{transition:none}}
+</style>
+
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:12px">
+    <span class="eyebrow">Agora painter · design for Alex · 4 Nov 2026</span>
+    <h1>Panels and sizes</h1>
+    <p class="lede">Side panels that shut to nothing from icons in the top bar, and windows that know their own size. The lens holds both, so you can read them and change them in the world. Drag the width to try it.</p>
+    <span class="draft">Draft by Claude, for you to question or change</span>
+  </header>
+
+  <section class="stage" aria-label="A Writing window you can resize">
+    <div class="controls">
+      <label for="w">Window width</label>
+      <input id="w" type="range" min="720" max="1720" step="10" value="1500">
+      <span class="wnum" id="wnum">1500 px</span>
+      <span class="sizechip" id="sizechip">wide</span>
+    </div>
+    <div class="viewport" id="vp">
+      <div class="win" id="win">
+        <div class="bar">
+          <button class="ib" id="t-rail" aria-label="Documents" title="Documents">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9 4.5v15"/></svg></button>
+          <span class="brand">WRITING</span>
+          <span class="sp"></span>
+          <button class="ib" id="t-comments" aria-label="Comments" title="Comments">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v8.5A1.5 1.5 0 0 1 19 17H10l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 5 5.5z"/></svg></button>
+          <span class="new">+ New</span>
+        </div>
+        <div class="body" id="body">
+          <aside class="panel left" id="p-rail" style="width:292px"><div class="in" style="width:292px">
+            <div class="ph">Plans</div>
+            <div class="row cur">Agent prompts<small>Waiting for you · Tue</small></div>
+            <div class="row">Native windows get kinds<small>Waiting for you · Tue</small></div>
+            <div class="row">Shedding clutter<small>Oct 27</small></div>
+            <div class="ph" style="margin-top:10px">Notes</div>
+            <div class="row">Rough spots — side panels<small>10m</small></div>
+            <div class="row">Rough spots — worker models<small>23m</small></div>
+          </div></aside>
+          <main class="center" id="center">
+            <article class="sheet">
+              <h3>Agent prompts</h3>
+              <p>Each agent is one long-running model process. Nothing runs on a timer. When something wakes an agent, the House sends it <mark>one message, built in this order</mark>.</p>
+              <p>The system prompt comes first: the rules. Codex agents get the same text as developer instructions. Nothing else is in it.</p>
+              <p>Then the welcome and the soul, only in a fresh conversation and after each compaction.</p>
+            </article>
+          </main>
+          <aside class="panel right" id="p-comments" style="width:300px"><div class="in" style="width:300px">
+            <div class="ph">Comments · 2</div>
+            <div class="cm"><b>Alex</b> Shorten this, the order matters more than the words.<q>one message, built in this order</q></div>
+            <div class="cm"><b>JEFF</b> Moved the soul note up.</div>
+          </div></aside>
+        </div>
+      </div>
+    </div>
+    <p style="font-size:13px;color:var(--muted)">The dashed line is the window's right edge. Press the icons to open or shut a panel. If you open one at a size that shuts it, it lies over the page. Clicking the page shuts it again.</p>
+  </section>
+
+  <section class="pair">
+    <div class="pane">
+      <h3>The lens (in the world)</h3>
+<pre id="lens"><span class="ln c"># writing.lens: lines marked on the left are new</span>
+<span class="ln">root : writing-shell, title "Writing"</span>
+<span class="ln new" data-k="sizes">  sizes narrow 0, middle 1080, wide 1460</span>
+<span class="ln">  rail : doc-rail, hint "Find a document"</span>
+<span class="ln new">    panel left, icon sidebar, label "Documents"</span>
+<span class="ln new" data-k="rail">    shut when narrow middle</span>
+<span class="ln c">    …shelves as now…</span>
+<span class="ln">page-view : doc-page</span>
+<span class="ln new">  measure 780</span>
+<span class="ln">  comments : column, of tag:comment …</span>
+<span class="ln new">    panel right, icon comment, label "Comments"</span>
+<span class="ln new" data-k="comments">    shut when narrow</span></pre>
+    </div>
+    <div class="pane">
+      <h3>What the world sees</h3>
+<pre id="readout"></pre>
+      <div class="cmds" aria-label="Lines you could type">
+        <button class="cmd" data-cmd="comments=shut">view writing comments=shut</button>
+        <button class="cmd" data-cmd="rail=open">view writing rail=open</button>
+        <button class="cmd" data-cmd="rail=shut">view writing rail=shut</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Three words, all general</h2>
+    <div class="words">
+      <div class="word"><span class="mono">sizes narrow 0, middle 1080, wide 1460</span>
+        <p>On the root of any lens. It names window widths. The window's current name is <code>$view.size</code> and its width is <code>$view.width</code>. Any part can use them, for example <code>only when $view.size = wide</code>. This is how each app says what it does at different dimensions.</p></div>
+      <div class="word"><span class="mono">panel left|right, icon, label</span>
+        <p>On any part. The part becomes a side panel that is open or shut, and shut means no width at all. Its icon goes in the window's top bar: left panels on the left and right panels on the right, like Claude desktop.</p></div>
+      <div class="word"><span class="mono">shut when narrow middle</span>
+        <p>On a panel. At those sizes it shuts itself, so the text stays in the centre. A panel you shut by hand stays shut when the window grows. A panel the size shut opens again when there is room.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Where each piece lives</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>What</th><th>Where</th><th>Recorded?</th></tr></thead>
+      <tbody>
+        <tr><td>How Writing behaves at each size: the sizes, which panels shut, the measure</td><td>The lens, a world thing anyone can read and edit</td><td>Yes, as ordinary edits</td></tr>
+        <tr><td>Which panels are open right now</td><td>The window's view (<code>$view.rail</code>, <code>$view.comments</code>). The kernel already keeps each window's view in memory, and <code>look-view</code> shows it.</td><td>No, it's screen state (your 26 Oct rule)</td></tr>
+        <tr><td>"I always want comments shut"</td><td>Your <code>view-preference view.comments=shut</code>, which already exists</td><td>Yes, private to you</td></tr>
+        <tr><td>Opening or shutting a panel from Lines, or by JEFF</td><td>A new word, <code>view &lt;window&gt; comments=open</code>, that changes a running window's view</td><td>No</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>What gets built</h2>
+    <ul class="plain">
+      <li><b>Painter</b> (general): the three words, the top-bar icons, the overlay at small sizes, and <code>$view.size</code> and <code>$view.width</code>, kept current as the window resizes. Documented in ARRANGEMENT.md.</li>
+      <li><b>Kernel</b>: the <code>view</code> word, which reaches a running window and records nothing.</li>
+      <li><b>Writing</b>: the lens lines above, and a wider page (740 → 780).</li>
+      <li>The 40px fold strip from an hour ago gets replaced. It was never committed.</li>
+      <li>The doc rail works. I checked a copy of your world: 77 documents, shelves open and shut, and clicking a row opens it, with no errors.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Your calls</h2>
+    <ol class="q">
+      <li><b>Named sizes, or panels that give way by themselves?</b> I recommend named sizes. They're readable, and other parts can use them too. The other way: each panel gets a number for its order, and the painter shuts panels whenever the page would get narrower than its measure. That needs no width numbers, but nothing else can use it.</li>
+      <li><b>The numbers.</b> Rail shuts under 1460, comments under 1080, page 780. These are lens lines, so they're easy to change later.</li>
+      <li><b>Overlay at small sizes.</b> Opening a panel when the window is too small lays it over the page instead of squeezing the text. Is that right?</li>
+      <li><b>The <code>view</code> word.</b> Should JEFF be allowed to open panels on your windows, or only you?</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>What would change my mind</h2>
+    <ul class="plain">
+      <li>If apps keep needing numbers that depend on panel widths, sizes are the wrong unit, and the give-way rule is better.</li>
+      <li>If you want the open panels to follow you between windows or machines, that's a preference rather than screen state, and it belongs in the world.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+(()=>{
+  const SIZES=[['narrow',0],['middle',1080],['wide',1460]];
+  const P={rail:{side:'left',w:292,shutWhen:['narrow','middle'],el:document.getElementById('p-rail'),btn:document.getElementById('t-rail')},
+           comments:{side:'right',w:300,shutWhen:['narrow'],el:document.getElementById('p-comments'),btn:document.getElementById('t-comments')}};
+  const st={width:1500,size:null};for(const k in P)Object.assign(P[k],{open:true,by:null,over:false});
+  const range=document.getElementById('w'),vp=document.getElementById('vp'),win=document.getElementById('win'),body=document.getElementById('body');
+  let scrim=null;
+  const sizeOf=w=>SIZES.filter(s=>w>=s[1]).pop()[0];
+  function applySize(){
+    const s=sizeOf(st.width);if(s===st.size)return;st.size=s;
+    for(const k in P){const p=P[k];p.over=false;
+      if(p.shutWhen.includes(s)){if(p.open||p.by!=='you'){p.open=false;p.by=p.by==='you'?'you':'size'}}
+      else if(p.by==='size'){p.open=true;p.by=null}}
+  }
+  function toggle(k,want){const p=P[k];const open=want===undefined?!p.open:want;
+    p.open=open;p.by=open?null:'you';p.over=open&&p.shutWhen.includes(st.size);
+    if(p.over)for(const o in P)if(o!==k&&P[o].over){P[o].over=false;P[o].open=false;P[o].by='size'}
+    paint()}
+  function paint(){
+    const scale=Math.min(1,vp.clientWidth/1720);win.style.width=st.width+'px';win.style.transform=`scale(${scale})`;vp.style.height=Math.round(560*scale)+'px';
+    document.getElementById('wnum').textContent=st.width+' px';document.getElementById('sizechip').textContent=st.size;
+    for(const k in P){const p=P[k];p.el.classList.toggle('shut',!p.open);p.el.classList.toggle('over',p.open&&p.over);
+      p.btn.setAttribute('aria-pressed',String(p.open));p.btn.title=(p.open?'Shut ':'Open ')+(k==='rail'?'documents':'comments')}
+    const anyOver=Object.values(P).some(p=>p.open&&p.over);
+    if(anyOver&&!scrim){scrim=document.createElement('button');scrim.className='scrim';scrim.setAttribute('aria-label','Shut the panel');
+      scrim.onclick=()=>{for(const k in P)if(P[k].over){P[k].over=false;P[k].open=false;P[k].by='size'}paint()};
+      body.insertBefore(scrim,document.getElementById('p-comments'))}
+    if(!anyOver&&scrim){scrim.remove();scrim=null}
+    for(const ln of document.querySelectorAll('#lens .ln[data-k]')){const k=ln.dataset.k;
+      ln.classList.toggle('hot',k==='sizes'||(P[k]&&P[k].shutWhen.includes(st.size)))}
+    const line=(k)=>{const p=P[k];const v=p.open?(p.over?'open, over the page':'open'):(p.by==='you'?'shut, by you':'shut, by size');
+      return '  '+k.padEnd(10)+v};
+    document.getElementById('readout').textContent='> look-view writing\nwriting · size '+st.size+' ('+st.width+' px)\n'+line('rail')+'\n'+line('comments')+
+      '\n\nnot recorded: this is the window\'s own view';
+  }
+  range.addEventListener('input',()=>{st.width=+range.value;applySize();paint()});
+  P.rail.btn.addEventListener('click',()=>toggle('rail'));P.comments.btn.addEventListener('click',()=>toggle('comments'));
+  for(const b of document.querySelectorAll('.cmd'))b.addEventListener('click',()=>{const [k,v]=b.dataset.cmd.split('=');toggle(k,v==='open')});
+  addEventListener('resize',paint);
+  applySize();paint();
+})();
+</script>

@@ -20,7 +20,7 @@ board = load("music_board_install", LAB / "apps/taskboard/install.py")
 painter = load("music_painter_install", LAB / "painter/install.py")
 Q = board.quote
 GRANTS = ("window.surface rows look look-view history components help component-health component-action "
-          "hear:make hear:set hear:forget hear:undo hear:component hear:component-action "
+          "hear:make hear:set hear:forget hear:undo hear:component hear:component-action hear:view "
           "media.now media.pause media.resume media.next media.prev media.shuffle media.repeat")
 
 
