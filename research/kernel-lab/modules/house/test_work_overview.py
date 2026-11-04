@@ -199,3 +199,24 @@ def test_todays_world_shows_working_builders_and_blockers_by_name():
     for r in got:
         for field in ("title", "owner", "blocker", "resolver"):
             assert not re.search(r"\bdk\d+\b", r[field]), (field, r[field])
+
+
+def project_with(settings_rows, cards, hello):
+    def see(line, use):
+        if line == "rows taskboard-task":
+            return {"rows": cards}
+        return {"rows": list(settings_rows) if line == "rows work-settings" else []}
+    module = SimpleNamespace(see=see, hello=hello)
+    return W.rows(module, {"jeff": SimpleNamespace(person="dk2", name="JEFF")}, SimpleNamespace(rows=lambda m: []), "r")
+
+
+def test_work_settings_are_the_worlds_and_only_the_house_persons():
+    """4 Nov: which lanes hide and what Work says are facts on work-settings, read at each call."""
+    blocked = card(blocker="Needs a key")
+    mine = {"kind": "work-settings", "made_by": "dk2", "word_blocked": "Stuck", "hide_lanes": "now"}
+    theirs = {"kind": "work-settings", "made_by": "dk99", "word_blocked": "Hijacked"}
+    assert project_with([theirs], [blocked], {"for": "dk2"})[0]["state"] == "Blocked"
+    assert project_with([mine], [blocked], {"for": "dk2"}) == []          # lane Now hidden by Alex's setting
+    mine["hide_lanes"] = "done"
+    assert project_with([mine], [blocked], {"for": "dk2"})[0]["state"] == "Stuck"
+    assert project_with([], [blocked], {"for": "dk2"})[0]["state"] == "Blocked"
