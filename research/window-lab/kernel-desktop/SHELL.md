@@ -125,6 +125,10 @@ World things the shell reads, none required (every one has a default):
 
 - `kind=shell-settings`: `show_cpu`, `show_memory` (`yes` shows an optional reading), `dock_apps` (comma list of Agora apps pinned
   to the dock, default `lines,help,board,taskboard,appearance,feed`), `jeff_open` (the line the JEFF popover runs), `wallpaper` (a picture file: the Windows wallpaper; empty puts Alex's own back).
+- `kind=app name=<a dock_apps entry> label= does="window.open <lens>" [icon=agora:<svg>|data:image/...]` (4 Nov): what an
+  app on the dock and in the launcher is called and opens. Only the steward's own count, only ones that open a lens, and
+  the host's own names (viewer, lines, help, thing, tasks and the older built-ins in shell-kit.js) stay the host's. A new
+  app is one `make`, no edit to shell-kit.js; Music is the first (its installer makes it).
 - `kind=button bar=taskbar path=<exe>`: existing taskbar pins; the dock shows them as pinned apps.
 - `kind=window shows=shell-top|shell-dock|shell-desktop`: the three shell windows `window.shell on` makes.
 - Data read: `wm.windows`, `system.now`, `media.now`, `rows notification`, `rows presence`, `rows shell-settings`, `rows any bar=taskbar`, `rows lens`, `wm.title <key>` (live titles, tolerated if refused).
