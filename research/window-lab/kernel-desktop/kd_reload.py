@@ -82,6 +82,8 @@ def main():
     ap.add_argument("only", nargs="*", help="refresh only these modules (and pages if window is named)")
     ap.add_argument("--dry", action="store_true")
     ap.add_argument("--full", action="store_true")
+    ap.add_argument("--skip", nargs="*", default=[], help="leave these modules running (the House skips itself "
+                                                           "while workers run, and restarts later)")
     a = ap.parse_args()
     kd_start, mods, keeper_start = processes()
     if kd_start is None:
@@ -95,7 +97,7 @@ def main():
     stale = {}
     for name, entry, start, _ in mods:
         files = newer(own_files(entry), start) + (proto if proto else [])
-        if files and (not a.only or name in a.only):
+        if files and (not a.only or name in a.only) and name not in a.skip:
             stale[name] = files
     window_start = next((m[2] for m in mods if m[0] == "window"), kd_start)
     since = max(window_start, STAMP.stat().st_mtime if STAMP.exists() else 0)

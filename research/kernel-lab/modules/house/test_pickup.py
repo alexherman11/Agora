@@ -40,8 +40,7 @@ def test_a_finished_review_or_a_failure_wakes_the_owner(manager):
     s = state(manager, 'reviewed'); s['candidate'] = 'c0ffee123456'
     agent = Agent(); manager.h.agents = {'dk99': agent}
     manager.guarded(s, lambda st: None)
-    assert 'passed its independent checks' in agent.woken[-1][0] and 'house.land dk1' in agent.woken[-1][0]
-    assert 'house.snap' in agent.woken[-1][0]
+    assert 'passed its checks' in agent.woken[-1][0] and 'house.land dk1' in agent.woken[-1][0]
 
     def fails(st):
         raise RuntimeError('main conflicts with this worker in house.py')
@@ -54,7 +53,7 @@ def test_a_landing_asks_the_owner_to_check_it_and_tell_jeff(manager):
     agent = Agent(); manager.h.agents = {'dk99': agent}
     manager.guarded(s, lambda st: None)
     text = agent.woken[-1][0]
-    assert 'landed on main (abc123456)' in text and 'tell JEFF in Shop talk' in text and 'looks good' in text
+    assert 'landed on main (abc123456)' in text and 'tell JEFF in Shop talk' in text and 'house.snap' in text
 
 
 def test_work_nobody_can_pick_up_goes_to_jeff(manager):
@@ -111,8 +110,18 @@ def test_the_house_start_tells_each_owner_once_about_cut_off_workers(manager):
     agent = Agent(); agent.person = 'dk99'; manager.h.agents = {'dk99': agent}
     manager.wake_cut_off()
     manager.wake_cut_off()
-    assert len(agent.woken) == 1 and 'cut these workers off' in agent.woken[0][0]
+    assert len(agent.woken) == 1 and 'cut these older workers off' in agent.woken[0][0]
     assert 'house.tell dk1' in agent.woken[0][0] and s.get('awaiting')
+
+
+def test_a_worker_cut_off_a_little_while_ago_carries_on_by_itself(manager):
+    s = state(manager, 'recovery-needed'); s.update(cut_phase='working', pid=0, session='abc', cut_from=B.stamp())
+    agent = Agent(); agent.person = 'dk99'; manager.h.agents = {'dk99': agent}
+    manager.session = lambda person: manager.fixture_door
+    with patch('builders.threading', SimpleNamespace(Thread=Mock())) as threads:
+        manager.wake_cut_off()
+    assert agent.woken == [] and threads.Thread.call_count == 1 and s['phase'] == 'preparing'
+    assert 'Carry on with your task.' in s['pending']
 
 
 def test_workers_on_finished_cards_nag_nobody(manager):

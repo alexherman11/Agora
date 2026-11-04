@@ -9,6 +9,8 @@ house: the module that runs the world's agents (MOVING-IN D3). Python, the kerne
 An agent is a person in the world with a `house-agent` thing saying how it runs:
     make kind=house-agent name=JEFF person=<person> signer=jeff provider=claude model=claude-opus-5-5 reasoning=medium
          fallback_provider=codex fallback_model=gpt-6-astra soul=<thing> charter=<thing> speaks=text want=awake
+    Its system prompt is prompt=<thing> (its own, optional) followed by charter=<thing> (the standing rules), both read
+    again at every wake: an edit to either restarts its process under the new prompt, keeping the conversation.
     wake_policy=addressed skips warm starts and task-change wakes while retaining next_steps=on context.
     Chat addresses and explicit house.wake still reach it; compaction continues its addressed conversation.
 
@@ -34,6 +36,7 @@ live.py), never into the log. Transcripts and state stay in <world>/modules/hous
 
 Off switch: off house (every agent's process ends with it).
 """
+import hashlib
 import json
 import re
 import os
@@ -134,7 +137,13 @@ class Agent:
         return self.cfg["person"]
 
     def provider(self):
-        """The provider in use: the fallback while the preferred one's plan is used up (quota_policy's rule)."""
+        """The provider in use: the fallback while the preferred one's plan is used up (quota_policy's rule).
+        Alex, 4 Nov: the fallback holds only for the model whose plan ran out. Choosing another model on the
+        house-agent thing ends it (JEFF sat on the fallback from 28 Oct to 4 Nov because nothing ever cleared it)."""
+        if self.state.get("on_fallback") and self.state.get("fallback_from") != [
+                self.cfg.get("provider", "claude"), self.cfg.get("model", "")]:
+            self.state.pop("on_fallback", None)
+            self.state.pop("fallback_from", None)
         if self.state.get("on_fallback") and self.cfg.get("fallback_provider"):
             return (self.cfg["fallback_provider"], self.cfg.get("fallback_model", ""),
                     self.cfg.get("fallback_reasoning") or self.cfg.get("reasoning", "medium"))
@@ -161,7 +170,8 @@ class Agent:
             raise RuntimeError(f"no door session for {self.name} (signer {self.cfg.get('signer')})")
         self.token_file().write_text(token, encoding="utf-8")
         self.door = Door(token)
-        charter = self.house.charter_text(self.cfg.get("charter"))
+        charter = self.house.system_text(self)
+        self.state["system_sha"] = hashlib.sha256(charter.encode("utf-8")).hexdigest()
         (self.dir / "charter.txt").write_text(charter, encoding="utf-8")
         mcp = T.mcp_config(URL, self.token_file(), self.dir / "mcp.json")
         session = self.state.get("session") if self.state.get("session_provider") == provider else None
@@ -214,6 +224,14 @@ class Agent:
         if self.cfg.get("want", "awake") == "asleep" or not self.inbox:
             return
         try:
+            # its system prompt (prompt= and charter=) is read at each wake: an edit ends the old process, and the
+            # conversation resumes under the new prompt (Alex, 4 Nov: he writes JEFF's prompt in Writing)
+            if self.child and self.child.alive():
+                text = self.house.system_text(self)
+                if hashlib.sha256(text.encode("utf-8")).hexdigest() != self.state.get("system_sha"):
+                    self.log("restart", "its system prompt changed")
+                    self.child.stop()
+                    self.child = None
             if not (self.child and self.child.alive()):
                 self.start()
         except Exception as exc:                      # noqa: BLE001
@@ -326,7 +344,8 @@ class Agent:
                     # its plan is used up: the fallback takes over with a fresh conversation, and what it was told
                     # is said again there (quota_policy: only a verified limit switches, never an auth failure)
                     self.log("quota", ev["detail"])
-                    self.state.update(on_fallback=now_s(), quota=ev["detail"][:200])
+                    self.state.update(on_fallback=now_s(), quota=ev["detail"][:200],
+                                      fallback_from=[self.cfg.get("provider", "claude"), self.cfg.get("model", "")])
                     self.inbox.insert(0, {"text": "~ (said again: your other model's plan ran out mid-turn)\n"
                                                   + self.state.get("last_sent", ""), "chat": self.turn.get("chat"),
                                           "at": self.turn.get("woken", time.time())})
@@ -591,6 +610,15 @@ class House:
         text = str(rows[0].get("text") or "").strip()
         return ("## Alex's standing rules (look " + cid + " is the live one)\n\n" + text) if text else \
             f"charter: not read: {cid} is empty or gone; tell Alex."
+
+    def system_text(self, a):
+        """An agent's system prompt: its own prompt=<thing> (written by Alex), then the standing rules (charter=)."""
+        charter = self.charter_text(a.cfg.get("charter"))
+        if not a.cfg.get("prompt"):
+            return charter
+        rows = self.m.see(f"look {a.cfg['prompt']}").get("rows") or [{}]
+        own = str(rows[0].get("text") or "").strip()
+        return (own + "\n\n" + charter) if own else charter
 
     def welcome(self, a):
         cfg = a.cfg
@@ -912,6 +940,10 @@ class House:
             return self.builders.request_review(msg)
         if word == "house.land":
             return self.builders.land(msg)
+        if word == "house.release":
+            return self.builders.release(msg)
+        if word == "house.stop" and args.get("target") in self.builders.states:
+            return self.builders.halt(msg)           # a card: stop its worker (owner, steward or Alex)
         if word in ("house.log", "house.activity") and args.get("target") in self.builders.states:
             state = self.builders.states[args["target"]]
             if not self.m.see("look " + (state.get("chat") or state["task"]), use=msg.get("use")).get("rows"):
@@ -950,6 +982,9 @@ class House:
             a.wake(f"~ {by} woke you (house.wake)" + (f": {words}" if words else ""))
             return {"text": f"{a.name} is {'woken' if a.busy else 'told'}; it answers in its own time", "external": True}
         if word == "house.stop":
+            caller = (msg.get("caller") or {}).get("person")
+            if not (self.builders.steward(caller) or self.builders.alex(caller)):
+                return {"refused": "house.stop <person> is for stewards; house.stop <card> stops a worker you own"}
             a.stop("house.stop")
             return {"text": f"{a.name}'s process ended; the next line to it starts it again", "external": True}
         return {"refused": f"the house has no word {word}"}
@@ -1060,8 +1095,9 @@ OFFER = [
              "thread and worktree. Its owner, the card's lead, a steward or Alex may tell it; others are refused. A "
              "running worker reads them at its next turn boundary; a stopped one (received, blocked, reviewed) resumes "
              "with them in a new turn. Its owner is still woken at each turn end, and so is anyone else who told it. "
-             "Landed or released work does not restart (house.build starts a new run); held cards, uncertain or "
-             "recovery-needed workers, and work under review or landing are refused."},
+             "Landed or released work does not restart (house.build starts a new run). When every slot is busy, it "
+             "starts with your words by itself as soon as one frees. A paused (held) card and work being landed "
+             "are refused."},
     {"word": "house.hand", "kind": "do", "needs": TASK_NEEDS, "takes": "<id> <name>", "undo": "external", "may": "members",
      "help": "house.hand <task> <name>: give a card's worker, and the card, to another resident, who is in charge of it "
              "from then on: woken at its turn ends, answers it with house.tell, reviews and lands it. Its owner, a "
@@ -1086,7 +1122,13 @@ OFFER = [
     {"word": "house.review", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "members",
      "help": "house.review <task>: independently check a received committed result against current main, including hidden desktop checks. Does not land or close it."},
     {"word": "house.land", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "members",
-     "help": "house.land <task>: publish the exact reviewed source if main and ownership still match. Activation and owner verification remain separate."},
+     "help": "house.land <task>: one step. The House commits what the worker left, runs the checks, lands it on main "
+             "and switches it on (restarts what it touched; a change to the House itself restarts the House once "
+             "nobody is busy). You hear once, when it is live or what stopped it. One landing at a time; the next "
+             "waits its turn."},
+    {"word": "house.release", "kind": "do", "needs": TASK_NEEDS, "takes": "<id> [<why>]", "undo": "external", "may": "members",
+     "help": "house.release <task> [why]: the card's worker ends for good (stopped first if running). Its worktree and "
+             "branch are kept; the card is free for a new worker. Its owner, a steward or Alex may release it."},
     {"word": "house.active", "kind": "see", "takes": "",
      "help": "house.active: visible cards being worked on or blocked, with holder, blocker and resolver. Finished, queued and released work hides automatically."},
     {"word": "house.who", "kind": "see", "takes": "",
@@ -1101,9 +1143,10 @@ OFFER = [
     {"word": "house.wake", "kind": "do", "takes": "<id> [<words>]", "undo": "external", "may": "members",
      "help": "house.wake <person> [words]: wake an agent now with your words. Usually you need not: saying @name in a "
              "chat, or any line in its closed chat, wakes it. It answers in its own time."},
-    {"word": "house.stop", "kind": "do", "takes": "<id>", "undo": "external", "may": "stewards",
-     "help": "house.stop <person>: end an agent's process now (mid-turn too). The next line to it starts it again; "
-             "set its house-agent want=asleep to keep it asleep."},
+    {"word": "house.stop", "kind": "do", "takes": "<id>", "undo": "external", "may": "members",
+     "help": "house.stop <card>: stop that card's worker mid-turn; it keeps its worktree, and house.tell starts it again "
+             "with new words (its owner, a steward or Alex). house.stop <person> (stewards): end an agent's process "
+             "now; the next line to it starts it again; set its house-agent want=asleep to keep it asleep."},
 ]
 
 

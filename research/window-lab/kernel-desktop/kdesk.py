@@ -54,6 +54,7 @@ VENV_PY = HERE.parents[2] / ".venv/Scripts/python.exe"
 if not VENV_PY.is_file():
     VENV_PY = Path(sys.prefix) / "Scripts/python.exe"
 STEWARD_ACCOUNT = "desktop:alex"
+ADAPTERS = HERE.parents[1] / "kernel-lab/modules/adapters/adapters.py"
 
 WINDOW_GRANTS = "window.* make set forget rows look who failed hear:make hear:set hear:forget hear:undo hear:off"
 GUY_GRANTS = "guy.* window.list window.overlay rows look holds hear:window.opened"
@@ -83,7 +84,9 @@ def module_specs(headless=False):
          "grants": SYSTEM_GRANTS, "for": "steward"},
         {"name": "media", "run": [py, str(HERE / "kd_media.py")] + tail, "publishes": "media.*",
          "grants": MEDIA_GRANTS, "for": "steward"},
-        {"name": "twitch", "run": [str(VENV_PY), str(HERE / "kd_twitch.py")] + tail, "publishes": "twitch.*",
+        # an adapter (kernel-lab/modules/adapters): the one adapter source, run as the module named twitch; what it
+        # reads and where it writes is the adapter thing named twitch, in the world
+        {"name": "twitch", "run": [str(VENV_PY), str(ADAPTERS)] + tail, "publishes": "twitch.*",
          "grants": "rows chat.receive", "only": "kind:chat,said", "for": "steward"},
         {"name": "house", "run": [py, str(HERE.parents[1] / "kernel-lab/modules/house/house.py")],
          "publishes": "house.*", "grants": HOUSE_GRANTS, "for": "steward"},
@@ -107,7 +110,8 @@ ABOUT = {"window": "the window host: it makes the Agora windows on this desktop 
          "system": "what this machine is doing (CPU, memory, network, volume, battery, the window in front), for the "
                    "bars' widgets and system.now",
          "media": "the media words (media.play, media.next, media.prev, media.now) through Windows' media session",
-         "twitch": "read-only anonymous Twitch chat; twitch.now reads connection state; off twitch disconnects",
+         "twitch": "read-only anonymous Twitch chat, an adapter: its settings (channel, into) and text are the adapter "
+                   "thing named twitch; twitch.now reads connection state; off twitch disconnects",
          "summarize": "local task summaries with honest literal fallback; off summarize stops it",
          "house": "the house: runs the world's agents (JEFF first), wakes one only when someone addresses it (@name, "
                   "its closed chat such as the Conversation, a task given to it, house.wake); house.who says what each "
@@ -142,6 +146,12 @@ def after_genesis(k, headless=False):
                         todo.append((g,'words',words+' holds'))
             if ABOUT.get(name) and not k.state.get(m, "about"):
                 todo.append((m, "about", ABOUT[name]))
+            # a module whose program is gone from source (4 Nov: kd_twitch.py became the adapter source) follows what
+            # source now runs it with; a run someone pointed at a program that exists is theirs and stays
+            spec = next((s for s in module_specs(headless) if s["name"] == name), None)
+            run = k.state.get(m, "run") or []
+            if spec and run != spec["run"] and not all(Path(a).is_file() for a in run[1:2]):
+                todo.append((m, "run", spec["run"]))
         widen = []
         for m in k.things("module"):
             spec = next((s for s in module_specs(headless) if s["name"] == k.state.get(m, "name")), None)

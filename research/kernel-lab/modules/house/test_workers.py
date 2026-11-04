@@ -32,7 +32,8 @@ def test_claude_and_codex_pools_fill_separately(manager):
     with patch('builders.threading', SimpleNamespace(Thread=Mock())):
         for i, t in enumerate(('dk1', 'dk2', 'dk3', 'dk4')):
             assert manager.start(dict(msg(t), args=dict(target=t, kv={'with': 'claude'}))).get('external')
-        assert 'claude workers are busy' in manager.start(dict(msg('dk5'), args=dict(target='dk5', kv={'with': 'claude'})))['refused']
+        assert 'claude workers are busy' in manager.start(dict(msg('dk5'), args=dict(target='dk5', kv={'with': 'claude'})))['text']
+        assert manager.states['dk5']['phase'] == 'queued'               # 4 Nov: it waits its turn, never refused
         assert manager.start(msg('dk6')).get('external')            # a Codex worker still starts
     s = manager.states['dk1']
     assert s['provider'] == 'claude' and s['model'] == 'claude-opus-5-5' and s['name'].startswith('Claude — ')
@@ -71,7 +72,7 @@ def test_a_finished_turn_goes_to_the_chat_and_wakes_the_resident_there(manager):
     said = [w for w in manager.fixture_door.writes if w[1].startswith('say dk50 ')]
     assert said and 'the dock unpins now' in said[0][1]
     text, chat = agent.woken[0]
-    assert chat is None and 'the dock unpins now' in text and 'house.tell dk1' in text and 'house.review dk1' in text
+    assert chat is None and 'the dock unpins now' in text and 'house.tell dk1' in text and 'house.land dk1' in text
 
 
 def test_what_the_resident_says_during_its_turn_starts_the_worker_after_it(manager):

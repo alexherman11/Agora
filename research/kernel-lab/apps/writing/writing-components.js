@@ -421,8 +421,12 @@ function wrToJeff(words,quote,doc){
 }
 
 // ---- writing-shell -----------------------------------------------------------------------------------------------------
+// window.wrSeeded: the target this page has already opened (one window per page; kept on the page, since component
+// code can be evaluated again on a repaint)
 function mountShell(api,s){
   const view=api.view(),root=api.part('body','div',{class:'wr-shell'});
+  // window.open writing <document> starts on that document (the window's $view.target), once
+  if(view.target&&window.wrSeeded!==view.target){window.wrSeeded=view.target;queueMicrotask(()=>api.select({open:view.target,back:view.open||''}))}
   const back=view.back&&view.back!==view.open;
   const top=wrEl('header',{class:'wr-top'},wrEl('div',{class:'wr-brand'},wrEl('i',{},'✎'),s.title||'Writing'));
   if(back)top.append(wrEl('button',{type:'button',class:'wr-btn','aria-label':'Back to the document before',title:'Back (Alt+←)',on:{click:()=>api.select({open:view.back,back:view.open})}},wrIcon('back'),'Back'));

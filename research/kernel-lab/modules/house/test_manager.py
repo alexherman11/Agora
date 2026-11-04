@@ -32,7 +32,8 @@ def test_three_tasks_dispatch_as_requester_without_escalation(manager):
         for task in ('dk1','dk2'):
             assert M.dispatch(manager,request(task)).get('external')
             assert manager.states[task]['manager']=='dk99'
-        assert 'refused' in M.dispatch(manager,request('dk3'))  # pool of two
+        assert 'starts by itself' in M.dispatch(manager,request('dk3'))['text']  # pool of two: it waits its turn
+        assert manager.states['dk3']['phase']=='queued'
         assert threads.Thread.call_count==2
         assert threads.Thread.return_value.start.call_count==2
         assert [call.kwargs['args'][0]['task'] for call in threads.Thread.call_args_list]==['dk1','dk2']
