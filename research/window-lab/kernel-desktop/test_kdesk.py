@@ -5,6 +5,7 @@ appears on the screen). Everything is said as lines over HTTP, as Alex's pages a
     C:/Projects/Agora4/.venv/Scripts/python.exe -m unittest test_kdesk -v        (from research/window-lab/kernel-desktop)
 """
 import json
+import struct
 import os
 import shutil
 import sys
@@ -184,6 +185,27 @@ class DesktopTest(unittest.TestCase):
         self.assertEqual(1, sum(1 for x in d.windows() if x["shows"] == "page"))
         for far in ("https://example.com/", "http://192.168.1.4:8794/", "file:///C:/Windows/win.ini", "http://127.0.0.1/"):
             self.assertIn("this machine only", d.say(f'window.open url="{far}"')["text"], far)
+
+    def test_a_picture_of_a_view_is_a_file_that_a_line_hands_on(self):
+        # 4 Nov, the wallpaper pilot: window.picture draws what window.open would show, hidden, and hands it back as
+        # the caller's own file; in a line, `; ... $new` passes it on (the world rule that makes the theme the
+        # wallpaper is this line on theme.changed). The window module may make files only once a steward says so.
+        d = self.d
+        mod = next(r["id"] for r in d.say("rows module", "alex")["rows"] if r.get("name") == "window")
+        refused = d.say("window.picture help size=320x200", "alex")
+        self.assertFalse(refused.get("ok"), refused["text"])
+        self.assertIn("upload", refused["text"])
+        self.assertTrue(d.say(f'grant {mod} words="upload" only=kind:file', "alex")["ok"])
+        sid = d.say('make kind=shell-settings name="Shell settings"', "alex")["made"][0]
+        out = d.say(f'window.picture help size=320x200 name="Help picture" ; set {sid} wallpaper=$new', "alex")
+        self.assertTrue(out["ok"], out["text"])
+        fid = d.say("rows shell-settings", "alex")["rows"][0]["wallpaper"]
+        f = next(r for r in d.say("rows file", "alex")["rows"] if r["id"] == fid)
+        self.assertEqual(("image/png", "Help picture"), (f["mime_type"], f["name"]))
+        data = (Path(d.dir) / "world" / "blobs" / f["blob_hash"]).read_bytes()
+        self.assertEqual(b"\x89PNG", data[:4])
+        self.assertEqual((320, 200), struct.unpack(">II", data[16:24]))     # the PNG's own width and height
+        self.assertIn("no view, lens or thing", d.say("window.picture nothing-called-this", "alex")["text"])
 
     def test_off_window_closes_all_and_undo_brings_them_back(self):
         d = self.d

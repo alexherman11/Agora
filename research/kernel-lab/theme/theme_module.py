@@ -73,6 +73,9 @@ OFFER = [
              "wallpaper=preset:dusk: change a theme you made. Every value is checked; an empty value drops an override."},
     {"word": "theme.preview", "kind": "see", "takes": "<theme> path=value ...", "may": "anyone",
      "help": "theme.preview <theme> path=value ...: what theme.edit would give, as variables for a preview. Writes nothing."},
+    {"word": "theme.changed", "kind": "hear", "takes": "", "may": "anyone",
+     "help": "theme.changed: heard when the look changes (a theme used, tried, kept, reverted or edited, or a trial "
+             "ending). A rule can act on it: rule on=theme.changed do=\"...\" (the wallpaper follows the theme this way)."},
     {"word": "theme.options", "kind": "see", "takes": "[theme=<theme>]", "may": "anyone",
      "help": "theme.options: the safe fonts, radii, shadows, motion curves and wallpaper presets an editor may offer."},
     {"word": "theme.native", "kind": "see", "takes": "", "may": "anyone",

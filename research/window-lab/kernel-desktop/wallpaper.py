@@ -1,51 +1,46 @@
-r"""wallpaper: the theme's wallpaper as the real Windows wallpaper (Claude, 27 Oct 2026).
+r"""EDITING THE DESKTOP HOST (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+This file is a seam between the world and Windows: it turns world facts into screen effects and screen events into world
+facts, through small words. It holds no preferences and no content. Which apps, what a button opens, sizes, names, ids and
+who may do what live in settings things it reads (shell-settings, wm-settings). It does not seed the world at start
+(people, chats, pins). New behaviour is a rule over the words offered here. Before writing a Windows or browser helper,
+use the shared one (gaming_gate for full-screen and desktop tests, widget_browser for hidden pages) instead of a copy.
 
-Alex, 27 Oct: "render the theme's wallpaper to an image, set it as my real Windows wallpaper, and drop the full-screen
-wallpaper window. Keep an off switch that puts my old wallpaper back."
+wallpaper: the Windows wallpaper, saved, set and put back. Only the seam; what the wallpaper shows is the world's.
 
-The desktop page (pages/shell/desktop.html, the same drawing the bars copy behind themselves) is rendered once in hidden
-headless Edge at the monitor's real size and saved as a PNG; that file becomes the Windows wallpaper (Fill, 1:1). Nothing
-of ours runs over the desktop afterwards: the desktop icons are back, and a click on the wallpaper is a click on Windows'
-own desktop. A new theme is rendered again (the window module asks for the theme's hash every few seconds).
+The window module (kd_window.follow_wallpaper) calls apply() with the picture `Shell settings` names (wallpaper=<file>)
+and restore() when the setting is emptied. What fills the setting is a rule in the world, e.g. the theme's wallpaper:
+
+    rule on=theme.changed do="window.picture shell-desktop size=screen name=\"Agora wallpaper\" ; set <Shell settings> wallpaper=$new"
+
+and a photo of Alex's own is `set <Shell settings> wallpaper=<file>`. (27 Oct this file also drew the theme and asked for
+its hash every 5 s; 4 Nov that became window.picture plus the rule above. research/source-edits/SOURCE-EDITS-AUDIT.md.)
 
 The off switch. Before the first change, the wallpaper as it was (its file, its style, and a copy of the picture, since a
 Spotlight picture is a cache file Windows rotates away) is saved in state/wallpaper/before.json. restore() puts it back
-and forgets the save. window.shell off does it, and so does this, with or without the desk running:
+and forgets the save. Emptying the setting does it (and undo brings Agora's back); so does this, with or without the desk:
 
     .venv/Scripts/python.exe research/window-lab/kernel-desktop/wallpaper.py restore
 
 Windows has no supported call that turns Windows Spotlight back on, so a Spotlight desktop comes back as the Spotlight
-picture it showed; the command line restore then opens Settings > Background, where Spotlight is one pick. The command
-line restore also leaves a mark (state/wallpaper/off) so the desk does not set the theme's wallpaper again on its next
-start; `wallpaper.py on` takes the mark away.
+picture it showed; the command line restore then opens Settings > Background, where Spotlight is one pick. It also
+leaves a mark (state/wallpaper/off) so the desk leaves the wallpaper alone until `wallpaper.py on`.
 
 Documented calls only: SystemParametersInfoW(SPI_SETDESKWALLPAPER) and the WallpaperStyle / TileWallpaper values under
 HKCU\Control Panel\Desktop. AGORA_DESKTOP_LAYER=bottom (or workerw) brings the old wallpaper window back instead.
 """
-import base64
 import ctypes
-import hashlib
 import json
 import os
 import shutil
-import socket
-import struct
-import subprocess
 import sys
-import tempfile
-import threading
 import time
-import urllib.error
-import urllib.request
 import winreg
 from pathlib import Path
-from urllib.parse import quote, urlsplit
 
 HERE = Path(__file__).resolve().parent
 STATE = HERE / "state" / "wallpaper"
 BEFORE = STATE / "before.json"
 OFF = STATE / "off"                   # made by `wallpaper.py restore`: the desk leaves the wallpaper alone until `on`
-EDGE = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 DESK_KEY = r"Control Panel\Desktop"
 WALLPAPERS_KEY = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Wallpapers"
 SPI_SETDESKWALLPAPER = 0x0014
@@ -55,11 +50,6 @@ SPOTLIGHT = 3                         # Explorer\Wallpapers BackgroundType: 0 pi
 user32 = ctypes.WinDLL("user32", use_last_error=True)
 user32.SystemParametersInfoW.argtypes = [ctypes.c_uint, ctypes.c_uint, ctypes.c_wchar_p, ctypes.c_uint]
 user32.SystemParametersInfoW.restype = ctypes.c_int
-
-
-def enabled():
-    """The theme's wallpaper as Windows' own is the default; AGORA_DESKTOP_LAYER=bottom|workerw keeps the old window."""
-    return os.environ.get("AGORA_DESKTOP_LAYER", "system") == "system"
 
 
 # ------------------------------------------------------------------------------------------------ Windows' wallpaper
@@ -118,12 +108,12 @@ def save_before():
 
 
 def apply(png):
-    """Make `png` the Windows wallpaper (saving the old one first). -> 'set' or 'already'."""
+    """Make the picture `png` the Windows wallpaper (saving the old one first). -> 'set' or 'already'."""
     save_before()
     if current()["path"].lower() == str(png).lower():
         return "already"
     _set(png)
-    for old in STATE.glob("agora-*.png"):
+    for old in STATE.glob("agora-*.*"):
         if old.resolve() != Path(png).resolve():
             try:
                 old.unlink()
@@ -151,200 +141,6 @@ def restore(open_settings=False):
     return said
 
 
-# ------------------------------------------------------------------------------------------------ rendering
-class CDP:
-    """The few DevTools calls the render needs, over a plain websocket (as hidden_evidence.py)."""
-    def __init__(self, url):
-        p = urlsplit(url)
-        self.s = socket.create_connection((p.hostname, p.port), timeout=30)
-        key = base64.b64encode(os.urandom(16)).decode()
-        self.s.sendall((f"GET {p.path} HTTP/1.1\r\nHost: {p.netloc}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
-                        f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n").encode())
-        got = b""
-        while not got.endswith(b"\r\n\r\n"):
-            got += self.s.recv(1)
-        if b"101" not in got.splitlines()[0]:
-            raise OSError("DevTools refused the socket")
-        self.seq = 0
-
-    def _read(self, n):
-        out = b""
-        while len(out) < n:
-            b = self.s.recv(n - len(out))
-            if not b:
-                raise EOFError("DevTools closed")
-            out += b
-        return out
-
-    def _receive(self):
-        first, second = self._read(2)
-        size = second & 127
-        if size == 126:
-            size = struct.unpack("!H", self._read(2))[0]
-        elif size == 127:
-            size = struct.unpack("!Q", self._read(8))[0]
-        mask = self._read(4) if second & 128 else None
-        data = self._read(size)
-        if mask:
-            data = bytes(x ^ mask[i % 4] for i, x in enumerate(data))
-        return json.loads(data)
-
-    def call(self, method, **params):
-        self.seq += 1
-        data = json.dumps({"id": self.seq, "method": method, "params": params}).encode()
-        mask, n = os.urandom(4), len(data)
-        head = bytes((0x81, 0x80 | (n if n < 126 else 126 if n < 65536 else 127)))
-        if n >= 126:
-            head += struct.pack("!H" if n < 65536 else "!Q", n)
-        self.s.sendall(head + mask + bytes(x ^ mask[i % 4] for i, x in enumerate(data)))
-        while True:
-            r = self._receive()
-            if r.get("id") == self.seq:
-                if "error" in r:
-                    raise RuntimeError(r["error"])
-                return r.get("result") or {}
-
-    def js(self, expression):
-        r = self.call("Runtime.evaluate", expression=expression, returnByValue=True, awaitPromise=True)
-        return (r.get("result") or {}).get("value")
-
-
-# The page is drawn when its theme is in, and a picture wallpaper has loaded (it is a CSS background, not an <img>).
-DRAWN = """(() => {
-  if (!window.__ready) return false;
-  const w = document.querySelector('.wall');
-  if (!w) return false;
-  const bg = getComputedStyle(w).backgroundImage || '';
-  if (!/url\\(/.test(bg)) return true;
-  return performance.getEntriesByType('resource').some(e => /theme-wallpaper/.test(e.name) && e.responseEnd > 0);
-})()"""
-
-
-def render(port, token, out, size, scale):
-    """Draw the desktop page at `size` real pixels (`scale` real pixels per CSS pixel) into the PNG `out`. Hidden:
-    headless Edge with its own throwaway profile, no window."""
-    w, h = size
-    cw, ch = round(w / scale), round(h / scale)
-    STATE.mkdir(parents=True, exist_ok=True)
-    tmp = tempfile.mkdtemp(prefix="edge-", dir=STATE)
-    proc = subprocess.Popen([EDGE, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
-                             "--remote-debugging-port=0", "--remote-allow-origins=*", "--disable-background-networking",
-                             "--hide-scrollbars", "--mute-audio", "--user-data-dir=" + tmp, "about:blank"],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=0x08000000)
-    cdp = None
-    try:
-        active = Path(tmp) / "DevToolsActivePort"
-        end = time.monotonic() + 30
-        dport = None
-        while dport is None and time.monotonic() < end:
-            try:                       # Edge may still hold the file it is writing (a PermissionError, seen live 27 Oct)
-                dport = active.read_text().splitlines()[0]
-            except (OSError, IndexError):
-                time.sleep(0.1)
-        if dport is None:
-            raise TimeoutError("headless Edge did not start in 30 s")
-        pages = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{dport}/json/list", timeout=10).read())
-        cdp = CDP(next(p["webSocketDebuggerUrl"] for p in pages if p["type"] == "page"))
-        cdp.call("Page.enable")
-        cdp.call("Emulation.setDeviceMetricsOverride", width=cw, height=ch, deviceScaleFactor=scale, mobile=False,
-                 screenWidth=cw, screenHeight=ch)
-        page = "/desk/shell/desktop.html?hide=1&sx=0&sy=0&sw=%d&sh=%d" % (cw, ch)
-        cdp.call("Page.navigate", url=f"http://127.0.0.1:{port}/dev/signin?token={quote(token)}&next={quote(page)}")
-        end = time.monotonic() + 30
-        while not cdp.js(DRAWN):
-            if time.monotonic() > end:
-                raise TimeoutError("the desktop page did not draw in 30 s")
-            time.sleep(0.2)
-        time.sleep(0.5)                               # one more frame for the dim layer and a decoded picture
-        shot = cdp.call("Page.captureScreenshot", format="png", fromSurface=True)
-        data = base64.b64decode(shot["data"])
-        tmp_out = Path(str(out) + ".part")
-        tmp_out.write_bytes(data)
-        os.replace(tmp_out, out)
-        return out
-    finally:
-        try:
-            if cdp:
-                cdp.call("Browser.close")
-        except Exception:
-            pass
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.terminate()
-        for _ in range(10):
-            try:
-                shutil.rmtree(tmp)
-                break
-            except OSError:
-                time.sleep(0.5)
-
-
-def theme_hash(port, token):
-    """-> the hash of the theme the desktop's owner wears now (the door's theme.json)."""
-    req = urllib.request.Request(f"http://127.0.0.1:{port}/desk/theme.json", headers={"Authorization": "Bearer " + token})
-    with urllib.request.urlopen(req, timeout=10) as r:
-        return json.loads(r.read())["hash"]
-
-
-class Keeper:
-    """While the shell's desktop layer is on, keeps the Windows wallpaper like the theme; when it goes, puts the old
-    wallpaper back. The window module calls want() from each reconcile; the work runs on this thread."""
-    def __init__(self, port, token, size, scale, log):
-        self.port, self.token, self.size, self.scale, self.log = port, token, tuple(size), scale, log
-        self.on = None                 # None until the first reconcile says
-        self.shown = None              # the theme hash on the wallpaper now
-        self.said = ""
-        self.wake = threading.Event()
-        threading.Thread(target=self.run, daemon=True, name="wallpaper").start()
-
-    def want(self, on):
-        if on != self.on:
-            self.on = on
-            self.wake.set()
-
-    def status(self):
-        return self.said
-
-    def step(self):
-        if self.on is None:
-            return
-        if OFF.exists():                              # wallpaper.py restore was run: stay off until wallpaper.py on
-            self.said = "off (wallpaper.py restore); wallpaper.py on brings the theme's wallpaper back"
-            return
-        if not self.on:
-            if BEFORE.exists():
-                self.said = restore(open_settings=False)
-                self.log("wallpaper: " + self.said)
-            self.shown = None
-            return
-        h = theme_hash(self.port, self.token)
-        if h == self.shown:
-            return
-        w, ht = self.size
-        png = STATE / f"agora-{h}-{w}x{ht}.png"
-        if not png.exists():
-            t = time.monotonic()
-            render(self.port, self.token, png, self.size, self.scale)
-            self.log(f"wallpaper: drew theme {h} at {w}x{ht} in {time.monotonic() - t:.1f} s")
-        got = apply(png)
-        self.shown = h
-        self.said = f"the theme's wallpaper is the Windows wallpaper ({got})"
-        self.log("wallpaper: " + self.said)
-
-    def run(self):
-        while True:
-            self.wake.wait(5)
-            self.wake.clear()
-            try:
-                self.step()
-            except Exception as exc:
-                import traceback
-                self.said = f"wallpaper: {exc!r}"
-                self.log(self.said + "\n" + traceback.format_exc(limit=4))
-                self.wake.wait(30)                    # a failing render is not retried every few seconds
-
-
 if __name__ == "__main__":
     what = sys.argv[1] if len(sys.argv) > 1 else "status"
     if what == "restore":
@@ -354,7 +150,7 @@ if __name__ == "__main__":
         print("the desk leaves the wallpaper alone until: wallpaper.py on")
     elif what == "on":
         OFF.unlink(missing_ok=True)
-        print("on: the desk sets the theme's wallpaper again within a few seconds (while the shell is on)")
+        print("on: within a few seconds the desk sets the wallpaper Shell settings names again")
     elif what == "status":
         now = current()
         print(f"Windows wallpaper: {now['path'] or '(none)'} (style {now['style']}, background type {now['background_type']})")

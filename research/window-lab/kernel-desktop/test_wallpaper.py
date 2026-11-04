@@ -71,15 +71,29 @@ class WallpaperOffSwitch(unittest.TestCase):
         self.assertIsNone(wallpaper.save_before())
         self.assertFalse(wallpaper.BEFORE.exists())
 
-    def test_keeper_stays_off_after_a_command_line_restore(self):
+    def host(self):
+        import kd_window
+        h = kd_window.WindowHost.__new__(kd_window.WindowHost)  # only the wallpaper half: no module, no screen
+        h.wall_want, h.wall_said, h.token = None, "", "t"
+        return h
+
+    def test_the_window_host_stays_off_after_a_command_line_restore_and_looks_again(self):
         wallpaper.apply(self.theme("ddd"))
         wallpaper.OFF.write_text("off")
         wallpaper.restore()
-        k = wallpaper.Keeper.__new__(wallpaper.Keeper)
-        k.on, k.shown, k.said, k.log = True, None, "", lambda s: None
-        k.step()                                             # would render and apply if it ignored the mark
+        h = self.host()
+        h.wall_want = "dk1"
+        h._apply_wallpaper("dk1")                            # would fetch and apply if it ignored the mark
         self.assertEqual(Path(self.win.now["path"]).read_bytes(), b"spotlight picture")
-        self.assertIn("wallpaper.py on", k.said)
+        self.assertIn("wallpaper.py on", h.wall_said)
+        self.assertIsNone(h.wall_want, "it looks again next time, so `wallpaper.py on` needs no restart")
+
+    def test_emptying_the_setting_puts_the_old_wallpaper_back(self):
+        wallpaper.apply(self.theme("eee"))
+        h = self.host()
+        h._apply_wallpaper("")
+        self.assertEqual(Path(self.win.now["path"]).read_bytes(), b"spotlight picture")
+        self.assertIn("old wallpaper is back", h.wall_said)
 
 
 if __name__ == "__main__":

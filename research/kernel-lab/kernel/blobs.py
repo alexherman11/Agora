@@ -136,6 +136,13 @@ def receive(k, actor, data, name='Upload', group=None):
 
 def upload(k, actor, st, entry, tx, group, saw=None):
     data = getattr(k._local, 'upload_bytes', None)
+    if data is None and st.kv.get('digest') and actor.kind == 'module':
+        # A module hands its caller a file it made (a picture, an export): it put the bytes in this world's blob
+        # store (put() above, content-addressed) and names them by hash; get() checks the hash again. The file is
+        # the caller's, private, like any upload (4 Nov: window.picture; before this only the `files` module could).
+        # The module's grant for upload must reach files (only=kind:file), as a make must reach its kind.
+        k.reaches(actor, 'upload', 'file', group=group)
+        data = get(k, st.kv['digest'])
     if data is None:
         raise Refused('upload needs file bytes through the upload door or agora.upload(file)')
     if len(data) > cap(k):
