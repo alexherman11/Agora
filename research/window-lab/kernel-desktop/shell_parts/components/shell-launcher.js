@@ -8,13 +8,13 @@ export default {mount(api, s) {
   K.watch(api, 'settings', 4000, (v) => { settings = v; });
   const open = async () => {
     if (Pop.cur && Pop.cur.id === 'launcher') { Pop.close(); return; }
-    const [lenses, pins] = await Promise.all([Data.lensNames(), Data.pins()]);
+    const [lenses, pins] = await Promise.all([Data.lensNames(), Data.pins(), Data.apps()]);
     const have = new Set(lenses);
     const names = (s.apps || settings.dock_apps || K.DOCK_APPS).split(/[ ,]+/).filter(Boolean)
       .filter((n) => ['lines', 'help', 'thing', 'tasks'].includes(n) || have.has(n));
     const entries = [
-      ...names.filter((n) => K.AGORA_APPS[n]).map((n) => ({ name: K.AGORA_APPS[n][0], icon: 'agora:' + n, line: K.AGORA_APPS[n][1] })),
-      ...pins.map((p) => ({ name: p.label || p.name || 'Pinned', icon: p.path ? 'exe:' + p.path : 'agora:' + K.appOf(K.opensLens(p.does)), line: p.does || `window.launch path=${p.path}` })),
+      ...names.filter((n) => K.AGORA_APPS[n]).map((n) => ({ name: K.AGORA_APPS[n][0], icon: K.appIcon(n), line: K.AGORA_APPS[n][1] })),
+      ...pins.map((p) => ({ name: p.label || p.name || 'Pinned', icon: p.path ? 'exe:' + p.path : K.appIcon(K.appOf(K.opensLens(p.does))), line: p.does || `window.launch path=${p.path}` })),
     ];
     const input = h('input', { type: 'text', placeholder: 'Open an app, or say a line', 'aria-label': 'Open an app or say a line', autocomplete: 'off', spellcheck: 'false', 'data-autofocus': '' });
     const grid = h('div', { cls: 'apps', role: 'list' });

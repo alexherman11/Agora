@@ -86,12 +86,33 @@ const ShellKit = (() => {
     feed: ['Feed', 'window.open feed'], thing: ['Thing', 'window.open thing'], tasks: ['Running windows', 'window.open tasks'],
     work: ['Work', 'window.open work'],          // who is at work and what is moving (kernel-lab/apps/work, 27 Oct)
     writing: ['Writing', 'window.open writing'], // documents and plans to review (kernel-lab/apps/writing, 27 Oct)
-    music: ['Music', 'window.open music'],
   };
+  // Every other app is an `app` thing in the world (4 Nov): name=<what dock_apps says> label= does="window.open <lens>"
+  // [icon=agora:<svg name>|data:image/...]. A new app is one make, never a line here. Only the steward's own app things
+  // count (the settings' person), only ones that open a lens, and a name the host already has above stays the host's.
+  // The entries above that are apps rather than the host's own pages (board, taskboard, appearance, feed, work,
+  // writing) are older than app things; each moves out when its installer makes its app thing.
+  const BUILT_IN = new Set(Object.keys(AGORA_APPS));
+  const APP_ICONS = {};
+  function takeApps(rows, owner) {
+    const seen = new Set();
+    for (const r of rows || []) {
+      const n = String(r.name || '').toLowerCase(), does = String(r.does || '').trim();
+      if (!owner || (r.made_by !== owner && r.for !== owner) || BUILT_IN.has(n) || !/^[a-z][a-z0-9-]{0,40}$/.test(n)
+          || !/^window\.open [A-Za-z0-9_.-]+$/.test(does)) continue;
+      seen.add(n);
+      AGORA_APPS[n] = [String(r.label || r.title || n), does];
+      if (/^(agora:[a-z0-9-]+|data:image\/)/.test(String(r.icon || ''))) APP_ICONS[n] = String(r.icon); else delete APP_ICONS[n];
+    }
+    for (const n of Object.keys(AGORA_APPS)) if (!BUILT_IN.has(n) && !seen.has(n)) { delete AGORA_APPS[n]; delete APP_ICONS[n]; }
+    return [...seen].sort().map((n) => [n, ...AGORA_APPS[n], APP_ICONS[n] || '']);
+  }
+  const appIcon = (n) => APP_ICONS[n] || 'agora:' + n;
   const DOCK_APPS = 'lines,help,board,taskboard,appearance,feed';
   const appOf = (name) => {
     const n = (name || '').toLowerCase();
     if (AGORA_APPS[n]) return n;
+    for (const [app, [, line]] of Object.entries(AGORA_APPS)) if (!BUILT_IN.has(app) && opensLens(line) === n) return app;
     for (const [re, app] of [[/task/, 'taskboard'], [/board/, 'board'], [/appearance|theme/, 'appearance'], [/feed/, 'feed'],
                              [/help/, 'help'], [/lines|chat/, 'lines']]) if (re.test(n)) return app;
     return 'thing';
@@ -148,14 +169,14 @@ const ShellKit = (() => {
           if (w.agora && (!o || o.edge || /^(taskbar|shell-)/.test(o.shows || ''))) return [];
           const shows = (o && o.shows) || w.shows || '';
           return [{ key: String(w.key), app: (o && o.name) || w.app || nice((w.exe || '').split(/[\\/]/).pop().replace(/\.exe$/i, '')), exe: w.exe || '',
-            icon: w.agora ? 'agora:' + appOf(shows) : refOf(w.icon) || (w.exe ? 'exe:' + w.exe : ''),
+            icon: w.agora ? appIcon(appOf(shows)) : refOf(w.icon) || (w.exe ? 'exe:' + w.exe : ''),
             agora: w.agora || '', state: w.state || 'normal', focused: !!w.focused, managed: w.managed !== false, why: w.why || '', shows, space: w.space || '' }];
         });
       }
       this.wmOK = false;               // the window manager is off: the native shell is the fallback
       const [a, b] = await Promise.all([this.see('window.list'), this.see('window.desktop')]);
       const mine = (a.rows || []).filter((w) => w.kind === 'window' && !w.edge && !/^(taskbar|shell-)/.test(w.shows || ''))
-        .map((w) => ({ key: w.id, app: w.name || nice(w.shows), exe: '', icon: 'agora:' + appOf(w.shows),
+        .map((w) => ({ key: w.id, app: w.name || nice(w.shows), exe: '', icon: appIcon(appOf(w.shows)),
           agora: w.id, state: w.shown === false ? 'minimised' : 'normal', focused: !!w.front, managed: false, shows: w.shows, title: w.name }));
       const theirs = (b.rows || []).filter((w) => w.handle).map((w) => ({
         key: String(w.handle), app: nice(w.program), exe: w.path || '', icon: w.ref || (w.path ? 'exe:' + w.path : 'hwnd:' + w.handle),
@@ -163,6 +184,11 @@ const ShellKit = (() => {
       return [...theirs, ...mine];
     },
     async settings() { const r = await this.see('rows shell-settings'); return (r && r.rows && r.rows[0]) || {}; },
+    // the world's app things (see takeApps); AGORA_APPS follows them, so every part that reads it sees the same apps
+    async apps() {
+      const [r, s] = await Promise.all([this.see('rows app'), this.settings()]);
+      return takeApps(!refused(r) && Array.isArray(r.rows) ? r.rows : [], s.for || s.made_by);
+    },
     async pins() {
       const r = await this.see('rows any bar=taskbar');
       return ((r && r.rows) || []).filter((p) => !p.slot && p.kind !== 'widget' && (p.path || /^window\.open /.test(p.does || '')));
@@ -219,7 +245,7 @@ const ShellKit = (() => {
   // ------------------------------------------------------------------------------------------------ the reading hub
   // watch(api, name, ms, fn): fn(value) now (if there is one) and whenever the reading changes; it runs as the part
   // (api.guard), and the subscription ends with the part (api.cleanup). poke(name): read again now (after an act).
-  const loaders = { windows: () => Data.windows(), settings: () => Data.settings(), pins: () => Data.pins(), lenses: () => Data.lensNames(),
+  const loaders = { windows: () => Data.windows(), settings: () => Data.settings(), apps: () => Data.apps(), pins: () => Data.pins(), lenses: () => Data.lensNames(),
     system: () => Data.system(), media: () => Data.media(), notes: () => Data.notes(), jeff: () => Data.jeff() };
   const hub = {};
   function feed(name) {
@@ -466,7 +492,7 @@ const ShellKit = (() => {
   readTheme();
   addEventListener('ag-theme', () => nativeTimers.requestAnimationFrame(readTheme));
 
-  return { h, glyph, Icon, iconUrl, AGORA_APPS, DOCK_APPS, appOf, opensLens, nice, yes, num, cssVar, Data, watch, poke, on, emit, fire,
+  return { h, glyph, Icon, iconUrl, AGORA_APPS, DOCK_APPS, appOf, appIcon, opensLens, nice, yes, num, cssVar, Data, watch, poke, on, emit, fire,
     Pop, Menu, roving, toast, ran, fmt, report, thumbs,
     set shape(fn) { shapeFn = fn; report(); }, get shape() { return shapeFn; } };
 })();

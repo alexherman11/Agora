@@ -140,7 +140,10 @@ class MusicInstallTest(unittest.TestCase):
                          shells[0]["dock_apps"].split(","))
         self.assertEqual("Music", door.rows("lens", name="music")[0]["title"])
         self.assertTrue(door.rows("widget", name="music")[0]["on"])
+        self.assertEqual([("Music", "window.open music")],
+                         [(a["label"], a["does"]) for a in door.rows("app", name="music")])
         self.assertEqual(ids, app.install(door))
+        self.assertEqual(1, len(door.rows("app", name="music")), "reinstall must not make a second app thing")
         self.assertEqual(shells, door.rows("shell-settings"), "reinstall must leave dock settings unchanged")
         # The same installer must retain Alex's app order and unrelated settings.
         shell = shells[0]["id"]
