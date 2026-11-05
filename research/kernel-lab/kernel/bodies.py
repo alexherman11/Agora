@@ -177,9 +177,9 @@ def edit(k, actor, st, entry, tx, group, saw=None):
         raise Refused('edit takes field=, changes=, base= and version= only; set changes other facts')
     if k.shown(actor.person, t) is None:
         raise k.no_such(t)
-    current = k.state.get(t, field)
+    current = tx.get(t, field)
     current = '' if current is None else str(current)
-    if not isinstance(k.state.get(t, field, ''), str) and current:
+    if not isinstance(tx.get(t, field, ''), str) and current:
         raise Refused(f'{k.name(t)} {field}= is not text')
     by = {'by': actor.id, 'for': actor.person}
     with _lock:
