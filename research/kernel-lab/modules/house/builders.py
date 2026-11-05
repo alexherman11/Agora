@@ -197,7 +197,9 @@ class Builders:
         self.home = house.home / 'builders'
         self.home.mkdir(parents=True, exist_ok=True)
         self.lock = threading.RLock()
+        self.notification_lock = threading.RLock()
         self.states, self.children = {}, {}
+        self.request_receipts = {}
         self.stopping = False
         self.landing_lock = threading.Lock()          # one landing at a time; the next waits its turn, never refused
         self.house_restart_due = False                # a landed change to the House itself: restart once all is idle
@@ -293,6 +295,61 @@ class Builders:
         build = {'asked':'asked', 'preparing':'asked', 'working':'building', 'reviewing':'landing',
                  'received':'landing', 'reviewed':'landing', 'landed':'landed', 'released':'released'}.get(phase, 'blocked')
         self.update(state, build=build, build_phase=phase, build_detail=detail[:1500], **facts)
+        self.try_start_outcome(state)
+
+    def start_request(self, msg):
+        """The protocol acknowledged this call; reconcile its eventual result."""
+        caller = msg.get('caller') or {}
+        context = dict(requester=caller.get('person'), requester_name=caller.get('name'),
+                       task=(msg.get('args') or {}).get('target') or '', name=msg['word'])
+        try:
+            operation = self.work if msg['word'] == 'house.work' else self.start
+            out = operation(dict(msg, _start_notice=True))
+        except Exception as exc:
+            # A door timeout can follow a successful write. Never call that a refusal.
+            out = {'text': f'start unresolved: {exc}; reconcile the card before trying again',
+                   'external': True}
+        if out.get('rows'):
+            state = self.states.get(out['rows'][0].get('task'))
+            if state and state['phase'] == QUEUED:
+                self.try_start_outcome(state)
+        else:
+            result = out.get('refused') or out.get('text', '')
+            self.request_receipts[msg['use']] = (context, result)
+            self.deliver_start_requests()
+        return out
+
+    def deliver_start_requests(self):
+        with self.notification_lock:
+            for request, (context, result) in list(self.request_receipts.items()):
+                try:
+                    self.wake_owner(context, self.message("Start request settled", context, result=result)
+                                    + '\n' + result)
+                except Exception:
+                    continue
+                self.request_receipts.pop(request, None)
+
+    def try_start_outcome(self, state):
+        with self.notification_lock:
+            self._start_outcome(state)
+
+    def _start_outcome(self, state):
+        if not state.get('start_notice'):
+            return
+        if state['phase'] == 'asked':
+            return                          # claim has not reached the card yet
+        try:
+            card = self.session(state['requester']).look(state['task'])
+            result = dict(request=state['start_notice'], card=state['task'], build_run=card.get('build_run', ''),
+                          build=card.get('build', ''), build_phase=card.get('build_phase', ''),
+                          request_phase=state['phase'], detail=state.get('detail', ''))
+            self.wake_owner(state, self.message("Start request settled", state, result=json.dumps(result))
+                            + '\n' + json.dumps(result), receipt=('start', state['start_notice']))
+            state.pop('start_notice', None)
+            state['start_receipt'] = result
+            self.save(state)
+        except Exception as exc:
+            self.event(state, 'unsaid', f'start wake: {exc!r}')
 
     def start(self, msg):
         target = (msg.get('args') or {}).get('target')
@@ -336,6 +393,8 @@ class Builders:
                          title=task.get('title') or target, phase='asked', detail='claim pending',
                          model=model, reasoning=reasoning, created=stamp(), activity=[],
                          task_owner=task.get('who',''), pending=[], basis={k:task.get(k,'') for k in ('title','text','acceptance','who')})
+            if msg.get('_start_notice'):
+                state['start_notice'] = msg.get('use')
             if msg.get('_managed'):
                 state['manager'] = caller['person']
                 M.check_state(self, state)
@@ -379,8 +438,12 @@ class Builders:
                 # The local receipt remains authoritative if ownership/door changed.
                 pass
         finally:
-            M.notify(self, state)
             try:
+                M.notify(self, state)
+            except Exception as exc:
+                self.event(state, 'unsaid', f'manager wake: {exc!r}')
+            try:
+                self.try_start_outcome(state)
                 self.outcome(state)
             except Exception as exc:                 # noqa: BLE001  telling is a help, never a reason to fail
                 self.event(state, 'unsaid', f'outcome wake: {exc!r}')
@@ -448,8 +511,10 @@ class Builders:
         line = f'"{exe}" "{helper}" --log "{log}" ' + ' '.join(args)
         ps = ("$r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = '"
               + line.replace("'", "''") + "' }; $r.ReturnValue")
-        subprocess.run(['powershell', '-NoProfile', '-Command', ps], capture_output=True, text=True, timeout=60,
-                       creationflags=T.NO_WINDOW)
+        proc = subprocess.run(['powershell', '-NoProfile', '-Command', ps], capture_output=True, text=True, timeout=60,
+                              creationflags=T.NO_WINDOW)
+        if proc.returncode or proc.stdout.strip() != '0':
+            raise RuntimeError('activation helper did not start: ' + (proc.stderr or proc.stdout).strip()[:500])
 
     def build(self, state):
         M.check_state(self, state)
@@ -542,7 +607,9 @@ class Builders:
                     state['turn_started'] = stamp()
                     state['turn_id'] = e.get('turn')
                     self.phase(state, 'working', f'authenticated {label} turn running')
-                elif kind == 'tool':
+                if kind == 'turn_started' or (claude and kind in ('init', 'tool', 'text')):
+                    self.followup_started(state)
+                if kind == 'tool':
                     activity = T.worker_activity.tool(e)
                     self.event(state, 'act', activity['summary'] if activity else e.get('name', 'tool'),
                                activity['detail'] if activity else None)
@@ -666,12 +733,31 @@ class Builders:
             out.append((gm, self.message("Nobody can pick this up (JEFF)", state, why=why) + "\n"))
         return out
 
-    def wake_owner(self, state, text):
-        for agent, prefix in self.route(state):
+    def wake_owner(self, state, text, receipt=None):
+        routes = self.route(state)
+        if not routes:
+            raise RuntimeError('no owner is available for this receipt')
+        delivery = None
+        if receipt:
+            kind, key = receipt
+            deliveries = state.setdefault('wake_deliveries', {})
+            delivery = deliveries.get(kind)
+            if not delivery or delivery['key'] != key:
+                delivery = deliveries[kind] = dict(key=key, people=[])
+        for agent, prefix in routes:
+            person = getattr(agent, 'person', None) or agent.name
+            if delivery and person in delivery['people']:
+                continue
             agent.wake(prefix + text)
-            self.event(state, 'told', f"woke {agent.name} (busy={getattr(agent, 'busy', '?')}, "
-                                      f"inbox={len(getattr(agent, 'inbox', None) or [])})"
-                       + (' for its owner' if prefix else ''))
+            if delivery is not None:
+                delivery['people'].append(person)
+                self.save(state)
+            try:
+                self.event(state, 'told', f"woke {agent.name} (busy={getattr(agent, 'busy', '?')}, "
+                                          f"inbox={len(getattr(agent, 'inbox', None) or [])})"
+                           + (' for its owner' if prefix else ''))
+            except Exception:
+                pass                        # delivery succeeded even if its diagnostic failed
 
     def stopped(self, state):
         """It waits on the one in charge from now; they get one reminder if a turn of theirs ends without acting."""
@@ -712,6 +798,10 @@ class Builders:
 
     def outcome(self, state):
         """A House operation on the worker ended (review, landing, or a failure): the one in charge hears how."""
+        with self.notification_lock:
+            self._outcome(state)
+
+    def _outcome(self, state):
         phase, task, name = state['phase'], state['task'], state['name']
         if self.stopping:
             return                       # the House is going down; wake_cut_off tells them when it is back
@@ -720,20 +810,48 @@ class Builders:
         if state.pop('quiet', None):
             self.save(state)
             return                       # its owner stopped it themselves: they know
+        state['outcome_pending'] = True
+        self.save(state)
         if phase == "reviewed":
             text = self.message("It passed its checks", state, commit=str(state.get("candidate", ""))[:9])
         elif phase == "landed":
             text = self.message("It landed", state, commit=str(state.get("landed_commit", ""))[:9],
                                 activation=state.get("activation", ""))
         else:
-            text = self.message("It stopped", state, detail=str(state.get("detail", ""))[:700])
-        said = [phase, str(state.get('detail', ''))[:300]]
+            detail = str(state.get("detail", ""))[:700]
+            if state.get('land_attempt'):
+                detail = state.get('land_step', 'landing') + ': ' + detail
+            text = self.message("It stopped", state, detail=detail)
+        if state.get('land_attempt'):
+            state['land_receipt'] = dict(attempt=state['land_attempt'], step=state.get('land_step'),
+                                        phase=phase, reason=state.get('detail', ''),
+                                        activation=state.get('activation', ''),
+                                        next=(f'house.snap <thing>; verify {task}' if phase == 'landed'
+                                              else f'house.tell {task} <repair the reported step>; house.land {task}'))
+            text += '\n' + json.dumps(state['land_receipt'])
+        said = [phase, str(state.get('detail', ''))[:300], state.get('land_attempt')]
         if state.get('last_outcome') == said:
+            state.pop('outcome_pending', None)
             self.event(state, 'quiet', 'same outcome as last time; nobody woken again')
             return                       # the same failure twice wakes nobody twice (the 3 Nov loop)
-        state['last_outcome'] = said
         self.stopped(state)
-        self.wake_owner(state, text)
+        self.wake_owner(state, text, receipt=('outcome', said))
+        state['last_outcome'] = said
+        state.pop('outcome_pending', None)
+        self.save(state)
+
+    def deliver_outcomes(self):
+        """Retry undelivered receipts on the House's ordinary tick."""
+        self.deliver_start_requests()
+        for state in list(self.states.values()):
+            self.try_start_outcome(state)
+            if state.get('followup_notice'):
+                self.followup_started(state)
+            if state.get('outcome_pending'):
+                try:
+                    self.outcome(state)
+                except Exception:
+                    pass
 
     def card_done(self, state):
         """Its card is finished (lane Done and the like): nobody needs reminding about the worker any more."""
@@ -1001,13 +1119,35 @@ class Builders:
         pending, state['pending'] = state.get('pending', []), []
         if pending:
             state['tellers'], state['told_by'] = state.get('told_by') or [], []
+            state['followup_inflight'] = dict(count=len(pending), queued_at=state.pop('followup_queued_at', ''))
         self.save(state)
         return pending
+
+    def followup_started(self, state):
+        """An authenticated turn (or Claude's activity) confirms retained words ran."""
+        with self.notification_lock:
+            receipt = state.pop('followup_inflight', None)
+            if receipt:
+                state['followup_receipt'] = dict(receipt, started=stamp(), card=state['task'])
+                state['followup_notice'] = True
+                self.save(state)
+            if not state.get('followup_notice'):
+                return
+            try:
+                self.wake_owner(state, self.message("Retained words started", state)
+                                + '\n' + json.dumps(state['followup_receipt']),
+                                receipt=('followup', state['followup_receipt']))
+            except Exception:
+                return
+            state.pop('followup_notice', None)
+            self.save(state)
 
     def reopen(self, state):
         """A stopped worker (received, blocked, reviewed) takes a new turn in the same worktree. A review's receipts
         are about a result that is about to change, so they move to `earlier_reviews` instead of standing as current."""
         was = state['phase']
+        for key in ('land_attempt', 'land_step', 'outcome_pending'):
+            state.pop(key, None)
         if was != 'received':
             old = {k: state.pop(k) for k in ('review_base', 'candidate', 'checks', 'self_proof_sha256') if k in state}
             if old:
@@ -1047,8 +1187,9 @@ class Builders:
             return {'refused': 'the card was not made: ' + str(made.get('text', ''))[:200]}
         out = self.start(dict(msg, args=dict(target=card, kv=dict(kv, **{'with': provider}))))
         if out.get('refused'):
-            return {'refused': f'made card {card}, but the worker did not start: {out["refused"]}'}
-        return {'text': f"started a {PROVIDERS[provider]['label']} worker on {title} ({card}). You are woken each time "
+            return {'text': f'made card {card}, but the worker did not start: {out["refused"]}',
+                    'external': True}
+        return {'text': f"recorded a {PROVIDERS[provider]['label']} worker request on {title} ({card}). You are woken each time "
                         f"it finishes a turn (its words also go in its chat); answer it with house.tell {card} <words>.",
                 'external': True, 'rows': out.get('rows', [])}
 
@@ -1136,20 +1277,23 @@ class Builders:
                 if added:
                     state['told_by'].append(dict(person=caller.get('person'),name=name,**{'as':how}))
             if hold:          # said during the resident's own turn: starts the worker when that turn ends
+                state.setdefault('followup_queued_at', stamp())
                 state['pending'].append(words[:8000])
                 self.event(state,'heard',words)
-                return {'text':'follow-up retained until your turn ends','external':True}
+                return {'text':'follow-up retained until your turn ends and a worker slot is free; '
+                               'you hear when its turn starts','external':True}
             resume=self.resumable(state)
             # Explicit owner correction replaces the task basis, never its authority.
             state['basis']={k:task.get(k,'') for k in ('title','text','acceptance','who')}
             state['pending'].append(words[:8000])
+            state.setdefault('followup_queued_at', stamp())
             self.event(state,'heard',words)
             if resume and self.full(state.get('provider','codex')):
                 state['queued_turn']=stamp()        # every slot busy: it starts with these words when one frees
                 self.event(state,QUEUED,'told while every slot was busy; it starts when one frees')
                 self.save(state)
                 return {'text':f'every {state.get("provider","codex")} slot is busy; it starts with your words by itself '
-                               f'as soon as one frees','external':True}
+                               f'as soon as one frees; you hear when its turn starts','external':True}
             if how!='owner':
                 self.event(state,how,f"{caller.get('name') or caller.get('person')} told it as {how}, not its owner")
             if resume:
@@ -1159,7 +1303,8 @@ class Builders:
         if resume and phase!='received':
             return {'text':f'worker was {phase}; it resumes with your words in a new turn on the same worktree{told}',
                     'external':True}
-        return {'text':f'follow-up retained for this builder; it will be read at the next turn boundary{told}','external':True}
+        return {'text':f'follow-up retained for this builder; it will be read at the next turn boundary; '
+                       f'you hear when that turn starts{told}','external':True}
 
     def hear(self, msg):
         if msg.get('word')!='say' or not msg.get('said'):
@@ -1276,15 +1421,21 @@ class Builders:
         state['review_base'] = base
         self.save(state)
         if base != state['base']:
+            if state.get('land_attempt'):
+                state['land_step'] = 'merge'
             try:
                 self.git(tree, 'merge', '--no-edit', base)
             except RuntimeError:
                 # Never leave conflict markers for the next review's commit to pick up.
                 conflicted = self.git(tree, 'diff', '--name-only', '--diff-filter=U').split()
+                if not conflicted:
+                    raise                       # e.g. index.lock: preserve the actual refusal
                 self.git(tree, 'merge', '--abort')
                 raise RuntimeError('main conflicts with this worker in ' + ', '.join(conflicted or ['some files'])
                                    + '; merge main into the worker branch by hand, then review again') from None
         candidate = self.git(tree, 'rev-parse', 'HEAD')
+        if state.get('land_attempt'):
+            state['land_step'] = 'checks'
         state.update(review_base=base, candidate=candidate, checks=[])
         self.phase(state, 'reviewing', 'independent kernel and hidden desktop checks on '+candidate[:12])
         folder = self.home/state['run']
@@ -1330,6 +1481,10 @@ class Builders:
                 return {'refused': f'it was cut off while {self.cut_phase(state) or "busy"}; house.release it and '
                                    f'start afresh with house.build {state["task"]}'}
             state['land_from'] = phase
+            state['land_attempt'] = uuid.uuid4().hex
+            state['land_step'] = 'checks'
+            state.pop('quiet', None)
+            state.pop('activation', None)
             state['phase'] = 'reviewing'
             state.pop('awaiting', None)
             state.pop('reminded', None)
@@ -1344,7 +1499,9 @@ class Builders:
             for attempt in range(2):            # main may move between checks and landing (someone else landed)
                 main = self.git(self.repo, 'rev-parse', 'main')
                 if not (reviewed and state.get('candidate') and state.get('review_base') == main):
+                    state['land_step'] = 'checks'
                     self.review(state)
+                state['land_step'] = 'publication'
                 state['phase'] = 'landing'
                 self.save(state)
                 try:
@@ -1354,6 +1511,7 @@ class Builders:
                     if 'main advanced' not in str(exc) or attempt:
                         raise
                     reviewed = False
+        state['land_step'] = 'activation'
         self.activate(state)
 
     def activate(self, state):
@@ -1361,21 +1519,31 @@ class Builders:
         restarts the House only once no worker runs and no agent is mid-turn (idle_check)."""
         reload = T.REPO / 'research' / 'window-lab' / 'kernel-desktop' / 'kd_reload.py'
         try:
-            dry = subprocess.run([str(T.PY), str(reload), '--dry'], capture_output=True, text=True, timeout=120,
-                                 creationflags=T.NO_WINDOW).stdout
+            result = subprocess.run([str(T.PY), str(reload), '--dry'], capture_output=True, text=True, timeout=120,
+                                    creationflags=T.NO_WINDOW)
+            if getattr(result, 'returncode', 0):
+                raise RuntimeError('activation inspection failed: ' + (result.stderr or result.stdout)[:500])
+            dry = result.stdout
         except Exception as exc:                       # noqa: BLE001  landed is landed; say what didn't switch on
-            state['activation'] = f'not switched on ({type(exc).__name__}); ask JEFF to house.restart what it needs'
+            state['activation'] = f'not switched on ({exc}); ask JEFF to house.restart what it needs'
             self.event(state, 'activation', state['activation'])
             self.save(state)
             return
         lines = [x.strip() for x in dry.splitlines() if x.strip()]
-        if not lines or any('nothing is stale' in x for x in lines):
+        if not lines:
+            state['activation'] = 'activation inspection returned no result; ask JEFF to check before restarting'
+        elif any('nothing is stale' in x for x in lines):
             state['activation'] = 'nothing needed restarting; it is live'
         else:
             house = any(x.startswith('house:') for x in lines)
             others = [x for x in lines if not x.startswith('house:')]
             if others:
-                self.spawn_reload(['--skip', 'house'] if house else [], self.home / state['run'] / 'activation.log')
+                try:
+                    self.spawn_reload(['--skip', 'house'] if house else [], self.home / state['run'] / 'activation.log')
+                except Exception as exc:
+                    state['activation'] = f'not switched on ({exc}); ask JEFF to house.restart what it needs'
+                    self.event(state, 'activation', state['activation'])
+                    return
             if house:
                 self.house_restart_due = True
             state['activation'] = ('switching on: ' + '; '.join(x.split(' (')[0].split(':')[0] for x in lines)

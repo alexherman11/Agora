@@ -886,12 +886,11 @@ class House:
         word, args = msg.get("word"), msg.get("args") or {}
         if not self.ready.wait(5):
             return {"refused": "the house is still starting; try again in a moment"}
+        if word in ("house.build", "house.work"):
+            self.m.accept(msg)
+            return self.builders.start_request(msg)
         if word == "house.manage":
             return BM.dispatch(self.builders, msg)
-        if word == "house.build":
-            return self.builders.start(msg)
-        if word == "house.work":
-            return self.builders.work(msg)
         if word == "house.restart":
             return self.restart(msg)
         if word == "house.retry":
@@ -1041,6 +1040,8 @@ class House:
     def ticker(self):
         while not self.m.closed.is_set():
             self.publish()
+            if self.builders:
+                self.builders.deliver_outcomes()
             time.sleep(5)
 
     def off(self):

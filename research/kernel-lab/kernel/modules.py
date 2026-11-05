@@ -16,6 +16,9 @@ Newline-separated JSON over the module's stdin and stdout. Every message has a t
            home}
     call {use, word, args,      see {use, line}        -> kernel answers {t: rows, use, text, rows, refused?}
           caller}               answer {use, lines?, text?, rows?, saw?, refused?}
+                                accepted {use}        (external work only; a slow call returns "starting",
+                                                       caller readings stay open until its final answer;
+                                                       the module delivers the eventual receipt itself)
     done {use, ok, record?,     (after an answer with lines: whether the kernel admitted it, and what it made)
           made, text}
                                 do {id, line, saw?}    -> {t: done, id, ok, text, rows, record?, made, refused?}
@@ -134,11 +137,22 @@ class ModuleProcess:
             threading.Thread(target=self._own, args=(msg,), daemon=True).start()     # a module on its own
         elif t == "see":
             self.send({"t": "rows", "use": msg.get("use"), "refused": "no call of yours is open with that use"})
+        elif t == "accepted":
+            # An external operation can outlive the synchronous receipt deadline.
+            # Keep its caller's narrowed reading context until the final answer.
+            p = self.pending.get(msg.get("use"))
+            if p is not None:
+                p["accepted"] = {"t": "answer", "use": msg["use"], "external": True,
+                                 "text": "starting; you will hear when the request settles",
+                                 "rows": [{"request": msg["use"], "status": "starting"}]}
         elif t in ("answer", "status"):
             p = self.pending.get(msg.get("use"))
             if p is not None:
                 p["answer"] = msg
                 p["event"].set()
+                if p.get("detached"):
+                    # Never apply late declarative lines after a caller returned.
+                    self.pending.pop(msg["use"], None)
         elif t == "happen":
             said = k.announce(self.mid, str(msg.get("word") or ""), msg.get("target"), msg.get("text") or "")
             if said != "ok":
@@ -171,6 +185,10 @@ class ModuleProcess:
         self.pending[use] = p
         self.send(dict(msg, use=use))
         p["event"].wait(timeout)
+        if p["answer"] is None and p.get("accepted"):
+            p["detached"] = True
+            if p["answer"] is None:
+                return p["accepted"]
         self.pending.pop(use, None)
         return p["answer"]
 

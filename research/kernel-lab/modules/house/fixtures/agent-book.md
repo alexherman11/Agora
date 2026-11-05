@@ -99,6 +99,14 @@ $.words
 
 ~ $.name ($.card) passed its checks (commit $.commit). house.land $.card lands it and switches it on.
 
+### Start request settled
+
+~ $.name ($.card): the start request settled. Read the attached receipt for the card's build state before starting another worker.
+
+### Retained words started
+
+~ $.name ($.card) has started the turn with your retained words. You will hear again when that turn ends.
+
 ### It landed
 
 ~ $.name ($.card) landed on main ($.commit); $.activation.

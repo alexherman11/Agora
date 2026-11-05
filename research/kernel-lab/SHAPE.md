@@ -226,6 +226,14 @@ A module is a process in any language that speaks lines. It keeps nothing lastin
 - **Offering words.** A word is published only in the module's own namespace (its grant says which: `tally.*`), only with help. The first offer writes the entry; after that the entry is the world's, and a later offer only binds the implementation. If an offer's `takes` no longer matches the entry, the steward is told and nothing is overwritten.
 - **Answering.** An answer is lines, never facts: the module changes the world only by acts ("Every act is a line"). Its lines are one use, one record, checked as the caller narrowed to the module, and admitted only if what it saw is unchanged.
 - **Time.** A call not answered in 10 s is refused: "tally did not answer in 10 s; nothing was done".
+
+  Implementation update, 4 November 2026: an external operation may first send
+  `accepted {use}`. If its final answer misses that deadline, the receipt says
+  `starting; you will hear when the request settles`, with the request identifier.
+  Its caller-scoped readings remain open until the final answer. The module
+  delivers its eventual outcome itself; late answer lines are never applied.
+  A fast final answer still returns normally. This supersedes the timeout
+  refusal above for acknowledged external operations.
 - **Off.** `off tally` is a kernel word: it revokes all of the module's grants in one record (undoable, which is how it is turned on again), ends its holds, and stops its process. Every running thing can say what it is (`look tally`) and what it is doing (`status tally`).
 
 **What the kernel can and cannot enforce.** Read plainly: the kernel enforces what a module can do *in the world*, because the door is the only way in. It does not contain what a module process does *on the machine*: files, network. "No private storage" is enforced by there being no storage word and by review, not by the kernel. The module lab found the same ("network: observed, not contained", commit b5bd505). So a module from a stranger is not safe to run on the host merely because its grants are narrow. Reviewed modules run as plain processes; strangers' modules wait for a sandbox. WASI is the candidate, since the same stdin and stdout protocol runs inside it and it gives a module no files or network unless handed them (**imagined**).

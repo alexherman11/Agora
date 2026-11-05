@@ -140,6 +140,7 @@ def test_follow_up_and_outcome_render_at_use(world):
     import builders
     b = builders.Builders.__new__(builders.Builders)
     b.h, b.lock, b.stopping = h, threading.RLock(), False
+    b.notification_lock = threading.RLock()
     b.save = b.assert_owned = b.event = b.stopped = Mock()
     b.run_worker, b.wake_owner = Mock(), Mock()
     state = dict(task="card", name="Worker", requester_name="Sable", session="thread", phase="blocked")

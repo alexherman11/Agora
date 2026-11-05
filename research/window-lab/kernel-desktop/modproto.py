@@ -76,6 +76,15 @@ class Module:
     def happen(self, word, target=None, text=""):
         self.send({"t": "happen", "word": word, "target": target, "text": text})
 
+    def accept(self, msg):
+        """Acknowledge external work before any slow reads or effects.
+
+        The module must deliver its eventual result to its owner itself.
+        Final answers are informational: no declarative lines after acceptance.
+        Caller-scoped readings remain valid until that final answer.
+        """
+        self.send({"t": "accepted", "use": msg["use"]})
+
     def _handle(self, msg):
         t = msg.get("t")
         if t == "hello":
