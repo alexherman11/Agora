@@ -101,7 +101,7 @@ class ModuleIntentTests(unittest.TestCase):
     def test_contract_help_and_owner(self):
         self.assertEqual({w['word'] for w in offers()},{'wm.windows','wm.focus','wm.minimise','wm.restore','wm.close',
             'wm.pin','wm.unpin','wm.arrange','wm.mode','wm.leave-alone','wm.manage','wm.policy','wm.reload','wm.rollback',
-            'wm.sizes','wm.size'})
+            'wm.sizes','wm.size','wm.move'})
         self.assertTrue(all(w['help'] for w in offers()))
         self.assertIn('refused',self.call('wm.windows',person='stranger'))
     def test_modes_are_fenced_intent_and_live_disabled(self):

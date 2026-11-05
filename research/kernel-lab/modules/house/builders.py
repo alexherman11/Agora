@@ -1656,7 +1656,12 @@ class Builders:
     def rows(self, msg=None):
         with self.lock:
             states=list(self.states.values())
-        return [self.row(s) for s in states if msg is None or self.h.m.see('look '+s['task'],use=msg.get('use')).get('rows')]
+        if msg is not None and states:
+            # Keep the caller's card visibility without a kernel round trip per worker.
+            visible = {r['id'] for kind in ('taskboard-task', 'task')
+                       for r in self.h.m.see('rows '+kind, use=msg.get('use')).get('rows') or []}
+            states = [s for s in states if s['task'] in visible]
+        return [self.row(s) for s in states]
 
     def log(self, task):
         state = self.states[task]

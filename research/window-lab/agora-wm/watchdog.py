@@ -22,7 +22,7 @@ import subprocess
 import sys
 import threading
 import time
-from win32_host import Native, WindowRef, identity, same, attribute, u, k, dpi_aware
+from win32_host import Native, WindowRef, identity, same, attribute, u, k, dpi_aware, gate
 
 PROP='Agora.WM.Lease'
 HOTKEY=0x4A72
@@ -44,7 +44,7 @@ def write(path,data):
 def release_all(path,native=None):
     """Idempotent, identity+cookie checked. Retain failures for explicit recovery."""
     path=Path(path);native=native or Native(mutating=True)
-    data=json.loads(path.read_text(encoding='utf-8'));out=[]
+    data=json.loads(path.read_text(encoding='utf-8'));out=[];held=False
     for entry in data.get('windows',[]):
         if entry.get('released'):continue
         ref=WindowRef(**entry['ref'])
@@ -52,10 +52,17 @@ def release_all(path,native=None):
             entry['released']=True;entry['outcome']='identity/cookie no longer matches; untouched'
         else:
             try:
-                if entry.get('restore_geometry',True):native.restore_placement(ref,entry['placement'])
-                old=entry['dwm'];native.style(ref,old.get('34',0xFFFFFFFF),old.get('33',0))
+                # Off, crash recovery and the panic chord share this release.
+                # Never replay geometry or styling through a game/desktop gate.
+                # Latch a gate for the entire release; inspection failure is closed.
+                if not held:
+                    try:held=bool(gate())
+                    except Exception:held=True
+                if not held:
+                    if entry.get('restore_geometry',True):native.restore_placement(ref,entry['placement'])
+                    old=entry['dwm'];native.style(ref,old.get('34',0xFFFFFFFF),old.get('33',0))
                 u.RemovePropW(ref.hwnd,PROP)
-                entry['released']=True;entry['outcome']='restored'
+                entry['released']=True;entry['outcome']='released without window changes: gate active' if held else 'restored'
             except (OSError,PermissionError) as exc:
                 entry['outcome']=type(exc).__name__
         out.append({'app':Path(ref.process['exe']).stem,'outcome':entry['outcome']})

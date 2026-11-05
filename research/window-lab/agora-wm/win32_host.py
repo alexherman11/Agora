@@ -319,7 +319,9 @@ class Native:
     def needs_restore(self,ref):return bool(u.IsIconic(ref.hwnd) or u.IsZoomed(ref.hwnd))
 
     def minimise(self,ref):self.check(ref);u.ShowWindowAsync(ref.hwnd,7)
-    def restore(self,ref):self.check(ref);u.ShowWindowAsync(ref.hwnd,4)
+    def restore(self,ref):
+        self.check(ref)
+        if not u.ShowWindowAsync(ref.hwnd,4):raise OSError(C.get_last_error(),'ShowWindowAsync restore')
     def restore_shared(self,ref):
         """Ask the app's window-state handler to restore; never synthesize input.
 
