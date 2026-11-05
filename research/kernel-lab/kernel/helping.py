@@ -376,6 +376,7 @@ FILL_INS = (
     ("$<setting>", "verb steps", "the setting given as <setting>=…; one nobody gave is left out", "one use"),
     ("$target, $item", "a rule's do=", "the thing the happening was about", "one firing"),
     ("$by", "a rule's do=", "who did the happening", "one firing"),
+    ("$said", "a rule's do=", "the exact message made by the happening, or empty", "one firing"),
     ("$carried", "a lens drop gesture", "the thing dragged and dropped", "one drop"),
     ("$view $viewer.<x> $item.<x>", "component lenses", "the view, who reads it, the row being painted", "one paint"),
 )

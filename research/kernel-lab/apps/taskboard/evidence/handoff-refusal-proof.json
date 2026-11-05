@@ -1,0 +1,17 @@
+{
+  "rules": [
+    "hr99",
+    "hr100",
+    "hr101",
+    "hr102"
+  ],
+  "enabled": true,
+  "handoff": "hr106",
+  "source": "hr107",
+  "notice": "hr109",
+  "addressed_to": "hr2",
+  "wakes": 1,
+  "workers_started": 0,
+  "notification_kind": "notification",
+  "notification_state": "unread"
+}

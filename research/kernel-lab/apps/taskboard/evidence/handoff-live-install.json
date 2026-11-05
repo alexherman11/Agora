@@ -1,0 +1,13 @@
+{
+  "world": "8810",
+  "policy": "dk2486",
+  "policy_receipt": "r5526",
+  "live_rule_ids": [],
+  "activation": "blocked pending House landing of dk2479",
+  "disabled_rule_lines_after_landing": [
+    "rule name=\"Record pending delegated handoffs\" on=\"house.hand\" by=\"anyone\" off=\"yes\" do=\"handoff.open $target to_field=who owner=$by\"",
+    "rule name=\"Recognize pending recipient refusals\" on=\"say\" by=\"anyone\" off=\"yes\" do=\"handoff.observe $said policy=dk2486\"",
+    "rule name=\"Wake delegator when a pending handoff is refused\" on=\"make\" by=\"anyone\" off=\"yes\" do=\"handoff.notify $target text=\\\"Handoff blocked: {task}; recipient {recipient}. {reason} — {source}\\\" cc=\\\"Alex\\\"\" kind=\"handoff-refusal\"",
+    "rule name=\"Accept handoff when recipient instructs worker\" on=\"house.tell\" by=\"anyone\" off=\"yes\" do=\"handoff.close $target recipient=$by\""
+  ]
+}

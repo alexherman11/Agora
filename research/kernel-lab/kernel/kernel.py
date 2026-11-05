@@ -1279,7 +1279,7 @@ class Kernel:
 
     # the names the kernel fills itself, never an as= name: in any line ($me $here $today $now $new), and where a
     # verb, a rule, the painter or a component lens runs ($target $this $by $item $carried $view $viewer). help $
-    SUPPLIED = frozenset({"me", "here", "today", "now", "new", "target", "this", "by", "item", "carried", "view",
+    SUPPLIED = frozenset({"me", "here", "today", "now", "new", "target", "this", "by", "said", "item", "carried", "view",
                           "viewer"})
     SESSION_NAMES = 64                                 # a sign-in keeps its last 64 as= names; older ones are dropped
 
@@ -1828,6 +1828,10 @@ class Kernel:
             by = "" if h.get("by") == "sealed" else str(h.get("for") or h.get("by") or "")
             line = L.re.sub(r"\$(target|item)\b", lambda m: h.get("target") or "",       # $item: the old desk's word
                             str(r.get('do_bound') or r.get("do") or "")).replace("$by", by)
+            # The exact immutable message made by this happening, not the latest
+            # message in its chat (which may already have another speaker).
+            said = next((m for m in h.get("made") or [] if self.state.get(m, "kind") == "said"), "")
+            line = L.re.sub(r"\$said\b", lambda m: said, line)
             resting = self._rule_rests(line)
             if resting:
                 self.rules_fired = (self.rules_fired + [(rid, h.get("n"), f"resting: {resting} is off")])[-50:]

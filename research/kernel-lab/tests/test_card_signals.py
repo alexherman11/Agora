@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import os
+import shlex
 import sys
 import threading
 import time
@@ -29,6 +30,10 @@ class CardRules(unittest.TestCase):
         self.a = self.k.actor_for(self.k.accounts["alex"])
         self.j = self.k.actor_for(self.k.join("jeff", "JEFF", invite="x")["person"])
         self.w = self.k.actor_for(self.k.join("worker", "Worker", invite="x")["person"])
+        # House messages now read the live Agent Book; install the same fixture
+        # as the other hidden House tests instead of expecting removed fallbacks.
+        book = (LAB / "modules/house/fixtures/agent-book.md").read_text(encoding="utf-8")
+        self.say('make kind=document title="Agent Book" text=' + shlex.quote(book))
         self.say('verb task.done steps="set $target lane=Done" help="hidden completion"')
         self.say('verb house.land steps="set $target build=landed" help="hidden publication receipt"')
         for line in (LAB / "apps/taskboard/card-rules.lines").read_text(encoding="utf-8").splitlines():
