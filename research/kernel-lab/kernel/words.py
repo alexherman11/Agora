@@ -443,7 +443,8 @@ def help_(k, actor, st, entry, tx, group, saw=None):
         if e is None:
             if w=='part-style':
                 return dict(text='make kind=part-style lens=<lens> target=component.part[fact=value] color=... background=... radius=... padding=... gap=... glow=... lines=1..9 emphasis=normal|bold. Colour tokens or #rgb/#rgba/#rrggbb/#rrggbbaa. Spacing uses 1..4 measures (gap 1..2), including CSS shorthand padding. target=tokens defines colour/spacing and motion-<name> JSON tokens. Invalid writes refuse. personal-style applies just for me.')
-            card = component_card(k, actor, w)
+            # a topic of the same name is the page someone wrote for readers: it wins over the component's card
+            card = None if helping.topic_named(k, actor, w) else component_card(k, actor, w)
             if card: return card
         elif k.shown(actor.person, e) is None:
             raise k.no_such(e)

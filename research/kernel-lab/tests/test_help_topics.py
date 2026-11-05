@@ -151,3 +151,11 @@ def test_a_subtopic_answers_to_its_words_as_they_read(world):
     assert say(k, b, 'help wm drag')['text'].startswith('wm-drag: Dragging a window.')
     assert say(k, b, 'help wm')['text'].startswith('wm: The window manager.')
     assert say(k, b, 'help wm nothing-here')['text'].startswith('wm: The window manager.')
+
+
+def test_a_topic_named_like_a_component_is_the_page_shown(world):
+    k, a, b = world
+    say(k, a, 'make kind=component name=gauge purpose="A round gauge."')
+    assert 'A round gauge.' in say(k, b, 'help gauge')['text']
+    say(k, a, 'make kind=topic name=gauge words="look" text="Gauges on the bar."')
+    assert say(k, b, 'help gauge')['text'].startswith('gauge: Gauges on the bar.')
