@@ -123,15 +123,26 @@ class Manager:
     def minimum_size(self,row,work):
         return self._sizes(row,work)[1]
 
-    def request_share(self,key=None,expect=None):
+    def game_protected(self,reasons):
+        # Process names are produced by the shared game gate, not by a caller.
+        return any(r.lower().endswith('.exe') or r=='notification gate 3' for r in reasons)
+
+    def request_gates(self,reasons):
+        """A user request may cross gaming protection, never desktop failures."""
+        return [r for r in reasons if not (r.lower().endswith('.exe') or r in (
+            'full-screen foreground application','notification gate 2','notification gate 3'))]
+
+    def request_share(self,key=None,expect=None,requested=False):
         """One bar request; never a standing exemption from the gaming gate."""
         if self.mode!='live':raise PermissionError('shared layout requires live mode')
         previous=self.share
         self.share={'until':time.monotonic()+5,'keys':{r['key'] for r in self.rows},
             'target':key,'expect':expect,'new':{r['key'] for r in self.rows},'ready':False,
-            'probed':set(),'probe_wait':{},'planned':False,'failed':set()}
+            'probed':set(),'probe_wait':{},'planned':False,'failed':set(),'requested':requested}
         self.gate_cache=(None,-1.0)
-        if self.layout_gates():
+        reasons=self.gated_now()
+        self.share['target_only']=requested and self.game_protected(reasons)
+        if (self.request_gates(reasons) if self.share['target_only'] else self.layout_gates()):
             self.share=previous
             raise PermissionError('exclusive fullscreen or unavailable desktop; shared layout is unsupported')
         row=next((r for r in self.rows if r['key']==key),None)
@@ -142,11 +153,13 @@ class Manager:
             self.share=previous
             raise ValueError('shared arrangement needs a window or expected executable')
         self._drop_gesture()
-        self.share_floats.clear();self.share_note=''
+        if not self.share['target_only']:self.share_floats.clear()
+        self.share_note=''
         # Failure counts are observations, not an app exclusion. A new explicit
         # bar request permits one fresh probe, never a background retry.
-        for candidate in self.rows:
-            if self._shareable(candidate):self.failures.pop(candidate['key'],None)
+        if not self.share['target_only']:
+            for candidate in self.rows:
+                if self._shareable(candidate):self.failures.pop(candidate['key'],None)
         self.pending.clear()
         self.boot=True
 
@@ -211,7 +224,11 @@ class Manager:
 
     def ingest(self,rows,work,events=()):
         """Polling reconciles missing hooks, size refusals and work-area changes."""
+        # A newly observed executable may be the game that just started. Do not
+        # run its first layout using a pre-launch clear process-gate cache.
+        if {r['exe'] for r in rows}-{r['exe'] for r in self.rows}:self.gate_cache=(None,-1.0)
         now=time.monotonic();self.rows=rows;self.refs={r['key']:r['ref'] for r in rows}
+        self.state.work=work
         for row in rows:
             key=row['key'];old=self.actual.get(key)
             if key not in self.recency or row['focused'] and (not old or not old['focused']):
@@ -241,13 +258,31 @@ class Manager:
             return None
         sharing=self._sharing()
         if sharing and sharing['expect'] and not sharing['ready']:
-            target=next((r for r in rows if r['key'] not in sharing['new']
+            matches=[r for r in rows if r['key'] not in sharing['new']
                 and (str(r['exe']).lower()==sharing['expect'].lower()
-                    or sharing['expect']=='agora' and r.get('agora')) and self._shareable(r)),None)
+                    or sharing['expect']=='agora' and r.get('agora')) and self._shareable(r)]
+            target=matches[0] if len(matches)==1 else None
             if target:
                 sharing['target']=target['key'];sharing['keys'].add(target['key'])
         if sharing:
             sharing['ready']=any(r['key']==sharing['target'] for r in rows)
+        if sharing and sharing.get('requested') and self.game_protected(self.gated_now()):
+            sharing['target_only']=True
+        if sharing and sharing.get('target_only'):
+            reasons=self.gated_now()
+            if self.request_gates(reasons):
+                self._hold_share('Requested launch cancelled: desktop gate is unavailable')
+            elif sharing['ready']:
+                row=next(r for r in rows if r['key']==sharing['target'])
+                # Consume the request before touching native state. One exact
+                # target, no follow-up layout or automatic retry on refusal.
+                try:
+                    result=self._requested_action('focus',row,reasons)
+                    if result is False:self.share_note='Windows refused requested focus; no retry'
+                except (OSError,PermissionError) as exc:
+                    self._hold_share('Requested launch refused; no retry: '+str(exc))
+            self.gated=True;self._drop_gesture()
+            return {'gated':reasons,'plan':[],'minimise':[],'notes':[self.share_note]}
         gates=self.layout_gates()
         if sharing and not sharing['ready']:gates=gates or ['waiting for requested window']
         if gates:
@@ -571,6 +606,14 @@ class Manager:
     def apply(self,plan,current):
         if not valid(plan.state):return  # impossible fixed geometry fails closed
         if self.layout_gates():return
+        # The process/fullscreen gate cannot classify every windowed game.
+        # Capacity pressure alone never authorises hiding an observed window.
+        # Hold the whole plan, including neighbour moves, until an explicit
+        # arrangement or enough space is available. Keep this at the native seam.
+        if not (self.share and self.share.get('requested')) and any(
+                k in current and current[k]['state']!='minimised' for k in plan.minimise):
+            self._drop_gesture();self.boot=True
+            return
         try:self._apply_plan(plan,current)
         except (OSError,PermissionError):
             if not self.share:raise
@@ -620,11 +663,58 @@ class Manager:
                     self._hold_share('Native placement refused; sharing stopped without retry')
                     return
 
-    def action(self,verb,key,share=False):
+    def _requested_action(self,verb,row,reasons,geometry=None):
+        """One named user action; never admit a background layout through a gate."""
         if self.mode!='live':raise PermissionError('native window actions require live mode')
-        if share and verb in ('focus','restore'):self.request_share(key=key)
-        elif self.gate_fn():raise PermissionError('game/fullscreen gate is active')
+        if self.request_gates(reasons):
+            raise PermissionError('desktop gate is active; requested action is unavailable')
+        if not self._shareable(row):
+            raise PermissionError('window is no longer manageable')
+        if row['key'] in self.pins and (verb in ('restore','move') or row['state']=='minimised'):
+            raise PermissionError('unpin before restoring/moving')
+        target=None
+        if verb=='move':
+            if row['state']=='minimised':raise PermissionError('restore the window before moving')
+            def pair(value):
+                try:parts=tuple(int(x) for x in value.split(','))
+                except (ValueError,AttributeError):raise ValueError('at and size need two integer coordinates')
+                if len(parts)!=2:raise ValueError('at and size need two integer coordinates')
+                return parts
+            geometry=geometry or {}
+            if set(geometry)-{'at','size'} or 'at' not in geometry:
+                raise ValueError('move needs at=x,y and optional size=w,h')
+            target=Rect(*pair(geometry['at']),*(pair(geometry['size']) if 'size' in geometry else row['rect'][2:]))
+            if target.w<=0 or target.h<=0 or not self.state.work.contains(target):
+                raise ValueError('requested rectangle must fit the current work area')
+        # Supersede stale share/drag debt, without creating an exemption or
+        # scheduling retries. Subsequent ticks still use the full gaming gate.
+        self._hold_share('Requested target only; background layout remains protected')
+        self.pending.clear();self._drop_gesture();self.boot=True;self.gated=True
+        self.lease.heartbeat();self.lease.save(row['ref'])
+        if verb=='move':
+            self.native.place(row['ref'],target)  # existing SWP_NOACTIVATE boundary
+            self.remembered[row['key']]=(target.w,target.h);self.user_sized.add(row['key'])
+            return
+        if row['state']=='minimised':
+            self.native.restore(row['ref'])
+        return self.native.focus(row['ref'])
+
+    def action(self,verb,key,share=False,requested=False,geometry=None):
+        if self.mode!='live':raise PermissionError('native window actions require live mode')
         row=next((r for r in self.rows if r['key']==key),None)
+        reasons=list(self.gate_fn())
+        # The following tick must not reuse a pre-game clear cache after this
+        # request has just observed the game. No transient reflow exemption.
+        self.gate_cache=(reasons,time.monotonic())
+        # Only the admitted world request path sets requested. Internal policy
+        # calls, minimise/close and all layout paths retain their original gate.
+        if requested and (verb=='move' or verb in ('focus','restore') and reasons
+                          and (not share or self.game_protected(reasons))):
+            if not row:raise PermissionError('window is no longer manageable')
+            return self._requested_action(verb,row,reasons,geometry)
+        if verb=='move':raise PermissionError('move requires an explicit request')
+        if share and verb in ('focus','restore'):self.request_share(key=key,requested=requested)
+        elif reasons:raise PermissionError('game/fullscreen gate is active')
         if not row or not (self._shareable(row) if share else self._managed(row)):
             raise PermissionError('window is no longer manageable')
         if verb in ('minimise','restore') and key in self.pins:raise PermissionError('unpin before minimising/restoring')

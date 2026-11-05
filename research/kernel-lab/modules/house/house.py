@@ -761,13 +761,18 @@ class House:
         revision = None
         if notice:
             found = self.m.see("look " + notice).get("rows") or []
-            if not found or not found[0].get("card_signal"):
+            if not found or not (found[0].get("card_signal") or found[0].get("kind") == "notification"):
                 return
             revision = int(found[0].get("rev") or 0)
         rows = self.m.see("rows taskboard-event").get("rows") or []
+        # Generic world notifications use the same durable addressed-note inbox.
+        # They may address their own maker; their recipient controls read/dismiss.
+        rows += self.m.see("rows notification").get("rows") or []
         packets = {}
         for row in rows:
-            if not row.get("card_signal"):
+            if not (row.get("card_signal") or row.get("kind") == "notification"):
+                continue
+            if row.get("kind") == "notification" and row.get("state") != "unread":
                 continue
             record = int(row.get("rev") or 0)
             if revision is not None and record != revision:
@@ -781,7 +786,8 @@ class House:
                 ):
                     continue
                 current = self.line_for(a, row["id"])
-                if not current or not current.get("text") or not current.get("about"):
+                if (not current or not current.get("text") or not current.get("about")
+                        or (current.get("kind") == "notification" and current.get("state") != "unread")):
                     continue
                 # Source visibility can narrow after the note was written.
                 if not self.sees_line(a, row.get("source"), None):
@@ -812,7 +818,9 @@ class House:
             notes = []
             for sid in item["card_signal_notes"]:
                 row = self.line_for(a, sid)
-                if row and row.get("text") and row.get("about") and self.sees_line(a, row.get("source"), None):
+                if (row and row.get("text") and row.get("about")
+                        and not (row.get("kind") == "notification" and row.get("state") != "unread")
+                        and self.sees_line(a, row.get("source"), None)):
                     notes.append(dict(row, id=sid))
             if notes:
                 kept.append(dict(item, text=self.card_signal_text(notes),
@@ -850,6 +858,9 @@ class House:
         if word in ("make", "set", "undo") and target:
             rows = self.m.see(f"look {target}").get("rows") or [{}]
             kind = rows[0].get("kind")
+            if kind == "notification":
+                self.retract_card_signals()
+                return
             if kind in ("house-agent", "house-settings"):
                 self.load()
                 for a in self.agents.values():

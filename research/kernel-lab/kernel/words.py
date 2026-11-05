@@ -28,6 +28,32 @@ def _k(word, kind, takes, may, undo, help, **more):
 from hosts.web.layout import HELP as PANE_HELP, panes, arrange
 
 KERNEL_ENTRIES = [
+    _k("notification.send", "do", "<id> to=<person> text=<text> [about=<id>] [key=<key>] [cc=<person>]",
+       "members", "yes",
+       help="notification.send <source> to=<person> text=... [about=<thing>] [key=<key>] [cc=<person>]: "
+            "create a durable, permission-scoped addressed notification. A sender/recipient/key reuses its identity; "
+            "default key is the source. cc= allows envelope visibility, never another wake. No work starts."),
+    *[_k("notification." + action, "do", "<id>", "members", "yes",
+         help=f"notification.{action} <notification>: only its recipient changes read/dismiss state. "
+              "No work starts; undo restores the prior state.", needs="kind=notification")
+      for action in ("read", "dismiss")],
+    *[_k("handoff." + action, "do", takes, "members", "yes", help=help_)
+      for action, takes, help_ in [
+          ("open", "<id> [to=<person>|to_field=<field>] [owner=<person>]",
+           "handoff.open <thing> to=<person>: record your pending delegation without starting work. "
+           "In a rule, to_field= reads the recipient at the triggering act, owner=$by restricts to the delegator."),
+          ("close", "<id> [recipient=<person>]",
+           "handoff.close <thing>: the recipient acknowledges acceptance; its owner may close for recipient=."),
+          ("observe", "<id> policy=<id>",
+           "handoff.observe <said> policy=<handoff-policy>: record a linked pending recipient refusal. "
+           "The policy owns chat, scope/provider/cannot and session regexes. No model or retry."),
+          ("refuse", "<id> source=<said> category=<scope|provider|cannot>",
+           "handoff.refuse <handoff> source=<said> category=scope|provider|cannot: "
+           "its recipient explicitly records a refusal using their later visible message. No scope changes."),
+          ("notify", "<id> text=<template> [cc=<person>]",
+           "handoff.notify <handoff-refusal> text=...: once per pending handoff, address its owner with "
+           "{task}, {recipient}, {reason}, {source}. cc= permits envelope visibility where evidence is visible, "
+           "without another wake. Rechecks evidence; never starts work.")]],
     _k("task.signal", "do", "<id> mode=<waiting|notify|reporter> event=<landed|done> [route=<field>:<person>]",
        "members", "yes",
        help="task.signal <card> mode=waiting|notify|reporter event=landed|done [route=<field>:<person>]: "
@@ -117,7 +143,7 @@ KERNEL_ENTRIES = [
     _k('rule', 'do', 'on=<word> [kind=<kind>] do=<line> [name=<text>]', 'members', 'yes',
        help='rule on=<word> [kind=<target kind>] do="<line>" [name=<text>]: '
             'make a rule, binding its words now. It runs as its maker when that word happens on that kind. '
-            '$target and $by are supplied at firing time. off=yes stops it. '
+            '$target, $by and $said (the message made by this act) are supplied at firing time. off=yes stops it. '
             'make kind=rule on=<word> of_kind=<kind> do="…" says the same.'),
     *[_k(w, "see" if w == "panes" else "do", "[<words>]", "members", "no" if w == "panes" else "yes", help=h)
       for w, h in PANE_HELP.items()],
@@ -281,6 +307,7 @@ KERNEL_ENTRIES = [
 # aspects no line may write with make or set: what the kernel itself keeps, or derives
 RESERVED_KINDS = {"person", "agent", "module", "grant", "word", "invite", "world", "place", "group", "kit", "web-layout", "paint-report", "said"}
 RESERVED_KINDS.add('file')
+RESERVED_KINDS.update({'handoff', 'handoff-refusal', 'notification'})
 RESERVED = {"kind", "made_by", "for", "pinned", "forgotten", "sees", "lives", "from", "bound", "origin", "bundle",
             "made", "changed", "made_at", "changed_at", "steps_bound", "do_bound", "on_entry", "reviewed_code"}
 SEES_SAID = {"me", "leaders", "group", "place"}      # what `make … sees=` may say (section 7: it may narrow)
@@ -1255,12 +1282,19 @@ from .chat import say, receive as chat_receive, chat as chat_word, closed_sees
 from .store import GONE
 from .next_steps import change as task_change
 from .card_signals import signal as card_signal
+from .handoffs import open_ as handoff_open, close as handoff_close, observe as handoff_observe, notify as handoff_notify, refuse as handoff_refuse
+from .notifications import send as notification_send, state as notification_state
 from .bodies import edit as body_edit, edits as body_edits
 from .text_ops import change as text_change
 from painter.arrangement import component, look_view, components, component_card, window_view
 from painter.health import component_health, component_action, personal_view, personal_style, paint_clear
 
 KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant": grant, "widget": widget, "describe": describe,
+          "notification.send": notification_send, "notification.read": notification_state,
+          "notification.dismiss": notification_state,
+          "handoff.open": handoff_open, "handoff.close": handoff_close,
+          "handoff.observe": handoff_observe, "handoff.notify": handoff_notify,
+          "handoff.refuse": handoff_refuse,
           "task.signal": card_signal,
           **{"task-" + action: task_change for action in ("next", "revise", "review", "verify", "followup")},
           'edit': body_edit, 'edits': body_edits,

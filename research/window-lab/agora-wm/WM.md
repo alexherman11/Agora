@@ -1,3 +1,10 @@
+> Update, 5 November 2026: explicit game recovery is covered by
+> [requested recovery](REQUESTED-RECOVERY-dk2547.md). Background game protection
+> remains; gated lease release leaves windows untouched, and unsolicited
+> capacity eviction is held even with a clear gate. First activation still
+> runs the old shutdown code: the gaming restart hold remains. Source checks
+> do not establish activation or live game recovery.
+
 > Update, 27 October 2026: open/restore policy and causal history below are superseded by [adaptive visibility](ADAPTIVE-20261027.md). Source tested; live activation remains with coordinator.
 
 > Update, 4 November 2026: move-drag dwell and ghost-only neighbours below are

@@ -37,13 +37,14 @@ HELP={
          'Set a named window-kind size rule. Fractions use usable work area, half width includes its gutter share. Changes are undoable world facts.'),
  'windows':('see','','Current windows: app, exe/icon reference, state, focus and geometry; never titles.'),
  'policy':('see','','Startup imported policy code snapshot, scoped to Manager/Native and their local module functions; hot reload is unavailable.'),
- 'focus':('do','<key>','Ask Windows to focus a current manageable window; foreground lock may refuse.'),
+ 'focus':('do','<key> [share=yes]','Explicitly activate this window. During gaming only the named window is restored/focused; no layout runs. Foreground lock may refuse.'),
  'minimise':('do','<key>','Really minimise a manageable unpinned window; never cloak.'),
- 'restore':('do','<key>','Restore a manageable window and place it without overlap.'),
+ 'restore':('do','<key> [share=yes]','Restore this requested window, including companions while gaming, without arranging or minimising others. Locked/unavailable desktops refuse.'),
+ 'move':('do','<key> at=<x,y> [size=<w,h>]','Move only this requested visible window within the current work area, without focus, neighbour movement or settings changes. Works for games and companions; native refusal is not retried.'),
  'close':('do','<key>','Ask the window politely to close with WM_CLOSE; never kill a process.'),
  'pin':('do','<key>','Keep this window fixed. Screen state, kept by this window manager, never in the world.'),
  'unpin':('do','<key>','Let this pinned window move again. Screen state, never in the world.'),
- 'arrange':('do','[expect=<exe|agora>]','Re-solve the layout; expect arms one bar-requested shared layout for a new executable or Agora window, for at most five seconds. Browser windows keep half-screen width; LRU gives way before the request. Exclusive fullscreen is unsupported.'),
+ 'arrange':('do','[expect=<exe|agora>]','Re-solve the layout; expect arms one bar request for at most five seconds. While gaming only the matching new window is activated, with no neighbour layout. Otherwise ordinary shared layout applies.'),
  'reload':('do','sha256=<reviewed digest>','Unavailable: refuses before source/native/lease operations. Existing watchdog cannot guarantee a bounded live handoff.'),
  'rollback':('do','sha256=<previous digest>','Unavailable: no retained code generation; requires a separately authorized WM lifecycle, with geometry/claim release.'),
  'mode':('do','live|shadow|off','Shadow computes only; live needs rollout arming; off releases every saved placement.'),
@@ -137,9 +138,12 @@ class WMModule:
         elif before:log(f'wm {topic}: clear')
 
     def _request(self,op,*args):
-        answer=queue.Queue();self.requests.put((op,args,answer))
+        answer=queue.Queue();answer.deadline=time.monotonic()+4;answer.cancelled=False
+        self.requests.put((op,args,answer))
         try:return answer.get(timeout=4)
-        except queue.Empty:return {'refused':'window manager did not answer'}
+        except queue.Empty:
+            answer.cancelled=True
+            return {'refused':'window manager did not answer; queued request cancelled'}
 
     def call(self,msg):
         caller=msg.get('caller') or {}
@@ -157,7 +161,9 @@ class WMModule:
                 return {'refused':'WM policy handoff requires a desktop steward'}
             return {'refused':REFUSAL}
         if word in ('focus','minimise','restore','close'):
-            return self._request('action',word,target,kv.get('share')=='yes')
+            return self._request('action',word,target,kv.get('share')=='yes',word in ('focus','restore'))
+        if word=='move':
+            return self._request('action',word,target,False,True,{k:v for k,v in kv.items() if k!='key'})
         if word=='arrange':return self._request('arrange',kv.get('expect'))
         settings=self.read_intent(msg.get('use'));sid=settings['id'];saw={sid:settings['rev']}
         if word in ('size','sizes'):
@@ -252,13 +258,18 @@ class WMModule:
             while True:
                 try:op,args,answer=self.requests.get_nowait()
                 except queue.Empty:break
+                if getattr(answer,'cancelled',False) or time.monotonic()>getattr(answer,'deadline',float('inf')):
+                    answer.put({'refused':'window request expired without native action'})
+                    continue
                 try:
                     if op=='action':
                         value=manager.action(*args);answer.put({'external':args[0]=='close','text':f'wm.{args[0]}: '+('Windows refused focus' if value is False else 'requested')})
                     elif args and args[0]:
-                        manager.request_share(expect=args[0])
-                        answer.put({'text':'shared layout awaits requested executable window (five seconds)'})
+                        manager.request_share(expect=args[0],requested=True)
+                        answer.put({'text':'awaiting requested executable window (five seconds; target only while gaming)'})
                     else:
+                        if manager.gated_now():
+                            raise PermissionError('background arrangement remains gated; request a named window action')
                         manager.state=solve(manager.state,{'type':'arrange'}).state
                         answer.put({'text':'layout re-solved'})
                 except Exception as exc:answer.put({'refused':str(exc)})
