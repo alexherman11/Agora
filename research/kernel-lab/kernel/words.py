@@ -28,6 +28,19 @@ def _k(word, kind, takes, may, undo, help, **more):
 from hosts.web.layout import HELP as PANE_HELP, panes, arrange
 
 KERNEL_ENTRIES = [
+    _k("conversation.open", "do", "<id> [fresh=yes]", "members", "yes",
+       help="conversation.open <module>: open your private conversation with this module. "
+            "The server chooses your chat; fresh=yes starts an empty one. Only a signed-in person may open it."),
+    _k("conversation.append", "do", "<id> text=<text>", "members", "yes",
+       help="conversation.append <chat> text=...: append to your private conversation. "
+            "The bound module may answer only for this chat's owner, under its grant. Never addresses or wakes anyone."),
+    _k("draft.create", "do", "<id> text=<text> destination=<group>", "members", "yes",
+       help="draft.create <conversation> text=... destination=<group>: the conversation's granted module "
+            "makes a private draft for its caller. This publishes nothing."),
+    _k("draft.post", "do", "<id> rev=<revision>", "members", "yes", needs="kind=draft",
+       help="draft.post <draft> rev=<reviewed revision>: Post the exact draft you reviewed, as your own act. "
+            "Only its person can Post; agents, modules, rules and verb wrappers cannot. "
+            "The destination's post permissions are checked again. Repeating Post does not duplicate it."),
     _k("notification.send", "do", "<id> to=<person> text=<text> [about=<id>] [key=<key>] [cc=<person>]",
        "members", "yes",
        help="notification.send <source> to=<person> text=... [about=<thing>] [key=<key>] [cc=<person>]: "
@@ -308,12 +321,14 @@ KERNEL_ENTRIES = [
 RESERVED_KINDS = {"person", "agent", "module", "grant", "word", "invite", "world", "place", "group", "kit", "web-layout", "paint-report", "said"}
 RESERVED_KINDS.add('file')
 RESERVED_KINDS.update({'handoff', 'handoff-refusal', 'notification'})
+RESERVED_KINDS.add('draft')
 RESERVED = {"kind", "made_by", "for", "pinned", "forgotten", "sees", "lives", "from", "bound", "origin", "bundle",
             "made", "changed", "made_at", "changed_at", "steps_bound", "do_bound", "on_entry", "reviewed_code"}
 SEES_SAID = {"me", "leaders", "group", "place"}      # what `make … sees=` may say (section 7: it may narrow)
 from .blobs import PROTECTED
 RESERVED.update(PROTECTED | {'pin_until', 'forget_reason'})
 RESERVED.add('via_actor')
+RESERVED.update({'conversation_agent', 'conversation_owner'})
 RESERVED.update({'outside', 'outside_not'})      # the kernel's answer to a module, never a fact (review, Low)
 RESERVED_PREFIX = ("in:", "like:", "member:", "answer:", "sees.", "vote:", "claim:", "contact:")
 
@@ -1284,12 +1299,15 @@ from .next_steps import change as task_change
 from .card_signals import signal as card_signal
 from .handoffs import open_ as handoff_open, close as handoff_close, observe as handoff_observe, notify as handoff_notify, refuse as handoff_refuse
 from .notifications import send as notification_send, state as notification_state
+from .conversations import open_conversation, append_conversation, create_draft, post_draft
 from .bodies import edit as body_edit, edits as body_edits
 from .text_ops import change as text_change
 from painter.arrangement import component, look_view, components, component_card, window_view
 from painter.health import component_health, component_action, personal_view, personal_style, paint_clear
 
 KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant": grant, "widget": widget, "describe": describe,
+          "conversation.open": open_conversation, "conversation.append": append_conversation,
+          "draft.create": create_draft, "draft.post": post_draft,
           "notification.send": notification_send, "notification.read": notification_state,
           "notification.dismiss": notification_state,
           "handoff.open": handoff_open, "handoff.close": handoff_close,

@@ -924,6 +924,8 @@ class Kernel:
         rec = {"at": self.now().strftime("%Y-%m-%dT%H:%M:%SZ"), "by": by, "words": words,
                "parts": tx.parts}
         rec.update({k: v for k, v in extra.items() if v is not None})
+        if tx.extra.get("passive"):
+            rec["passive"] = True
         rec = self.log.append(rec)
         for p in rec["parts"]:
             self.state.apply(p["facts"], rec["seq"])
@@ -940,6 +942,7 @@ class Kernel:
                 self._happen({"word": p["word"], "target": p.get("target") or (made[0] if made else None),
                               "entry": p.get('entry') or self.find_entry(p['word']),
                               "made": made, "by": rec["by"], "for": rec.get("for"),
+                              "passive": rec.get("passive", False),
                               "text": p.get("words", ""), "record": rec["seq"]})
         eid = rec.get('entry')
         if self.state.get(eid, 'from') == 'verb' and not any(p.get('entry') == eid for p in rec['parts']):
@@ -947,6 +950,7 @@ class Kernel:
             self._happen({'word': self.state.get(eid, 'word'), 'entry': eid,
                           'target': L.parse(words).target or (made[0] if made else None),
                           'made': made, 'by': rec['by'], 'for': rec.get('for'),
+                          'passive': rec.get('passive', False),
                           'text': words, 'record': rec['seq']})
         with self.changed:
             self.changed.notify_all()                    # pages' streams wake on every record
@@ -957,9 +961,9 @@ class Kernel:
         h["n"] = len(self.happenings) + 1
         self.happenings.append(h)
         del self.happenings[:-2000]                      # momentary: the last 2000 are kept for streams catching up
-        if self.modules:
+        if self.modules and not h.get("passive"):
             self.modules.deliver(h)
-        if self._rule_wants(h):
+        if not h.get("passive") and self._rule_wants(h):
             if self._rules_q is None:
                 import queue as _q
                 self._rules_q = _q.Queue()

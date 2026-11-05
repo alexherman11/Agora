@@ -432,6 +432,10 @@ def answer(k, actor, words, group):
     hit = topic_named(k, actor, w)
     if hit:
         return _topic_page(k, actor, group, hit[0], hit[1], pool)
+    namespace = [a for name, a in sorted(pool.items()) if name.startswith(w + ".")]
+    if namespace and not k.module_named(w):
+        return {"text": "\n\n".join([f"{w}: related words"] + [a.get("help", a["word"]) for a in namespace]),
+                "rows": [{"word": a["word"], "kind": a.get("word_kind")} for a in namespace]}
     family = [a for name, a in sorted(pool.items()) if "." in name and name.rsplit(".", 1)[1] == w]
     if family:
         lines = [f"{w} <thing>: a plain word. It runs the family's own {w} for the kind of thing you name, "
