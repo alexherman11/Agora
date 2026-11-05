@@ -67,7 +67,8 @@ def alive(pid):
         return True
 HELD = {'yes', 'true', '1', 'paused', 'held', 'blocked', 'cancelled', 'canceled'}
 CHECKS = [
-    ['research/kernel-lab/tests/test_chat.py', 'research/kernel-lab/tests/test_paint_health.py'],
+    ['research/kernel-lab/tests/test_chat.py', 'research/kernel-lab/tests/test_paint_health.py',
+     'research/kernel-lab/modules/house/test_imports.py'],
     ['research/window-lab/kernel-desktop/test_kdesk.py'],
 ]
 
