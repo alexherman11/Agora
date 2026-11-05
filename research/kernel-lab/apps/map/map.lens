@@ -17,7 +17,7 @@ root : map-shell, title "Seabright"
   plan : map-route, map Seabright
     only when $view.tool = route
     on route do map.route name=$name stops=$stops mode=$mode map=Seabright
-  layers : map-layers, map Seabright
+  layers : map-layers, map Seabright, collapsed yes
     watch reading:"map.layers Seabright"
     on hide do map.hide $layer map=Seabright
     on unhide do map.unhide $layer map=Seabright

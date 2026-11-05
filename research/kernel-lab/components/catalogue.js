@@ -7,7 +7,25 @@ export default {mount(api,s){
   if(kind==='button')return api.part('control','button',{type:'button',on:{click:()=>fire('press')({})}},label);
   if(['input','editor','choice','switch'].includes(kind)){
     const type=kind==='editor'?'multiline':kind==='choice'?'choice':kind==='switch'?'toggle':'text';
-    const n=api.part('control',type==='multiline'?'textarea':type==='choice'?'select':'input',{'aria-label':label,value:s.value||'',placeholder:s.hint||'',...(type==='toggle'?{type:'checkbox'}:{})});
+    const explicit=kind==='input'&&s.commit==='submit';
+    const n=api.part('control',type==='multiline'?'textarea':type==='choice'?'select':'input',{'aria-label':label,value:explicit?(api.draft.value??s.value??''):s.value||'',placeholder:s.hint||'',...(type==='toggle'?{type:'checkbox'}:{})});
+    if(explicit){
+      const status=api.part('status','p',{role:'status','aria-live':'polite'},api.draft.outcome||'');
+      const submit=api.part('submit','button',{type:'button'},s.submitLabel||api.label('submit','Submit'));
+      const ready=()=>{submit.disabled=!!api.draft.busy||!n.value.trim()};
+      api.draft.updateSubmit=()=>{n.value=api.draft.value??n.value;status.textContent=api.draft.outcome||'';ready()};
+      n.addEventListener('input',()=>{api.draft.value=n.value;ready()});
+      const send=async()=>{
+        if(api.draft.busy||!n.value.trim())return;
+        const value=n.value;api.draft.value=value;api.draft.busy=true;ready();api.draft.outcome=status.textContent='';
+        try{await api.fire('submit',{value});if(api.draft.value===value){api.draft.value='';n.value=''}api.draft.outcome=status.textContent=api.label('sent','Sent.')}
+        catch(e){api.draft.outcome=status.textContent=String(e.message||e)}
+        finally{api.draft.busy=false;api.draft.updateSubmit()}
+      };
+      n.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();send()}});
+      submit.addEventListener('click',send);ready();
+      root.append(P.node('label',{},label),n,submit,status);return root;
+    }
     if(type==='choice')for(const value of String(s.options).split('|'))n.append(P.node('option',{value},value));
     if(type==='toggle')n.checked=!!s.checked;
     const commit=()=>fire('change')({value:type==='toggle'?(n.checked?'yes':'no'):n.value});

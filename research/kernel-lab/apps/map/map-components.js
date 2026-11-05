@@ -22,7 +22,7 @@ const MAP_CSS=`
 .gm-col{position:absolute;top:12px;bottom:12px;display:flex;flex-direction:column;gap:10px;pointer-events:none;z-index:5;width:min(350px,calc(50% - 24px))}
 .gm-col>*{pointer-events:auto}.gm-col.gm-left{left:12px}.gm-col.gm-right{right:12px;top:64px;bottom:96px;width:min(300px,calc(50% - 24px))}
 .gm-col .gm-scroll{overflow:auto;display:flex;flex-direction:column;gap:10px;min-height:0;padding:0 2px 4px;scrollbar-width:thin}
-.gm-shell.gm-folded .gm-right .gm-scroll{display:none}
+.gm-layer-body[hidden]{display:none}
 .gm-fold{align-self:flex-end;border:0;border-radius:999px;padding:6px 12px;background:var(--card,#fff);color:inherit;box-shadow:0 2px 10px #1f2a2422;font:inherit;font-size:12px;cursor:pointer}
 .gm-card{background:color-mix(in srgb,var(--card,#fff) 96%,transparent);border:1px solid color-mix(in srgb,var(--ink,#26302c) 9%,transparent);border-radius:16px;box-shadow:0 8px 28px #1f2a241c;padding:12px 14px}
 .gm-card h3{margin:0 0 8px;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#5f6b66);font-weight:700;display:flex;align-items:center;gap:8px}
@@ -98,13 +98,14 @@ const MAP_CSS=`
 .gm-status{position:absolute;inset:0;display:grid;place-items:center;font-size:15px;color:#3e3a33;pointer-events:none}
 .gm-status span{background:#fffdf8e6;padding:10px 18px;border-radius:12px;box-shadow:0 4px 18px #0002;max-width:70%}
 .gm-more{all:unset;cursor:pointer;padding:0 6px;border-radius:6px;color:var(--muted,#5f6b66);font-size:15px;line-height:1}.gm-more:hover,.gm-more:focus-visible{background:color-mix(in srgb,var(--ink,#26302c) 8%,transparent)}
-.gm-layer{display:grid;grid-template-columns:auto auto 1fr auto auto;align-items:center;gap:8px;padding:5px 4px;border-radius:9px}
+.gm-layer{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:5px 4px;border-radius:9px}
 .gm-layer:hover{background:color-mix(in srgb,var(--ink,#26302c) 5%,transparent)}
 .gm-layer input{accent-color:#2f6f62;width:16px;height:16px;margin:0}
 .gm-layer label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gm-layer .gm-mine{font-size:10.5px;color:var(--muted,#5f6b66);border:1px solid color-mix(in srgb,var(--ink,#26302c) 18%,transparent);border-radius:5px;padding:0 4px;margin-left:4px}
 .gm-swatch{width:12px;height:12px;border-radius:50%;box-shadow:inset 0 0 0 1px #0002}
-.gm-count{font-size:12px;color:var(--muted,#5f6b66);font-variant-numeric:tabular-nums}
+.gm-count{grid-column:3/-1;font-size:12px;color:var(--muted,#5f6b66);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.gm-layer>.gm-more{grid-column:5;grid-row:1}.gm-layer>label{overflow-wrap:anywhere}
 .gm-err{grid-column:2/-1;font-size:12px;color:#a2402a}
 .gm-sub{font-size:11px;color:var(--muted,#5f6b66);margin:12px 0 4px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}
 .gm-form{display:flex;flex-direction:column;gap:8px;margin-top:8px}
@@ -160,7 +161,7 @@ const MAP_CSS=`
 .gm-shell[data-style=night]{--card:#1f2629;--ink:#e8e2d6;--muted:#a9b0aa;--paper:#171d20}
 .gm-shell[data-style=night] .gm-scale-wrap,.gm-shell[data-style=night] .gm-attrib,.gm-shell[data-style=night] .gm-loading{background:#1c211fcc;color:#d8d2c6}
 .gm-shell[data-style=night] .gm-scale{border-color:#d8d2c6}
-@media (max-width:760px){.gm-col.gm-left{top:auto;left:8px;right:8px;bottom:8px;width:auto;max-height:46vh}.gm-col.gm-right{display:none}.gm-tools{top:8px}.gm-nav{bottom:auto;top:64px;right:8px}}
+@media (max-width:760px){.gm-col.gm-left{top:auto;left:8px;right:8px;bottom:8px;width:auto;max-height:46vh}.gm-col.gm-right{top:8px;right:8px;bottom:auto;max-height:40vh;width:min(260px,calc(100% - 140px))}.gm-tools{top:8px}.gm-nav{bottom:auto;top:64px;right:8px}}
 /* a place's page */
 .pp{min-height:100vh;box-sizing:border-box;background:var(--paper,#f6f3ec);color:var(--ink,#26302c);font:14px/1.5 var(--ag-font,system-ui,sans-serif);padding:0 0 24px}
 .pp-wrap{max-width:720px;margin:0 auto;padding:0 16px;display:flex;flex-direction:column;gap:12px}
@@ -279,15 +280,13 @@ function mountShell(api){
   const root=api.part('shell','div',{class:'gm-shell'});
   const stage=mapEl('div',{class:'gm-stage'}),left=mapEl('div',{class:'gm-col gm-left'}),right=mapEl('div',{class:'gm-col gm-right'});
   const lscroll=mapEl('div',{class:'gm-scroll'}),rscroll=mapEl('div',{class:'gm-scroll'});
-  const folded=!!api.draft.folded;root.classList.toggle('gm-folded',folded);
-  const fold=mapEl('button',{type:'button',class:'gm-fold','aria-expanded':String(!folded),on:{click:()=>{api.draft.folded=!api.draft.folded;root.classList.toggle('gm-folded',api.draft.folded);fold.textContent=api.draft.folded?'Layers':'Hide layers';fold.setAttribute('aria-expanded',String(!api.draft.folded))}}},folded?'Layers':'Hide layers');
   for(const child of api.children){
     if(child.component==='geo-map')stage.append(api.render(child));
     else if(child.component==='map-search')left.append(api.render(child));
     else if(child.component==='map-layers')rscroll.append(api.render(child));
     else lscroll.append(api.render(child));
   }
-  left.append(lscroll);right.append(fold,rscroll);root.append(stage,left,right);
+  left.append(lscroll);right.append(rscroll);root.append(stage,left,right);
   return root;
 }
 
@@ -458,24 +457,29 @@ function mountLayers(api,settings){
   const card=api.part('layers','section',{class:'gm-card','aria-label':'Layers'});
   const controlId=key=>'gm-'+String(api.node.path||'map').replace(/[^a-z0-9_-]/gi,'-')+'-'+key;
   const add=mapEl('button',{type:'button',class:'gm-btn gm-primary gm-small','aria-expanded':String(!!api.draft.newLayer)},'+ Add a layer');
-  card.append(mapEl('h3',{},mapIcon('layers'),api.label('title','Layers'),mapHas(api,'make')?add:null));
-  const body=mapEl('div');card.append(body);
+  const folded=()=>api.draft.folded??(settings.collapsed===true||settings.collapsed==='yes');
+  const body=mapEl('div',{class:'gm-layer-body'}),contents=mapEl('div');
+  const toggle=api.part('toggle','button',{type:'button',class:'gm-btn gm-small'});
+  const show=()=>{body.hidden=folded();toggle.textContent=api.label(folded()?'showlayers':'hidelayers',folded()?'Show layers':'Hide layers');toggle.setAttribute('aria-expanded',String(!folded()))};
+  toggle.addEventListener('click',()=>{api.draft.folded=!folded();show()});show();
+  card.append(mapEl('h3',{},mapIcon('layers'),api.label('title','Layers'),toggle));
+  if(mapHas(api,'make'))body.append(add);body.append(contents);card.append(body);
   // local toggles (an editor open, the gallery) repaint this card only: the painter skips identical plans
   const paint=rows=>{
-    const list=mapEl('div',{role:'list'});body.replaceChildren();
+    const list=mapEl('div',{role:'list'});contents.replaceChildren();
     const head=rows.find(r=>r.kind==='map')||{};const hidden=new Set(String(head.hidden||'').split(/\s+/).filter(Boolean));
     const layers=rows.filter(r=>r.kind!=='map');
     add.setAttribute('aria-expanded',String(!!api.draft.newLayer));add.textContent=api.draft.newLayer?'Close':'+ Add a layer';
     add.onclick=()=>{api.draft.newLayer=!api.draft.newLayer;api.draft.template=null;paint(rows)};
-    if(api.draft.newLayer)body.append(gallery(rows,layers));
-    body.append(list);
+    if(api.draft.newLayer)contents.append(gallery(rows,layers));
+    contents.append(list);
     if(!layers.length)list.append(mapEl('p',{class:'gm-empty'},'No layers yet. Add one, or say ',mapEl('code',{},'make kind=map-layer map='+(head.name||settings.map)+' name=… shows="rows spot"')));
     for(const L of layers){
       const on=!hidden.has(L.id)&&L.on!=='no';
       const box=mapEl('input',{type:'checkbox',id:controlId(L.id),'aria-label':'Show '+L.name,on:{change:()=>mapFire(api,box.checked?'unhide':'hide',{layer:L.id})}});box.checked=on;
       const row=api.part('layer','div',{class:'gm-layer',role:'listitem',title:'Shows: '+(L.shows||'')+(L.by?' · made by '+L.by:'')},
-        box,mapEl('span',{class:'gm-swatch',style:{background:L.color||'#cf5a3c'}}),mapEl('label',{for:controlId(L.id)},L.name||'A layer',L.only==='me'||L.sees==='me'||String(L.sees||'').startsWith('person:')?mapEl('span',{class:'gm-mine'},'only you'):null),
-        mapEl('span',{class:'gm-count'},String(L.count||0)+(L.unplaced?' · '+L.unplaced+' unplaced':'')));
+        box,mapEl('span',{class:'gm-swatch',style:{background:L.color||'#cf5a3c'}}),mapEl('label',{for:controlId(L.id)},L.title||L.name||api.label('layer','A layer'),L.only==='me'||L.sees==='me'||String(L.sees||'').startsWith('person:')?mapEl('span',{class:'gm-mine'},'only you'):null),
+        mapEl('span',{class:'gm-count'},String(L.count||0)+' '+api.label('onmap','on map')+(L.unplaced?' · '+L.unplaced+' '+api.label('withoutlocation','without a location'):'')));
       row.setAttribute('data-fact-layer',String(L.name||'').toLowerCase().replace(/[^a-z0-9-]+/g,'-'));
       if(L.error)row.append(mapEl('span',{class:'gm-err'},L.error));
       list.append(row);

@@ -1,9 +1,9 @@
 root : column, role nb-asks
   heading : text "Asks & offers"
-  ask : input, label "Ask for something", hint "What would help? Press Enter to post."
-    on change do board.post post_kind=ask seats=$view.asks_seats text=$value in=$view.asks_channel
-  offer : input, label "Offer something", hint "What can you share? Press Enter to post."
-    on change do board.post post_kind=offer seats=$view.asks_seats text=$value in=$view.asks_channel
+  ask : input, label "Ask for something", hint "What would help? Press Enter to post.", commit submit, submitLabel "Post ask"
+    on submit do board.post post_kind=ask seats=$view.asks_seats text=$value in=$view.asks_channel
+  offer : input, label "Offer something", hint "What can you share? Press Enter to post.", commit submit, submitLabel "Post offer"
+    on submit do board.post post_kind=offer seats=$view.asks_seats text=$value in=$view.asks_channel
   entries : list, label "Asks and offers", of reading:"board.asks in=$view.channel side=$view.asks_side status=$view.asks_status" as a, limit 30, each ask-item
 ask-item : column, role nb-ask
   line : row

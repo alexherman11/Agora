@@ -1,3 +1,10 @@
+// Local to this component module: existing widget runtimes need no upgrade.
+function pageBounds(total,size,page=0){
+  total=Math.max(0,Math.floor(Number(total)||0));size=Math.max(1,Math.floor(Number(size)||1));
+  const pages=Math.max(1,Math.ceil(total/size));
+  page=Math.max(0,Math.min(pages-1,Math.floor(Number(page)||0)));
+  return {page,pages,start:page*size,end:Math.min(total,(page+1)*size),previous:page>0,next:page<pages-1};
+}
 export default {css:`
 body:has(.work-overview){padding:24px!important;min-width:0!important;overflow:hidden}
 .work-overview{height:calc(100dvh - 48px);min-height:0;display:flex;flex-direction:column;gap:20px;color:var(--work-ink,#293d35)}
@@ -33,15 +40,15 @@ body:has(.work-overview){padding:24px!important;min-width:0!important;overflow:h
   }
   const list=P.node('div',{class:'work-rows','aria-label':s.board?'Tasks and work':'Current work'});
   const footer=P.node('nav',{class:'work-pagination','aria-label':'Work pages'});
-  const prev=P.node('button',{type:'button'},'Previous'),next=P.node('button',{type:'button'},'Next'),count=P.node('span',{'aria-live':'polite'});
+  const prev=P.node('button',{type:'button',disabled:true},'Previous'),next=P.node('button',{type:'button',disabled:true},'Next'),count=P.node('span',{'aria-live':'polite'});
   footer.append(prev,count,next);root.append(heading);if(s.board)root.append(filters);root.append(list,footer);
   let page=Math.max(0,Math.floor(Number(api.view().workPage)||0));
   function draw(){
     const size=Math.max(1,Math.floor((list.getBoundingClientRect().height-2)/58));
-    const pages=Math.max(1,Math.ceil(rows.length/size));page=Math.min(page,pages-1);
-    list.replaceChildren(...rows.slice(page*size,(page+1)*size).map(api.render));
+    const bounds=pageBounds(rows.length,size,page);page=bounds.page;
+    list.replaceChildren(...rows.slice(bounds.start,bounds.end).map(api.render));
     if(!rows.length)list.append(P.node('p',{class:'work-quiet'},'No tasks in this view.'));
-    prev.disabled=page===0;next.disabled=page===pages-1;
+    prev.disabled=!bounds.previous;next.disabled=!bounds.next;
     count.textContent=rows.length?`${page*size+1}–${Math.min(rows.length,(page+1)*size)} of ${rows.length}`:'All clear';
   }
   prev.onclick=()=>api.select({workPage:Math.max(0,page-1)}).catch(api.tell);

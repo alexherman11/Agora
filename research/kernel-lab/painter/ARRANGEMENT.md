@@ -236,6 +236,55 @@ selection-only control, a keyboard-callable `quote` action, and `dispose` for
 `api.cleanup`; authors arrange a More-menu fallback. Committing the action clears
 the consumed browser selection; merely selecting text does not act. It adds no word authority.
 
+`input, commit submit, submitLabel "Send"` emits **submit** only on non-IME Enter
+or its button. It never sends on blur, ignores blank/pending submissions, retains
+refused drafts and clears only successfully sent text. Arrange `on submit do ...`
+with `$value`. Default `commit=change` retains the existing change gesture.
+This works for a quick-add field, a search command or a chat draft; it is not a
+board-specific input.
+
+Feed, file reader and Work keep `pageBounds(total, size, page)` inside their
+component modules. It clamps the zero-based page and disables unavailable
+previous/next controls, including empty and one-page collections. They require
+no change to painter widget code or grants.
+
+Board and map components publish from checked-in `board-components.bundle.js`
+and `map-components.bundle.js`: each component imports one file into its code
+fact. The board file includes its CSS; the map file includes its engine and
+worker definitions. Builders regenerate these files before landing with
+`research/community-app/board/build_component_bundles.py`; `--check` detects
+stale artifacts without writing. Publication never assembles bundles or patches
+the top bar, dock or other widgets.
+
+The shared calendar wraps its grid in the `container` part, an inline-size
+container named `calendar`. Its breakpoints measure that part, including inside
+a split layout, rather than the desktop viewport. Agenda width uses world style
+tokens `calendar-agenda-min` and `calendar-agenda-max`; normal paper/ink/spacing
+tokens still apply.
+
+`file, quoteMode inline, replyTarget <post>, replyLabel "Discussion"` keeps the
+quoted passage, page and response in a visible draft in that reader. Arrange
+`on reply do ... $target $fields`; fields are `text`, `quote`, `source`, `page`,
+with a fresh target revision. `startLabel` names the destination when there is
+no existing reply target. Without a target, an authored **start** gesture
+receives `$group` (replyGroup or the bound row's first group) and `$fields`
+containing title and text with the quote and file link. Its returned first made
+thing becomes the local reply target for later quotes. Selection never sends;
+the explicitly labelled send button does. Failures keep the draft. No authored
+destination shows an unavailable explanation. Existing `quoteMode=thread`
+keeps the containing thread workflow; shared right-click Comment is unchanged.
+
+Post-kind metadata `compose_fields_first=yes` and `compose_message_rows=3`
+arranges declared details before the message and chooses its initial height in
+the shared composer. It works for any kind. The submit footer stays reachable
+while the dialog scrolls, styled with the existing world tokens.
+
+`map-layers, collapsed yes` starts folded with its Show/Hide layers button inside
+the panel, including narrow windows. An explicit toggle persists for that
+mounted part. Labels `showlayers`, `hidelayers`, `onmap`, `withoutlocation` are
+world-configurable; layer names come from map-layer things, never app-specific
+name matching in the renderer.
+
 `api.fire(event, {…values, select:{…localView}})` applies a local view selection
 after word admission succeeds and before the first resulting repaint. Use it
 to dismiss a one-action dialog atomically with its successful action. Refusal

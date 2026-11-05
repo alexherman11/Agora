@@ -64,7 +64,8 @@ COMPONENTS = {
                 dict(map=T(), hide=T(), focus=T(), style=T(), labels=T(default='{}'))),
     'map-layers': ('Layers of a map: show or hide each for yourself, + Add a layer from a gallery of readings (shared or '
                    'only yours), the ground\'s own layers, and how the map looks.',
-                   'layers layer', '', 'hide unhide make make-mine edit-layer forget-layer style', dict(map=T(), labels=T(default='{}'))),
+                   'layers layer toggle', '', 'hide unhide make make-mine edit-layer forget-layer style',
+                   dict(map=T(), collapsed=T('boolean',False), labels=T(default='{}'))),
     'map-search': ('Search for things, places, streets, corners and towns (map.find); choosing one flies there.',
                    'search', '', '', dict(map=T(), labels=T(default='{}'))),
     'map-inspector': ('What was pressed: a building\'s card (what is at it, the talk, its page), every fact of a thing, '
@@ -93,7 +94,7 @@ PAGE_GRANTS = ('window.surface rows look look-view history components help compo
 
 
 def code():
-    return '\n'.join((HERE / f).read_text(encoding='utf-8') for f in ('geo-worker.js', 'geo-engine.js', 'map-components.js'))
+    return (HERE / 'map-components.bundle.js').read_text(encoding='utf-8')
 
 
 def wait_for(door, word, seconds=20):

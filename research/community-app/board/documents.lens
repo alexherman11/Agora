@@ -14,7 +14,9 @@ document-item : document-entry
   on rename do files.rename $target name=$value
   on move do files.move $target to=$parent
   on store do files.store $target library=$library.id parent=$parent
-  preview : file, target $item.file_id, name $item.name, owner $item.upload_owner
+  preview : file, target $item.file_id, name $item.name, owner $item.upload_owner, quoteMode inline, replyTarget $item.source_post, replyLabel $item.source_title, startLabel $library.title
+    on reply do board.reply $target $fields
+    on start do board.post post_kind=discussion in=$group $fields
     on alt do set $target alt=$value
     on rsvp do board.rsvp $target status=going
     on calendar do board.calendar $target

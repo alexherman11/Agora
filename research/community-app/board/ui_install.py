@@ -103,8 +103,7 @@ def install_ui(door):
             words={'start':'Starts','end':'Ends','closes':'Sign-ups close','until':'Show until','seats':'Places available','location':'Meeting place','place':'Link to a place','options':'Choices (one word each)'}
             labels={key:words.get(key,key.replace('_',' ').capitalize()) for key in fields}
             door.say('look '+kind['id']);door.say('set '+kind['id']+' field_types='+Q(json.dumps(types))+' field_labels='+Q(json.dumps(labels)))
-    code=(HERE/'board-components.js').read_text(encoding='utf-8')
-    code=code.replace('export default {mount', 'export default {css:'+json.dumps((HERE/'board-theme.css').read_text(encoding='utf-8'))+',mount')
+    code=(HERE/'board-components.bundle.js').read_text(encoding='utf-8')
     import hashlib
     for card in cards():
         name=card.pop('name')
@@ -129,6 +128,10 @@ def install_ui(door):
     # Each channel's own view and each kind's defaults are world data from definitions.json,
     # brought onto an already-installed world here (a fresh world gets them from install).
     data=json.loads((HERE/'definitions.json').read_text(encoding='utf-8'))
+    for definition in data['kinds']:
+        for kind in door.rows('kind',name=definition['name']):
+            changes={key:definition[key] for key in ('compose_fields_first','compose_message_rows') if key in definition and kind.get(key)!=definition[key]}
+            if changes:door.say('look '+kind['id']);door.say(line('set',kind['id'],**changes))
     for definition in data['channels']:
         for channel in door.rows('board-channel',title=definition['name']):
             changes={k:definition[k] for k in ('opens','opens_label') if k in definition and channel.get(k)!=definition[k]}

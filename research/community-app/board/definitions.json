@@ -11,7 +11,7 @@
     {"name": "discussion", "fields": ""},
     {"name": "question", "fields": ""},
     {"name": "announcement", "fields": "until", "leaders_only": "yes"},
-    {"name": "event", "fields": "start end location seats closes place", "required": "start seats", "defaults": "{\"seats\": \"500\"}"},
+    {"name": "event", "fields": "start end location seats closes place", "required": "start seats", "defaults": "{\"seats\": \"500\"}", "compose_fields_first": "yes", "compose_message_rows": "3"},
     {"name": "poll", "fields": "options closes", "required": "options closes"},
     {"name": "ask", "fields": "seats closes", "required": "seats"},
     {"name": "offer", "fields": "seats closes", "required": "seats"},

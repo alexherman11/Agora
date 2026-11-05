@@ -7,7 +7,8 @@
 //   on rsvp do … $target status=$value        (value = going | maybe)
 // Without an add or rsvp gesture those controls are simply not offered.
 export default {css:`
-.cal{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,300px);gap:var(--nb-space-4,16px);color:var(--ink,#303d37);font-size:var(--nb-small,14px);line-height:1.4}
+.cal-container{container-type:inline-size;container-name:calendar;min-width:0}
+.cal{display:grid;grid-template-columns:minmax(0,1fr) minmax(var(--calendar-agenda-min,240px),var(--calendar-agenda-max,300px));gap:var(--nb-space-4,16px);color:var(--ink,#303d37);font-size:var(--nb-small,14px);line-height:1.4}
 .cal[data-view=week]{grid-template-columns:minmax(0,1fr)}
 .cal button{font:inherit;color:inherit;cursor:pointer}
 .cal-head{grid-column:1/-1;display:flex;align-items:center;flex-wrap:wrap;gap:var(--nb-space-2,8px)}
@@ -59,8 +60,8 @@ export default {css:`
 .cal-form-actions{display:flex;gap:var(--nb-space-2,8px);align-items:center}
 .cal-form-actions .cal-add{margin-left:0}
 .cal-status{color:#8a3b2a;font-size:var(--nb-tiny,12px);margin:0}
-@media (max-width:820px){.cal{grid-template-columns:minmax(0,1fr)}.cal-day{min-height:64px}.cal-week{grid-template-columns:minmax(0,1fr)}.cal-col{min-height:0}.cal .cal-rsvp button{min-height:40px}}
-@media (max-width:560px){.cal .cal-chip{font-size:0;height:6px;padding:0;border-left:0;background:var(--nb-kind-event,#315d86);border-radius:3px}.cal .cal-chip[data-yours=going]{background:var(--accent,#315f52)}.cal-day{padding:4px 3px;align-items:center}}
+@container calendar (max-width:820px){.cal{grid-template-columns:minmax(0,1fr)}.cal-day{min-height:64px}.cal-week{grid-template-columns:minmax(0,1fr)}.cal-col{min-height:0}.cal .cal-rsvp button{min-height:40px}}
+@container calendar (max-width:560px){.cal .cal-chip{font-size:0;height:6px;padding:0;border-left:0;background:var(--nb-kind-event,#315d86);border-radius:3px}.cal .cal-chip[data-yours=going]{background:var(--accent,#315f52)}.cal-day{padding:4px 3px;align-items:center}.cal-dow{padding:6px 0;text-align:center;letter-spacing:0}}
 `,mount(api,s){
   const {P}=api,L=api.label,v=api.view(),node=api.node;
   const has=event=>node.gestures.some(g=>g.event===event);
@@ -80,6 +81,7 @@ export default {css:`
   const go=values=>api.select(values).catch(api.tell);
   const choose=(d,extra={})=>{go({calendarDate:ymd(d),...extra});if(has('select'))api.fire('select',{value:ymd(d)}).catch(api.tell)};
   const root=api.part('body','section',{class:'cal','data-view':mode,'aria-label':L('label',s.label||'Calendar')});
+  const container=api.part('container','div',{class:'cal-container'},root);
 
   // Header: where you are, step back/forward, today, month|week, add.
   const title=mode==='month'?day.toLocaleDateString(locale,{month:'long',year:'numeric'})
@@ -179,5 +181,5 @@ export default {css:`
       if(has('add'))side.append(P.press(L('addday','＋ Add an event this day'),()=>go({calendarAdd:'yes'}),'cal-soft'))}
   }
   if(side.children.length)root.append(side);
-  return root;
+  return container;
 }};

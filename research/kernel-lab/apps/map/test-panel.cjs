@@ -1,8 +1,7 @@
 // Nonvisual checks of the actual component facade and pin input handlers. No WebGL/browser window.
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const code=fs.readFileSync(__dirname+'/map-components.js','utf8').replace('export default','const exported =');
-const engine=fs.readFileSync(__dirname+'/geo-engine.js','utf8');
-vm.runInThisContext(engine+'\n'+code);
+const code=fs.readFileSync(__dirname+'/map-components.bundle.js','utf8').replace('export default','const exported =');
+vm.runInThisContext(code);
 
 (async()=>{
   let state={tool:'board-tool',target:'board-target',thread:'old',channel:'neighbours',hide:'parent-hide'};

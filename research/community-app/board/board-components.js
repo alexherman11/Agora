@@ -1,4 +1,11 @@
 // Reviewed presentation only. Arrangements own bindings and world-word gestures.
+// Local to this component module: existing widget runtimes need no upgrade.
+function pageBounds(total,size,page=0){
+  total=Math.max(0,Math.floor(Number(total)||0));size=Math.max(1,Math.floor(Number(size)||1));
+  const pages=Math.max(1,Math.ceil(total/size));
+  page=Math.max(0,Math.min(pages-1,Math.floor(Number(page)||0)));
+  return {page,pages,start:page*size,end:Math.min(total,(page+1)*size),previous:page>0,next:page<pages-1};
+}
 export default {mount(api,s){
   const {P}=api,L=api.label,kind=api.node.component,f=api.facts,v=api.view();
   const root=api.part('body','section',{class:'nb-'+kind.replace('board-',''),'aria-label':L('label',s.title||kind.replace('board-',''))});
@@ -71,7 +78,13 @@ export default {mount(api,s){
   if(kind==='board-feed'){
     root.append(...kids());const collection=api.node.collection;
     if(!api.children.length)root.append(text('span','☀','nb-empty-icon'),text('h2',L('empty','Room for a first conversation')),text('p',L('emptyhint','Ask a question, share a plan or say hello. Your neighbours will find it here.')),press('first','Start a conversation',()=>api.select({compose:'yes'}),'nb-primary'));
-    if(collection&&collection.total>collection.limit)root.append(P.node('nav',{class:'nb-pagination','aria-label':L('pages','Conversation pages')},press('previous','← Newer',()=>api.select({offset:Math.max(0,collection.offset-collection.limit)})),text('span',(collection.offset+1)+'–'+Math.min(collection.total,collection.offset+collection.limit)+' / '+collection.total,'nb-meta'),press('older','Older →',()=>api.select({offset:Math.min(Math.floor((collection.total-1)/collection.limit)*collection.limit,collection.offset+collection.limit)}))));return root;
+    if(collection&&collection.total>collection.limit){
+      const bounds=pageBounds(collection.total,collection.limit,collection.offset/collection.limit);
+      const previous=press('previous','← Newer',()=>api.select({offset:(bounds.page-1)*collection.limit}));
+      const next=press('older','Older →',()=>api.select({offset:(bounds.page+1)*collection.limit}));
+      previous.disabled=!bounds.previous;next.disabled=!bounds.next;
+      root.append(P.node('nav',{class:'nb-pagination','aria-label':L('pages','Conversation pages')},previous,text('span',(bounds.start+1)+'–'+bounds.end+' / '+collection.total,'nb-meta'),next));
+    }return root;
   }
   if(kind==='board-post'){
     root.dataset.post=f.id;root.dataset.kind=f.post_kind||'discussion';root.dataset.depth=f.depth||0;
@@ -173,13 +186,17 @@ export default {mount(api,s){
     const draw=()=>{save();fields.replaceChildren();const definition=definitions.find(k=>k.name===type.value),types=JSON.parse(definition?.field_types||'{}'),labels=JSON.parse(definition?.field_labels||'{}'),advanced=P.node('details',{class:'nb-advanced'},P.node('summary',{},L('moreoptions','More options')));chosen.textContent=(definition?.compose_icon||icons[type.value]||'✦')+' '+L(definition?.compose_label||type.value,definition?.compose_label||titleCase(type.value));for(const key of String(definition?.fields||'').split(/\s+/).filter(Boolean)){const label=L(key,labels[key]||key.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase())),format=types[key]||'text',input=P.node('input',{'aria-label':label,name:key,type:format==='number'?'number':'text','data-format':format,value:api.draft[key]||'',...(format==='number'?{min:1,max:10000,step:1}:{}),...(String(definition.required||'').split(' ').includes(key)?{required:''}:{})}),wrap=P.node('label',{},label,input);input.addEventListener('input',()=>{api.draft[key]=input.value});
       if(format==='datetime'){input.placeholder=L('datehint','e.g. Thu 6pm');const confirm=P.node('small',{role:'status',class:'nb-date-confirm'}),picker=P.node('input',{type:'datetime-local','aria-label':label+' · '+L('picker','Choose date and time'),'data-picker':'yes'});picker.addEventListener('change',()=>{input.value=picker.value;input.dispatchEvent(new Event('input'))});const check=()=>{const parsed=P.parseDateEntry(input.value);input.setCustomValidity(input.value&&!parsed.ok?parsed.message:'');confirm.textContent=input.value?(parsed.ok?L('dateconfirmed','That is')+' '+parsed.label:parsed.message):'';if(parsed.ok)picker.value=parsed.local};input.addEventListener('input',check);wrap.append(P.node('details',{class:'nb-date-picker'},P.node('summary',{},L('choosewhen','Choose date and time…')),picker),confirm);check()}
       (String(s.advancedFields||'closes place').split(' ').includes(key)?advanced:fields).append(wrap)
-    }if(advanced.children.length>1)fields.append(advanced);tiles.hidden=!!api.draft.chosen;step.hidden=!api.draft.chosen};
+    }if(advanced.children.length>1)fields.append(advanced);
+      if(definition?.compose_fields_first==='yes')step.insertBefore(fields,body);else step.insertBefore(body,fields);
+      body.rows=Math.max(1,Math.min(12,Number(definition?.compose_message_rows)||5));
+      tiles.hidden=!!api.draft.chosen;step.hidden=actions.hidden=!api.draft.chosen};
     api.read('rows kind').then(api.guard(async kinds=>{const people=await api.read('board.badges'),me=people.find(p=>p.id===viewer),leader=me?.badges.some(b=>['steward','leader'].includes(b));definitions=kinds.filter(k=>k.name!=='reply'&&(!k.leaders_only||leader));const rank=k=>{const n=['discussion','question','event','poll','ask','document'].indexOf(k.name);return n<0?99:n},ordered=[...definitions].sort((a,b)=>rank(a)-rank(b));for(const k of ordered){type.append(P.node('option',{value:k.name},L(k.name,titleCase(k.name))));tiles.append(P.press('',()=>{type.value=k.name;api.draft.chosen=true;draw()},'nb-kind-tile'));const tile=tiles.lastChild;tile.dataset.postType=k.name;tile.append(text('span',k.compose_icon||icons[k.name]||'✦','nb-tile-icon'),text('strong',L(k.compose_label||k.name,k.compose_label||titleCase(k.name))),text('span',L(k.compose_description||k.name+'-description',k.compose_description||'Share this with your neighbours.')))}type.value=api.draft.kind||'discussion';draw()})).catch(api.tell);type.addEventListener('change',()=>{api.draft.chosen=true;draw()});
     api.read('rows board-channel').then(api.guard(channels=>{for(const c of channels)channel.append(P.node('option',{value:c.group},L(c.title,c.title)));channel.value=api.draft.channel||v.channel||channels.find(c=>c.title==='Neighbours')?.group||channels[0]?.group}));
     const upload=api.part('upload','input',{type:'file',multiple:'',hidden:'','aria-label':L('attach','Add photos or files')}),dropzone=P.node('div',{class:'nb-upload',tabindex:0,role:'button','aria-label':L('attach','Add photos or files')},text('strong',L('dropfiles','Drop photos or files here')),text('span',L('browsefiles','or choose files')));
     const prepare=async files=>{submit.disabled=true;for(const file of files){out.textContent=L('uploading','Preparing your attachment…');try{const result=await api.upload(file,channel.value);uploads.push({id:result.made[0],name:file.name});drawUploads();out.textContent=L('privateupload','Ready. Attachments stay private until you post.')}catch(e){out.textContent=String(e.message||e)}}submit.disabled=false};upload.addEventListener('change',()=>prepare(upload.files));dropzone.addEventListener('click',()=>upload.click());dropzone.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();upload.click()}});dropzone.addEventListener('dragover',e=>{e.preventDefault();dropzone.classList.add('over')});dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('over'));dropzone.addEventListener('drop',e=>{e.preventDefault();dropzone.classList.remove('over');prepare(e.dataTransfer.files)});
     const submit=P.node('button',{type:'submit',class:'nb-primary'},L('publish','Post to neighbours'));
-    step.append(P.node('div',{class:'nb-titleline'},chosen,press('changetype','← Choose a different post',()=>{save();api.draft.chosen=false;draw()})),P.node('label',{},L('channel','Channel'),channel),title,body,fields,dropzone,upload,attachments,submit,out);form.append(type,tiles,step);
+    const actions=P.node('footer',{class:'nb-compose-actions'},submit,out);
+    step.append(P.node('div',{class:'nb-titleline'},chosen,press('changetype','← Choose a different post',()=>{save();api.draft.chosen=false;draw()})),P.node('label',{},L('channel','Channel'),channel),title,body,fields,dropzone,upload,attachments);form.append(type,tiles,step,actions);
     P.submit(form,async e=>{e.preventDefault();if(!api.draft.chosen)return;save();submit.disabled=true;try{const values={text:body.value,title:title.value,post_kind:type.value,in:channel.value};for(const input of fields.querySelectorAll('input[name]'))if(input.value)values[input.name]=input.dataset.format==='datetime'?P.parseDateEntry(input.value).iso:input.value;
       // Retain a successful post if a later attach refuses; retry attaches to it
       // instead of creating duplicate conversations.
