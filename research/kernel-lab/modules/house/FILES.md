@@ -4,6 +4,8 @@ What each file in `research/kernel-lab/modules/house/` does, read from the code 
 
 ## Code
 
+- **`handover.py`**: recoverable `house.hand` transfer. Journals intent before changing the card, recovers the recipient's chat, reconciles the canonical worker owner, and retries completion notices. A pending transfer fences lifecycle changes.
+
 - **`messages.py`**: reads the live Agent Book by heading whenever a message is built. The generic reader is `kernel/text_templates.py`; it uses `Kernel.fill_text`, alongside the existing `$` names. No source template or section cache.
 
 - **`house.py`**: the module itself. It runs the world's agents (people with a `house-agent` thing). It wakes an agent only when someone addresses it, keeps a durable cursor per agent, and posts the agent's words and tool receipts into the chat that woke it. It answers the words `house.who`, `house.wake`, `house.stop`, `house.refresh`, `house.activity` and `house.log`, and hands `house.build`, `work`, `house.retry`, `house.tell`, `house.review`, `house.land` and `house.manage` on to the builders. It also does the next-steps (continuity) wakes. Entry point: `main()`.
@@ -16,6 +18,8 @@ What each file in `research/kernel-lab/modules/house/` does, read from the code 
 - **`proof_house.py`**: an end-to-end proof. It runs JEFF in a hidden sandbox desktop (port 8830) against `fake_model.py` and checks the house words, wake rules, the three tools offered, the durable cursor and latency. It writes `evidence/house-proof.json`.
 
 ## Tests (pytest, no live model, window or world)
+
+- **`test_handover.py`**: real hidden kernel receipts, repeated chat creation, partial handoffs, lost responses, restart/save recovery, ownership admission, concurrent calls, and the ten-second accepted-call deadline.
 
 - **`../../tests/test_house_refresh.py`**: fresh conversations on demand: current prompt, charter, welcome, guide and soul; preserved transcript and old state; sleeping and busy agents; queued messages and restart recovery; both transport commands; stale child events; failure handling; steward-only Lines dispatch.
 - **`test_builders.py`**: the builder lifecycle: ownership and holds, restart uncertainty, retries, review and landing against a real git repo, Codex progress privacy. Its `manager` fixture is shared by the other tests.

@@ -1074,7 +1074,8 @@ class House:
         if word == "house.tell":
             return self.builders.tell(msg)
         if word == "house.hand":
-            return self.builders.hand(msg)
+            self.m.accept(msg)
+            return self.builders.hand_request(msg)
         if word == "house.snap":
             return self.snap(msg)
         if word == "house.review":
@@ -1278,8 +1279,10 @@ OFFER = [
     {"word": "house.hand", "kind": "do", "needs": TASK_NEEDS, "takes": "<id> <name>", "undo": "external", "may": "members",
      "help": "house.hand <task> <name>: give a card's worker, and the card, to another resident, who is in charge of it "
              "from then on: woken at its turn ends, answers it with house.tell, reviews and lands it. Its owner, a "
-             "steward or Alex may hand it on; a worker mid-turn, mid-review or mid-landing is handed once it stops. "
-             "The new owner is woken with where it stands and its last words."},
+             "steward or Alex may hand it on once it stops. The new owner is woken with where it stands and its "
+             "last words. A slow request says starting; its caller hears the result. An unresolved card write "
+             "blocks worker actions until read-back confirms it; repeat the same handoff to reconcile. "
+             "house.who shows the saved owner and any unresolved handoff."},
     {"word": "house.snap", "kind": "see", "takes": "<thing> [from=<task>] [size=<w>x<h>]", "may": "members",
      "help": "house.snap <thing> [from=<task>]: a picture of a thing (a lens, an app, a chat, a card) the way it shows in "
              "a window, taken hidden, never on Alex's screen. from=<task> shows a worker's unlanded code, in a hidden "

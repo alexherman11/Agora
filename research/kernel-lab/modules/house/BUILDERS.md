@@ -1,5 +1,42 @@
 # Kernel House builders — implementation, 27 October
 
+## Recoverable ownership handoffs (builder draft, 5 November, dk3259)
+
+`house.hand` uses the existing word; this is a mechanism fix (`Source: fix`,
+`Missing-word: none`). The saved worker `requester` is the authority used by
+landing, notifications and `house.who`. Listings also expose its person id as
+`owner`, alongside `owner_name`, and `handoff_status`/`handoff_to` while unresolved.
+Editing a card's `who` alone never grants worker authority.
+
+The House persists a handoff intent, recovers or creates the recipient's private
+chat, then writes `who`, `lead` and `builder_chat` together under the card's
+revision fence. Only the authenticated caller writes the card; an explicit
+denial never causes a retry under another person's session. Existing chats are
+read through the recipient's door, including chats created before a lost reply.
+A deduplicated `make` can return an empty `made` list; that is no longer indexed.
+The saved owner changes only after read-back confirms the intended card, run,
+recipient and chat. A failed save leaves the old in-memory authority intact.
+
+An uncertain card write is retained, not replayed. Lifecycle actions and queued
+worker starts are held while its intent is unresolved. Repeating the handoff
+with the same recipient reads it back; a different transfer cannot overtake it.
+The ordinary tick and House startup also reconcile a completed write. A write
+that cannot be confirmed remains explicitly unresolved; neither a display name
+nor a failed response is treated as proof of ownership.
+
+The module acknowledges a slow request through the existing accepted-call
+protocol, so the ten-second deadline returns `starting` rather than a false
+refusal. Completion notices to the recipient and caller survive restart;
+notification failure does not undo the transfer or report it as refused.
+Quick refusals remain refusals. Quick successful receipts distinguish completed
+ownership from pending notification. Repeating a completed transfer is harmless.
+This is recovery across two stores, not an atomic transaction between them.
+
+Hidden coverage in `test_handover.py` uses real in-process kernels for the empty
+deduplication receipt, legacy partial handoffs, both lost-write timings, restart
+and failed-save recovery, authority checks, simultaneous hand/land, notification
+retry, and the real ten-second module deadline. No model or native window starts.
+
 ## Committed definition import (builder draft, dk2393)
 
 `house.import <thing> field=code|text from=<landed-card> path=<repository-file>`
