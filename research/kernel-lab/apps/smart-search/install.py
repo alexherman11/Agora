@@ -1,7 +1,8 @@
-"""Reviewable installer taking an already authenticated Door, never credentials.
+"""Reviewable installer taking an already authenticated Door.
 
-No CLI/live default. Does not activate a widget, grant authority, open a window,
-change shell settings or restart the broker. House handles reviewed activation.
+install(door) only authors the component, lens and widget. activate(door) is the
+whole switch-on for a steward's door; `--live` runs it on the desktop (8810).
+Neither opens a window, changes shell settings or restarts anything.
 """
 import hashlib
 import importlib.util
@@ -41,3 +42,34 @@ def entry(door):
     """Explicit post-review one-click entry; creates no fixture apps or windows."""
     return painter.upsert(door, "button", "smart-search-button", label="Search",
                           bar="taskbar", icon="search", does="window.open smart-search")
+
+
+def activate(door):
+    """The whole switch-on, for a steward's door (component review and `widget` are steward words):
+    install, review the exact component bytes, turn the widget on with only REQUIRED_GRANTS, then the
+    one Search button. Re-running changes only what differs. Opens no window."""
+    ids = install(door)
+    if door.rows("component", name="smart-search")[0].get("reviewed_code") != ids["review_sha256"]:
+        door.say("look " + ids["component"]); door.say("component " + ids["component"])
+    current = door.rows("widget", name="smart-search")[0]
+    granted = any(g.get("words") == REQUIRED_GRANTS and not g.get("revoked") for g in door.rows("grant", to=ids["widget"]))
+    if not current.get("on") or not granted:
+        door.say("look " + ids["widget"])
+        door.say("widget " + ids["widget"] + " surface=window grants=" + painter.Q(REQUIRED_GRANTS))
+    ids["button"] = entry(door)
+    return ids
+
+
+if __name__ == "__main__":
+    # Alex's desktop. Run by a steward's session (the House cannot give a worker one); off switch:
+    # `off <the smart-search widget>` and `forget <the smart-search-button>`.
+    import argparse
+    import sys
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--live", action="store_true")
+    if not ap.parse_args().live:
+        ap.error("use activate(door) in a hidden scratch world, or --live on the desktop after House review")
+    sys.path.insert(0, str(LAB.parent / "window-lab/kernel-desktop"))
+    from gaming_gate import assert_clear
+    assert_clear()
+    print(activate(painter.taskboard.live_door()))
