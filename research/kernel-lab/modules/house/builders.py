@@ -28,6 +28,7 @@ import uuid
 import transport as T
 import manager as M
 from messages import message
+import review_suites
 
 ACTIVE = {'asked', 'preparing', 'working', 'reviewing', 'landing'}
 RESUMABLE = {'received', 'blocked', 'reviewed'}   # stopped, not landed or released: house.tell gives it a new turn
@@ -822,10 +823,14 @@ class Builders:
             if state.get('land_attempt'):
                 detail = state.get('land_step', 'landing') + ': ' + detail
             text = self.message("It stopped", state, detail=detail)
+        checks_text = review_suites.summary(state.get('checks', []))
+        if checks_text:
+            text += '\n' + checks_text
         if state.get('land_attempt'):
             state['land_receipt'] = dict(attempt=state['land_attempt'], step=state.get('land_step'),
                                         phase=phase, reason=state.get('detail', ''),
                                         activation=state.get('activation', ''),
+                                        checks=state.get('checks', []),
                                         next=(f'house.snap <thing>; verify {task}' if phase == 'landed'
                                               else f'house.tell {task} <repair the reported step>; house.land {task}'))
             text += '\n' + json.dumps(state['land_receipt'])
@@ -1438,22 +1443,58 @@ class Builders:
             state['land_step'] = 'checks'
         state.update(review_base=base, candidate=candidate, checks=[])
         self.phase(state, 'reviewing', 'independent kernel and hidden desktop checks on '+candidate[:12])
-        folder = self.home/state['run']
-        for i, tests in enumerate(CHECKS):
+        folder = self.home/state['run']/('review-' + uuid.uuid4().hex)
+        folder.mkdir()
+        suites = self.review_plan(state)
+        state['review_suites'] = review_suites.fingerprint(suites)
+        self.save(state)
+        failures = []
+        for i, suite in enumerate(suites):
             path = folder/f'check-{i}.txt'
-            with path.open('w', encoding='utf-8') as out:
-                proc = subprocess.run([str(T.PY), '-B', '-m', 'pytest', '-q', *tests], cwd=tree, env=T.clean_env('off'),
-                                      stdout=out, stderr=subprocess.STDOUT, timeout=600, creationflags=T.NO_WINDOW)
-            receipt = dict(tests=tests, returncode=proc.returncode, evidence=str(path),
-                           sha256=hashlib.sha256(path.read_bytes()).hexdigest())
+            command = review_suites.command(suite, T.PY)
+            receipt = dict(name=suite['name'], runner=suite['runner'], tests=suite['paths'],
+                           command=command, candidate=candidate, status='running', returncode=None,
+                           evidence=str(path), artifacts=str(folder / f'check-{i}-artifacts'))
             state['checks'].append(receipt)
             self.save(state)
-            if proc.returncode:
-                raise RuntimeError('independent check failed; see '+str(path))
+            with path.open('w', encoding='utf-8') as out:
+                try:
+                    if suite['desktop']:
+                        import gaming_gate
+                        gaming_gate.assert_clear()
+                    env = T.clean_env('off')
+                    env['AGORA_TMP'] = str(tree / '.tmp' / 'house-review' / state['run'] / str(i))
+                    env['AGORA_REVIEW_EVIDENCE'] = receipt['artifacts']
+                    proc = subprocess.run(command, cwd=tree, env=env, stdout=out, stderr=subprocess.STDOUT,
+                                          timeout=suite['timeout'], creationflags=T.NO_WINDOW)
+                    receipt.update(returncode=proc.returncode, status='passed' if proc.returncode == 0 else 'failed')
+                except Exception as exc:
+                    receipt.update(status='blocked' if isinstance(exc, RuntimeError) else 'failed',
+                                   error=f'{type(exc).__name__}: {exc}')
+                    out.write('\n' + receipt['error'] + '\n')
+            receipt['sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+            self.save(state)
+            if receipt['status'] != 'passed':
+                failures.append(f"{suite['name']}; see {path}")
+        if failures:
+            raise RuntimeError('independent check failed: ' + ' | '.join(failures))
+        if review_suites.fingerprint(self.review_plan(state)) != state['review_suites']:
+            raise RuntimeError('card suites changed during review; check again')
         if self.git(tree, 'rev-parse', 'HEAD') != candidate or self.git(tree, 'status', '--porcelain', '--untracked-files=no'):
             raise RuntimeError('candidate changed during review; evidence not reusable')
         self.phase(state, 'reviewed', 'independent checks passed; awaiting source publication and activation',
                    reviewed_commit=candidate)
+
+    def review_plan(self, state):
+        card = self.session(state['requester']).look(state['task'])
+        return review_suites.plan(card, state['tree'], CHECKS)
+
+    def suites_current(self, state):
+        current = self.review_plan(state)
+        # Old reviews of cards without suites retain the existing baseline contract.
+        if not state.get('review_suites'):
+            return len(current) == len(CHECKS)
+        return state['review_suites'] == review_suites.fingerprint(current)
 
     def land(self, msg):
         """house.land <card>: one step (Alex, 4 Nov). The House runs the checks, lands the worker's work on main and
@@ -1498,7 +1539,8 @@ class Builders:
         with self.landing_lock:
             for attempt in range(2):            # main may move between checks and landing (someone else landed)
                 main = self.git(self.repo, 'rev-parse', 'main')
-                if not (reviewed and state.get('candidate') and state.get('review_base') == main):
+                if not (reviewed and state.get('candidate') and state.get('review_base') == main
+                        and self.suites_current(state)):
                     state['land_step'] = 'checks'
                     self.review(state)
                 state['land_step'] = 'publication'
@@ -1553,6 +1595,8 @@ class Builders:
 
     def publish(self, state):
         self.assert_owned(state)
+        if not self.suites_current(state):
+            raise RuntimeError('card suites changed after review; review again before publication')
         if self.git(self.repo, 'branch', '--show-current') != 'main':
             raise RuntimeError('canonical checkout is not on main')
         if self.git(self.repo, 'rev-parse', 'HEAD') != state['review_base']:

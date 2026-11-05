@@ -123,3 +123,62 @@ def test_a_reoffer_refreshes_what_the_module_wrote_and_help_drops_what_it_no_lon
     assert k.state.get(hint, 'help') == "pad.hint: the steward's words"           # a steward's edit stays
     assert 'pad.old' not in say(k, a, 'help pad')['text']                         # no longer offered: left out
     assert 'pad.old' in say(k, a, 'help check')['text']
+
+
+def test_help_pages_fill_live_facts_with_the_readers_own_sight(world):
+    """Alex, 5 Nov: help that relies on something outside itself says it with $. so it stays current."""
+    k, a, b = world
+    s = say(k, a, 'make kind=note name="Pool settings" workers=4')['made'][0]
+    t = say(k, a, 'make kind=topic name=pool words="look" short="the shared pool" '
+                  'text="Up to $[[Pool settings]].workers workers run at once ($.short). Write $$today for the date. '
+                  'Gone: $[[Nothing here]].x"')['made'][0]
+    page = say(k, b, 'help pool')['text']
+    assert 'Up to 4 workers run at once (the shared pool).' in page
+    assert 'Write $today for the date.' in page                     # $$ is a plain $, other $ words stay as written
+    assert '(not known here: $[[Nothing here]].x)' in page          # a gap is named, never guessed
+    say(k, a, f'look {s}')
+    say(k, a, f'set {s} workers=6')
+    assert 'Up to 6 workers' in say(k, b, 'help pool')['text']       # read when shown, never stored
+    say(k, a, 'verb tidy steps="look" help="tidy: $.word, one of $[[Pool settings]].workers"')
+    assert 'tidy: tidy, one of 6' in say(k, b, 'help tidy')['text']
+
+
+def test_a_subtopic_answers_to_its_words_as_they_read(world):
+    """help wm drag finds the wm-drag page; the first word alone still finds its own page."""
+    k, a, b = world
+    say(k, a, 'make kind=topic name=wm words="look" text="The window manager. Deeper: help wm drag"')
+    say(k, a, 'make kind=topic name=wm-drag words="look" text="Dragging a window."')
+    assert say(k, b, 'help wm drag')['text'].startswith('wm-drag: Dragging a window.')
+    assert say(k, b, 'help wm')['text'].startswith('wm: The window manager.')
+    assert say(k, b, 'help wm nothing-here')['text'].startswith('wm: The window manager.')
+
+
+def test_a_topic_named_like_a_component_is_the_page_shown(world):
+    k, a, b = world
+    say(k, a, 'make kind=component name=gauge purpose="A round gauge."')
+    assert 'A round gauge.' in say(k, b, 'help gauge')['text']
+    say(k, a, 'make kind=topic name=gauge words="look" text="Gauges on the bar."')
+    assert say(k, b, 'help gauge')['text'].startswith('gauge: Gauges on the bar.')
+
+
+def test_help_on_a_topics_own_id_is_that_page(world):
+    k, a, b = world
+    t = say(k, a, 'make kind=topic name=lanes words="look" text="Lanes on the board."')['made'][0]
+    assert say(k, b, f'help {t}')['text'].startswith('lanes: Lanes on the board.')
+
+
+def test_an_at_name_ending_a_sentence_still_calls(world):
+    k, a, b = world
+    chat = say(k, a, 'make kind=chat name=Lobby')['made'][0]
+    line = say(k, a, f'say {chat} text="thanks @Bea."')['made'][0]
+    assert k.state.get(line, 'to') == b.person
+
+
+def test_the_front_page_lists_only_the_top_of_each_layered_page(world):
+    k, a, b = world
+    for name in ('wm', 'wm-drag', 'wm-sizes', 'pool'):
+        say(k, a, f'make kind=topic name={name} words="look" text="page {name}"')
+    say(k, a, 'make kind=topic name=gestures under=wm words="look" text="page gestures"')
+    topics_line = [l for l in say(k, b, 'help')['text'].splitlines() if l.startswith('topics:')][0]
+    assert 'wm' in topics_line and 'pool' in topics_line
+    assert 'wm-drag' not in topics_line and 'wm-sizes' not in topics_line and 'gestures' not in topics_line

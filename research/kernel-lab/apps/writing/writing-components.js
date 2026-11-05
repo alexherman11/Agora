@@ -553,6 +553,7 @@ function mountHome(api,s){
 // and undo survive a save. Saves go through the lens's `write` gesture (the kernel's `edit`: changed spans and the text
 // they were made against); the kernel keeps every change in the document's CRDT history.
 const WR_EDITORS=new Map();
+const WR_PLACES=new Map();   // each document's scroll place, kept while the window lives (the part's draft does not outlive a document)
 const WR_SAVE_MS=700;
 // The words of some Markdown as a reader sees them, each with where it stands in the source: what comments quote and
 // are found by. Headings, list and quote marks, emphasis, code ticks and link addresses are left out.
@@ -849,11 +850,22 @@ function mountPage(api,s){
   wrReadDocs(api).then(api.guard(docs=>{D.docs=docs;const seen=JSON.stringify(docs.map(x=>[x.id,wrTitle(x),x.source]));
     if(seen!==docsSeen){docsSeen=seen;resolve=wrResolver(docs);entry?.ed.relink()}
     api.read('rows said about='+id).then(api.guard(sent=>drawBelow(docs,wrRows(sent)))).catch(()=>drawBelow(docs,[]))})).catch(()=>{});
-  desk.addEventListener('scroll',()=>{D.scroll=desk.scrollTop},{passive:true});
-  queueMicrotask(()=>{if(D.scroll)desk.scrollTop=D.scroll});
-  // pressing the empty page below the text puts the caret at the end, as a word processor does
+  // each document keeps its own place (5 Nov: one place for every document opened a short one at its bottom);
+  // a document not seen yet opens at its top. Not until the place is put back does scrolling count, so a page
+  // still short while it draws cannot overwrite the remembered place with a clamped one.
+  let placing=true;
+  desk.addEventListener('scroll',()=>{if(!placing)WR_PLACES.set(id,desk.scrollTop)},{passive:true});
+  queueMicrotask(()=>{const want=WR_PLACES.get(id)||0;let tries=0;
+    const put=()=>{if(!desk.isConnected)return;desk.scrollTop=want;
+      if(Math.abs(desk.scrollTop-want)>2&&++tries<20)return requestAnimationFrame(put);placing=false};put()});
+  // the empty page: beside a line puts the caret on that line; below the text, at the end, as a word processor does
   desk.addEventListener('mousedown',ev=>{if(!entry||ev.button!==0)return;if(ev.target!==desk&&ev.target!==root&&ev.target!==paper&&ev.target!==sheet)return;
-    const v=entry.ed.view,r=v.contentDOM.getBoundingClientRect();if(ev.clientY<r.top)return;ev.preventDefault();wrLater(()=>{v.focus();v.dispatch({selection:{anchor:v.state.doc.length},scrollIntoView:true})})});
+    const v=entry.ed.view,r=v.contentDOM.getBoundingClientRect();if(ev.clientY<r.top)return;ev.preventDefault();
+    let at=v.state.doc.length;
+    if(ev.clientY<=r.bottom-2){    // beside the text: the line at that height (a heading's spacing must not give the line above)
+      const b=v.lineBlockAtHeight(ev.clientY-v.documentTop);
+      at=v.posAtCoords({x:Math.min(Math.max(ev.clientX,r.left+4),r.right-4),y:ev.clientY});
+      if(at==null||at<b.from||at>b.to)at=ev.clientX<r.left+r.width/2?b.from:b.to}wrLater(()=>{v.focus();v.dispatch({selection:{anchor:at}})})});
   if(view.fresh===id&&!readonly&&!D.welcomed){D.welcomed=true;queueMicrotask(()=>{title.focus();title.select()})}
   return desk;
 }

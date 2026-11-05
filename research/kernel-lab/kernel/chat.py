@@ -54,7 +54,7 @@ def addressed(k, chat, text, speaker):
     """-> (person ids the line calls, @names that call no one here)."""
     bare = QUOTED.sub(" ", text)
     to, unknown = [], []
-    for name in AT.findall(bare):
+    for name in (n.rstrip(".-") for n in AT.findall(bare)):     # "thanks @JEFF." calls JEFF, not "JEFF."
         hit = [p for p in k.things("person") if str(k.state.get(p, "name", "")).casefold() == name.casefold()]
         if hit:
             if hit[0] != speaker:                    # naming yourself calls no one
