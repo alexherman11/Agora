@@ -115,18 +115,18 @@ def test_a_reviewed_worker_on_current_main_lands_without_checking_twice(manager)
     assert calls == ['publish', 'activate']
 
 
-def test_a_house_change_restarts_the_house_only_once_nobody_is_busy(manager):
+def test_a_house_change_restarts_at_once_but_never_during_a_git_step(manager):
+    """Alex, 5 Nov: a restart pauses each agent and worker and continues them after, instead of waiting for quiet.
+    Only claiming, review and landing touch git, so only those hold it back."""
     spawned = []
     manager.spawn_reload = lambda args, log: spawned.append(args)
     manager.house_restart_due = True
+    landing = state(manager, 'landing')
+    manager.idle_check()
+    assert spawned == [] and manager.house_restart_due              # mid-landing: wait for git
+    landing['phase'] = 'landed'
     busy = Agent(); busy.busy = True; manager.h.agents = {'dk99': busy}
-    manager.idle_check()
-    assert spawned == [] and manager.house_restart_due
-    busy.busy = False
-    manager.children['dk7'] = Child()                                 # a worker is mid-turn
-    manager.idle_check()
-    assert spawned == []
-    manager.children.clear()
+    manager.children['dk7'] = Child()                                 # an agent and a worker mid-turn: no wait
     manager.idle_check()
     assert spawned == [['house']] and not manager.house_restart_due
 

@@ -77,6 +77,40 @@ def now_s():
     return time.strftime("%Y-%m-%dT%H:%M:%S")
 
 
+RESETS = re.compile(r"resets\s+(?:(?P<mon>[A-Za-z]{3})[a-z]*\s+(?P<day>\d{1,2}),?\s+)?(?P<h>\d{1,2})(?::(?P<min>\d{2}))?"
+                    r"\s*(?P<ap>am|pm)(?:\s*\((?P<tz>[^)]+)\))?", re.I)
+
+
+def plan_resets_at(detail, since):
+    """When a used-up plan comes back, from the provider's own words ("resets 6:30pm (America/Los_Angeles)",
+    "resets Nov 6, 3pm"): the first such moment after `since` (epoch seconds). None when the words don't say."""
+    import datetime as dt
+    m = RESETS.search(str(detail or ""))
+    if not m:
+        return None
+    tz = None
+    if m["tz"]:
+        try:
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo(m["tz"].strip())
+        except Exception:                             # noqa: BLE001  no tz data here: the desktop's own clock
+            tz = None
+    start = dt.datetime.fromtimestamp(since, tz) if tz else dt.datetime.fromtimestamp(since)
+    hour = int(m["h"]) % 12 + (12 if m["ap"].lower() == "pm" else 0)
+    at = start.replace(hour=hour, minute=int(m["min"] or 0), second=0, microsecond=0)
+    if m["mon"]:
+        try:
+            month = time.strptime(m["mon"][:3].title(), "%b").tm_mon
+            at = at.replace(month=month, day=int(m["day"]))
+        except ValueError:
+            return None
+        if at <= start:
+            at = at.replace(year=at.year + 1)
+    elif at <= start:
+        at += dt.timedelta(days=1)
+    return at.timestamp()
+
+
 class Door:
     """The agent's own door session, for its spoken words (the house never speaks as the house in a chat)."""
 
@@ -142,6 +176,22 @@ class Agent:
                 self.cfg.get("provider", "claude"), self.cfg.get("model", "")]:
             self.state.pop("on_fallback", None)
             self.state.pop("fallback_from", None)
+        # 5 Nov: and it ends when the plan comes back, at the reset the provider named (JEFF sat on Codex 15 hours
+        # past a 6:30pm reset because only a model change cleared it)
+        if self.state.get("on_fallback"):
+            until = self.state.get("fallback_until")
+            if until is None:
+                try:
+                    since = time.mktime(time.strptime(self.state["on_fallback"], "%Y-%m-%dT%H:%M:%S"))
+                except (ValueError, TypeError):
+                    since = time.time()
+                until = plan_resets_at(self.state.get("quota"), since)
+                if until is not None:
+                    self.state["fallback_until"] = until
+            if until is not None and time.time() >= until:
+                self.log("fallback", "its plan has reset: back to " + " ".join(self.state.get("fallback_from") or []))
+                for k in ("on_fallback", "fallback_from", "fallback_until"):
+                    self.state.pop(k, None)
         if self.state.get("on_fallback") and self.cfg.get("fallback_provider"):
             return (self.cfg["fallback_provider"], self.cfg.get("fallback_model", ""),
                     self.cfg.get("fallback_reasoning") or self.cfg.get("reasoning", "medium"))
@@ -233,6 +283,10 @@ class Agent:
                     self.log("restart", "its system prompt changed")
                     self.child.stop()
                     self.child = None
+                elif self.state.get("session_provider") and                         self.provider()[:2] != (self.state["session_provider"], self.state.get("session_model")):
+                    self.log("restart", "its model changed (a fallback began or ended)")
+                    self.child.stop()
+                    self.child = None
             if not (self.child and self.child.alive()):
                 self.start()
         except Exception as exc:                      # noqa: BLE001
@@ -247,23 +301,35 @@ class Agent:
         first = self.inbox[0].get("chat")
         items = [i for i in self.inbox if i.get("chat") == first]
         self.inbox = [i for i in self.inbox if i.get("chat") != first]
+        # busy from the moment its lines leave the inbox: building the message takes seconds, and an empty inbox with
+        # busy unset looked idle to the House's restart check (5 Nov: a restart then cut off JEFF's turn on Alex's line)
+        self.busy = True
         record = next((i["record"] for i in reversed(items) if i.get("record")), None)
         if record:
             self.house.mark_turn(self, record)          # its acts this turn say because=r<record> in the log
         chats = [i["chat"] for i in items if i.get("chat")]
         parts = []
-        if self.state.pop("welcome_due", None):
-            parts.append(self.house.welcome(self))
-        context = self.house.next_steps(self)
-        if context:
-            parts.append(context)
-        parts.append(self.house.message("The time"))
-        parts += [i["text"] for i in items]
-        text = "\n\n".join(parts)
-        self.turn = {"chat": chats[-1] if chats else None, "woken": min(i["at"] for i in items), "first": None,
-                     "receipts": [], "line": None, "woken_by": items[-1]["text"].splitlines()[0][:160]}
-        if self.child.send(text):
-            self.busy = True
+        fresh = self.state.pop("welcome_due", None)
+        try:
+            if fresh:
+                parts.append(self.house.welcome(self))
+            context = self.house.next_steps(self)
+            # Alex, 5 Nov: the task list is not resent every turn, only in a fresh conversation or when it changed
+            if context and (fresh or context != self.state.get("next_steps_context")):
+                parts.append(context)
+            parts.append(self.house.message("The time"))
+            parts += [i["text"] for i in items]
+            text = "\n\n".join(parts)
+            self.turn = {"chat": chats[-1] if chats else None, "woken": min(i["at"] for i in items), "first": None,
+                         "receipts": [], "line": None, "woken_by": items[-1]["text"].splitlines()[0][:160]}
+            said = self.child.send(text)
+        except Exception as exc:                      # noqa: BLE001  never left busy with nothing running
+            said = False
+            self.log("error", f"could not build its message: {exc!r}")
+        if said:
+            # what this turn was told, until it ends: a House restart in between says it again when it is back
+            self.state["in_flight"] = [{k: i[k] for k in ("text", "chat", "record", "first_record", "at", "said_again")
+                                        if k in i} for i in items]
             signals = {n for i in items for n in i.get("card_signal_notes", [])}
             if signals:
                 self.state["card_signals_seen"] = sorted(set(self.state.get("card_signals_seen", [])) | signals)
@@ -282,7 +348,10 @@ class Agent:
             self.state["last_sent"] = text[-4000:]
             self.log("sent", text)
         else:
+            self.busy = False
             self.inbox = items + self.inbox
+            if fresh:
+                self.state["welcome_due"] = fresh
         self.save()
         self.house.publish()
 
@@ -337,6 +406,11 @@ class Agent:
                 self.activity("acts", "\n".join(left))
             with self.lock:
                 self.busy = False
+                if getattr(self.house, "stopping", False):
+                    # the House is going off and cut this turn: in_flight stays, and the House says it again on return
+                    self.save()
+                    return
+                self.state.pop("in_flight", None)
                 if ev["ok"]:
                     self.state["turns"] = self.state.get("turns", 0) + 1
                     self.state["last_turn"] = now_s()
@@ -367,7 +441,7 @@ class Agent:
                 self.busy = False
                 self.child = None
                 self.log("exit", ev.get("code"))
-                if ev.get("code"):
+                if ev.get("code") and not getattr(self.house, "stopping", False):
                     tail = ""
                     try:
                         tail = (self.dir / "stderr.log").read_text(encoding="utf-8", errors="replace")[-1500:]
@@ -376,8 +450,24 @@ class Agent:
                     if "No conversation found" in tail:
                         self.state.pop("session", None)       # its conversation is gone: the next start is fresh
                     self.state["error"] = f"its process ended ({ev.get('code')})"
+                if not getattr(self.house, "stopping", False) and self.state.get("in_flight"):
+                    # it died mid-turn: what it was told is said again, once, when it is next free
+                    self.inbox = self.said_again(self.state.pop("in_flight")) + self.inbox
                 self.save()
             self.house.publish()
+
+    def said_again(self, items):
+        """Items a cut-off turn was told, to be said again with a note saying why. Once only: an item already said
+        again is dropped, so a turn that always dies can't loop."""
+        note = self.house.message("When a restart cut off your turn")
+        out = []
+        for i in items or []:
+            if i.get("said_again"):
+                self.log("dropped", {"why": "cut off twice", "text": str(i.get("text"))[:200]})
+                continue
+            out.append(dict(i, text=note + "\n" + str(i.get("text") or ""), said_again=True,
+                            at=i.get("at") or time.time()))
+        return out
 
     def _spoke(self, text):
         if self.turn.get("first") is None:
@@ -433,6 +523,7 @@ class Agent:
 
 
 class House:
+    stopping = False                      # going off: cut turns are paused, not failed, and resume at the next start
     def __init__(self):
         self.m = Module(offer=OFFER, on_call=self.call, on_happen=self.happen, on_status=self.status,
                         on_hello=self.hello, on_off=self.off)
@@ -670,6 +761,11 @@ class House:
             busy = a.busy
             a.busy = True
             try:
+                # a turn the last House cut off comes first, said again; then what waited for it then; then catch-up
+                cut, paused = a.state.pop("in_flight", None), a.state.pop("paused", None)
+                if cut or paused:
+                    a.inbox = a.said_again(cut) + list(paused or []) + a.inbox
+                    a.save()
                 self._catch_up(a)
             finally:
                 a.busy = busy
@@ -681,8 +777,11 @@ class House:
         cursor = int(a.state.get("cursor", 0))
         got = []
         self.card_signals(a, cursor=cursor)
+        held = [(int(i.get("first_record") or i["record"]), int(i["record"])) for i in a.inbox if i.get("record")]
         for r in self.m.see("rows said").get("rows") or []:
             rev = int(r.get("rev") or 0)
+            if any(lo <= rev <= hi for lo, hi in held):        # already waiting (a cut-off turn said again)
+                continue
             if rev > cursor and a.person in str(r.get("to") or "").split() and r.get("made_by") != a.person \
                     and r.get("for") != a.person and self.sees_line(a, r.get("id"), r.get("chat")):
                 got.append((rev, r))
@@ -1062,9 +1161,19 @@ class House:
             time.sleep(5)
 
     def off(self):
+        """Every agent pauses: the turn it is in (in_flight) and what waits for it with no record behind it (house.wake,
+        worker reports, task wakes) are kept, and the next start says them again. Lines with a record come back
+        through catch-up, past the cursor."""
+        self.stopping = True
         if self.builders:
             self.builders.off()
         for a in list(self.agents.values()):
+            with a.lock:
+                waiting = [{k: i[k] for k in ("text", "chat", "at", "said_again") if k in i}
+                           for i in a.inbox if not i.get("record")]
+                if waiting:
+                    a.state["paused"] = a.state.get("paused", []) + waiting
+                    a.save()
             a.stop("off house")
         os._exit(0)
 

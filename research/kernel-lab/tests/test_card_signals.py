@@ -389,6 +389,12 @@ class CardRules(unittest.TestCase):
         restarted.state = json.loads(json.dumps(a.state))
         restarted.busy = False
         h2.catch_up(restarted)
+        # 5 Nov: the restart cut the dependency turn mid-way, so it is said again first; the chat lines still follow
+        sent = restarted.child.send.call_args.args[0]
+        self.assertIn("Dependency has landed", sent)
+        self.assertIn("said again", sent)
+        self.assertNotIn("Before publication", sent)
+        restarted._event({"e": "result", "ok": True, "detail": ""})
         sent = restarted.child.send.call_args.args[0]
         self.assertIn("Before publication", sent)
         self.assertIn("After publication", sent)

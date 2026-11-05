@@ -492,14 +492,13 @@ class Builders:
                     self.save(state)
 
     def idle_check(self):
-        """A landed change to the House itself switches on only when no worker runs, nothing is landing and no agent
-        is mid-turn, so the restart cuts nobody off (Alex, 4 Nov: work lands on his system by itself)."""
+        """A landed change to the House itself switches on as soon as no git step is under way (Alex, 5 Nov: a
+        restart pauses each agent and worker and continues them when it is back, instead of waiting for quiet).
+        Agents mid-turn are said their turn again (house.py, in_flight); workers mid-turn carry on by themselves
+        (wake_cut_off). Only claiming, review and landing touch git, so only those are waited for."""
         if not self.house_restart_due or self.stopping:
             return
-        if self.children or any(s['phase'] in ('reviewing', 'landing', 'asked', 'preparing', 'working')
-                                 for s in self.states.values()):
-            return
-        if any(getattr(a, 'busy', False) or getattr(a, 'inbox', None) for a in getattr(self.h, 'agents', {}).values()):
+        if any(s['phase'] in ('reviewing', 'landing', 'asked', 'preparing') for s in self.states.values()):
             return
         self.house_restart_due = False
         self.spawn_reload(['house'], self.home / 'activation-house.log')
@@ -1517,7 +1516,7 @@ class Builders:
 
     def activate(self, state):
         """Switch the landed change on: restart what it made stale (kd_reload, detached). A change to the House itself
-        restarts the House only once no worker runs and no agent is mid-turn (idle_check)."""
+        restarts the House as soon as no git step is under way; who it cuts off resumes (idle_check)."""
         reload = T.REPO / 'research' / 'window-lab' / 'kernel-desktop' / 'kd_reload.py'
         try:
             result = subprocess.run([str(T.PY), str(reload), '--dry'], capture_output=True, text=True, timeout=120,
@@ -1548,7 +1547,7 @@ class Builders:
             if house:
                 self.house_restart_due = True
             state['activation'] = ('switching on: ' + '; '.join(x.split(' (')[0].split(':')[0] for x in lines)
-                                   + ('. The House restarts by itself once no worker or agent is busy' if house else ''))
+                                   + ('. The House restarts by itself once no git step is under way; anyone mid-turn carries on after' if house else ''))
         self.event(state, 'activation', state['activation'])
         self.save(state)
 

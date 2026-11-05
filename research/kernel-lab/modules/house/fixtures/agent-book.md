@@ -81,6 +81,10 @@ Held/unknown work requires its stated resolver; do not retry unknown effects. No
 The rules and the task list are sent again, under this line:
 `## Alex's standing rules (read again after the compaction; look $.charter is the live one)`
 
+### When a restart cut off your turn
+
+~ (said again: the House restarted in the middle of your turn on this, so you never finished it. Pick it up now.)
+
 ### Their worker finished a turn
 
 ~ Your worker $.name ($.card) finished a turn and says:
