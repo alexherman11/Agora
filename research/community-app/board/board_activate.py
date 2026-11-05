@@ -57,9 +57,7 @@ def activate(door):
     ids['library'] = have[0]['id'] if have else door.say(
         f'make kind=document-library name={LIBRARY} title="Research & documents" sees=group in={group}')['made'][0]
 
-    source = (HERE / 'document-components.js').read_text(encoding='utf-8')
-    source = source.replace('export default {mount', 'export default {css:' +
-                            json.dumps((HERE / 'documents.css').read_text(encoding='utf-8')) + ',mount')
+    source = (HERE / 'document-components.bundle.js').read_text(encoding='utf-8')
     for card in cards():
         if card['name'] in ('file', 'table'):
             name = card.pop('name')

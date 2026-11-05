@@ -115,7 +115,7 @@ def _board_probe():
         def items(tree): return find(tree, 'entries')['children']
         # add one: the input's own gesture line posts an ask into the Asks & offers channel
         root = plan('Maya')['tree']
-        assert find(root, 'heading')['settings']['text'] == 'Asks & offers'
+        assert find(root, 'heading')['settings']['text'] == 'Find help or share something'
         assert find(root, 'ask')['settings']['commit'] == 'submit'
         assert not any(g['event'] == 'change' for g in find(root, 'ask')['gestures'])
         f.say('Maya', gesture(find(root, 'ask'), 'submit', value='Need a hand moving a sofa'))

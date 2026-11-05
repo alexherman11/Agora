@@ -463,3 +463,52 @@ For component authors:
   `.wr-page:has(>.wr-margin[data-shut]){grid-template-columns:minmax(0,1fr)}`.
 
 This replaced the 40px fold strip (`fold <label>`, `P.fold`) from earlier the same day, which was never committed.
+# Receipt outcomes and local selection (4 November, round 2 builder draft)
+
+`components for="action result"` / `help action-notice` describe the reusable
+receipt notice. Arrange it beside actions whose rows may disappear:
+
+```text
+root : column
+  outcome : action-notice, stateKey actionNotice, scopeKeys "channel thread"
+    on undo do undo $value
+  done : button, label "Mark done", completionText "Marked done."
+    on press do set $view.target done=yes
+```
+
+The bundled `actionFeedback` helper publishes pending feedback synchronously,
+before admission or a world reread. Its component-local channel holds a navigation
+scope and unique action token, followed by the exact returned receipt.
+`scopeKeys` names the view fields that define navigation (empty means all).
+Components use `feedbackAPI(api).select` for navigation: it clears notices and
+invalidates pending completions immediately. Undo checks the current scope and
+token again before firing the authored gesture with that exact receipt.
+Legacy JSON notices in view state are ignored. Refused Undo retains recovery
+and displays the reason; an older completion cannot replace a newer outcome.
+`noticeKey` on button and `stateKey` on notice select another local channel.
+Pending button presses cannot repeat.
+
+For local navigation, a button's `selectKey="thread replyTo"` assigns its `value`
+to each named view key without a world write. Choice uses `selectKey` for one
+key, or its original authored `change` gesture when absent.
+Both Work arrangements demonstrate reuse with a real Mark done action:
+`work-line` emits `done`, the lens authors `set $item lane=Done`, and
+`action-notice stateKey workNotice` reverses its exact receipt. Work filters
+only navigate; they no longer manufacture completion notices.
+
+The canonical helper is `components/action-feedback.js`; the repository bundle
+builder embeds it in complete component artifacts. There is no publication-time
+assembly and no widget-runtime dependency. Help is generated from the
+`action-notice` entry in `painter/catalogue.py`.
+
+These are components and world arrangements, with no new widget primitive,
+grant or tiling engine. The notice exposes body/message/undo/dismiss parts,
+labels `undo`, `undone`, `dismiss`, and `notice-*` theme tokens for spacing,
+colour and shape. It never sends a message. Shared right-click Comment remains
+the existing host interaction mechanism.
+
+Painter subscription hints are optional: a refused hear no longer prevents
+the first authorised reading from painting. A screen-local component-health
+observation records the limitation, and normal reconciliation continues.
+This runtime fix affects newly assembled painter widgets; updating component
+code alone cannot patch an already stored widget runtime.

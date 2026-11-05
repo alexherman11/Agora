@@ -395,7 +395,7 @@ async function hearViews(){try{await agora.hear('view',event=>{
     else viewState[key]=value;
   }
   applyPanels();refresh().catch(tell);
-})}catch{/* a widget installed before 4 Nov holds no hear:view grant; its panels still work from the buttons */}}
+})}catch(e){subscriptionFailures.push('view: '+String(e.message||e))}}
 // The theme changed (the host sends it; common.js has already updated `theme`): repaint the tokens and styles at once.
 addEventListener('ag-theme',()=>{
   Object.assign(P.tokens,themeTokens());
@@ -422,9 +422,20 @@ async function hearMotion(word){if(heard.has(word))return;heard.add(word);await 
 // seen again, then one fresh plan catches it up. Six tucked boards no longer replan the world on every act (27 Oct).
 function soon(){if(document.hidden)return;clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>refresh().catch(tell),80)}
 document.addEventListener('visibilitychange',()=>{if(document.hidden)return;clearTimeout(refreshTimer);refresh().catch(tell)});
-for(const word of ['make','set','forget','undo','component','component-action'])await hearMotion(word);
+const subscriptionFailures=[];
+for(const word of ['make','set','forget','undo','component','component-action']){
+  try{await hearMotion(word)}catch(e){subscriptionFailures.push(word+': '+String(e.message||e))}
+}
 await hearViews();
 await refresh();
+if(subscriptionFailures.length){
+  // Optional event hints must not prevent the first paint. Reconciliation below
+  // still uses ordinary authorised reads; no subscription or grant is widened.
+  const message='Live updates limited; periodic refresh remains available. '+subscriptionFailures.join('; ');
+  console.warn(message);
+  pendingObservations.set(currentPlan.tree.path,{path:currentPlan.tree.path,health:'healthy',last_error:message.slice(0,300),elapsed_ms:0,source:'',painted:[]});
+  await flushObservations();
+}
 // A forgotten/private target may no longer be hearable. Time-dependent bindings
 // also have no world happening. Reconcile the visible projection, without
 // widening the event stream or revealing why a row disappeared.

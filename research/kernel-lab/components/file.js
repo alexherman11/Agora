@@ -35,7 +35,7 @@ export default {css:`
       if(s.owner){if(s.owner===viewer)editor()}
       else api.read('rows file').then(api.guard(files=>{const original=files.find(row=>row.id===f.id);if((original?.upload_owner||original?.for||original?.made_by)===viewer)editor()}));
     }else if(data.kind==='document'){
-      heading.textContent='▤ '+(f.name||f.title||L('document','Document'));root.append(P.node('p',{class:'nb-meta'},data.pages.length+' '+L('pages','pages')));
+      heading.textContent='▤ '+(f.name||f.title||L('document','Document'));root.append(P.node('p',{class:'nb-meta'},data.pages.length+' '+L(data.pages.length===1?'page':'pages',data.pages.length===1?'page':'pages')));
       if(s.variant==='thumbnail'){root.append(P.node('p',{class:'nb-document-preview'},(data.pages[0]||'').slice(0,280)));return}
       const requested=!s.pageTarget||s.pageTarget===f.id?Number(s.page||1):1;
       const requestKey=[f.id,s.pageTarget,s.page,s.pageRequest].join('|');
@@ -90,7 +90,7 @@ export default {css:`
         api.select({quote:text,source:f.id,page,replyTo:api.view().thread});
       };
       const picker=P.node('select',{'aria-label':L('pagepicker','Choose a page')});for(let i=1;i<=data.pages.length;i++)picker.append(P.node('option',{value:i},L('page','Page')+' '+i));picker.value=page;picker.addEventListener('change',()=>{page=Number(picker.value);draw()});
-      draw();root.append(P.node('div',{class:'nb-actions'},previous,stamp,picker,next),content);
+      draw();if(data.pages.length>1)root.append(P.node('div',{class:'nb-actions'},previous,stamp,picker,next));root.append(content);
       const selection=P.selectionAction(content,api.draft,()=>page+':'+data.pages[page-1],quote,{label:L('quote','Quote selection')});api.cleanup(selection.dispose);
       root.append(P.node('details',{class:'nb-more'},P.node('summary',{},L('more','More')),P.press(L('quote','Quote selection'),selection.quote)));
       if(s.quoteMode==='inline'){root.append(reply);if(replyDraft)paintReply()}

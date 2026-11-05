@@ -10,6 +10,8 @@ root : board-shell, title "Seabright"
     watch reading:"rows board-seen"
     watch reading:"board.queue"
   centre : column, role nb-centre
+    action-result : action-notice, scopeKeys "channel opens thread search queue asksThread documentsFolder documentsOpen"
+      on undo do undo $value
     tools : board-toolbar
     calendar : calendar, of reading:"board.events in=$view.channel around=$view.calendarDate" as e, limit 100, each calendar-event, openKey "thread replyTo", label "Calendar"
       only when $view.opens = calendar and $view.search = "" and $view.queue != yes
@@ -127,5 +129,6 @@ attachment-thumbnail : file, content $content, name $file.name, owner $file.uplo
   on calendar do board.calendar $target
   table : table, sortable yes
 result : board-entry
+  format stamp as short-relative
 calendar-event : text "$e.title"
   format stamp as short-relative

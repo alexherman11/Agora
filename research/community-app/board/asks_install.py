@@ -10,7 +10,7 @@ from ui_install import upsert, widget_source, Q, TOKENS, HERE
 
 NAME = 'seabright-asks'
 # asks_channel is where "add one" posts; channel filters the list and is shared with the host board when nested.
-VIEW = dict(channel='', asks_channel='', asks_side='all', asks_status='active', asks_seats=1)
+VIEW = dict(channel='', asks_channel='', asks_side='all', asks_status='active', asks_seats=1, asksThread='', asksReplyTo='')
 GRANTS = ('window.surface rows look look-view help component-health component-action personal-view personal-style '
           'board.* claim set undo hear:board.* hear:claim hear:set hear:undo')
 

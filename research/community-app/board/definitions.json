@@ -8,15 +8,15 @@
     {"name": "Off-topic", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30}
   ],
   "kinds": [
-    {"name": "discussion", "fields": ""},
-    {"name": "question", "fields": ""},
-    {"name": "announcement", "fields": "until", "leaders_only": "yes"},
-    {"name": "event", "fields": "start end location seats closes place", "required": "start seats", "defaults": "{\"seats\": \"500\"}", "compose_fields_first": "yes", "compose_message_rows": "3"},
-    {"name": "poll", "fields": "options closes", "required": "options closes"},
-    {"name": "ask", "fields": "seats closes", "required": "seats"},
-    {"name": "offer", "fields": "seats closes", "required": "seats"},
-    {"name": "document", "fields": ""},
-    {"name": "decision", "fields": "", "leaders_only": "yes"}
+    {"name": "discussion", "fields": "", "compose_scope": "board"},
+    {"name": "question", "fields": "", "compose_scope": "board"},
+    {"name": "announcement", "fields": "until", "leaders_only": "yes", "compose_scope": "board"},
+    {"name": "event", "fields": "start end location seats closes place", "required": "start", "defaults": "{\"seats\": \"500\"}", "compose_fields_first": "yes", "compose_message_rows": "3", "compose_scope": "board"},
+    {"name": "poll", "fields": "options closes", "required": "options closes", "compose_scope": "board"},
+    {"name": "ask", "fields": "seats closes", "required": "seats", "compose_scope": "board"},
+    {"name": "offer", "fields": "seats closes", "required": "seats", "compose_scope": "board"},
+    {"name": "document", "fields": "", "compose_scope": "board"},
+    {"name": "decision", "fields": "", "leaders_only": "yes", "compose_scope": "board"}
   ],
   "orderings": [
     {"name": "New", "rule": "new"},

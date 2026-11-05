@@ -13,6 +13,7 @@
 // Built by install.py as: geo-worker.js + geo-engine.js + this file.
 
 const MAP_CSS=`
+.gm-shell>[data-component=action-notice][data-part=body]{position:absolute;top:var(--map-notice-top,64px);z-index:8;bottom:auto;left:12px;right:12px}
 .gm-panel{min-width:0;width:100%}.gm-panel>.gm-shell{height:100%;min-height:280px}
 .gm-panel-entry{display:flex;align-items:center;gap:8px;margin:8px 0}
 .gm-panel-body{position:relative;min-width:0;overflow:hidden;border-radius:12px}
@@ -205,7 +206,7 @@ function mapHead(rows){return rows.find(r=>r.kind==='map')||{}}
 function mapReadLayers(api,map){return api.read('map.layers '+mapQ(map)).then(mapRows)}
 function mapHas(api,event){return (api.node.gestures||[]).some(g=>g.event===event)}
 function mapLineOf(api,event){const g=(api.node.gestures||[]).find(g=>g.event===event);return g?g.line:''}
-async function mapFire(api,event,values,okText){try{const out=await api.fire(event,values);if(okText)api.tell(okText);return out}catch(e){api.tell(String(e?.message||e).split('\n')[0]);return null}}
+async function mapFire(api,event,values,okText){try{return okText?await actionFeedback(api).run(event,values,okText):await api.fire(event,values)}catch(e){api.tell(String(e?.message||e).split('\n')[0]);return null}}
 function mapAgo(iso){const t=Date.parse(iso);if(!isFinite(t))return '';const s=(Date.now()-t)/1000;if(s<60)return 'just now';if(s<3600)return Math.round(s/60)+' min ago';if(s<86400)return Math.round(s/3600)+' h ago';return Math.round(s/86400)+' d ago'}
 function mapMetres(m){m=Number(m)||0;return m>=1000?(m/1000).toFixed(m>=10000?0:1)+' km':Math.round(m)+' m'}
 function mapRefOf(sel){return sel?.ref||''}
@@ -281,7 +282,8 @@ function mountShell(api){
   const stage=mapEl('div',{class:'gm-stage'}),left=mapEl('div',{class:'gm-col gm-left'}),right=mapEl('div',{class:'gm-col gm-right'});
   const lscroll=mapEl('div',{class:'gm-scroll'}),rscroll=mapEl('div',{class:'gm-scroll'});
   for(const child of api.children){
-    if(child.component==='geo-map')stage.append(api.render(child));
+    if(child.component==='action-notice')root.append(api.render(child));
+    else if(child.component==='geo-map')stage.append(api.render(child));
     else if(child.component==='map-search')left.append(api.render(child));
     else if(child.component==='map-layers')rscroll.append(api.render(child));
     else lscroll.append(api.render(child));
@@ -326,7 +328,7 @@ function mountGeoMap(api,settings){
     on:{click:()=>{d.menu=!d.menu;paintMenu()}}},mapIcon('add'),'Add');
   if(mapHas(api,'put'))tools.append(addBtn);
   // The route planner is an authored sibling in map.lens; panels may supply one separately.
-  if(api.node.component!=='map-panel')tools.append(mapEl('button',{type:'button','aria-pressed':String(E.tool==='route'),on:{click:()=>setTool('route')}},mapIcon('route'),'Route'));
+  if(settings.routes===true||settings.routes==='yes')tools.append(mapEl('button',{type:'button','aria-pressed':String(E.tool==='route'),on:{click:()=>setTool('route')}},mapIcon('route'),'Route'));
   const menuSlot=mapEl('div');
   const KINDS=[['spot','📍','A spot','A place people can find: a bench, a gate, a view'],['event','📅','An event','Something happening, with a time'],
     ['note','📝','A note','A few words left at a place'],['other','✳️','Something else…','Any kind this world knows']];
@@ -580,9 +582,9 @@ function mountInspector(api,settings){
       items.sort((a,b)=>String(b.made||'').localeCompare(String(a.made||'')));
       const seen=new Set();for(const it of items){if(seen.has(it.id))continue;seen.add(it.id);if(seen.size>7)break;
         list.append(mapEl('button',{type:'button',style:{color:it.color||'#cf5a3c'},on:{click:()=>fly(it)}},mapEl('span',{class:'gm-dot'}),mapEl('span',{style:{color:'var(--ink,#26302c)'}},mapName(it)),mapEl('small',{},(it.by?it.by+' · ':'')+mapAgo(it.made))))}
-      if(!seen.size)list.append(mapEl('p',{class:'gm-empty'},'Nothing placed yet. Be the first: press Add.'))}),()=>{});
-    card.append(mapEl('p',{class:'gm-empty',style:{marginTop:'10px'}},'Press a building to see what happens there. Press ',mapEl('b',{},'Add'),' to put a spot, an event or a note anywhere. Every press is also a line: ',
-      mapEl('code',{},'map.add "Seabright & Murray" kind=spot name="Bench"'),'.'));
+      if(!seen.size)list.append(mapEl('p',{class:'gm-empty'},api.label('empty',mapHas(api,'put')?'Nothing placed yet. Press Add to place something.':'Nothing placed yet. Explore the map or search for a place.')))}),()=>{});
+    card.append(mapEl('p',{class:'gm-empty',style:{marginTop:'10px'}},api.label('explore','Press a building to see what happens there.')));
+    if(mapHas(api,'put'))card.append(mapEl('p',{class:'gm-empty'},api.label('addhelp','Press Add to put a spot, an event or a note on the map.')));
     return card;
   }
   const actions=mapEl('div',{class:'gm-actions'}),lines=mapEl('div',{class:'gm-line'});
@@ -600,13 +602,13 @@ function mountInspector(api,settings){
       actions.append(mapEl('button',{type:'button',class:'gm-btn gm-warm',on:{click:()=>mapFire(api,'put',{place:mapPlaceArg(sel),kind:'spot',fields:{name:sel.name||'A spot'},select:{selected:''}},'Added '+(sel.name||'a spot'))}},'Add as a spot'));
       lines.textContent='Add runs: '+mapLineOf(api,'put');
     }
-    if(sel.lat!=null)actions.append(routeFrom(title,Number(sel.lat),Number(sel.lon)));
+    if(sel.lat!=null&&(settings.routes===true||settings.routes==='yes'))actions.append(routeFrom(title,Number(sel.lat),Number(sel.lon)));
     card.append(actions,lines);return card;
   }
   // a thing in the world: every fact it has (as you may see it), where it is, what is near
   card.append(mapEl('h3',{},sel.layer||'In the world',close),mapEl('p',{class:'gm-title'},sel.name||'A thing'));
   const where=mapEl('p',{class:'gm-where'},'…'),facts=mapEl('dl',{class:'gm-facts'}),near=mapEl('div',{class:'gm-list'});
-  card.append(where,facts,actions,near,lines);
+  card.append(where,actions,near,mapEl('details',{},mapEl('summary',{},api.label('details','Details')),facts,lines));
   api.rows('map.where '+sel.thing+' map='+mapQ(map)).then(api.guard(r=>{if(!where.querySelector('.gm-big'))where.textContent=mapRows(r)[0]?.where||''}),()=>{if(!where.querySelector('.gm-big'))where.textContent=''});
   api.read('look '+sel.thing).then(api.guard(rows=>{
     const t=mapRows(rows)[0];if(!t){facts.append(mapEl('dd',{},'You cannot see this any more.'));return}
@@ -636,7 +638,7 @@ function mountInspector(api,settings){
       actions.append(mapEl('button',{type:'button',class:'gm-btn gm-primary',on:{click:()=>api.select({fly:sel.thing+'@'+Date.now()})}},'Fly along it'));
       if(mapHas(api,'replan'))actions.append(mapEl('button',{type:'button',class:'gm-btn',on:{click:()=>mapFire(api,'replan',{route:sel.thing,saw:{[sel.thing]:t.rev}},'Replanned')}},'Replan'));
     }
-    else if(t.lat!==undefined){const ll=[Number(t.lat),Number(t.lon)];if(ll.every(Number.isFinite))actions.append(routeFrom(sel.name,ll[0],ll[1],sel.thing))}
+    else if(t.lat!==undefined&&(settings.routes===true||settings.routes==='yes')){const ll=[Number(t.lat),Number(t.lon)];if(ll.every(Number.isFinite))actions.append(routeFrom(sel.name,ll[0],ll[1],sel.thing))}
     if(mapHas(api,'forget'))actions.append(mapEl('button',{type:'button',class:'gm-btn',on:{click:()=>mapFire(api,'forget',{thing:sel.thing,saw:{[sel.thing]:t.rev},select:{selected:''}},'Removed. Undo brings it back.')}},'Remove'));
     lines.textContent=['edit','forget','replan'].map(e=>mapLineOf(api,e)).filter(Boolean).map(l=>'runs: '+l).join('\n');
   }),api.guard(e=>facts.append(mapEl('dd',{},String(e?.message||e)))));
@@ -797,6 +799,7 @@ function mountPlaceTalk(api,settings){
 }
 
 export default {css:MAP_CSS,mount(api,settings){
+  api=feedbackAPI(api);
   switch(api.node.component){
     case 'map-panel':return mountPanel(api,settings);
     case 'map-shell':return mountShell(api,settings);

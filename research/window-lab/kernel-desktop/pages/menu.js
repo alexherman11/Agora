@@ -18,6 +18,7 @@
 "use strict";
 const AgoraMenu = (() => {
   const ID = /^[a-z]{1,8}\d+$/;
+  const readable = (...values) => values.map(v => String(v || "").replace(/\s+/g, " ").trim()).find(v => v && !ID.test(v)) || "Selected item";
   const Q = (s) => '"' + String(s ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
   let box = null, back = null, conversation = null, shown = 0;
 
@@ -133,7 +134,7 @@ const AgoraMenu = (() => {
     const quote = String(o.quote || "").replace(/\s+/g, " ").trim().slice(0, 2000);
     back = document.activeElement;
     box = el("div", { class: "ag-menu", role: "menu", "aria-label": "Menu", "data-thing": thing || undefined });
-    const head = el("div", { class: "ag-head" }, el("strong", {}, String(o.label || (thing ? thing : "This window")).slice(0, 120)));
+    const head = el("div", { class: "ag-head" }, el("strong", {}, readable(o.label, thing ? "Selected item" : "This window").slice(0, 120)));
     box.append(head);
     if (quote) box.append(el("div", { class: "ag-quote" }, quote.length > 220 ? quote.slice(0, 220) + "…" : quote));
     const wait = el("div", { class: "ag-wait" }, "…");
@@ -143,9 +144,10 @@ const AgoraMenu = (() => {
     const read = thing ? await words(thing) : win ? await words(win) : { row: null, me: "", acts: [], lenses: [] };
     if (box !== mine) return;                                        // closed or replaced while reading
     wait.remove();
-    const row = read.row, name = row ? String(row.title || row.name || row.id) : "";
+    const row = read.row, name = readable(row?.title, row?.name, String(row?.text || "").replace(/\s+/g, " ").trim().slice(0, 80), o.label);
     if (row) {
-      head.replaceChildren(el("strong", {}, name.slice(0, 120)), el("small", {}, thing ? row.kind || "" : "window"));
+      const kind = readable(row.post_kind, row.kind, "Item").replace(/[-_]/g, " ").replace(/^./, c => c.toUpperCase());
+      head.replaceChildren(el("strong", {}, name.slice(0, 120)), el("small", {}, thing ? kind : "Window"));
     }
     const list = [];
     if (quote) {
@@ -185,7 +187,7 @@ const AgoraMenu = (() => {
     const field = input("Your words (optional) · Enter sends", "Your comment on these words", async (words) => {
       const chat = await conversationId();
       if (!chat) { close(true); told({ ok: false, text: "Comment: there is no Conversation here" }); return; }
-      const link = thing ? `— from [[${thing}|${String(name || thing).replace(/[\[\]|]/g, "")}]]` : "";
+      const link = thing ? `— from [[${thing}|${String(name || "Selected item").replace(/[\[\]|]/g, "")}]]` : "";
       const text = [words, quote.split("\n").map((l) => "> " + l).join("\n"), link].filter(Boolean).join("\n\n");
       await run(`say ${chat} text=${Q(text)}` + (thing ? ` about=${thing}` : ""), "Commented · it is in the Conversation");
     });

@@ -36,12 +36,12 @@ BOARD_GRANTS = GRANTS.replace("house.active", "house.board")
 # The two general components Work arranges, beside the catalogue's (components/*.js), with their cards.
 COMPONENTS = {
     "work-overview": dict(category="collections", purpose="Current work with bounded pages; nothing scrolls.",
-        settings="{}", parts='{"body": {"facts": "bound visible row"}}', slots='["rows"]',
+        settings="{}", parts='{"body": {"facts": "bound visible row"}}', slots='["rows","notice"]',
         gestures="", example="root : work-overview", uses="Work", limitations="Pages fit the available height."),
     "work-line": dict(category="content", purpose="One current card, holder and blocker; names open details.",
         settings=json.dumps({key: {"type": "text", "default": ""} for key in
                              ("title", "owner", "state", "blocker", "resolver", "detail", "next")}),
-        parts='{"body": {"facts": "bound visible row"}}', slots="[]", gestures="",
+        parts='{"body": {"facts": "bound visible row"}, "done": {}}', slots="[]", gestures="done",
         example='root : work-line, title "Current work"', uses="Work",
         limitations="Long lines are ellipsized; activate a name for details."),
 }
@@ -62,6 +62,12 @@ for _component, _extra in {
 
 def components(door):
     import hashlib
+    from painter.catalogue import cards
+    for card in cards():
+        if card['name']=='action-notice':
+            name=card.pop('name')
+            tid=painter.upsert(door,'component',name,**card,code=(LAB/'components/action-notice.js').read_text(encoding='utf-8'))
+            door.say('look '+tid);door.say('component '+tid)
     for name, card in COMPONENTS.items():
         code = (LAB / "components" / f"{name}.js").read_text(encoding="utf-8")
         t = painter.upsert(door, "component", name, **card, code=code)

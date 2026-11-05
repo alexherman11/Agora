@@ -14,6 +14,10 @@ def setting(type='text', default=''):
 T = setting
 COMMON = dict(label=T(default='Example'))
 CATALOGUE = {
+    'action-notice': ('feedback', 'Show an action result and reverse its exact receipt, even after its row disappears.',
+        dict(stateKey=T(default='actionNotice'),scopeKeys=T(),labels=T(default='{}')), 'body message undo dismiss', '', 'undo',
+        'Map moves; private board actions; work panels; forms',
+        'Bundled actionFeedback publishes immediate pending/results without a world reread. stateKey names a local channel; scopeKeys names view fields defining navigation (empty means all). Navigation clears results and invalidates pending tokens. Undo rechecks scope/token and uses the exact returned receipt only, with an authored gesture and existing permission. Work Mark done reuses the same contract. Old JSON view notices are intentionally ignored.'),
     'date-tile': ('content','A date tile, time range, place and bounded countdown for any dated thing.',
         dict(start=T(),end=T(),place=T(),soonDays=T('number',3),date=T(),month=T(),day=T(),weekday=T(),time=T(),labels=T(default='{}')),
         'body tile month day weekday time place countdown','','','Events; appointments; deadlines',
@@ -52,12 +56,14 @@ CATALOGUE = {
 }
 
 for name,category,purpose,settings,uses,limits in [
-    ('button','inputs','Press to say an authored word.',{},'Forms; settings; sign-in page',''),
+    ('button','inputs','Press to say an authored word, or select named view state.',
+     dict(selectKey=T(),value=T(),completionText=T(),noticeKey=T(default='actionNotice')),
+     'Forms; settings; sign-in page','completionText publishes the returned receipt to action-notice. Pending presses cannot repeat. selectKey changes only local view state.'),
     ('input','inputs','Edit one line; commit=submit sends only on Enter or the explicit button, retaining refused drafts.',
      dict(value=T(),hint=T(),commit=T(default='change'),submitLabel=T(default='Submit'),labels=T(default='{}')),
      'Forms; settings; chat; search','commit=change emits change on blur; commit=submit emits submit, ignores IME Enter, and prevents duplicate pending submissions.'),
     ('editor','inputs','Edit plain text or Markdown source.',dict(value=T(),hint=T()),'Writing room; document editor; email','No collaborative rich text, pagination or desktop publishing engine.'),
-    ('choice','inputs','Choose one supplied option.',dict(value=T(),options=T(default='One|Two|Three')),'Forms; polls; settings',''),
+    ('choice','inputs','Choose one supplied option.',dict(value=T(),options=T(default='One|Two|Three'),selectKey=T()),'Forms; polls; settings','selectKey changes local view state; otherwise emits the authored change gesture.'),
     ('switch','inputs','Toggle a boolean setting.',dict(checked=T('boolean',False)),'Settings; form builder',''),
     ('text-block','content','Show selectable text.',dict(value=T(default='A little room to think.')),'Feed; rooms; writing room',''),
     ('markdown','content','Render safe Markdown headings, emphasis and checklists.',dict(value=T(default='## Welcome\n**Bring** a thought.\n- [ ] Make room')),'Feed; writing room; reading room','No raw HTML or concurrent document model.'),
