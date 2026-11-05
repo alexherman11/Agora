@@ -917,6 +917,9 @@ class House:
             return self.builders.request_review(msg)
         if word == "house.land":
             return self.builders.land(msg)
+        if word == "house.import":
+            import imports
+            return imports.call(self, msg)
         if word == "house.release":
             return self.builders.release(msg)
         if word == "house.stop" and args.get("target") in self.builders.states:
@@ -1067,6 +1070,12 @@ class House:
 
 
 OFFER = [
+    {"word": "house.import", "kind": "do", "may": "stewards", "undo": "yes",
+     "takes": "<id> field=code|text from=<landed-card> path=<repository-file>",
+     "help": "house.import <thing> field=code|text from=<landed-card> path=<file>: copy a regular UTF-8 "
+             "file from the House-recorded landing into component.code or lens.text. It must be touched by "
+             "that landing and still match committed main. Direct steward/agent calls only. Gaming gate first; ordinary field permissions "
+             "and revision fences apply. Equal bytes do nothing. Does not review, grant, install or open windows."},
     {"word": "house.manage", "kind": "do", "needs": "kind=taskboard-task|task", "takes": "<id> [action=<word>] [<words>]", "undo": "external", "may": "members",
      "help": "house.manage <task> action=build|tell|retry|report|review|land|note [words]: only the explicitly approved resident person, for its three locally approved tasks. Builders and other people are refused before effects."},
     {"word": "house.retry", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "members",

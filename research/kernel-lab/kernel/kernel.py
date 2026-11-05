@@ -1922,6 +1922,12 @@ class Kernel:
             raise
         self.modules.done(mid, ans.get("use"), {"ok": True, "made": out.get("made", []), "text": out.get("text", ""),
                                                 **({"record": f"r{out['record']}"} if out.get("record") else {})})
+        # A declarative module's receipt is meaningful only after admission, including
+        # successful equality/no-op. Previously its detailed text/rows were discarded.
+        if ans.get("text"):
+            out["text"] += "\n" + ans["text"]
+        if ans.get("rows"):
+            out["rows"] = ans["rows"]
         return out
 
     def admit(self, mid, caller, text, entry, ans, press=None, press_saw=None):
@@ -1954,7 +1960,9 @@ class Kernel:
                         raise ValueError
                     # no aspects named: the whole thing, as a bare rev fences it (a {rev} alone would fence only what
                     # the answer writes, weaker than the int it stands for; kernel review round 2)
-                    out[str(t)] = {"rev": int(v.get("rev", 0)), "aspects": aspects} if aspects else int(v.get("rev", 0))
+                    out[str(t)] = {"rev": int(v.get("rev", 0)), "aspects": aspects or ["*"],
+                                   **({"participant": True} if v.get("participant") is True else {})} \
+                        if aspects or v.get("participant") is True else int(v.get("rev", 0))
                 else:
                     out[str(t)] = int(v)
             except (TypeError, ValueError):
@@ -1967,6 +1975,7 @@ class Kernel:
         from .words import KERNEL
         author = Actor(mid, caller.person, "module", module=mid, caller=caller)
         saw = self._module_saw(mid, ans)
+        self.check_participants(author, saw)  # includes equality/no-op, before any answer lines
         if True:
             notes, handles = [], {}
             for line in ans["lines"]:
