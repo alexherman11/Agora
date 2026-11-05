@@ -179,7 +179,10 @@ class WiringTests(unittest.TestCase):
     def test_lens_uses_read_only_board_and_stable_state_keys(self):
         tree = parse((LAB / "apps/work/task-work.lens").read_text(encoding="utf-8"))
         self.assertEqual(tree["root"]["settings"]["board"], "true")
-        self.assertEqual(tree["root"]["children"][0]["query"], 'reading:"house.board" as t')
+        # Notices and other controls may precede the board collection.
+        children = {child["name"]: child for child in tree["root"]["children"]}
+        self.assertEqual(children["rows"]["query"], 'reading:"house.board" as t')
+        self.assertEqual(children["rows"]["each"], "work-line")
         self.assertEqual(tree["work-line"]["settings"]["stateKey"], "$t.state_key")
         self.assertIn('reading:"house.active"', (LAB / "apps/work/work.lens").read_text(encoding="utf-8"))
 
