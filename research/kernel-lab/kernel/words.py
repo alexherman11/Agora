@@ -48,6 +48,22 @@ KERNEL_ENTRIES = [
             'the new text, with every check set makes; undo takes it back. Every change is also kept, with who and '
             'when, in a CRDT history beside the world (edits <thing> reads it). If the text changed meanwhile, '
             'version= (from an earlier edit) merges the change into it; without it the edit is refused as stale.'),
+    _k('text.append', 'do', '<id> text=<text> [heading=<title>] [field=<name>]', 'maker or lead or leaders', 'yes',
+       aliases='append',
+       help='text.append <thing> text="A dated line" [heading="Section"] [field=text]: append a line without '
+            'resending the text. heading= appends to that Markdown heading\'s direct body, before the next heading '
+            'of any level; a missing heading is created at the end as ## Section. Duplicate headings refuse. '
+            'Quoted text accepts \\n, \\r, \\t and \\\\ escapes after Lines unquoting, or actual newlines. '
+            'Uses current text, set rights and edit history; undo takes it back. Works in verbs, rules and buttons. '
+            'Example: text.append "Our notes" heading="Updates" text="A new line".'),
+    _k('text.replace', 'do', '<id> new=<text> [old=<text>] [heading=<title>] [field=<name>]', 'maker or lead or leaders', 'yes',
+       aliases='replace',
+       help='text.replace <thing> old="before" new="after" [heading="Section"] [field=text]: replace all exact, '
+            'nonoverlapping matches in the text (or that heading\'s direct body). Missing/empty old refuses; '
+            'new= alone deletes matches. With heading= and new= but no old=, replace the direct body, keeping '
+            'the heading and child sections. Missing or duplicate headings refuse. Escapes as in text.append. '
+            'Uses current text, set rights and edit history; undo takes it back. Receipts count matches. '
+            'Example: text.replace "Our notes" heading="Updates" new="The replacement section body".'),
     _k('edits', 'see', '<id> [field=<name>]', 'anyone', 'no',
        help='edits <thing> [field=text]: the changes kept for a text fact written with edit: who, when, how many '
             'operations. The deleted words themselves are never shown.'),
@@ -558,8 +574,14 @@ def undo(k, actor, st, entry, tx, group, saw=None):
             k.reaches(actor, 'undo', k.state.get(target, 'kind'), target=target,
                       fields=[f[1] for f in facts if f[0] == target],
                       group=(k.groups_of(target) or [k.place])[0])
+        restored = set()
         for f in reversed(facts):
             t, a = f[0], f[1]
+            # Several steps of one verb can write the same fact. Check its
+            # final value once, then restore the value before the whole act.
+            if (t, a) in restored:
+                continue
+            restored.add((t, a))
             v = f[3] if len(f) > 3 else None
             value, last = now(t, a)
             later = [x for x, _ in k.state.history.get((t, a), []) if x > r["seq"]]
@@ -811,7 +833,7 @@ def set_(k, actor, st, entry, tx, group, saw=None):
                            f"{key}; set {t} {other[0]}= changes that one")
     if k.state.get(t, "kind") == "kind":
         k.kinds.validate_decl(actor, st.kv, (k.groups_of(t) or [k.place])[0], old=dict(k.state.things.get(t, {})), t=t)
-    if all(str(k.state.get(t, a) if k.state.get(t, a) is not None else '') == str(v) for a, v in st.kv.items()):
+    if all(str(tx.get(t, a) if tx.get(t, a) is not None else '') == str(v) for a, v in st.kv.items()):
         return {"text": f"{k.name(t)} already says {', '.join(f'{a}={v}' for a, v in st.kv.items())}; nothing changed"}
     _writable(k, st.kv)
     _conditions(k, st.kv, group)
@@ -1234,6 +1256,7 @@ from .store import GONE
 from .next_steps import change as task_change
 from .card_signals import signal as card_signal
 from .bodies import edit as body_edit, edits as body_edits
+from .text_ops import change as text_change
 from painter.arrangement import component, look_view, components, component_card, window_view
 from painter.health import component_health, component_action, personal_view, personal_style, paint_clear
 
@@ -1241,6 +1264,7 @@ KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant":
           "task.signal": card_signal,
           **{"task-" + action: task_change for action in ("next", "revise", "review", "verify", "followup")},
           'edit': body_edit, 'edits': body_edits,
+          'text.append': text_change, 'text.replace': text_change,
           'upload': upload, 'attach': attach, 'file-result': file_result, 'file-read': file_read,
           'dictionary-copy': dictionary_copy, 'group': group_word, 'clock': clock, 'forgotten': forgotten,
           'component': component, 'look-view': look_view, 'view': window_view, 'components': components,

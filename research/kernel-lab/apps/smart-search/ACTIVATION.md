@@ -1,5 +1,15 @@
 # Search everything — scoped House handoff
 
+## Switch-on (5 November)
+
+Landing does not run app installers (House `activate` only restarts what is stale), and component
+review (`component`) and widget activation (`widget`) are steward words. So a steward's session runs
+`python research/kernel-lab/apps/smart-search/install.py --live` from main: gaming gate, then
+`activate(door)` = install, review the exact component bytes, turn the widget on with only
+`REQUIRED_GRANTS`, one **Search** taskbar button. Idempotent; opens no window. A worker does not
+read Alex's session token to do this. Hidden check: `research/smart-search-lab/check_activation.py`.
+Off switch: `off` the smart-search widget, `forget` the smart-search-button.
+
 ## Current small step: Search (4 November)
 
 Sable authorized the lexical window and one **Search** taskbar button.
