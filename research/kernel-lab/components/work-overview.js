@@ -4,28 +4,43 @@ body:has(.work-overview){padding:24px!important;min-width:0!important;overflow:h
 .work-heading{display:flex;align-items:baseline;gap:14px;flex:none}
 .work-heading h1{margin:0;font-size:26px;font-weight:600;letter-spacing:-.03em}
 .work-caption{color:var(--work-muted,#647367);font-size:13px}
+.work-filters{display:flex;gap:6px;flex-wrap:wrap}
+.work-filters button{font:inherit;font-size:12px;border:1px solid var(--work-rule,#dce4da);border-radius:8px;padding:6px 10px;background:var(--work-card,#fffef9);color:inherit;cursor:pointer}
+.work-filters button[aria-pressed=true]{border-color:var(--work-accent,#638779);font-weight:600}
 .work-rows{flex:1;min-height:0;overflow:hidden;border:1px solid var(--work-rule,#dce4da);border-radius:14px;background:var(--work-card,#fffef9)}
 .work-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;font-size:12px}
 .work-pagination button{font:inherit;border:1px solid var(--work-rule,#dce4da);border-radius:8px;padding:6px 12px;background:var(--work-card,#fffef9);color:inherit}
 .work-pagination button:disabled{opacity:.45}
 .work-quiet{padding:24px;color:var(--work-muted,#647367)}
-`,mount(api){
+`,mount(api,s){
   const {P}=api,t=P.tokens,root=api.part('body','main',{class:'work-overview',style:{
     '--work-ink':t.ink,'--work-muted':t.muted,'--work-card':t.card,'--work-rule':t.muted+'40',
     '--work-accent':t.accent,'--work-blocked':t.orange}});
-  const rows=api.children.flatMap(n=>n.children||[]);
-  const heading=P.node('header',{class:'work-heading'},P.node('h1',{},'Work'),
-    P.node('span',{class:'work-caption'},'Active and blocked · '+rows.length));
-  const list=P.node('div',{class:'work-rows','aria-label':'Current work'});
+  const all=api.children.flatMap(n=>n.children||[]);
+  const groups={All:()=>true,Running:n=>n.settings.stateKey==='running',
+    Queued:n=>n.settings.stateKey==='queued',Blocked:n=>n.settings.stateKey==='blocked',
+    Waiting:n=>['review','activation'].includes(n.settings.stateKey),
+    Done:n=>['done','cancelled'].includes(n.settings.stateKey)};
+  const chosen=Object.hasOwn(groups,api.view().workFilter)?api.view().workFilter:'All';
+  const rows=s.board?all.filter(groups[chosen]):all;
+  const running=all.filter(groups.Running).length;
+  const heading=P.node('header',{class:'work-heading'},P.node('h1',{},s.title||(s.board?'Tasks & work':'Work')),
+    P.node('span',{class:'work-caption'},s.board?`${running} running · ${all.length} tasks`:`Active and blocked · ${all.length}`));
+  const filters=P.node('nav',{class:'work-filters','aria-label':'Task states'});
+  for(const [label,accept]of Object.entries(groups)){
+    const button=P.node('button',{type:'button','aria-pressed':String(chosen===label)},`${label} ${all.filter(accept).length}`);
+    button.onclick=()=>api.select({workFilter:label,workPage:0}).catch(api.tell);filters.append(button);
+  }
+  const list=P.node('div',{class:'work-rows','aria-label':s.board?'Tasks and work':'Current work'});
   const footer=P.node('nav',{class:'work-pagination','aria-label':'Work pages'});
   const prev=P.node('button',{type:'button'},'Previous'),next=P.node('button',{type:'button'},'Next'),count=P.node('span',{'aria-live':'polite'});
-  footer.append(prev,count,next);root.append(heading,list,footer);
-  let page=Number(api.view().workPage)||0;
+  footer.append(prev,count,next);root.append(heading);if(s.board)root.append(filters);root.append(list,footer);
+  let page=Math.max(0,Math.floor(Number(api.view().workPage)||0));
   function draw(){
     const size=Math.max(1,Math.floor((list.getBoundingClientRect().height-2)/58));
     const pages=Math.max(1,Math.ceil(rows.length/size));page=Math.min(page,pages-1);
     list.replaceChildren(...rows.slice(page*size,(page+1)*size).map(api.render));
-    if(!rows.length)list.append(P.node('p',{class:'work-quiet'},'Nothing active or blocked. A quiet moment.'));
+    if(!rows.length)list.append(P.node('p',{class:'work-quiet'},'No tasks in this view.'));
     prev.disabled=page===0;next.disabled=page===pages-1;
     count.textContent=rows.length?`${page*size+1}–${Math.min(rows.length,(page+1)*size)} of ${rows.length}`:'All clear';
   }

@@ -57,6 +57,7 @@ import transport as T                        # noqa: E402
 import manager as BM                         # noqa: E402
 from messages import message
 import work_overview                         # noqa: E402
+import task_board                            # noqa: E402
 
 try:
     from quota_policy import quota_error     # noqa: E402  the old desk's own rule: what counts as a used-up plan
@@ -915,6 +916,8 @@ class House:
             if not self.m.see("look " + (state.get("chat") or state["task"]), use=msg.get("use")).get("rows"):
                 return {"refused": "this worker log belongs to its requester"}
             return self.builders.log(args["target"])
+        if word == "house.board":
+            return {"rows": task_board.rows(self.m, self.agents, self.builders, msg.get("use"))}
         if word == "house.active":
             rows = work_overview.rows(self.m, self.agents, self.builders, msg.get("use"))
             return {"text": f"{len(rows)} active or blocked cards", "rows": rows}
@@ -1095,6 +1098,7 @@ OFFER = [
     {"word": "house.release", "kind": "do", "needs": TASK_NEEDS, "takes": "<id> [<why>]", "undo": "external", "may": "members",
      "help": "house.release <task> [why]: the card's worker ends for good (stopped first if running). Its worktree and "
              "branch are kept; the card is free for a new worker. Its owner, a steward or Alex may release it."},
+    {"word": "house.board", "kind": "see", "takes": "", "help": "house.board: visible tasks joined with live execution, blockers and delivery."},
     {"word": "house.active", "kind": "see", "takes": "",
      "help": "house.active: visible cards being worked on or blocked, with holder, blocker and resolver. Finished, queued and released work hides automatically."},
     {"word": "house.who", "kind": "see", "takes": "",
