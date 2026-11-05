@@ -27,6 +27,8 @@ def _k(word, kind, takes, may, undo, help, **more):
 
 from hosts.web.layout import HELP as PANE_HELP, panes, arrange
 
+PRESS_MODE_HELP = "press is a do word; /see refuses it. Send it through /do."
+
 KERNEL_ENTRIES = [
     _k("notification.send", "do", "<id> to=<person> text=<text> [about=<id>] [key=<key>] [cc=<person>]",
        "members", "yes",
@@ -297,9 +299,9 @@ KERNEL_ENTRIES = [
             "as a fact."),
     _k("on", "do", "<module>", "stewards", "yes",
        help="on <module>: turn a module back on, with the grants its off took back. undo turns it off again."),
-    _k("press", "see", "<id>", "anyone", "no",
+    _k("press", "do", "<id>", "anyone", "no",
        help="press <button>: run its does= line as you, exactly as a click would (press Feed, press dk41). What the "
-            "line does is its own act, with its own receipt and undo."),
+            "line does is its own act, with its own receipt and undo. " + PRESS_MODE_HELP),
     _k("role", "do", "<id> leader|member|none in=<group>", "leaders", "yes",
        help="role <person> leader|member|none in=<group>: who leads a group and who belongs to it. Leaders appoint."),
 ]

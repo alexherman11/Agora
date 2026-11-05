@@ -141,13 +141,26 @@ class Kernel:
     def _new_kernel_words(self):
         """A world founded before a kernel word existed gets its entry, by one record of the kernel's own. A word the
         world renamed is found by its bound name, so nothing is added twice."""
-        from .words import KERNEL_ENTRIES, KERNEL
+        from .words import KERNEL_ENTRIES, KERNEL, PRESS_MODE_HELP
         with self.lock:
             have = {self.state.get(e, "bound") or self.state.get(e, "word") for e in self.things("word")
                     if self.state.get(e, "from") == "kernel"}
             # a word this kernel no longer runs (held or removed, e.g. around while the graph is held, 28 Oct) rests
             # hidden rather than answering "unbound"; it comes back by itself when a kernel has it again
             mine = [e for e in self.things("word") if self.state.get(e, "from") == "kernel"]
+            # dk2834: older dictionaries classified the button dispatcher as a reading.
+            # Repair by implementation identity, including renamed words and group copies.
+            presses = [e for e in mine if self.state.get(e, "bound") == "press"
+                       and self.state.get(e, "word_kind") == "see"]
+            if presses:
+                tx = Tx(self)
+                tx.part("words", None, "press acts; /see refuses it")
+                for e in presses:
+                    tx.set(e, "word_kind", "do")
+                    help_text = self.state.get(e, "help", "")
+                    if PRESS_MODE_HELP not in help_text:
+                        tx.set(e, "help", (help_text + " " + PRESS_MODE_HELP).strip())
+                self._commit(tx, by="kernel", words="press is a do word")
             gone = [e for e in mine if (self.state.get(e, "bound") or self.state.get(e, "word")) not in KERNEL
                     and self.state.get(e, "status", "live") != "hidden"]
             back = [e for e in mine if self.state.get(e, "retired") == "yes"
@@ -1202,7 +1215,7 @@ class Kernel:
             pressed = pressed_id = None
             try:
                 self.reserved_as(s)
-                s, pressed, pressed_id = self.pressed_line(actor, s)   # press <button>: its does= runs here, typed
+                s, pressed, pressed_id = self.pressed_line(actor, s, mode=mode)
                 r = self.step(actor, s, press=press if len(steps) == 1 else None, saw=saw, mode=mode)
                 if pressed:
                     r = dict(r, text=f"pressed {pressed}: {r.get('text', '')}")
@@ -1235,7 +1248,7 @@ class Kernel:
             self.modules.reconcile()
         return out
 
-    def pressed_line(self, actor, text):
+    def pressed_line(self, actor, text, mode="do"):
         """press <button> -> (its does= line, its label, its id). The line runs as an ordinary typed line, outside any lock, so
         a module word in it answers as it would from a click. Anything else -> (text, None)."""
         st = L.parse(text)
@@ -1246,6 +1259,8 @@ class Kernel:
                 return text, None, None
             if not eid or self.state.get(eid, "bound") != "press" or self.state.get(eid, "from") != "kernel":
                 return text, None, None
+            if mode == "see":
+                raise Refused(f"{st.word} acts; /see runs only readings; send it through /do")
             if not st.target and st.words:
                 self.name_target(actor, st, self.entry(eid), None)
             if not st.target:
@@ -1386,6 +1401,8 @@ class Kernel:
                 raise Refused(f"nothing answers to '{st.word}' here; " + suggest(self, actor, st.word, group))
             entry = self.entry(eid)
             st.word = entry['word']
+            if mode == "see" and entry.get("word_kind") != "see":
+                raise Refused(f"{st.word} is an act; /see runs only readings; send it through /do")
             text = L.re.sub(r'^\S+', st.word, text, count=1)
             takes = self.takes_id(entry.get("takes"))
             if st.target and takes is None:
@@ -1410,8 +1427,6 @@ class Kernel:
                 if said:
                     raise Refused(said)
             src, name = self.source(entry)
-            if mode == "see" and entry.get("word_kind") != "see":
-                raise Refused(f"{st.word} is an act; /see runs only readings")
             if src == "kernel":
                 fn = KERNEL.get(name)
                 if fn is None:
