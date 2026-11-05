@@ -159,3 +159,16 @@ def test_a_topic_named_like_a_component_is_the_page_shown(world):
     assert 'A round gauge.' in say(k, b, 'help gauge')['text']
     say(k, a, 'make kind=topic name=gauge words="look" text="Gauges on the bar."')
     assert say(k, b, 'help gauge')['text'].startswith('gauge: Gauges on the bar.')
+
+
+def test_help_on_a_topics_own_id_is_that_page(world):
+    k, a, b = world
+    t = say(k, a, 'make kind=topic name=lanes words="look" text="Lanes on the board."')['made'][0]
+    assert say(k, b, f'help {t}')['text'].startswith('lanes: Lanes on the board.')
+
+
+def test_an_at_name_ending_a_sentence_still_calls(world):
+    k, a, b = world
+    chat = say(k, a, 'make kind=chat name=Lobby')['made'][0]
+    line = say(k, a, f'say {chat} text="thanks @Bea."')['made'][0]
+    assert k.state.get(line, 'to') == b.person

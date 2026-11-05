@@ -499,6 +499,8 @@ def answer(k, actor, words, group):
         a = k.shown(actor.person, w)
         if a is not None:
             kind = a.get("kind")
+            if kind == "topic":                              # help <a topic's id> is that page
+                return _topic_page(k, actor, group, w, a, pool)
             k.mark(actor, w, a)
             page = (topic_named(k, actor, kind) and _topic_page(k, actor, group, *topic_named(k, actor, kind), pool)) \
                 or _kind_page(k, actor, group, kind, pool) or {"text": "", "rows": []}
