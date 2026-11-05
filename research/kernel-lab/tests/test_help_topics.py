@@ -123,3 +123,21 @@ def test_a_reoffer_refreshes_what_the_module_wrote_and_help_drops_what_it_no_lon
     assert k.state.get(hint, 'help') == "pad.hint: the steward's words"           # a steward's edit stays
     assert 'pad.old' not in say(k, a, 'help pad')['text']                         # no longer offered: left out
     assert 'pad.old' in say(k, a, 'help check')['text']
+
+
+def test_help_pages_fill_live_facts_with_the_readers_own_sight(world):
+    """Alex, 5 Nov: help that relies on something outside itself says it with $. so it stays current."""
+    k, a, b = world
+    s = say(k, a, 'make kind=note name="Pool settings" workers=4')['made'][0]
+    t = say(k, a, 'make kind=topic name=pool words="look" short="the shared pool" '
+                  'text="Up to $[[Pool settings]].workers workers run at once ($.short). Write $$today for the date. '
+                  'Gone: $[[Nothing here]].x"')['made'][0]
+    page = say(k, b, 'help pool')['text']
+    assert 'Up to 4 workers run at once (the shared pool).' in page
+    assert 'Write $today for the date.' in page                     # $$ is a plain $, other $ words stay as written
+    assert '(not known here: $[[Nothing here]].x)' in page          # a gap is named, never guessed
+    say(k, a, f'look {s}')
+    say(k, a, f'set {s} workers=6')
+    assert 'Up to 6 workers' in say(k, b, 'help pool')['text']       # read when shown, never stored
+    say(k, a, 'verb tidy steps="look" help="tidy: $.word, one of $[[Pool settings]].workers"')
+    assert 'tidy: tidy, one of 6' in say(k, b, 'help tidy')['text']

@@ -32,6 +32,39 @@ USEFUL = ("look", "help", "rows", "search", "window.list", "window.open", "make"
           "theme.use", "task.add", "verb", "rule", "who", "recent", "refusals")
 
 
+LIVE = re.compile(r"\$\[\[([^\]\n]+)\]\]\.([A-Za-z_][A-Za-z0-9_-]*)|\$\.([A-Za-z_][A-Za-z0-9_-]*)")
+
+
+def live(k, actor, text, own):
+    """Help that stays current (Alex, 5 Nov 2026): in a page or a word's help, $.<fact> is a fact of the page's own
+    thing (or the word's own entry) and $[[thing|label]].<fact> a fact of another thing, read with the reader's own
+    sight each time the page is shown. A fact the reader can't read shows as a named gap, never a guess. Other $ words
+    ($today, $1, $target) are what help explains, so they stay as written; $$ writes a literal $."""
+    if "$" not in str(text or ""):
+        return text
+
+    def fill(m):
+        target, prop, local = m.groups()
+        try:
+            if local:
+                values = own or {}
+            else:
+                ref = target.split("|", 1)[0].strip()
+                t = ref if ref in k.state.things else None
+                if t is None:
+                    hits = k.named(actor, ref)
+                    t = hits[0][0] if len(hits) == 1 else None
+                values = (k.shown(actor.person, t) or {}) if t else {}
+            value = values.get(prop or local)
+            if value not in (None, ""):
+                return str(value)
+        except Exception:                                  # noqa: BLE001  a page never fails on one fill
+            pass
+        return f"(not known here: {m.group(0)})"
+    parts = str(text).split("$$")
+    return "$".join(LIVE.sub(fill, p) for p in parts)
+
+
 # ---------------------------------------------------------------------------------------------------- small pieces
 def _variants(w):
     w = w.casefold().strip()
@@ -166,7 +199,7 @@ def topic_named(k, actor, w):
 
 def _topic_page(k, actor, group, t, a, pool):
     k.mark(actor, t, a)
-    text = str(a.get("text", "")).replace("\\n", "\n")       # a topic's text may say \n for a new line
+    text = live(k, actor, str(a.get("text", "")).replace("\\n", "\n"), a)   # a topic's text may say \n for a new line
     lines = [f"{a.get('title') or a.get('name')}: {text}" if text else str(a.get('title') or a.get('name'))]
     pats = str(a.get("words") or "").split()
     named = _matching(pool, " ".join(p for p in pats if "*" not in p))
@@ -244,7 +277,7 @@ def _entry_page(k, actor, e):
         mid = k.module_named(a["from"][7:])
         if not mid or not k.state.get(mid, "on") or not k.modules or not k.modules.running(mid):
             facts.append("unbound: this community must grant and run the module")
-    text = a.get("help", "") + "\n" + " · ".join(facts)
+    text = live(k, actor, a.get("help", ""), a) + "\n" + " · ".join(facts)
     if _can_edit_entry(k, actor, a):
         text += f"\nfix this help: {_ws(k)} {a['word']} help=\"…\""
     elif _ask_hint(k, e):
@@ -364,6 +397,8 @@ FILL_IN_WORDS = {"fill-in", "fill-ins", "fillin", "fillins", "fills", "blanks", 
 FILL_INS = (
     ("$.<fact>", "prose templates", "a supplied fact of the thing the message is about", "one rendering"),
     ("$[[thing|label]].<fact>", "prose templates", "a visible fact read from another thing; label is optional", "one rendering"),
+    ("$.<fact>, $[[thing]].<fact>", "help pages and word help", "the page's own fact, or another thing's, as the reader "
+     "sees it now; $$ is a plain $", "one showing"),
     ("$<name>", "any line", "the thing a line made with as=<name>", "this sign-in, until the kernel restarts"),
     ("$new", "any line, verb steps", "the last thing made by an earlier line or step", "this sign-in"),
     ("$me", "any line, verb steps", "who is acting (an agent is itself)", "the line"),
