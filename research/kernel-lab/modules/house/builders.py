@@ -952,7 +952,13 @@ class Builders:
                    'external': True}
         if not out.get('caller_receipt'):
             self.request_receipts[msg['use']] = (context, out.get('refused') or out.get('text', ''))
-            self.deliver_start_requests()
+            # The refusal/unresolved answer is ready even if another receipt's
+            # recipient is slow. The normal tick retries this queued delivery.
+            if self.notification_lock.acquire(blocking=False):
+                try:
+                    self.deliver_start_requests()
+                finally:
+                    self.notification_lock.release()
         return out
 
     def halt(self, msg):

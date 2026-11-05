@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import sys
 import threading
+import time
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -172,6 +173,29 @@ def test_restart_recovers_write_that_finished_after_timeout(world, monkeypatch):
     assert len(w.house.agents[w.new].woken) == 1
 
 
+def test_restart_keeps_unresolved_transfer_without_waiting_for_it(world, monkeypatch):
+    w = world
+    original = w.Door.call
+
+    def lose(door, route, line, **kw):
+        if line.startswith('set '):
+            raise TimeoutError('write outcome unknown')
+        return original(door, route, line, **kw)
+
+    monkeypatch.setattr(w.Door, 'call', lose)
+    assert w.b.hand(w.request())['rows'][0]['status'] == 'unresolved'
+    started = time.monotonic()
+    again = B.Builders(w.house, w.b.repo)
+    again.session = w.Door
+    state = again.states[w.s['task']]
+    assert again.row(state)['handoff_status'] == 'unresolved'
+    assert not again.resumable(state)
+    assert 'unresolved' in again.land(w.request())['refused']
+    assert time.monotonic() - started < 1, 'startup waited for the transfer'
+    w.b = again
+    assert_owner(w, w.old)
+
+
 def test_lost_chat_answer_can_retry_without_duplicate_chat_or_card_split(world, monkeypatch):
     w = world
     original = w.Door.call
@@ -236,6 +260,41 @@ def test_notification_failure_keeps_success_and_retries_once(world, monkeypatch)
     assert 'hand_notice' not in w.s
 
 
+@pytest.mark.parametrize('recipient', ['Recipient', 'Missing'])
+def test_hand_receipt_does_not_wait_for_another_notification(world, recipient):
+    w = world
+    finished = threading.Event()
+    results = []
+
+    def request():
+        try:
+            results.append(w.b.hand_request(w.request(recipient=recipient)))
+        finally:
+            finished.set()
+
+    # Another notification can be slow or blocked on an agent. The ownership
+    # result must return while that lock is still held, leaving delivery queued.
+    thread = threading.Thread(target=request, daemon=True)
+    try:
+        with w.b.notification_lock:
+            thread.start()
+            assert finished.wait(2), 'handoff receipt waited for unrelated notification'
+    finally:
+        thread.join(5)
+    assert not thread.is_alive()
+    out = results[0]
+    if recipient == 'Recipient':
+        assert out['rows'][0]['status'] == 'handed'
+        assert 'notification is pending' in out['text']
+        assert_owner(w, w.new)
+        assert w.s.get('hand_notice')
+    else:
+        assert 'not a House agent' in out['refused']
+        assert w.b.request_receipts
+    w.b.deliver_outcomes()
+    assert not w.s.get('hand_notice') and not w.b.request_receipts
+
+
 def test_parallel_hand_and_land_cannot_cross_an_unresolved_write(world, monkeypatch):
     w = world
     reached, release = threading.Event(), threading.Event()
@@ -253,10 +312,11 @@ def test_parallel_hand_and_land_cannot_cross_an_unresolved_write(world, monkeypa
     thread.start()
     try:
         assert reached.wait(5)
+        started = time.monotonic()
         assert w.b.hand(w.request())['rows'][0]['status'] == 'unresolved'
-        assert 'unresolved' in w.b.land(w.request())['refused']
-        assert 'unresolved' in w.b.release(w.request())['refused']
-        assert 'unresolved' in w.b.tell(w.request())['refused']
+        for operation in (w.b.land, w.b.release, w.b.tell, w.b.halt, w.b.retry, w.b.request_review):
+            assert 'unresolved' in operation(w.request())['refused']
+        assert time.monotonic() - started < 1, 'lifecycle fence waited for the transfer'
     finally:
         release.set()
         thread.join(5)

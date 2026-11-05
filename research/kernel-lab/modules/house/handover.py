@@ -74,7 +74,11 @@ def finish(b, state, task):
 def deliver(b, state):
     """Notification failure cannot turn a completed transfer into a refusal."""
     from builders import q
-    with b.notification_lock:
+    # A different notice may still be waiting on an agent. The durable notice
+    # stays queued for the next tick; a hand receipt never waits for that lock.
+    if not b.notification_lock.acquire(blocking=False):
+        return
+    try:
         hand = state.get('hand_notice')
         if not hand:
             return
@@ -99,6 +103,8 @@ def deliver(b, state):
             b.session(hand['person']).call('/do', f'say {hand["chat"]} text={q(note[:3000])}')
         except Exception:
             pass                         # owner delivery succeeded; chat is only a copy
+    finally:
+        b.notification_lock.release()
 
 
 def reconcile(b, state):

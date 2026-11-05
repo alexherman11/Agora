@@ -17,8 +17,9 @@ A deduplicated `make` can return an empty `made` list; that is no longer indexed
 The saved owner changes only after read-back confirms the intended card, run,
 recipient and chat. A failed save leaves the old in-memory authority intact.
 
-An uncertain card write is retained, not replayed. Lifecycle actions and queued
-worker starts are held while its intent is unresolved. Repeating the handoff
+An uncertain card write is retained, not replayed. Lifecycle calls return an
+explicit unresolved refusal; queued worker starts skip that worker. Neither
+waits for the transfer to finish. Repeating the handoff
 with the same recipient reads it back; a different transfer cannot overtake it.
 The ordinary tick and House startup also reconcile a completed write. A write
 that cannot be confirmed remains explicitly unresolved; neither a display name
@@ -30,12 +31,17 @@ refusal. Completion notices to the recipient and caller survive restart;
 notification failure does not undo the transfer or report it as refused.
 Quick refusals remain refusals. Quick successful receipts distinguish completed
 ownership from pending notification. Repeating a completed transfer is harmless.
+Handoff delivery attempts take the shared notification lock without waiting.
+If another notice owns it, the confirmed transfer returns with notification
+pending; refused or unresolved request notices remain queued for the tick.
 This is recovery across two stores, not an atomic transaction between them.
 
 Hidden coverage in `test_handover.py` uses real in-process kernels for the empty
 deduplication receipt, legacy partial handoffs, both lost-write timings, restart
-and failed-save recovery, authority checks, simultaneous hand/land, notification
-retry, and the real ten-second module deadline. No model or native window starts.
+and failed-save recovery, authority checks, prompt refusals from all six lifecycle
+calls during a transfer, startup with an unresolved intent, notification retry
+and lock contention, and the real ten-second module deadline. No model or native
+window starts.
 
 ## Committed definition import (builder draft, dk2393)
 
