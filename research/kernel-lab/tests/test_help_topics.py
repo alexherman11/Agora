@@ -182,3 +182,19 @@ def test_the_front_page_lists_only_the_top_of_each_layered_page(world):
     topics_line = [l for l in say(k, b, 'help')['text'].splitlines() if l.startswith('topics:')][0]
     assert 'wm' in topics_line and 'pool' in topics_line
     assert 'wm-drag' not in topics_line and 'wm-sizes' not in topics_line and 'gestures' not in topics_line
+
+
+def test_a_refused_line_refuses_only_itself(world):
+    """Alex's rule (17 Oct, confirmed 5 Nov): the lines after a refusal still run."""
+    k, a, b = world
+    out = k.run(b, 'make kind=note name=first; nosuchword here; make kind=note name=third')
+    assert out['ok'] is False and 'refused:' in out['text'] and 'not run' not in out['text']
+    assert len(out['made']) == 2                                  # first and third were both made
+
+
+def test_after_a_refusal_new_never_names_something_older(world):
+    k, a, b = world
+    out = k.run(b, 'make kind=note name=older; nosuchword; set $new colour=red')
+    assert out['ok'] is False and out['text'].count('refused:') == 2   # $new refuses rather than reaching "older"
+    older = out['made'][0]
+    assert k.state.get(older, 'colour') is None
