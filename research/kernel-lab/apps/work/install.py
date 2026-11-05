@@ -31,6 +31,7 @@ GRANTS = ("window.surface rows look look-view history components help component-
           "hear:make hear:set hear:forget hear:undo hear:component hear:component-action hear:view "
           "house.active house.who house.activity house.log chat say set hear:say hear:house.doing hear:task-*")
 
+BOARD_GRANTS = GRANTS.replace("house.active", "house.board")
 
 # The two general components Work arranges, beside the catalogue's (components/*.js), with their cards.
 COMPONENTS = {
@@ -46,6 +47,19 @@ COMPONENTS = {
 }
 
 
+# The combined lens reuses Work's components; preserve main's existing settings.
+for _component, _extra in {
+    "work-overview": {"board": {"type": "boolean", "default": False},
+                      "title": {"type": "text", "default": ""}},
+    "work-line": {key: {"type": "text", "default": ""} for key in
+                  ("stateKey", "lead", "executor", "acceptance", "delivery")},
+}.items():
+    _schema = json.loads(COMPONENTS[_component]["settings"])
+    for _key, _value in _extra.items():
+        _schema.setdefault(_key, _value)
+    COMPONENTS[_component]["settings"] = json.dumps(_schema)
+
+
 def components(door):
     import hashlib
     for name, card in COMPONENTS.items():
@@ -56,11 +70,29 @@ def components(door):
             door.say("component " + t)                 # the steward reviews these exact bytes (ARRANGEMENT.md)
 
 
+def combined_widget(door):
+    """Source wiring only until the owner explicitly runs the installer."""
+    mid = painter.upsert(door, "widget", "task-work", title="Tasks & work", style="bars",
+                         component_lens="task-work", code=painter.widget_source())
+    current = door.rows("widget", name="task-work")[0]
+    grants = [g for g in door.rows("grant", to=mid) if not g.get("revoked")]
+    if not current.get("on") or [g.get("words") for g in grants] != [BOARD_GRANTS]:
+        door.say("look " + mid)
+        if current.get("on"):
+            door.say("off " + mid)
+            door.say("look " + mid)
+        door.say("widget " + mid + " surface=window grants=" + Q(BOARD_GRANTS) + " only=kind:work-view")
+    painter.app(door, "task-work", "Tasks & work", "task-work")
+    return mid
+
+
 def install(door):
     out = {}
     components(door)
     text = (HERE / "work.lens").read_text(encoding="utf-8")
     out["lens"] = painter.upsert(door, "lens", "work", title="Work", painter="components", text=text)
+    out["combined_lens"] = painter.upsert(door, "lens", "task-work", title="Tasks & work", painter="components",
+                                         text=(HERE / "task-work.lens").read_text(encoding="utf-8"))
     mid = painter.upsert(door, "widget", "work", title="Work", style="bars", component_lens="work",
                          code=painter.widget_source())
     current = door.rows("widget", name="work")[0]
@@ -74,12 +106,22 @@ def install(door):
     out["widget"] = mid
     if not door.rows("work-view"):
         out["view"] = door.say('make kind=work-view name="Alex\'s work view" sees=me')["made"][0]
+    out["combined_widget"] = combined_widget(door)
     painter.app(door, "work", "Work", "work")
     # What Work hides and says is the world's (4 Nov): seeded once from the House's defaults, then Alex's to change.
     if not door.rows("work-settings"):
         overview = _load("work_overview_defaults", LAB / "modules/house/work_overview.py")
         door.say("make kind=work-settings name=\"Work settings\" "
                  + " ".join(f"{k}={Q(v)}" for k, v in overview.DEFAULTS.items()))
+    # New defaults join the existing House-owned settings; existing values win.
+    board_defaults = _load("task_work_defaults", LAB / "modules/house/task_board.py").DEFAULTS
+    for settings_row in door.rows("work-settings"):
+        additions = {k: v for k, v in board_defaults.items() if k not in settings_row}
+        if additions:
+            door.say("look " + settings_row["id"])
+            door.say("set " + settings_row["id"] + " "
+                     + " ".join(f"{k}={Q(v)}" for k, v in additions.items()))
+        break
     shell = door.rows("shell-settings")
     if shell:
         apps = (shell[0].get("dock_apps") or "lines,help,board,taskboard,appearance,feed").replace(" ", "")
