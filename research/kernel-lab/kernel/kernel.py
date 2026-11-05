@@ -1178,7 +1178,7 @@ class Kernel:
 
     # ------------------------------------------------------------------ the act loop
     def run(self, actor, line, press=None, saw=None, mode="do"):
-        """A whole line: its steps in order, each its own record; stops at the first refusal, naming what did not run.
+        """A whole line: its steps in order, each its own record; a refused step refuses only itself, the rest still run.
         -> {ok, text, rows, records, made}. A refusal or a broken word is kept in `refusals` (refusals.py), once, by
         the outermost run on this thread: a press whose button's line refuses inside is one refusal."""
         depth = getattr(self._local, "runs", 0)
@@ -1238,10 +1238,13 @@ class Kernel:
                 if getattr(exc, "kept", None):
                     # by id only: a member's label and does= line are their words (refusals session, 28 Oct)
                     out["kept"] = f"refused: pressing {pressed_id}: {exc.kept}" if pressed else f"refused: {exc.kept}"
-                if steps[i + 1:]:
-                    texts.append(f"not run: {' | '.join(steps[i + 1:])}")
+                # Alex's rule (17 Oct, confirmed 5 Nov): a refused line refuses only itself; the lines after it still
+                # run. What it would have made never existed, so $new refuses for the rest of this batch rather than
+                # naming something older.
                 out["ok"] = False
-                break
+                last = None
+                handles.pop("new", None)
+                continue
             texts.append(r["text"])
             out["rows"] += r.get("rows", [])
             if r.get("record"):
