@@ -23,6 +23,7 @@ The words answer at once and never wait on a model turn (the kernel gives a modu
     house.who                     who the house runs, and what each is doing         (see)
     house.wake <person> [words]   wake one now, with your words                      (do, outside the world)
     house.stop <person>           end its process; the next call starts it again     (do, outside the world)
+    house.refresh <person>        replace its conversation, retaining its history   (do, stewards)
     house.activity <person>       what it said and did outside any chat              (see)
     house.log <person>            its chat, its acts and its activity, as one log      (see)
 What an agent is doing changing (idle to working, a new act) is announced as the happening house.doing about its
@@ -46,6 +47,7 @@ import sys
 import threading
 import time
 import urllib.request
+import uuid
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -198,6 +200,8 @@ class Agent:
         return self.cfg.get("provider", "claude"), self.cfg.get("model", "claude-opus-5-5"), self.cfg.get("reasoning", "medium")
 
     def doing(self):
+        if getattr(self, "refreshing", False):
+            return "refreshing"
         if self.cfg.get("want", "awake") == "asleep":
             return "asleep"
         if self.state.get("error") and not self.busy:
@@ -252,6 +256,54 @@ class Agent:
             self.log("stop", why)
         self.house.publish()
 
+    def request_refresh(self):
+        """Queue a replacement without making a Lines call wait for process shutdown."""
+        if getattr(self, "refreshing", False):
+            return False
+        with self.lock:
+            if getattr(self, "refreshing", False):
+                return False
+            self.refreshing = True
+            threading.Thread(target=self.refresh, daemon=True, name=f"refresh-{self.name}").start()
+        return True
+
+    def refresh(self):
+        """Keep the old state and append-only transcript; start without a resume id."""
+        with self.lock:
+            try:
+                archive = self.dir / "conversations" / (uuid.uuid4().hex + ".json")
+                archive.parent.mkdir(exist_ok=True)
+                archive.write_text(json.dumps(self.state, indent=1, ensure_ascii=False), encoding="utf-8")
+                if self.child:
+                    self.child.stop()
+                    if self.child.alive():
+                        raise RuntimeError("the old process has not ended")
+                self.child, self.busy, self.turn = None, False, {}
+                # Only conversation context is reset. Cursors, counters, fallback state,
+                # configuration and queued addresses retain their existing meaning.
+                for key in ("session", "system_sha", "next_steps_context", "next_steps_queued",
+                            "last_sent", "last_acts", "error"):
+                    self.state.pop(key, None)
+                self.state["welcome_due"] = "a fresh conversation"
+                self.inbox = self.said_again(self.state.pop("in_flight", None)) + self.inbox
+                self.state["paused"] = list(self.inbox)
+                self.save()                         # durable before any replacement can start
+                self.log("refresh", {"previous_state": str(archive.relative_to(self.dir))})
+                self.house.mark_turn(self, None)
+                self.refreshing = False
+                if self.cfg.get("want", "awake") != "asleep":
+                    if self.inbox:
+                        self._begin()
+                    else:
+                        self.start()                # warm only; welcome/soul are read at the next wake
+            except Exception as exc:                # noqa: BLE001  visible failure, never a silent lost request
+                self.state["error"] = f"could not refresh: {exc}"
+                self.save()
+                self.log("error", self.state["error"])
+            finally:
+                self.refreshing = False
+                self.house.publish()
+
     # ---- waking
     def wake(self, text, chat=None, record=None, card_notes=None, first_record=None):
         """Something addressed to it. Said now if it is free, else at the end of its turn. Never blocks."""
@@ -269,7 +321,7 @@ class Agent:
 
     def _begin(self):
         self.house.refresh_card_signals(self)
-        if self.cfg.get("want", "awake") == "asleep" or not self.inbox:
+        if getattr(self, "refreshing", False) or self.cfg.get("want", "awake") == "asleep" or not self.inbox:
             return
         try:
             # its system prompt (prompt= and charter=) is read at each wake: an edit ends the old process, and the
@@ -330,6 +382,13 @@ class Agent:
             # what this turn was told, until it ends: a House restart in between says it again when it is back
             self.state["in_flight"] = [{k: i[k] for k in ("text", "chat", "record", "first_record", "at", "said_again")
                                         if k in i} for i in items]
+            if "paused" in self.state:
+                # Refresh persists the waiting inbox before replacing its process.
+                # Retire only the messages this new process actually received.
+                if self.inbox:
+                    self.state["paused"] = list(self.inbox)
+                else:
+                    self.state.pop("paused", None)
             signals = {n for i in items for n in i.get("card_signal_notes", [])}
             if signals:
                 self.state["card_signals_seen"] = sorted(set(self.state.get("card_signals_seen", [])) | signals)
@@ -365,11 +424,17 @@ class Agent:
                 log(f"house: {self.name}: {ev.get('e')} failed: {exc!r}")
 
     def _event(self, ev):
+        # Refresh and child replacement share this lock with the identity check.
+        # Otherwise an event can pass the check, wait for refresh, then mutate its successor.
+        with self.lock:
+            self._handle_event(ev)
+
+    def _handle_event(self, ev):
         e = ev["e"]
         source = ev.get("child")
-        if e in ("init", "exit") and source is not None and source is not self.child:
-            # A replaced process (stopped for quota, or restarted) reports late. Its exit must not drop the new one,
-            # or the new one runs on unseen and holds the conversation (JEFF, 28 Oct to 2 Nov 2026).
+        if source is not None and source is not self.child:
+            # No late output, tool receipt, compaction or result from a replaced
+            # process may speak into or change the fresh conversation.
             self.log("stale", {"e": e, "code": ev.get("code")})
             return
         if e == "init":
@@ -1057,6 +1122,14 @@ class House:
                     "rows": [{"person": a.person, "name": a.name, "log": "\n".join(log), "lines": len(log)}]}
         if a is None:
             return {"refused": f"{word} <person>: the house runs {', '.join(x.name for x in self.agents.values()) or 'no one'}"}
+        if word == "house.refresh":
+            caller = (msg.get("caller") or {}).get("person")
+            if not (self.builders.steward(caller) or self.builders.alex(caller)):
+                return {"refused": "house.refresh <person> is for stewards"}
+            requested = a.request_refresh()
+            return {"text": f"{a.name}'s conversation refresh is {'requested' if requested else 'already underway'}; "
+                            "house.who shows its state or any error. History and configuration are kept; "
+                            "its next wake uses fresh context.", "external": True}
         if word == "house.wake":
             by = (msg.get("caller") or {}).get("name") or "someone"
             words = (args.get("words") or "").strip()
@@ -1118,6 +1191,7 @@ class House:
         doing, acts = a.doing(), a.state.get("last_acts", [])
         last = a.state.get("last_turn", "")
         now = {"working": "; ".join(acts[-2:]) or "thinking", "error": a.state.get("error", ""),
+               "refreshing": "replacing its conversation",
                "asleep": "asleep (want=asleep)"}.get(doing) or (f"last turn {last[11:16]}" if last else "not yet woken")
         colour = {"working": "sage", "error": "rose", "idle": "sky"}.get(doing, "paper")     # the card's, in apps/work
         return {"name": a.name, "person": a.person, "id": a.cfg.get("id", ""), "doing": doing, "now": now,
@@ -1171,8 +1245,12 @@ class House:
             with a.lock:
                 waiting = [{k: i[k] for k in ("text", "chat", "at", "said_again") if k in i}
                            for i in a.inbox if not i.get("record")]
-                if waiting:
-                    a.state["paused"] = a.state.get("paused", []) + waiting
+                if "paused" in a.state:
+                    # Refresh may have put a cut-off recorded turn back in the
+                    # inbox, behind a cursor that already consumed that record.
+                    waiting = list(a.inbox)
+                if waiting or "paused" in a.state:
+                    a.state["paused"] = waiting
                     a.save()
             a.stop("off house")
         os._exit(0)
@@ -1243,6 +1321,11 @@ OFFER = [
     {"word": "house.wake", "kind": "do", "takes": "<id> [<words>]", "undo": "external", "may": "members",
      "help": "house.wake <person> [words]: wake an agent now with your words. Usually you need not: saying @name in a "
              "chat, or any line in its closed chat, wakes it. It answers in its own time."},
+    {"word": "house.refresh", "kind": "do", "takes": "<id>", "needs": "kind=person", "undo": "external", "may": "stewards",
+     "help": "house.refresh <person>: end an agent's process and replace its conversation with fresh context. "
+             "The next wake reads its current prompt, charter, welcome, guide and soul. Keeps transcript history, "
+             "configuration and waiting messages; an interrupted turn is said again. A sleeping agent stays asleep. "
+             "Returns when requested; house.who shows its state or any error. Stewards only."},
     {"word": "house.stop", "kind": "do", "takes": "<id>", "undo": "external", "may": "members",
      "help": "house.stop <card>: stop that card's worker mid-turn; it keeps its worktree, and house.tell starts it again "
              "with new words (its owner, a steward or Alex). house.stop <person> (stewards): end an agent's process "

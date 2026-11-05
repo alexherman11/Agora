@@ -96,6 +96,38 @@ JEFF model has picked up a card. After activation, observe a normal task-only
 event and inspect JEFF's activity before calling that acceptance verified.
 No live model trial was run by this worker.
 
+## Fresh conversations on demand (5 November 2026)
+
+Builder implementation for dk2273; landing and live acceptance remain with Pike
+and JEFF. `house.refresh <person>` is an external, steward-only word. It
+requests replacement of that resident's process and conversation. `house.who`
+shows `refreshing` while replacement is underway, then the ordinary process
+state or an error. The request receipt is not proof of successful replacement.
+
+An awake resident gets a new process without `--resume`. An idle resident takes
+no model turn until addressed; an interrupted turn is said again through the
+existing restart message, followed by waiting messages with their chat
+boundaries intact. A sleeping resident stays asleep. The fresh wake reads the
+current `prompt=`, `charter=`, Agent Book welcome, `guide=` and `soul=`. Automatic
+prompt-change restarts still resume their existing conversation; refresh is
+the explicit way to discard its accumulated context.
+
+Refresh changes no `house-agent` facts, credentials, provider settings or other
+residents. Normal provider selection still applies. Cursors, counters and
+fallback state are retained. Before ending the process, its previous state is
+saved in `<house-home>/<resident>/conversations/<unique-id>.json`. The existing
+`transcript.jsonl` remains append-only and records the archive reference;
+provider-managed conversation files are not removed. Pending messages are
+saved before starting the replacement. Failure to preserve state or end the
+old process prevents replacement. Late events from any replaced process,
+including text and final results, cannot affect its successor.
+
+Hidden evidence is in `tests/test_house_refresh.py`: private in-process worlds,
+real Lines dispatch and transport command construction, fake model children.
+This does not establish a live provider's response or Rowan's current soul.
+After landing and House activation, Pike checks a scratch resident; JEFF then
+refreshes Rowan and verifies his next addressed turn against the current soul.
+
 ## Rough spots: a replaced process ended its successor (2 Nov 2026)
 
 *Claude (builder), 2 Nov 2026.* JEFF answered nothing from 28 Oct 22:50 to 2 Nov. At the quota switch the House stopped
