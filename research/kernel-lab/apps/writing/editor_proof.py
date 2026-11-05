@@ -423,8 +423,8 @@ def run(out):
         def long_doc():
             docs = sorted([r for r in door.rows('document') if not r.get('file_source')], key=lambda r: -len(r.get('text') or ''))
             titles = [r.get('title') or '' for r in docs[:40]]
-            picked = w.js('(()=>{const t=' + json.dumps(titles) + ';for(const x of t){const n=[...document.querySelectorAll(".wr-row")].find(r=>r.title===x);'
-                          'if(n){n.setAttribute("data-proof-big","1");return x}}return null})()')
+            picked = w.js('(()=>{const t=' + json.dumps(titles) + ';for(const x of t){const n=[...document.querySelectorAll(".wr-row")].find(r=>r.title===x&&r.getBoundingClientRect().height>0);'
+                          'if(n){n.scrollIntoView({block:"center"});n.setAttribute("data-proof-big","1");return x}}return null})()')
             assert picked, titles[:5]
             big = next(r for r in docs if (r.get('title') or '') == picked)
             t1 = time.time()
@@ -442,6 +442,51 @@ def run(out):
             w.saved(door, big['id'], 15)
             return {'title': big.get('title'), 'characters': len(big.get('text') or ''), 'open s': round(opened, 2), 'keystroke to frame ms': round(lat or 0, 1)}
         w.step('the longest document opens, takes a keystroke in the middle, keeps it, and undoes it', long_doc, 'editor-10-long.png')
+
+        def margin_press():
+            # 5 Nov, Alex: "when navigating in writing, sometimes it just scrolls to the bottom" -- a press in the margin
+            # beside the text counted as below it and sent the caret (and the page) to the end
+            w.js('document.querySelector(".wr-desk").scrollTop=4000')
+            w.settle(300)
+            spot = w.js('(()=>{const d=document.querySelector(".wr-desk"),v=' + V + ',c=v.contentDOM.getBoundingClientRect(),h=innerHeight;'
+                        'const line=[...v.contentDOM.querySelectorAll(".cm-line")].find(l=>{const r=l.getBoundingClientRect();return r.top>h*.4&&r.bottom<h*.7&&l.textContent.trim().length>3});'
+                        'if(!line)return null;const r=line.getBoundingClientRect(),x=Math.max(c.left-24,4),y=(r.top+r.bottom)/2,hit=document.elementFromPoint(x,y);'
+                        'const ln=v.state.doc.lineAt(v.lineBlockAtHeight(y-v.documentTop).from);'
+                        'return {x,y,top:d.scrollTop,line:ln.number,text:ln.text.slice(0,40),dom:line.textContent.slice(0,40),hit:hit&&hit.className}})()')
+            assert spot, 'no visible line in the middle of the window'
+            off = w.p.c.js('(()=>{const r=document.querySelector("iframe").getBoundingClientRect();return {x:r.x,y:r.y}})()')
+            w.press(dict(x=spot['x'] + off['x'], y=spot['y'] + off['y']))
+            w.settle(300)
+            after = w.js('(()=>{const v=' + V + ',l=v.state.doc.lineAt(v.state.selection.main.head);return {top:document.querySelector(".wr-desk").scrollTop,line:l.number,text:l.text.slice(0,40),end:v.state.selection.main.head===v.state.doc.length}})()')
+            assert not after['end'], ('caret went to the end', spot, after)
+            assert abs(after['top'] - spot['top']) < 40, ('the page moved', spot, after)
+            assert after['line'] == spot['line'], ('caret on another line', spot, after)
+            return {'pressed beside line': spot['line'], 'caret line': after['line'], 'scroll before/after': [spot['top'], after['top']], 'target': spot['hit']}
+        w.step('a press in the margin beside a line puts the caret on that line; the page stays where it is', margin_press)
+
+        def own_places():
+            big_title = w.js('document.querySelector(".wr-title").value')
+            top = w.js('document.querySelector(".wr-desk").scrollTop')
+            assert top > 1000, top
+            # a long document this walk has not opened: before 5 Nov it opened at the other's place
+            seen = {big_title, 'Editor walk', 'Shedding clutter', 'Shedding clutter, in short', 'Moving into the desktop'}
+            docs = sorted([r for r in door.rows('document') if not r.get('file_source')], key=lambda r: -len(r.get('text') or ''))
+            titles = [r.get('title') or '' for r in docs[:40] if (r.get('title') or '') not in seen]
+            other = w.js('(()=>{const t=' + json.dumps(titles) + ';for(const x of t){const n=[...document.querySelectorAll(".wr-row")].find(r=>r.title===x&&r.getBoundingClientRect().height>0);'
+                         'if(n){n.scrollIntoView({block:"center"});n.setAttribute("data-proof-other","1");return x}}return null})()')
+            assert other, titles[:5]
+            w.click('[data-proof-other]')
+            w.until(f'(()=>{{const t=document.querySelector(".wr-title");return (t?.value||t?.textContent||"").trim()==={json.dumps(other)}&&!!document.querySelector(".wr-desk .wr-sheet")}})()', 15)
+            w.settle(400)
+            short = w.js('document.querySelector(".wr-desk").scrollTop')
+            assert short < 50, ('a document not opened before opened scrolled', other, short)
+            w.click('.wr-top button[aria-label^="Back"]')
+            w.until(f'document.querySelector(".wr-title")?.value==={json.dumps(big_title)}', 8)
+            w.settle(500)
+            back = w.js('document.querySelector(".wr-desk").scrollTop')
+            assert abs(back - top) < 40, ('the long document lost its place', top, back)
+            return {'long at': top, 'other': other, 'other opened at': short, 'long again at': back}
+        w.step('each document keeps its own place: another opens at its top, Back returns to where you were', own_places)
 
         def no_errors():
             e = errors(page)
