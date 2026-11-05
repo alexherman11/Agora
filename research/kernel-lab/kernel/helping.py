@@ -452,6 +452,14 @@ def answer(k, actor, words, group):
     w = (words or "").split()[0].casefold() if (words or "").strip() else ""
     if not w:
         return start_page(k, actor, group, pool)
+    # help wm drag: a subtopic named or aliased "wm-drag" or "wm drag" answers before the first word alone, so a
+    # layered page can be explored the way it reads (Alex, 5 Nov: explore the help, not a wall of text)
+    rest = (words or "").split()
+    for n in range(len(rest), 1, -1):
+        for joined in ("-".join(rest[:n]), " ".join(rest[:n])):
+            hit = topic_named(k, actor, joined.casefold())
+            if hit:
+                return _topic_page(k, actor, group, hit[0], hit[1], pool)
     if w in ("all", "everything") or (w == "words" and not topic_named(k, actor, w)):
         return all_page(k, actor, group, pool)
     if w == "check":

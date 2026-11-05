@@ -141,3 +141,13 @@ def test_help_pages_fill_live_facts_with_the_readers_own_sight(world):
     assert 'Up to 6 workers' in say(k, b, 'help pool')['text']       # read when shown, never stored
     say(k, a, 'verb tidy steps="look" help="tidy: $.word, one of $[[Pool settings]].workers"')
     assert 'tidy: tidy, one of 6' in say(k, b, 'help tidy')['text']
+
+
+def test_a_subtopic_answers_to_its_words_as_they_read(world):
+    """help wm drag finds the wm-drag page; the first word alone still finds its own page."""
+    k, a, b = world
+    say(k, a, 'make kind=topic name=wm words="look" text="The window manager. Deeper: help wm drag"')
+    say(k, a, 'make kind=topic name=wm-drag words="look" text="Dragging a window."')
+    assert say(k, b, 'help wm drag')['text'].startswith('wm-drag: Dragging a window.')
+    assert say(k, b, 'help wm')['text'].startswith('wm: The window manager.')
+    assert say(k, b, 'help wm nothing-here')['text'].startswith('wm: The window manager.')
