@@ -410,7 +410,7 @@ function playMotion(owner,token){
   P.motion(owner.element,motion);owner.element.dataset.lastMotion=token;
 }
 document.addEventListener('click',e=>{if(menu&&!menu.contains(e.target)&&!e.target.closest('.cardtop'))closeMenu()});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();document.querySelector('.veil')?.remove()}if(e.key.toLowerCase()==='n'&&!e.ctrlKey&&!e.metaKey&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)){e.preventDefault();document.querySelector('[aria-label="Add a task"]')?.focus()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();document.querySelector('.veil')?.remove()}const typing=e.target?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"])')||document.activeElement?.isContentEditable||['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName);const add=!typing&&!e.defaultPrevented&&e.key.toLowerCase()==='n'&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&document.querySelector('[aria-label="Add a task"]');if(add){e.preventDefault();add.focus()}});
 const heard=new Set();
 async function hearMotion(word){if(heard.has(word))return;heard.add(word);await agora.hear(word,event=>{
   for(const owner of componentOwners.values())if(owner.element?.isConnected&&!owner.failed&&Object.hasOwn(owner.node.saw,event.target)){

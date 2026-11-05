@@ -80,6 +80,20 @@ class EditorWalk(Walk):
         c.call('Input.dispatchKeyEvent', type='keyUp', **extra)
         self.frame()
 
+    def type(self, text):
+        """Each character as a key press (down with its text, then up), as a keyboard sends it. Walk.type used
+        Input.insertText, which skips keydown, so a page shortcut that ate a letter went unseen (5 Nov: the n)."""
+        c = self.p.c
+        for ch in text:
+            up = ch.upper()
+            vk = ord(up) if (up.isascii() and up.isalnum()) else (32 if ch == ' ' else 0)
+            code = ('Key' + up) if up.isascii() and up.isalpha() else ('Digit' + ch) if ch.isdigit() else ('Space' if ch == ' ' else '')
+            mods = SHIFT if (ch.isalpha() and ch.isupper()) else 0
+            extra = dict(key=ch, code=code, windowsVirtualKeyCode=vk, nativeVirtualKeyCode=vk, modifiers=mods)
+            c.call('Input.dispatchKeyEvent', type='keyDown', text=ch, unmodifiedText=ch.lower() if mods else ch, **extra)
+            c.call('Input.dispatchKeyEvent', type='keyUp', **extra)
+        self.frame()
+
     def enter(self):
         self.k('Enter', 'Enter', 13, text='\r')
 
@@ -168,6 +182,15 @@ def run(out):
             hist = door.say('edits ' + did)
             return {'end': text[-40:], 'history': hist['text'].split('\n')[0]}
         w.step('typing keeps itself: Saved, and the world\'s text is the editor\'s, with an edit history', typing_saves)
+
+        def every_key():
+            keys = ' abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789 .,;:!?\'"()-_/+=&%$#@~'
+            w.k('End', 'End', 35, CTRL)
+            w.type(keys)
+            got = w.saved(door, did)
+            assert got.endswith(keys), ('lost keys', [c for c in keys if c not in got[-len(keys) - 5:]], got[-120:])
+            return {'typed': len(keys), 'end': got[-40:]}
+        w.step('every letter, digit and mark typed as key presses arrives (5 Nov: n was eaten by a page shortcut)', every_key)
 
         def select_across():
             a, b = w.find('Editor walk') + 2, w.find('two') + 2

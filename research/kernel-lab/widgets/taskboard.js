@@ -71,6 +71,6 @@ async function details(t){
 }
 async function refresh(){if(dragging)return;try{[tasks,[settings]]=await Promise.all([rows('rows taskboard-task'),rows('rows taskboard-settings')]);filter=String(settings?.filter||'all');draw();await agora.describe(`Task board: ${tasks.length} tasks. ${lanes.map(l=>l+': '+tasks.filter(t=>t.lane===l).length).join('; ')}. Filter ${filter}.`)}catch(e){tell(e)}}
 document.addEventListener('click',e=>{if(menu&&!menu.contains(e.target)&&!e.target.closest('.cardtop'))closeMenu()});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();document.querySelector('.veil')?.remove()}if(e.key.toLowerCase()==='n'&&!e.ctrlKey&&!e.metaKey&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)){e.preventDefault();input.focus()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();document.querySelector('.veil')?.remove()}const typing=e.target?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"])')||document.activeElement?.isContentEditable||['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName);if(!typing&&!e.defaultPrevented&&e.key.toLowerCase()==='n'&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();input.focus()}});
 for(const word of ['make','set','forget','undo'])await agora.hear(word,refresh);
 await refresh();
