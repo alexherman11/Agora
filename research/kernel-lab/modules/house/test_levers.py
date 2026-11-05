@@ -107,6 +107,7 @@ def test_land_checks_again_when_main_moved_between_checks_and_landing(manager):
 
 def test_a_reviewed_worker_on_current_main_lands_without_checking_twice(manager):
     s = state(manager, 'reviewed'); s.update(candidate='c1', review_base='main-sha', land_from='reviewed'); calls = []
+    manager.session = lambda _: manager.fixture_door   # landing rereads card suite requirements
     manager.git = lambda cwd, *a: 'main-sha'
     manager.review = lambda st: calls.append('review')
     manager.publish = lambda st: calls.append('publish')

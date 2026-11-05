@@ -1219,12 +1219,16 @@ OFFER = [
     {"word": "house.build", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "members",
      "help": "house.build <task> [with=claude|codex]: claim a ready task and start a worker on it in your charge (Codex unless with=claude), within that kind's pool (four each by default). Uses your existing agent session; never creates credentials. Result receipt is not task completion."},
     {"word": "house.review", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "members",
-     "help": "house.review <task>: independently check a received committed result against current main, including hidden desktop checks. Does not land or close it."},
+     "help": "house.review <task>: independently check a received result against current main. Runs the House baseline "
+             "and the card's test_suites JSON list: {name, runner: pytest|python|node, paths: [worktree-relative paths], "
+             "timeout: seconds, desktop: boolean}. Desktop scripts must use the guarded hidden desktop; the gaming "
+             "gate runs first. Each suite has a named result and evidence. Does not land or close the card."},
     {"word": "house.land", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "members",
      "help": "house.land <task>: one step. The House commits what the worker left, runs the checks, lands it on main "
              "and switches it on (restarts what it touched; a change to the House itself restarts the House once "
              "nobody is busy). You hear once, when it is live or what stopped it. One landing at a time; the next "
-             "waits its turn."},
+             "waits its turn. Runs the card's test_suites as well as the baseline, reports every result, and checks "
+             "again if its suite definition changed since review (see help house.review)."},
     {"word": "house.release", "kind": "do", "needs": TASK_NEEDS, "takes": "<id> [<why>]", "undo": "external", "may": "members",
      "help": "house.release <task> [why]: the card's worker ends for good (stopped first if running). Its worktree and "
              "branch are kept; the card is free for a new worker. Its owner, a steward or Alex may release it."},
