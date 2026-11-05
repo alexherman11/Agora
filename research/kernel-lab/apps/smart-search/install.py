@@ -17,16 +17,16 @@ spec.loader.exec_module(painter)
 # Requested activation manifest, not executed by install(). No writes or launch
 # of native executables; ordinary window host still checks the viewer's rights.
 REQUIRED_GRANTS = ("window.surface rows look look-view history components help component-health component-action "
-                   "search window.open hear:make hear:set hear:forget hear:undo hear:component hear:component-action")
+                   "search window.open hear:make hear:set hear:forget hear:undo hear:component hear:component-action hear:view")
 
 
 def install(door):
     source = (HERE / "lexical.js").read_text(encoding="utf-8")
     cid = painter.upsert(door, "component", "smart-search", category="collections",
-        purpose="Apps and World text search: word matches and source evidence only.",
+        purpose="Apps and World text search: word matches, source evidence, and opening apps.",
         settings="{}", parts='{"body":{"facts":"caller-visible search results"}}', slots="[]",
-        gestures="evidence", example="root : smart-search", uses="Kernel search and caller-visible source evidence",
-        limitations="Word matches only; up to 50 results before supported-kind/source filters. Capabilities unverified. Files, Email and Web disconnected. No inference.",
+        gestures="evidence open", example="root : smart-search", uses="Kernel search and caller-visible source evidence",
+        limitations="Word matches only; up to 50 results before supported-kind/source filters. Opens only apps whose line is one window.open. Files, Email and Web disconnected. No inference.",
         code=source)
     # House must review exact code hash, then activate separately.
     lens = painter.upsert(door, "lens", "smart-search", title="Search",
