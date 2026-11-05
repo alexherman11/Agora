@@ -310,9 +310,9 @@ class FullscreenController(unittest.TestCase):
         self.assertNotIn(('minimise','request'),self.native.calls)
         self.assertTrue(valid(self.m.state))
 
-    def test_exclusive_unknown_pin_and_dialog_refuse_without_native_actions(self):
+    def test_unavailable_unknown_pin_and_dialog_refuse_without_native_actions(self):
         self.setup_case()
-        for reason in ('notification gate 3', 'notification gate 7',
+        for reason in ('notification gate 1', 'notification gate 7',
                        'notification state unavailable', 'process inspection failed'):
             self.gates[:] = [reason]
             result = self.dispatch('wm.restore', 'music', share='yes')
@@ -340,7 +340,7 @@ class FullscreenController(unittest.TestCase):
         # A second explicit request is a separate synthetic case, not a native retry.
         self.setup_case(new=True)
         self.dispatch('wm.arrange', expect=self.music['exe'])
-        self.gates[:] = ['notification gate 3']
+        self.gates[:] = ['notification gate 1']
         self.m.gate_cache = (None, -1)
         self.native.rows.append(self.music)
         self.tick()
