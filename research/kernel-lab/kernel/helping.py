@@ -368,7 +368,10 @@ def start_page(k, actor, group, pool):
         lines = [_who(k, actor), START, "", "words worth knowing:"] + _listing(k, actor, found, group)
         lines.append("help <anything> helps with that: help windows · help theme · help window.open · help all")
         page = {"text": "\n".join(lines), "rows": []}
-    names = [n for _, a in topics(k, actor) if (n := a.get("name")) and n != "start"]
+    # only the top of each layered page: a subtopic (under=<topic>, or named <topic>-<more>) is found from its page
+    tops = {str(a.get("name", "")).casefold() for _, a in topics(k, actor)}
+    names = [n for _, a in topics(k, actor) if (n := a.get("name")) and n != "start" and not a.get("under")
+             and not ("-" in n and n.casefold().rsplit("-", 1)[0] in tops)]
     mods = [k.state.get(m, "name") for m in k.things("module") if k.shown(actor.person, m) is not None
             and _matching(pool, f"{k.state.get(m, 'name')}.*")]
     more = list(dict.fromkeys(names + [m for m in mods if not topic_named(k, actor, m)]))

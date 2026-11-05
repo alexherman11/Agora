@@ -172,3 +172,13 @@ def test_an_at_name_ending_a_sentence_still_calls(world):
     chat = say(k, a, 'make kind=chat name=Lobby')['made'][0]
     line = say(k, a, f'say {chat} text="thanks @Bea."')['made'][0]
     assert k.state.get(line, 'to') == b.person
+
+
+def test_the_front_page_lists_only_the_top_of_each_layered_page(world):
+    k, a, b = world
+    for name in ('wm', 'wm-drag', 'wm-sizes', 'pool'):
+        say(k, a, f'make kind=topic name={name} words="look" text="page {name}"')
+    say(k, a, 'make kind=topic name=gestures under=wm words="look" text="page gestures"')
+    topics_line = [l for l in say(k, b, 'help')['text'].splitlines() if l.startswith('topics:')][0]
+    assert 'wm' in topics_line and 'pool' in topics_line
+    assert 'wm-drag' not in topics_line and 'wm-sizes' not in topics_line and 'gestures' not in topics_line
