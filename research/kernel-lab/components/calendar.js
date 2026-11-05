@@ -1,3 +1,66 @@
+// BEGIN SHARED ACTION FEEDBACK
+// Shared component-local feedback; bundled into each importing component.
+// No widget primitive, world write, persisted content or unqualified undo.
+function actionFeedback(api) {
+  const host=globalThis[Symbol.for('agora.action-feedback.v2')]??=
+    {entries:new Map(),scopes:new Map(),listeners:new Set(),serial:0};
+  const scope=(view,keys)=>JSON.stringify(Object.fromEntries(
+    (keys?keys.split(/\s+/):Object.keys(view)).filter(k=>k&&!/Notice$/.test(k)).sort().map(k=>[k,view[k]??''])));
+  const emit=()=>{for(const fn of [...host.listeners])fn()};
+  const current=entry=>entry&&entry.scope===scope(api.view(),entry.keys);
+  const clear=()=>{host.entries.clear();emit()};
+  const feedback={
+    observe(key,keys,draw){
+      host.scopes.set(key,keys);
+      const old=host.entries.get(key);
+      if(old&&!current(old))host.entries.delete(key);
+      // Register the authored scope even before the first action.
+      if(!host.entries.has(key))host.entries.set(key,{keys,scope:scope(api.view(),keys)});
+      const listener=()=>draw(feedback.get(key));
+      host.listeners.add(listener);api.cleanup(()=>host.listeners.delete(listener));listener();
+    },
+    get(key='actionNotice'){
+      const entry=host.entries.get(key);
+      if(!current(entry)){host.entries.delete(key);return null}
+      return entry?.notice||null;
+    },
+    begin(text,key='actionNotice'){
+      const keys=host.scopes.get(key),token={id:++host.serial,key};
+      host.entries.set(key,{keys,scope:scope(api.view(),keys),notice:{text,pending:true,token}});
+      emit();return token;
+    },
+    finish(token,result,text,extra={}){
+      const entry=host.entries.get(token.key);
+      if(!current(entry)||entry.notice?.token!==token)return false;
+      entry.notice={text,record:result?.records?.at(-1)||'',token,...extra};emit();return true;
+    },
+    fail(token,error){return feedback.finish(token,null,String(error?.message||error))},
+    dismiss(key='actionNotice'){const entry=host.entries.get(key);if(entry){delete entry.notice;emit()}},
+    clear,
+    async run(event,values,text,key='actionNotice'){
+      const token=feedback.begin(api.label('pending','Working…'),key);
+      try{const result=await api.fire(event,values);feedback.finish(token,result,text);return result}
+      catch(e){feedback.fail(token,e);throw e}
+    },
+    select(values){
+      const next={...api.view(),...values};
+      for(const entry of host.entries.values()){
+        if(entry.scope!==scope(next,entry.keys)){clear();break}
+      }
+      return api.select(values);
+    }
+  };
+  return feedback;
+}
+function feedbackAPI(api){
+  const feedback=actionFeedback(api);
+  const wrapped={};
+  for(const key of Object.keys(api))if(key!=='select'&&key!=='feedback')
+    Object.defineProperty(wrapped,key,{enumerable:true,get:()=>api[key]});
+  return Object.assign(wrapped,{feedback,select:feedback.select});
+}
+
+// END SHARED ACTION FEEDBACK
 // A shared calendar: month and week over any dated things arranged as its children.
 // Each child's facts give start (ISO time), optional end, title, a place, text, and
 // optionally going/maybe counts, coming/maybe_coming names and your_rsvp. Where it
@@ -7,7 +70,8 @@
 //   on rsvp do … $target status=$value        (value = going | maybe)
 // Without an add or rsvp gesture those controls are simply not offered.
 export default {css:`
-.cal{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,300px);gap:var(--nb-space-4,16px);color:var(--ink,#303d37);font-size:var(--nb-small,14px);line-height:1.4}
+.cal-container{container-type:inline-size;container-name:calendar;min-width:0}
+.cal{display:grid;grid-template-columns:minmax(0,1fr) minmax(var(--calendar-agenda-min,240px),var(--calendar-agenda-max,300px));gap:var(--nb-space-4,16px);color:var(--ink,#303d37);font-size:var(--nb-small,14px);line-height:1.4}
 .cal[data-view=week]{grid-template-columns:minmax(0,1fr)}
 .cal button{font:inherit;color:inherit;cursor:pointer}
 .cal-head{grid-column:1/-1;display:flex;align-items:center;flex-wrap:wrap;gap:var(--nb-space-2,8px)}
@@ -59,9 +123,10 @@ export default {css:`
 .cal-form-actions{display:flex;gap:var(--nb-space-2,8px);align-items:center}
 .cal-form-actions .cal-add{margin-left:0}
 .cal-status{color:#8a3b2a;font-size:var(--nb-tiny,12px);margin:0}
-@media (max-width:820px){.cal{grid-template-columns:minmax(0,1fr)}.cal-day{min-height:64px}.cal-week{grid-template-columns:minmax(0,1fr)}.cal-col{min-height:0}.cal .cal-rsvp button{min-height:40px}}
-@media (max-width:560px){.cal .cal-chip{font-size:0;height:6px;padding:0;border-left:0;background:var(--nb-kind-event,#315d86);border-radius:3px}.cal .cal-chip[data-yours=going]{background:var(--accent,#315f52)}.cal-day{padding:4px 3px;align-items:center}}
+@container calendar (max-width:820px){.cal{grid-template-columns:minmax(0,1fr)}.cal-day{min-height:64px}.cal-week{grid-template-columns:minmax(0,1fr)}.cal-col{min-height:0}.cal .cal-rsvp button{min-height:40px}}
+@container calendar (max-width:560px){.cal .cal-chip{font-size:0;height:6px;padding:0;border-left:0;background:var(--nb-kind-event,#315d86);border-radius:3px}.cal .cal-chip[data-yours=going]{background:var(--accent,#315f52)}.cal-day{padding:4px 3px;align-items:center}.cal-dow{padding:6px 0;text-align:center;letter-spacing:0}}
 `,mount(api,s){
+  api=feedbackAPI(api);
   const {P}=api,L=api.label,v=api.view(),node=api.node;
   const has=event=>node.gestures.some(g=>g.event===event);
   const pad=n=>String(n).padStart(2,'0'),ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
@@ -80,6 +145,7 @@ export default {css:`
   const go=values=>api.select(values).catch(api.tell);
   const choose=(d,extra={})=>{go({calendarDate:ymd(d),...extra});if(has('select'))api.fire('select',{value:ymd(d)}).catch(api.tell)};
   const root=api.part('body','section',{class:'cal','data-view':mode,'aria-label':L('label',s.label||'Calendar')});
+  const container=api.part('container','div',{class:'cal-container'},root);
 
   // Header: where you are, step back/forward, today, month|week, add.
   const title=mode==='month'?day.toLocaleDateString(locale,{month:'long',year:'numeric'})
@@ -107,7 +173,7 @@ export default {css:`
     const row=P.node('div',{class:'cal-rsvp'});
     if(has('rsvp')&&e.id)for(const [status,label] of [['going','Going'],['maybe','Maybe']]){
       const b=P.press(L(status,label),async()=>{if(e.your_rsvp===status)return;b.disabled=true;
-        try{await api.fire('rsvp',{target:e.id,value:status})}catch(err){api.tell(String(err.message||err).replace(/^refused:\s*/,''))}finally{b.disabled=false}},'');
+        try{await api.feedback.run('rsvp',{target:e.id,value:status},L('rsvpsaved','Attendance saved.'))}catch(err){api.tell(String(err.message||err).replace(/^refused:\s*/,''))}finally{b.disabled=false}},'');
       b.setAttribute('aria-pressed',String(e.your_rsvp===status));b.dataset.rsvp=status;row.append(b)}
     if(s.openKey&&e.id)row.append(P.press(L('open','Open conversation'),()=>go(Object.fromEntries(String(s.openKey).split(/\s+/).filter(Boolean).map(key=>[key,e.id]))),'cal-open'));
     if(row.children.length)c.append(row);
@@ -179,5 +245,5 @@ export default {css:`
       if(has('add'))side.append(P.press(L('addday','＋ Add an event this day'),()=>go({calendarAdd:'yes'}),'cal-soft'))}
   }
   if(side.children.length)root.append(side);
-  return root;
+  return container;
 }};

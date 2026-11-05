@@ -236,6 +236,55 @@ selection-only control, a keyboard-callable `quote` action, and `dispose` for
 `api.cleanup`; authors arrange a More-menu fallback. Committing the action clears
 the consumed browser selection; merely selecting text does not act. It adds no word authority.
 
+`input, commit submit, submitLabel "Send"` emits **submit** only on non-IME Enter
+or its button. It never sends on blur, ignores blank/pending submissions, retains
+refused drafts and clears only successfully sent text. Arrange `on submit do ...`
+with `$value`. Default `commit=change` retains the existing change gesture.
+This works for a quick-add field, a search command or a chat draft; it is not a
+board-specific input.
+
+Feed, file reader and Work keep `pageBounds(total, size, page)` inside their
+component modules. It clamps the zero-based page and disables unavailable
+previous/next controls, including empty and one-page collections. They require
+no change to painter widget code or grants.
+
+Board and map components publish from checked-in `board-components.bundle.js`
+and `map-components.bundle.js`: each component imports one file into its code
+fact. The board file includes its CSS; the map file includes its engine and
+worker definitions. Builders regenerate these files before landing with
+`research/community-app/board/build_component_bundles.py`; `--check` detects
+stale artifacts without writing. Publication never assembles bundles or patches
+the top bar, dock or other widgets.
+
+The shared calendar wraps its grid in the `container` part, an inline-size
+container named `calendar`. Its breakpoints measure that part, including inside
+a split layout, rather than the desktop viewport. Agenda width uses world style
+tokens `calendar-agenda-min` and `calendar-agenda-max`; normal paper/ink/spacing
+tokens still apply.
+
+`file, quoteMode inline, replyTarget <post>, replyLabel "Discussion"` keeps the
+quoted passage, page and response in a visible draft in that reader. Arrange
+`on reply do ... $target $fields`; fields are `text`, `quote`, `source`, `page`,
+with a fresh target revision. `startLabel` names the destination when there is
+no existing reply target. Without a target, an authored **start** gesture
+receives `$group` (replyGroup or the bound row's first group) and `$fields`
+containing title and text with the quote and file link. Its returned first made
+thing becomes the local reply target for later quotes. Selection never sends;
+the explicitly labelled send button does. Failures keep the draft. No authored
+destination shows an unavailable explanation. Existing `quoteMode=thread`
+keeps the containing thread workflow; shared right-click Comment is unchanged.
+
+Post-kind metadata `compose_fields_first=yes` and `compose_message_rows=3`
+arranges declared details before the message and chooses its initial height in
+the shared composer. It works for any kind. The submit footer stays reachable
+while the dialog scrolls, styled with the existing world tokens.
+
+`map-layers, collapsed yes` starts folded with its Show/Hide layers button inside
+the panel, including narrow windows. An explicit toggle persists for that
+mounted part. Labels `showlayers`, `hidelayers`, `onmap`, `withoutlocation` are
+world-configurable; layer names come from map-layer things, never app-specific
+name matching in the renderer.
+
 `api.fire(event, {…values, select:{…localView}})` applies a local view selection
 after word admission succeeds and before the first resulting repaint. Use it
 to dismiss a one-action dialog atomically with its successful action. Refusal
@@ -414,3 +463,52 @@ For component authors:
   `.wr-page:has(>.wr-margin[data-shut]){grid-template-columns:minmax(0,1fr)}`.
 
 This replaced the 40px fold strip (`fold <label>`, `P.fold`) from earlier the same day, which was never committed.
+# Receipt outcomes and local selection (4 November, round 2 builder draft)
+
+`components for="action result"` / `help action-notice` describe the reusable
+receipt notice. Arrange it beside actions whose rows may disappear:
+
+```text
+root : column
+  outcome : action-notice, stateKey actionNotice, scopeKeys "channel thread"
+    on undo do undo $value
+  done : button, label "Mark done", completionText "Marked done."
+    on press do set $view.target done=yes
+```
+
+The bundled `actionFeedback` helper publishes pending feedback synchronously,
+before admission or a world reread. Its component-local channel holds a navigation
+scope and unique action token, followed by the exact returned receipt.
+`scopeKeys` names the view fields that define navigation (empty means all).
+Components use `feedbackAPI(api).select` for navigation: it clears notices and
+invalidates pending completions immediately. Undo checks the current scope and
+token again before firing the authored gesture with that exact receipt.
+Legacy JSON notices in view state are ignored. Refused Undo retains recovery
+and displays the reason; an older completion cannot replace a newer outcome.
+`noticeKey` on button and `stateKey` on notice select another local channel.
+Pending button presses cannot repeat.
+
+For local navigation, a button's `selectKey="thread replyTo"` assigns its `value`
+to each named view key without a world write. Choice uses `selectKey` for one
+key, or its original authored `change` gesture when absent.
+Both Work arrangements demonstrate reuse with a real Mark done action:
+`work-line` emits `done`, the lens authors `set $item lane=Done`, and
+`action-notice stateKey workNotice` reverses its exact receipt. Work filters
+only navigate; they no longer manufacture completion notices.
+
+The canonical helper is `components/action-feedback.js`; the repository bundle
+builder embeds it in complete component artifacts. There is no publication-time
+assembly and no widget-runtime dependency. Help is generated from the
+`action-notice` entry in `painter/catalogue.py`.
+
+These are components and world arrangements, with no new widget primitive,
+grant or tiling engine. The notice exposes body/message/undo/dismiss parts,
+labels `undo`, `undone`, `dismiss`, and `notice-*` theme tokens for spacing,
+colour and shape. It never sends a message. Shared right-click Comment remains
+the existing host interaction mechanism.
+
+Painter subscription hints are optional: a refused hear no longer prevents
+the first authorised reading from painting. A screen-local component-health
+observation records the limitation, and normal reconciliation continues.
+This runtime fix affects newly assembled painter widgets; updating component
+code alone cannot patch an already stored widget runtime.

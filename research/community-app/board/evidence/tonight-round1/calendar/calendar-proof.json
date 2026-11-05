@@ -1,0 +1,27 @@
+{
+  "checks": [
+    {
+      "check": "install_ui brings opens=calendar onto an installed channel",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "install_ui brings the event kind default seats",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "The board lens inherits the shared right-click ask menu",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "The calendar is a reviewed component card in the gallery",
+      "ok": true,
+      "detail": null
+    }
+  ],
+  "screenshots": [],
+  "hidden": true,
+  "live_touched": false
+}

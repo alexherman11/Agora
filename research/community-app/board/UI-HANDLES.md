@@ -177,3 +177,48 @@ only when that channel has something new for you; otherwise the part is hidden. 
 post (for a busy thread, its oldest unseen reply), which the thread pane outlines and scrolls to once.
 *Mark all seen* in a channel writes that channel's marker (`board.seen in=<group>`), leaving other channels'
 news alone. Your own posts are never news to you; channel unread counts use the same markers.
+# Round 2 handles (4 November, builder draft; not live yet)
+
+The composer selects kind declarations whose `compose_scope` matches its
+`kindScope` setting (default `board`). Give a neighbour-made post kind
+`compose_scope=board`; map-only kinds have no matching scope. No component edit
+is required to add another declared kind. Inputs use the kind's `defaults`,
+`required`, labels and types. Event capacity uses its existing world default
+and is optional in the form.
+The event count only shows places left when its facts contain a positive
+`seats` limit; the existing world default remains 500. This is not an
+unlimited-RSVP change. A person's own offer has a disabled Take a place action
+with an inline explanation.
+
+The shared `action-notice` component displays receipt-specific Undo after
+map moves, RSVP, claims, private board actions and ask completion. It survives
+the acted-on row leaving a list. Its `stateKey`/button `noticeKey` allows
+separate arrangements to retain separate outcomes. No global Ctrl+Z binding
+is claimed. `scopeKeys` defines the navigation boundary. Navigation clears
+feedback; stale tokens and stale Undo buttons cannot act. Pending notices
+paint synchronously before admission. Legacy JSON view notices are ignored.
+Work Mark done reuses this component with an actual task-state receipt and Undo.
+
+Asks uses the existing choice/button components for side/status filtering and
+the shared thread component for replies. `board-thread.threadKey` and
+`replyKey` default to `thread`/`replyTo`; the Asks arrangement uses
+`asksThread`/`asksReplyTo`. Fact-backed text-block children can supply its
+visible source and replies. Drafts survive admission rereads, pending sends
+cannot repeat, failures retain text, and success does not erase newer typing.
+
+Board search has an explicit Search button as well as Enter. Its field follows
+the active query after leaving results; result dates use the existing authored
+`short-relative` format. Dialogs name their action. Summary requests report
+pending, slow, success and failure states; they run only after an explicit
+press. Fixture checks must stub the model before opening any browser.
+An offline or refused model status leaves Summarise visible but disabled with
+a not-available reason. A pending request that has not answered reports that
+explicitly and stays guarded against repeat submissions.
+
+Document upload exposes `drop`, `choose`, `picker` and `status` parts. The drop
+surface groups one native Choose files button and the hidden picker. A
+single-page document reader omits previous/next/page-picker controls.
+
+The shared host menu now names untitled text by a readable excerpt and keeps
+the actual target in the link. Selection alone still does nothing; right-click
+Comment uses the same host Conversation mechanism.

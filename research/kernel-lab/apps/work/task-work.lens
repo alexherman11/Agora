@@ -1,4 +1,7 @@
 # Additive combined board. Work and Task board keep their existing lenses.
 root : work-overview, board true, title "Tasks & work"
+  notice : action-notice, stateKey workNotice, scopeKeys "workFilter workPage"
+    on undo do undo $value
   rows : column, of reading:"house.board" as t, each work-line
 work-line : work-line, title $t.title, owner $t.owner, lead $t.lead, executor $t.executor, state $t.state, stateKey $t.state_key, blocker $t.blocker, resolver $t.resolver, detail $t.detail, next $t.next_action, acceptance $t.acceptance, delivery $t.delivery
+  on done do set $item lane=Done

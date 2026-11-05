@@ -1,11 +1,13 @@
 root : map-shell, title "Seabright"
-  map : geo-map, map Seabright
+  notice : action-notice, scopeKeys "target"
+    on undo do undo $value
+  map : geo-map, map Seabright, routes yes
     watch reading:"map.layers Seabright"
     on put do map.add $place kind=$kind $fields
     on move do set $thing lat=$lat lon=$lon
     on resume do component-action seabright-map path=root/map action=clear
   search : map-search, map Seabright
-  inspect : map-inspector, map Seabright
+  inspect : map-inspector, map Seabright, routes yes
     watch reading:"map.layers Seabright"
     on put do map.add $place kind=$kind $fields
     on adopt do map.adopt $place lat=$lat lon=$lon name=$name
@@ -17,7 +19,7 @@ root : map-shell, title "Seabright"
   plan : map-route, map Seabright
     only when $view.tool = route
     on route do map.route name=$name stops=$stops mode=$mode map=Seabright
-  layers : map-layers, map Seabright
+  layers : map-layers, map Seabright, collapsed yes
     watch reading:"map.layers Seabright"
     on hide do map.hide $layer map=Seabright
     on unhide do map.unhide $layer map=Seabright

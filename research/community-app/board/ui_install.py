@@ -82,6 +82,12 @@ def install_ui(door):
         'decision':('Share a decision','Let neighbours know what was agreed.','✓')}
     defaults={'discussion':'','question':'','announcement':'until','event':'','poll':'','ask':'closes','offer':'closes','document':'','decision':''}
     for kind in door.rows('kind'):
+        # Neighbour-authored post kinds (e.g. Lost pet) declare fields too.
+        # Other apps must declare their own compose_scope before this migration.
+        if (kind.get('name') in compose or 'fields' in kind) and not kind.get('compose_scope'):
+            door.say('look '+kind['id']);door.say(line('set',kind['id'],compose_scope='board'))
+        if kind.get('name')=='event' and 'seats' in kind.get('required','').split():
+            door.say('look '+kind['id']);door.say(line('set',kind['id'],required=' '.join(k for k in kind['required'].split() if k!='seats')))
         if kind.get('name') in compose and not kind.get('accent'):
             door.say('look '+kind['id']);door.say(line('set',kind['id'],accent='nb-kind-'+kind['name']))
         if kind.get('field_labels'):
@@ -90,7 +96,7 @@ def install_ui(door):
                 if labels.get(key)==old:labels[key]=new;changed=True
             if changed:
                 door.say('look '+kind['id']);door.say(line('set',kind['id'],field_labels=json.dumps(labels)))
-        if not kind.get('compose_label'):
+        if not kind.get('compose_label') and (kind.get('compose_scope')=='board' or kind.get('name') in compose or ('fields' in kind and not kind.get('compose_scope'))):
             label,description,icon=compose.get(kind.get('name'),(kind.get('name','Post'),'Share this with your neighbours.','✦'))
             door.say('look '+kind['id']);door.say(line('set',kind['id'],compose_label=label,compose_description=description,compose_icon=icon))
         if kind.get('name') in defaults and 'card_fields' not in kind:
@@ -103,8 +109,7 @@ def install_ui(door):
             words={'start':'Starts','end':'Ends','closes':'Sign-ups close','until':'Show until','seats':'Places available','location':'Meeting place','place':'Link to a place','options':'Choices (one word each)'}
             labels={key:words.get(key,key.replace('_',' ').capitalize()) for key in fields}
             door.say('look '+kind['id']);door.say('set '+kind['id']+' field_types='+Q(json.dumps(types))+' field_labels='+Q(json.dumps(labels)))
-    code=(HERE/'board-components.js').read_text(encoding='utf-8')
-    code=code.replace('export default {mount', 'export default {css:'+json.dumps((HERE/'board-theme.css').read_text(encoding='utf-8'))+',mount')
+    code=(HERE/'board-components.bundle.js').read_text(encoding='utf-8')
     import hashlib
     for card in cards():
         name=card.pop('name')
@@ -118,8 +123,9 @@ def install_ui(door):
         if name=='board-shell':schema.update(title=T(default='Seabright'),subtitle=T(default='The neighbourhood board'),extras=T(default='feed'))
         if name=='board-post':schema.update(layout=T(default='compact'),detail=T('boolean',False),excerptLines=T('number',3),stamp=T(),date=T(),initials=T())
         if name=='board-entry':schema.update(stamp=T())
+        if name=='board-thread':schema.update(threadKey=T(default='thread'),replyKey=T(default='replyTo'))
         if name=='board-catchup':schema.update(previewCount=T('number',3))
-        if name=='board-composer':schema.update(advancedFields=T(default='closes place'))
+        if name=='board-composer':schema.update(advancedFields=T(default='closes place'),kindScope=T(default='board'))
         tid=upsert(door,'component',name,category='community',purpose=purpose,settings=json.dumps(schema),
                    parts=json.dumps({p:dict(facts='bound visible row') for p in parts.split()}),slots=json.dumps(slots.split()),
                    gestures=gestures,example=f'root : {name}',uses='Community board; feed; neighbourhood',
@@ -129,6 +135,10 @@ def install_ui(door):
     # Each channel's own view and each kind's defaults are world data from definitions.json,
     # brought onto an already-installed world here (a fresh world gets them from install).
     data=json.loads((HERE/'definitions.json').read_text(encoding='utf-8'))
+    for definition in data['kinds']:
+        for kind in door.rows('kind',name=definition['name']):
+            changes={key:definition[key] for key in ('compose_fields_first','compose_message_rows') if key in definition and kind.get(key)!=definition[key]}
+            if changes:door.say('look '+kind['id']);door.say(line('set',kind['id'],**changes))
     for definition in data['channels']:
         for channel in door.rows('board-channel',title=definition['name']):
             changes={k:definition[k] for k in ('opens','opens_label') if k in definition and channel.get(k)!=definition[k]}

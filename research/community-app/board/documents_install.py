@@ -25,8 +25,8 @@ PARTS = {
                          'body heading', 'tools upload phone listing', ''),
     'document-toolbar': ('Folder path and folder creation for any document library.',
                          'body breadcrumbs name status', '', 'folder'),
-    'document-upload': ('Computer picker and drag-drop upload through the guarded files door.',
-                        'body picker drop status', '', 'store attach'),
+    'document-upload': ('Drop files or use one Choose files button through the guarded files door.',
+                        'body picker drop choose status', '', 'store attach'),
     'document-list': ('A reading-backed collection of folders and document entries.',
                       'body empty', 'entries', ''),
     'document-entry': ('Named folder or file, rename, move, post source and preview slot.',
@@ -46,9 +46,7 @@ def install_documents(door):
         raise ValueError('Install the board channels before its document library.')
     library = upsert(door, 'document-library', 'seabright-documents',
                      title='Research & documents', **{'in': channel})
-    source = (HERE / 'document-components.js').read_text(encoding='utf-8')
-    source = source.replace('export default {mount', 'export default {css:' +
-                            json.dumps((HERE / 'documents.css').read_text(encoding='utf-8')) + ',mount')
+    source = (HERE / 'document-components.bundle.js').read_text(encoding='utf-8')
 
     def component(name, code, **card):
         tid = upsert(door, 'component', name, code=code, **card)
@@ -67,6 +65,7 @@ def install_documents(door):
         schema = dict(labels=T(default='{}'), library=T('fact'))
         if name == 'document-library':
             schema['title'] = T(default='Research & documents')
+            schema['showHeading'] = T('boolean', True)
         component(name, source, purpose=purpose, category='files', settings=json.dumps(schema),
                   parts=json.dumps({p: dict(facts='bound visible row') for p in parts.split()}),
                   slots=json.dumps(slots.split()), gestures=gestures,

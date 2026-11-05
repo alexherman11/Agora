@@ -55,7 +55,7 @@ def test_rsvp_toggle_keeps_one_seat():
     # The broad suite has other legacy modules named "install". Keep this
     # integration world in its own interpreter, just like the board proofs.
     import subprocess
-    pinned=Path(__file__).resolve().parents[3]/'.venv/Scripts/python.exe'
+    pinned=Path('C:/Projects/Agora4/.venv/Scripts/python.exe')
     result=subprocess.run([str(pinned),'-B',__file__,'--rsvp-probe'],capture_output=True,text=True,timeout=45)
     assert result.returncode==0,result.stdout+result.stderr
 

@@ -1,26 +1,39 @@
 // Reviewed presentation only. Arrangements own bindings and world-word gestures.
+// Local to this component module: existing widget runtimes need no upgrade.
+function pageBounds(total,size,page=0){
+  total=Math.max(0,Math.floor(Number(total)||0));size=Math.max(1,Math.floor(Number(size)||1));
+  const pages=Math.max(1,Math.ceil(total/size));
+  page=Math.max(0,Math.min(pages-1,Math.floor(Number(page)||0)));
+  return {page,pages,start:page*size,end:Math.min(total,(page+1)*size),previous:page>0,next:page<pages-1};
+}
+function boardPostKind(k,scope='board'){
+  return k.name!=='reply'&&(k.compose_scope? k.compose_scope===scope :
+    Object.hasOwn(k,'fields'));
+}
 export default {mount(api,s){
+  api=feedbackAPI(api);
   const {P}=api,L=api.label,kind=api.node.component,f=api.facts,v=api.view();
   const root=api.part('body','section',{class:'nb-'+kind.replace('board-',''),'aria-label':L('label',s.title||kind.replace('board-',''))});
   const kids=()=>api.children.map(api.render),text=(tag,value,cls='')=>P.node(tag,{class:cls},value);
   const press=(key,fallback,fn,cls='nb-text-button')=>P.press(L(key,fallback),fn,cls);
   const status=()=>api.part('status','p',{class:'nb-meta',role:'status','aria-live':'polite'});
   const safe=fn=>async()=>{try{await fn()}catch(e){api.tell(String(e.message||e).replace(/^refused:\s*/,'Please try again in a little while. '))}};
+  const notice=(result,message,token)=>api.feedback.finish(token,result,message);
   const open=(id,extra={})=>api.select({thread:id,replyTo:id,focus:'',quote:'',source:'',page:1,documentPage:1,documentFile:'',...extra});
-  const chooseSaved=async()=>{const orders=await api.read('rows board-order');return api.select({order:orders.find(o=>o.rule==='bookmarks')?.id||'',offset:0,thread:'',search:'',queue:'no',opens:''})};
+  const chooseSaved=async()=>{api.feedback.clear();const orders=await api.read('rows board-order');return api.select({order:orders.find(o=>o.rule==='bookmarks')?.id||'',offset:0,thread:'',search:'',queue:'no',opens:''})};
   const chooseQueue=()=>api.select({queue:'yes',search:'',thread:'',opens:''});
   // A channel opens its own view when its world thing says so (board-channel opens=calendar); the lens
   // arranges one part per view name. Conversations stay one press away in the toolbar.
-  const chooseChannel=async channel=>{if(channel==='__saved')return chooseSaved();if(channel==='__queue')return chooseQueue();const [orders,channels]=await Promise.all([api.read('rows board-order'),api.read('rows board-channel')]);return api.select({channel,offset:0,thread:'',search:'',queue:'no',summary:'',opens:channels.find(c=>c.group===channel)?.opens||'',calendarAdd:'no',calendarEvent:'',order:orders.some(o=>o.id===v.order&&o.rule==='bookmarks')?'':v.order||''})};
-  const titleCase=value=>String(value||'').replace(/^./,c=>c.toUpperCase());
+  const chooseChannel=async channel=>{api.feedback.clear();if(channel==='__saved')return chooseSaved();if(channel==='__queue')return chooseQueue();const [orders,channels]=await Promise.all([api.read('rows board-order'),api.read('rows board-channel')]);return api.select({channel,offset:0,thread:'',search:'',queue:'no',summary:'',opens:channels.find(c=>c.group===channel)?.opens||'',calendarAdd:'no',calendarEvent:'',order:orders.some(o=>o.id===v.order&&o.rule==='bookmarks')?'':v.order||''})};
+  const titleCase=value=>String(value||'').replace(/[-_]+/g,' ').replace(/^./,c=>c.toUpperCase());
   const icons={discussion:'☰',question:'?',event:'▦',poll:'▥',ask:'↗',offer:'♡',document:'▤',announcement:'⌖',decision:'✓'};
   const viewer=api.node.viewer?.id;
-  const searchBox=()=>{const input=P.node('input',{'aria-label':L('search','Search the board'),placeholder:L('searchhint','Search conversations and documents'),value:api.draft.search??v.search??''});input.addEventListener('input',()=>{api.draft.search=input.value});input.addEventListener('keydown',e=>{if(e.key==='Enter')api.select({search:input.value,offset:0,queue:'no',thread:''})});return input};
+  const searchBox=()=>{if(api.draft.searchQuery!==v.search){api.draft.search=v.search||'';api.draft.searchQuery=v.search}const input=P.node('input',{'aria-label':L('search','Search the board'),placeholder:L('searchhint','Search conversations and documents'),value:api.draft.searchQuery===v.search?(api.draft.search??v.search??''):(v.search||'')});input.addEventListener('input',()=>{api.draft.search=input.value;api.draft.searchQuery=v.search});input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing)api.select({search:input.value,offset:0,queue:'no',thread:''})});return input};
   if(kind==='board-shell'){
     const channel=P.node('select',{'aria-label':L('channel','Channel'),class:'nb-phone-channel',on:{change:e=>chooseChannel(e.target.value)}},P.node('option',{value:''},L('all','All conversations')));
     Promise.all([api.read('rows board-channel'),api.read('board.badges'),api.read('rows board-order')]).then(api.guard(async([channels,people,orders])=>{const group=P.node('optgroup',{label:L('channels','Channels')});for(const c of channels)group.append(P.node('option',{value:c.group},L(c.title,c.title)));const personal=P.node('optgroup',{label:L('yourboard','Your board')},P.node('option',{value:'__saved'},L('saved','Saved')));const me=people.find(p=>p.id===viewer);if(me?.badges.some(b=>['leader','steward'].includes(b))){const queue=await api.read('board.queue');personal.append(P.node('option',{value:'__queue'},L('queue','Leaders’ queue')+' ('+queue.length+')'))}channel.append(group,personal);channel.value=v.queue==='yes'?'__queue':orders.some(o=>o.id===v.order&&o.rule==='bookmarks')?'__saved':v.channel||''})).catch(api.tell);
     const search=searchBox();search.classList.add('nb-top-search');
-    const header=P.node('header',{class:'nb-masthead'},text('strong',api.display('title'),'nb-brand'),channel,search,press('searchbutton','⌕',()=>{root.classList.toggle('nb-search-open');search.focus()},'nb-search-icon'),press('compose','Write a post',()=>api.select({compose:'yes'}),'nb-primary'));
+    const header=P.node('header',{class:'nb-masthead'},text('strong',api.display('title'),'nb-brand'),channel,search,press('searchbutton','Search',()=>{if(search.value.trim())api.select({search:search.value.trim(),offset:0,queue:'no',thread:''});else{root.classList.toggle('nb-search-open');search.focus()}},'nb-search-icon'),press('compose','Write a post',()=>api.select({compose:'yes'}),'nb-primary'));
     const rendered=api.children.map(child=>({child,element:api.render(child)})),centre=rendered.find(row=>row.child.role==='nb-centre')?.element;
     for(const row of rendered)if(row.child.component==='board-navigation')row.element.classList.add('nb-navigation');
     const extras=rendered.filter(row=>row.element!==centre&&!['board-navigation','board-thread','board-composer'].includes(row.child.component));
@@ -59,7 +72,32 @@ export default {mount(api,s){
     const entries=P.node('div',{class:'nb-catchup-entries'},...[...groups.values()].slice(0,v.catchupExpanded==='yes'?groups.size:s.previewCount).map(api.render));
     const actions=P.node('div',{class:'nb-catchup-actions'},press('seen','Mark all seen',safe(()=>api.fire('seen',{select:{summary:''}}))));
     root.dataset.expanded=v.catchupExpanded||'no';root.append(toggle,entries,actions);
-    api.read('model.status').then(api.guard(rows=>{if(v.summaryUnavailable!=='yes'&&rows[0]?.up&&rows[0]?.installed?.includes(rows[0]?.model))actions.append(press('summary','Summarise',async()=>{try{const seen=mine(await api.read('rows board-seen')),caught=await api.rows('board.catch-up'+(v.channel?' in='+api.Q(v.channel):''));const snapshot=await api.fire('snapshot',{value:JSON.stringify(caught)});const summary=await api.fire('summarize',{target:snapshot.made[0]});const unavailable=/not running|unavailable|offline/i.test(summary.text||''),value=String(summary.text||'').replace(/^local model\s*·\s*.*?:\s+/i,'');await api.select({summary:unavailable?'':value,summaryUnavailable:unavailable?'yes':'no',summaryChannel:v.channel||'',summarySeenAt:seen})}catch{await api.select({summary:'',summaryUnavailable:'yes'})}}))})).catch(()=>{});
+    const summaryStatus=status();summaryStatus.textContent=api.draft.summaryStatus||'';actions.append(summaryStatus);
+    api.draft.updateSummary=()=>{summaryStatus.textContent=api.draft.summaryStatus||''};
+    const unavailable=message=>{
+      summaryStatus.textContent=L('summaryunavailable','Summary not available.')+(message?' '+message:'');
+      const button=press('summary','Summarise',()=>{});button.disabled=true;button.title=summaryStatus.textContent;actions.append(button);
+    };
+    api.read('model.status').then(api.guard(rows=>{
+      const state=rows[0]||{};
+      if(!state.up||!state.installed?.includes(state.model)){unavailable(state.reason||state.error||state.message||L('modeloffline','Summary not available. No ready local model was reported.'));return}
+      const button=press('summary','Summarise',async()=>{
+        if(api.draft.summaryBusy)return;api.draft.summaryBusy=true;button.disabled=true;
+        api.draft.summaryStatus=L('summarising','Preparing a summary…');api.draft.updateSummary();
+        const channel=v.channel||'';let timer;
+        try{
+          const seen=mine(await api.read('rows board-seen')),caught=await api.rows('board.catch-up'+(channel?' in='+api.Q(channel):''));
+          const snapshot=await api.fire('snapshot',{value:JSON.stringify(caught)});
+          timer=setTimeout(()=>{api.draft.summaryStatus=L('summarystillwaiting','Summary not available yet. The local model has not answered. You can keep reading.');api.draft.updateSummary?.()},15000);
+          const summary=await api.fire('summarize',{target:snapshot.made[0]});
+          const value=String(summary.text||'').replace(/^local model\s*·\s*.*?:\s+/i,'');
+          if(!value.trim()||/not running|unavailable|offline/i.test(value))throw Error(L('summaryunavailable','The local model did not return a summary.'));
+          if((api.view().channel||'')===channel)await api.select({summary:value,summaryChannel:channel,summarySeenAt:seen});
+          api.draft.summaryStatus=L('summaryready','Summary ready.');
+        }catch(e){api.draft.summaryStatus=L('summaryfailed','Summary not available. ')+String(e.message||e)}
+        finally{clearTimeout(timer);api.draft.summaryBusy=false;button.disabled=false;api.draft.updateSummary?.()}
+      });api.draft.updateSummary=()=>{summaryStatus.textContent=api.draft.summaryStatus||'';button.disabled=!!api.draft.summaryBusy};api.draft.updateSummary();actions.append(button);
+    })).catch(api.guard(e=>unavailable(String(e.message||e))));
     if(v.summary&&api.children.length&&v.summaryChannel===(v.channel||''))root.append(P.node('div',{class:'nb-summary'},text('strong',L('modellabel','Local model summary')),text('p',v.summary,'nb-meta')));return root;
   }
   if(kind==='board-entry'){
@@ -71,7 +109,13 @@ export default {mount(api,s){
   if(kind==='board-feed'){
     root.append(...kids());const collection=api.node.collection;
     if(!api.children.length)root.append(text('span','☀','nb-empty-icon'),text('h2',L('empty','Room for a first conversation')),text('p',L('emptyhint','Ask a question, share a plan or say hello. Your neighbours will find it here.')),press('first','Start a conversation',()=>api.select({compose:'yes'}),'nb-primary'));
-    if(collection&&collection.total>collection.limit)root.append(P.node('nav',{class:'nb-pagination','aria-label':L('pages','Conversation pages')},press('previous','← Newer',()=>api.select({offset:Math.max(0,collection.offset-collection.limit)})),text('span',(collection.offset+1)+'–'+Math.min(collection.total,collection.offset+collection.limit)+' / '+collection.total,'nb-meta'),press('older','Older →',()=>api.select({offset:Math.min(Math.floor((collection.total-1)/collection.limit)*collection.limit,collection.offset+collection.limit)}))));return root;
+    if(collection&&collection.total>collection.limit){
+      const bounds=pageBounds(collection.total,collection.limit,collection.offset/collection.limit);
+      const previous=press('previous','← Newer',()=>api.select({offset:(bounds.page-1)*collection.limit}));
+      const next=press('older','Older →',()=>api.select({offset:(bounds.page+1)*collection.limit}));
+      previous.disabled=!bounds.previous;next.disabled=!bounds.next;
+      root.append(P.node('nav',{class:'nb-pagination','aria-label':L('pages','Conversation pages')},previous,text('span',(bounds.start+1)+'–'+bounds.end+' / '+collection.total,'nb-meta'),next));
+    }return root;
   }
   if(kind==='board-post'){
     root.dataset.post=f.id;root.dataset.kind=f.post_kind||'discussion';root.dataset.depth=f.depth||0;
@@ -93,7 +137,7 @@ export default {mount(api,s){
     root.append(...api.children.filter(child=>!(f.post_kind==='decision'&&!f.outcome&&child.name==='body')).map(api.render));
     if(f.answered)api.read('rows post').then(api.guard(posts=>{const answer=posts.find(p=>p.id===f.answered);if(answer){const preview=api.part('answer','aside',{class:'nb-answer-preview'},text('strong',L('markedanswer','Marked answer')),text('p',answer.text));if(s.detail)root.insertBefore(preview,root.querySelector('.nb-actions'));else root.insertBefore(preview,root.querySelector('.nb-actions'))}}));
     const actions=P.node('div',{class:'nb-actions'});
-    const upvote=P.press(L('upvote','↑')+(Number(f.likes)?' '+f.likes:''),safe(()=>{if(!f.you_liked)return api.fire('like')}),'nb-upvote');upvote.setAttribute('aria-label',f.you_liked?L('youupvoted','You upvoted'):L('upvoteLabel','Upvote')+'; '+(f.likes||0)+' '+L('votes','upvotes'));upvote.setAttribute('aria-pressed',!!f.you_liked);if(f.you_liked)upvote.title=L('youupvoted','You upvoted');
+    const upvote=P.press('↑ '+L('upvoteLabel','Upvote')+(Number(f.likes)?' '+f.likes:''),safe(()=>api.fire('like')),'nb-upvote');upvote.setAttribute('aria-label',f.you_liked?L('youupvoted','You upvoted'):L('upvoteLabel','Upvote')+'; '+(f.likes||0)+' '+L('votes','upvotes'));upvote.setAttribute('aria-pressed',!!f.you_liked);upvote.disabled=!!f.you_liked;if(f.you_liked)upvote.title=L('youupvoted','You upvoted');
     actions.append(upvote,press('reply','Reply',()=>{if(s.detail){api.select({replyTo:Number(f.depth||0)>=2?(f.thread||f.id):f.id});root.closest('.nb-thread')?.querySelector('textarea')?.focus()}else open(f.thread||f.id)}));
     const activity=text('span','','nb-activity nb-meta');if(!f.reply_to)api.read('rows post').then(api.guard(posts=>{const replies=posts.filter(p=>p.thread===f.id),latest=replies.reduce((a,r)=>r.made>a?r.made:a,f.made);activity.textContent=replies.length+' '+L(replies.length===1?'onereply':'replies',replies.length===1?'reply':'replies')+' · '+L('active','Active')+' '+api.format('stamp',latest)}));actions.append(activity);
     let quoteAction;
@@ -104,7 +148,7 @@ export default {mount(api,s){
     const details=P.node('details',{class:'nb-more'},P.node('summary',{'aria-label':L('more','More conversation actions')},L('more','More'))),menu=P.node('div',{class:'nb-menu'});
     if(quoteAction)menu.append(press('quote','Quote selection',quoteAction));
     for(const action of ['bookmark','follow','hide','mute']){
-      let existing;const button=press(action,({bookmark:'Save for later',follow:'Follow replies',hide:'Hide for me',mute:'Mute thread'})[action],safe(async()=>{if(existing){const history=await api.rows('history '+existing.id),record=String(history[0].record);await api.fire('unpersonal',{value:record.startsWith('r')?record:'r'+record})}else await api.fire('personal',{value:action})}));
+      let existing;const button=press(action,({bookmark:'Save for later',follow:'Follow replies',hide:'Hide for me',mute:'Mute thread'})[action],safe(async()=>{const token=api.feedback.begin(L('pending','Working…'));try{if(existing){const history=await api.rows('history '+existing.id),record=String(history[0].record);await api.fire('unpersonal',{value:record.startsWith('r')?record:'r'+record});await notice(null,L('removed-'+action,'Preference removed.'),token)}else{const result=await api.fire('personal',{value:action});await notice(result,L('done-'+action,({bookmark:'Saved for later.',follow:'Following replies.',hide:'Hidden from your board.',mute:'Thread muted.'})[action]),token)}}catch(e){api.feedback.fail(token,e);throw e}}));
       api.read('rows board-mark').then(api.guard(marks=>{existing=marks.find(m=>m.about===f.id&&m.action===action);if(existing)button.textContent=L('undo-'+action,action==='bookmark'?'Remove bookmark':action==='follow'?'Unfollow replies':'Undo '+action)})).catch(api.tell);menu.append(button);
     }
     menu.append(press('why','Why is this here?',safe(async()=>{const r=await api.rows('board.why-here '+f.id);api.tell(r[0]?.why||'')})),press('history','Edit history',safe(async()=>{const rows=await api.rows('history '+f.id),words={post:'Posted',reply:'Replied',set:'Edited',like:'Upvoted',vote:'Voted',pin:'Pinned',forget:'Hidden',undo:'Undone','board.decide':'Decision recorded','board.answer':'Answer marked'};const body=P.node('section',{},text('h2',L('history','Edit history')),...rows.map(r=>P.node('section',{},text('p',api.format('stamp',r.at)+' · '+(r.sealed?L('privateaction','Private action'):r.by||L('neighbour','Neighbour'))+' · '+L(r.word,words[r.word]||'Updated')),...(r.facts||[]).filter(f=>['title','text','outcome','forget_reason'].includes(f.aspect)&&!f.removed).map(f=>text('p',String(f.value))))));P.overlay('dialog',body,{label:L('history','Edit history')})})),press('report','Report to leaders',()=>api.select({report:f.id})));details.append(menu);actions.append(details);root.append(actions);
@@ -117,24 +161,41 @@ export default {mount(api,s){
       if(owner===viewer||leads)menu.append(press('edit','Edit post',()=>api.select({edit:f.id,editText:f.text||''})));
     })).catch(api.tell);
     if(f.post_kind==='event'){
-      const toggle=P.node('div',{class:'nb-rsvp',role:'group','aria-label':L('attendance','Your attendance')}),buttons={};for(const state of ['going','maybe']){buttons[state]=press(state,titleCase(state),safe(()=>api.fire('rsvp',{value:state})),'nb-soft');buttons[state].setAttribute('aria-pressed','false');toggle.append(buttons[state])}
+      const toggle=P.node('div',{class:'nb-rsvp',role:'group','aria-label':L('attendance','Your attendance')}),buttons={};for(const state of ['going','maybe']){buttons[state]=press(state,titleCase(state),safe(async()=>{await api.feedback.run('rsvp',{value:state},L('rsvpsaved','Attendance saved.'));}),'nb-soft');buttons[state].setAttribute('aria-pressed','false');toggle.append(buttons[state])}
       const counts=text('p','','nb-event-count');root.insertBefore(counts,actions);
-      api.read('rows board-rsvp').then(api.guard(rows=>{const all=rows.filter(r=>r.about===f.id),own=all.find(r=>(r.for||r.made_by)===viewer);if(own)buttons[own.status]?.setAttribute('aria-pressed','true');counts.textContent=all.filter(r=>r.status==='going').length+' '+L('goingcount','going')+' · '+Number(f.seats_left||0)+' '+L('left','places left')}));
+      api.read('rows board-rsvp').then(api.guard(rows=>{const all=rows.filter(r=>r.about===f.id),own=all.find(r=>(r.for||r.made_by)===viewer);if(own)buttons[own.status]?.setAttribute('aria-pressed','true');counts.textContent=all.filter(r=>r.status==='going').length+' '+L('goingcount','going')+(Number(f.seats)>0?' · '+Number(f.seats_left||0)+' '+L('left','places left'):'')}));
       actions.append(toggle,press('calendar','Add to calendar',safe(async()=>{await api.downloadReading('board.calendar '+f.id)})));
     }
     return root;
   }
   if(kind==='board-thread'){
-    if(!v.thread)return root;
-    root.append(P.node('div',{class:'nb-titleline'},press('back','← Back',()=>api.select({thread:'',quote:''})),text('h2',L('conversation','Conversation'))),...kids());
+    const threadKey=s.threadKey||'thread',replyKey=s.replyKey||'replyTo';
+    v.thread=v[threadKey];v.replyTo=v[replyKey];
+    if(!v.thread){root.hidden=true;return root}
+    root.append(P.node('div',{class:'nb-titleline'},press('back','← Back',()=>api.select({[threadKey]:'',[replyKey]:'',quote:''})),text('h2',L('conversation','Conversation'))),...kids());
     const target=v.focus&&root.querySelector('[data-post="'+CSS.escape(v.focus)+'"]');
     if(target){target.classList.add('nb-focus');if(api.draft.focused!==v.thread+' '+v.focus){api.draft.focused=v.thread+' '+v.focus;requestAnimationFrame(()=>target.scrollIntoView({block:'center'}))}}
-    if(!root.querySelector('[data-post]')){if(!root.querySelector('.nb-notice'))root.append(text('p',L('unavailablethread','This conversation is unavailable.')));return root}
+    const containsTarget=n=>n.facts?.id===v.thread||(n.children||[]).some(containsTarget);
+    if(!api.children.some(containsTarget)){if(!root.querySelector('.nb-notice'))root.append(text('p',L('unavailablethread','This conversation is unavailable.')));return root}
     const form=P.node('form',{'aria-label':L('replyform','Write a reply')}),input=api.part('reply','textarea',{'aria-label':L('replytext','Your reply'),placeholder:L('replyhint','Add something to the conversation…'),value:api.draft.text||'',rows:3}),out=status();
     input.addEventListener('input',()=>{api.draft.text=input.value});
     if(v.quote)form.append(P.node('blockquote',{},v.quote),press('removequote','Remove quote',()=>api.select({quote:'',source:''})));
     const submit=P.node('button',{type:'submit',class:'nb-primary'},L('sendreply','Post reply'));
-    P.submit(form,async e=>{e.preventDefault();const sentText=input.value;submit.disabled=true;try{const participant=(await api.rows('look '+(v.replyTo||v.thread)))[0];await api.fire('reply',{target:v.replyTo||v.thread,fields:{text:input.value,...(v.quote?{quote:v.quote,source:v.source,page:v.page}:{})},saw:{[participant.id]:participant.rev}});if(api.draft.text===sentText){api.draft.text='';input.value=''}if(api.view().quote===v.quote&&api.view().source===v.source)await api.select({quote:'',source:''})}catch(err){out.textContent=String(err.message||err)}finally{submit.disabled=false}});form.append(input,submit,out);root.append(form);return root;
+    const update=()=>{input.value=api.draft.replyBusy?'':api.draft.text||'';input.disabled=!!api.draft.replyBusy;submit.disabled=!!api.draft.replyBusy||!input.value.trim();out.textContent=api.draft.replyOutcome||''};
+    api.draft.updateReply=update;input.addEventListener('input',update);update();
+    P.submit(form,async e=>{
+      e.preventDefault();if(api.draft.replyBusy||!input.value.trim())return;
+      const sentText=input.value,target=v.replyTo||v.thread;
+      api.draft.text=sentText;api.draft.replyBusy=true;api.draft.replyOutcome=L('replypending','Posting reply…');update();
+      try{
+        const participant=(await api.rows('look '+target))[0];
+        await api.fire('reply',{target,fields:{text:sentText,...(v.quote?{quote:v.quote,source:v.source,page:v.page}:{})},saw:{[participant.id]:participant.rev}});
+        if(api.draft.text===sentText)api.draft.text='';
+        api.draft.replyOutcome=L('replyposted','Reply posted.');
+        if(api.view().quote===v.quote&&api.view().source===v.source)await api.select({quote:'',source:''});
+      }catch(err){api.draft.replyOutcome=String(err.message||err)}
+      finally{api.draft.replyBusy=false;api.draft.updateReply?.()}
+    });form.append(input,submit,out);root.append(form);return root;
   }
   if(kind==='board-notice'){
     root.append(text('strong',L('hidden','Hidden by')+' '+f.by),text('p',f.reason),press('undo','Undo hide',safe(()=>api.fire('undo',{value:f.record}))));return root;
@@ -145,7 +206,7 @@ export default {mount(api,s){
       const filters=P.node('div',{class:'nb-searchfilters','aria-label':L('filters','Search filters')});
       for(const [key,label,reading]of [['channel','Channel','rows board-channel'],['kind','Post type','rows kind'],['person','Person','board.badges']]){
         const input=P.node('select',{'aria-label':L(key,label),on:{change:e=>api.select({[key]:e.target.value,offset:0,...(key==='channel'?{summary:''}:{})})}},P.node('option',{value:''},L('any-'+key,'Any '+label.toLowerCase())));filters.append(input);
-        api.read(reading).then(api.guard(rows=>{for(const row of rows)input.append(P.node('option',{value:key==='person'?row.id:key==='channel'?row.group:row.name},L(row.title||row.name,titleCase(row.title||row.name))));input.value=v[key]||''})).catch(api.tell);
+        api.read(reading).then(api.guard(rows=>{for(const row of (key==='kind'?rows.filter(k=>boardPostKind(k)):rows))input.append(P.node('option',{value:key==='person'?row.id:key==='channel'?row.group:row.name},L(row.title||row.name,titleCase(row.title||row.name))));input.value=v[key]||''})).catch(api.tell);
       }
       const dates=P.node('select',{'aria-label':L('when','When'),on:{change:e=>{const value=e.target.value;if(value==='custom'){const from=P.node('input',{type:'date','aria-label':L('from','From')}),to=P.node('input',{type:'date','aria-label':L('through','Through')}),body=P.node('div',{},text('h2',L('choosedates','Choose dates')),P.node('label',{},L('from','From'),from),P.node('label',{},L('through','Through'),to));const overlay=P.overlay('dialog',body,{label:L('choosedates','Choose dates')});body.append(press('usedates','Use these dates',()=>{api.select({since:from.value?new Date(from.value+'T00:00').toISOString():'',before:to.value?new Date(new Date(to.value+'T00:00').getTime()+86400000).toISOString():'',dateRange:'custom'});overlay.close()}))}else api.select({since:value?new Date(Date.now()-Number(value)*86400000).toISOString():'',before:'',dateRange:value})}}},...['','7','30','custom'].map((value,i)=>P.node('option',{value},L(['anytime','week','month','choosedates'][i],['Any time','Past week','Past month','Choose dates…'][i]))));dates.value=v.dateRange||'';filters.append(dates);root.append(filters);
     }
@@ -154,11 +215,12 @@ export default {mount(api,s){
   if(kind==='board-composer'){
     // One local draft per part survives projections; saved content goes through
     // the authored word and ordinary receipts, never a parallel client store.
-    const form=P.node('form',{'aria-label':L('compose','Write a post')}),out=status();let close;
-    const dialog=P.overlay('dialog',form,{label:L('compose','Write a post'),close:()=>api.select({compose:'no',hide:'',report:'',decide:'',edit:'',pin:''})});close=dialog.close;
-    api.cleanup(()=>close(true));dialog.node.classList.add('nb-dialog');
-    form.append(P.node('div',{class:'nb-titleline'},text('h2',L('compose','Write a post')),press('cancel','Cancel',close)));
     const special=['hide','report','decide','edit','pin'].find(key=>v[key]);
+    const dialogTitle=L(special||'compose',({hide:'Hide with a reason',report:'Report to leaders',decide:'Record a decision',edit:'Edit post',pin:'Pin until…'})[special]||'Write a post');
+    const form=P.node('form',{'aria-label':dialogTitle}),out=status();let close;
+    const dialog=P.overlay('dialog',form,{label:dialogTitle,close:()=>api.select({compose:'no',hide:'',report:'',decide:'',edit:'',pin:''})});close=dialog.close;
+    api.cleanup(()=>close(true));dialog.node.classList.add('nb-dialog');
+    form.append(P.node('div',{class:'nb-titleline'},text('h2',dialogTitle),press('cancel','Cancel',close)));
     if(special){
       const label=({hide:'Reason for hiding',report:'Reason for reporting',decide:'Decision outcome',edit:'Edit post',pin:'Pin until (UTC date or time)'})[special],input=P.node('textarea',{'aria-label':label,required:'',value:special==='edit'?v.editText||'':'',rows:5});form.append(text('label',label),input);
       input.addEventListener('input',()=>{api.draft.specialText=input.value});input.value=api.draft.specialText??input.value;
@@ -170,24 +232,28 @@ export default {mount(api,s){
     const drawUploads=()=>{attachments.replaceChildren();for(const file of uploads){const preview=P.node('div',{class:'nb-upload-preview'},text('p',file.name,'nb-meta'),press('removeattachment','Remove',()=>{uploads.splice(uploads.indexOf(file),1);drawUploads()}));attachments.append(preview);api.file(file.id,'thumbnail').then(api.guard(({url,blob})=>{if(blob.type.startsWith('image/'))preview.prepend(P.node('img',{src:url,alt:file.name}))})).catch(()=>{})}};drawUploads();
     const save=()=>{api.draft.title=title.value;api.draft.body=body.value;api.draft.kind=type.value;api.draft.channel=channel.value};title.addEventListener('input',save);body.addEventListener('input',save);channel.addEventListener('change',save);
     let definitions=[];
-    const draw=()=>{save();fields.replaceChildren();const definition=definitions.find(k=>k.name===type.value),types=JSON.parse(definition?.field_types||'{}'),labels=JSON.parse(definition?.field_labels||'{}'),advanced=P.node('details',{class:'nb-advanced'},P.node('summary',{},L('moreoptions','More options')));chosen.textContent=(definition?.compose_icon||icons[type.value]||'✦')+' '+L(definition?.compose_label||type.value,definition?.compose_label||titleCase(type.value));for(const key of String(definition?.fields||'').split(/\s+/).filter(Boolean)){const label=L(key,labels[key]||key.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase())),format=types[key]||'text',input=P.node('input',{'aria-label':label,name:key,type:format==='number'?'number':'text','data-format':format,value:api.draft[key]||'',...(format==='number'?{min:1,max:10000,step:1}:{}),...(String(definition.required||'').split(' ').includes(key)?{required:''}:{})}),wrap=P.node('label',{},label,input);input.addEventListener('input',()=>{api.draft[key]=input.value});
+    const draw=()=>{save();fields.replaceChildren();const definition=definitions.find(k=>k.name===type.value),types=JSON.parse(definition?.field_types||'{}'),defaults=JSON.parse(definition?.defaults||'{}'),labels=JSON.parse(definition?.field_labels||'{}'),advanced=P.node('details',{class:'nb-advanced'},P.node('summary',{},L('moreoptions','More options')));chosen.textContent=(definition?.compose_icon||icons[type.value]||'✦')+' '+L(definition?.compose_label||type.value,definition?.compose_label||titleCase(type.value));for(const key of String(definition?.fields||'').split(/\s+/).filter(Boolean)){const label=L(key,labels[key]||key.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase())),format=types[key]||'text',input=P.node('input',{'aria-label':label,name:key,type:format==='number'?'number':'text','data-format':format,value:api.draft[key]??defaults[key]??'',...(format==='number'?{min:1,max:10000,step:1}:{}),...(String(definition.required||'').split(' ').includes(key)?{required:''}:{})}),wrap=P.node('label',{},label,input);input.addEventListener('input',()=>{api.draft[key]=input.value});
       if(format==='datetime'){input.placeholder=L('datehint','e.g. Thu 6pm');const confirm=P.node('small',{role:'status',class:'nb-date-confirm'}),picker=P.node('input',{type:'datetime-local','aria-label':label+' · '+L('picker','Choose date and time'),'data-picker':'yes'});picker.addEventListener('change',()=>{input.value=picker.value;input.dispatchEvent(new Event('input'))});const check=()=>{const parsed=P.parseDateEntry(input.value);input.setCustomValidity(input.value&&!parsed.ok?parsed.message:'');confirm.textContent=input.value?(parsed.ok?L('dateconfirmed','That is')+' '+parsed.label:parsed.message):'';if(parsed.ok)picker.value=parsed.local};input.addEventListener('input',check);wrap.append(P.node('details',{class:'nb-date-picker'},P.node('summary',{},L('choosewhen','Choose date and time…')),picker),confirm);check()}
       (String(s.advancedFields||'closes place').split(' ').includes(key)?advanced:fields).append(wrap)
-    }if(advanced.children.length>1)fields.append(advanced);tiles.hidden=!!api.draft.chosen;step.hidden=!api.draft.chosen};
-    api.read('rows kind').then(api.guard(async kinds=>{const people=await api.read('board.badges'),me=people.find(p=>p.id===viewer),leader=me?.badges.some(b=>['steward','leader'].includes(b));definitions=kinds.filter(k=>k.name!=='reply'&&(!k.leaders_only||leader));const rank=k=>{const n=['discussion','question','event','poll','ask','document'].indexOf(k.name);return n<0?99:n},ordered=[...definitions].sort((a,b)=>rank(a)-rank(b));for(const k of ordered){type.append(P.node('option',{value:k.name},L(k.name,titleCase(k.name))));tiles.append(P.press('',()=>{type.value=k.name;api.draft.chosen=true;draw()},'nb-kind-tile'));const tile=tiles.lastChild;tile.dataset.postType=k.name;tile.append(text('span',k.compose_icon||icons[k.name]||'✦','nb-tile-icon'),text('strong',L(k.compose_label||k.name,k.compose_label||titleCase(k.name))),text('span',L(k.compose_description||k.name+'-description',k.compose_description||'Share this with your neighbours.')))}type.value=api.draft.kind||'discussion';draw()})).catch(api.tell);type.addEventListener('change',()=>{api.draft.chosen=true;draw()});
+    }if(advanced.children.length>1)fields.append(advanced);
+      if(definition?.compose_fields_first==='yes')step.insertBefore(fields,body);else step.insertBefore(body,fields);
+      body.rows=Math.max(1,Math.min(12,Number(definition?.compose_message_rows)||5));
+      tiles.hidden=!!api.draft.chosen;step.hidden=actions.hidden=!api.draft.chosen};
+    api.read('rows kind').then(api.guard(async kinds=>{const people=await api.read('board.badges'),me=people.find(p=>p.id===viewer),leader=me?.badges.some(b=>['steward','leader'].includes(b));definitions=kinds.filter(k=>boardPostKind(k,s.kindScope||'board')&&(!k.leaders_only||leader));const rank=k=>{const n=['discussion','question','event','poll','ask','document'].indexOf(k.name);return n<0?99:n},ordered=[...definitions].sort((a,b)=>rank(a)-rank(b));for(const k of ordered){type.append(P.node('option',{value:k.name},L(k.name,titleCase(k.name))));tiles.append(P.press('',()=>{type.value=k.name;api.draft.chosen=true;draw()},'nb-kind-tile'));const tile=tiles.lastChild;tile.dataset.postType=k.name;tile.append(text('span',k.compose_icon||icons[k.name]||'✦','nb-tile-icon'),text('strong',L(k.compose_label||k.name,k.compose_label||titleCase(k.name))),text('span',L(k.compose_description||k.name+'-description',k.compose_description||'Share this with your neighbours.')))}type.value=api.draft.kind||'discussion';draw()})).catch(api.tell);type.addEventListener('change',()=>{api.draft.chosen=true;draw()});
     api.read('rows board-channel').then(api.guard(channels=>{for(const c of channels)channel.append(P.node('option',{value:c.group},L(c.title,c.title)));channel.value=api.draft.channel||v.channel||channels.find(c=>c.title==='Neighbours')?.group||channels[0]?.group}));
     const upload=api.part('upload','input',{type:'file',multiple:'',hidden:'','aria-label':L('attach','Add photos or files')}),dropzone=P.node('div',{class:'nb-upload',tabindex:0,role:'button','aria-label':L('attach','Add photos or files')},text('strong',L('dropfiles','Drop photos or files here')),text('span',L('browsefiles','or choose files')));
     const prepare=async files=>{submit.disabled=true;for(const file of files){out.textContent=L('uploading','Preparing your attachment…');try{const result=await api.upload(file,channel.value);uploads.push({id:result.made[0],name:file.name});drawUploads();out.textContent=L('privateupload','Ready. Attachments stay private until you post.')}catch(e){out.textContent=String(e.message||e)}}submit.disabled=false};upload.addEventListener('change',()=>prepare(upload.files));dropzone.addEventListener('click',()=>upload.click());dropzone.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();upload.click()}});dropzone.addEventListener('dragover',e=>{e.preventDefault();dropzone.classList.add('over')});dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('over'));dropzone.addEventListener('drop',e=>{e.preventDefault();dropzone.classList.remove('over');prepare(e.dataTransfer.files)});
     const submit=P.node('button',{type:'submit',class:'nb-primary'},L('publish','Post to neighbours'));
-    step.append(P.node('div',{class:'nb-titleline'},chosen,press('changetype','← Choose a different post',()=>{save();api.draft.chosen=false;draw()})),P.node('label',{},L('channel','Channel'),channel),title,body,fields,dropzone,upload,attachments,submit,out);form.append(type,tiles,step);
-    P.submit(form,async e=>{e.preventDefault();if(!api.draft.chosen)return;save();submit.disabled=true;try{const values={text:body.value,title:title.value,post_kind:type.value,in:channel.value};for(const input of fields.querySelectorAll('input[name]'))if(input.value)values[input.name]=input.dataset.format==='datetime'?P.parseDateEntry(input.value).iso:input.value;
+    const actions=P.node('footer',{class:'nb-compose-actions'},submit,out);
+    step.append(P.node('div',{class:'nb-titleline'},chosen,press('changetype','← Choose a different post',()=>{save();api.draft.chosen=false;draw()})),P.node('label',{},L('channel','Channel'),channel),title,body,fields,dropzone,upload,attachments);form.append(type,tiles,step,actions);
+    P.submit(form,async e=>{e.preventDefault();if(!api.draft.chosen||api.draft.postBusy)return;save();api.draft.postBusy=true;submit.disabled=true;out.textContent=L('posting','Posting…');try{const values={text:body.value,title:title.value,post_kind:type.value,in:channel.value};for(const input of fields.querySelectorAll('input[name]'))if(input.value)values[input.name]=input.dataset.format==='datetime'?P.parseDateEntry(input.value).iso:input.value;
       // Retain a successful post if a later attach refuses; retry attaches to it
       // instead of creating duplicate conversations.
       const finished={offset:0,compose:'no',hide:'',report:'',decide:'',edit:'',pin:''};
       if(!api.draft.post){const receipt=await api.fire('post',{fields:values,...(!uploads.length?{select:finished}:{})});api.draft.post=receipt.made[0]}
       for(const file of [...uploads]){const rows=await Promise.all([api.rows('look '+file.id),api.rows('look '+api.draft.post)]),saw=Object.fromEntries(rows.flat().map(r=>[r.id,r.rev]));await api.fire('attach',{file:file.id,target:api.draft.post,saw,...(uploads.length===1?{select:finished}:{})});uploads.splice(uploads.indexOf(file),1)}
       for(const key of Object.keys(api.draft))delete api.draft[key];close();await api.select({offset:0,compose:'no',hide:'',report:'',decide:'',edit:''});
-    }catch(e){out.textContent=L('slow','Please give neighbours time to respond. ')+String(e.message||e).replace(/^refused:\s*/,'');api.tell(out.textContent)}finally{submit.disabled=false}});return root;
+    }catch(e){out.textContent=L('failedpost','Could not finish posting. Your draft is kept. ')+String(e.message||e).replace(/^refused:\s*/,'');api.tell(out.textContent)}finally{api.draft.postBusy=false;submit.disabled=false}});return root;
   }
   return root;
 }};

@@ -43,6 +43,8 @@ KINDS = {
                       compose_description='A building that matters to someone: a town hall, a house, a shop. It has a '
                                           'page where things happen: events at it, posts about it.'),
 }
+for _kind in KINDS.values():
+    _kind['compose_scope'] = 'map'
 LAYERS = [('Places', 'rows structure', 'place', '#8a6a3c', 1), ('Spots', 'rows spot', 'pin', '#2f7f8f', 2),
           ('Events', 'rows event', 'pin', '#cf5a3c', 3), ('Routes', 'rows route', 'path', '#6c5bb3', 4),
           ('Board', 'board.feed', 'pin', '#527f68', 5)]
@@ -61,15 +63,16 @@ COMPONENTS = {
                 'placed things of every layer as pins and routes. Drag to move, scroll to zoom, right-drag to turn; '
                 'Add puts a spot, an event, a note or any kind at a building or a point; Route plans a walk.',
                 'surface pin', '', 'put move resume open',
-                dict(map=T(), hide=T(), focus=T(), style=T(), labels=T(default='{}'))),
+                dict(map=T(), hide=T(), focus=T(), style=T(), routes=T('boolean',False), labels=T(default='{}'))),
     'map-layers': ('Layers of a map: show or hide each for yourself, + Add a layer from a gallery of readings (shared or '
                    'only yours), the ground\'s own layers, and how the map looks.',
-                   'layers layer', '', 'hide unhide make make-mine edit-layer forget-layer style', dict(map=T(), labels=T(default='{}'))),
+                   'layers layer toggle', '', 'hide unhide make make-mine edit-layer forget-layer style',
+                   dict(map=T(), collapsed=T('boolean',False), labels=T(default='{}'))),
     'map-search': ('Search for things, places, streets, corners and towns (map.find); choosing one flies there.',
                    'search', '', '', dict(map=T(), labels=T(default='{}'))),
     'map-inspector': ('What was pressed: a building\'s card (what is at it, the talk, its page), every fact of a thing, '
                       'or what is new on the map.',
-                      'inspector', '', 'put adopt open-page say edit forget replan', dict(map=T(), labels=T(default='{}'))),
+                      'inspector', '', 'put adopt open-page say edit forget replan', dict(map=T(), routes=T('boolean',False), labels=T(default='{}'))),
     'map-route': ('A route planner: stops in order, on foot or by bike, the street path\'s length and time, and save.',
                   'route', '', 'route', dict(map=T(), labels=T(default='{}'))),
     'place-page': ('A page for one place: a window opened on a structure ($view.target); its parts follow.',
@@ -93,7 +96,7 @@ PAGE_GRANTS = ('window.surface rows look look-view history components help compo
 
 
 def code():
-    return '\n'.join((HERE / f).read_text(encoding='utf-8') for f in ('geo-worker.js', 'geo-engine.js', 'map-components.js'))
+    return (HERE / 'map-components.bundle.js').read_text(encoding='utf-8')
 
 
 def wait_for(door, word, seconds=20):
@@ -148,6 +151,12 @@ def install(door, map_name=MAP, centre='36.9672,-122.0088'):
             ids['layer:' + name] = door.say(f'make kind=map-layer map={ids["map"]} name={Q(name)} shows={Q(shows)} '
                                             f'look={look} color={color} order={order}')['made'][0]
     source = code()
+    from painter.catalogue import cards
+    for card in cards():
+        if card['name']=='action-notice':
+            name=card.pop('name')
+            tid=upsert(door,'component',name,**card,code=(LAB/'components/action-notice.js').read_text(encoding='utf-8'))
+            door.say('look '+tid);door.say('component '+tid)
     for name, (purpose, parts, slots, gestures, schema) in COMPONENTS.items():
         tid = upsert(door, 'component', name, category='places', purpose=purpose, settings=json.dumps(schema),
                      parts=json.dumps({p: dict(facts='bound visible row') for p in parts.split()}),

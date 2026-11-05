@@ -1,4 +1,7 @@
 # Current cards, one calm line each; details open by name.
 root : work-overview
+  notice : action-notice, stateKey workNotice, scopeKeys "workFilter workPage"
+    on undo do undo $value
   rows : column, of reading:"house.active" as t, each work-line
 work-line : work-line, title $t.title, owner $t.owner, state $t.state, blocker $t.blocker, resolver $t.resolver, detail $t.detail, next $t.next_action
+  on done do set $item lane=Done

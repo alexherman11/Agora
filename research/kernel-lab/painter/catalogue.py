@@ -14,6 +14,10 @@ def setting(type='text', default=''):
 T = setting
 COMMON = dict(label=T(default='Example'))
 CATALOGUE = {
+    'action-notice': ('feedback', 'Show an action result and reverse its exact receipt, even after its row disappears.',
+        dict(stateKey=T(default='actionNotice'),scopeKeys=T(),labels=T(default='{}')), 'body message undo dismiss', '', 'undo',
+        'Map moves; private board actions; work panels; forms',
+        'Bundled actionFeedback publishes immediate pending/results without a world reread. stateKey names a local channel; scopeKeys names view fields defining navigation (empty means all). Navigation clears results and invalidates pending tokens. Undo rechecks scope/token and uses the exact returned receipt only, with an authored gesture and existing permission. Work Mark done reuses the same contract. Old JSON view notices are intentionally ignored.'),
     'date-tile': ('content','A date tile, time range, place and bounded countdown for any dated thing.',
         dict(start=T(),end=T(),place=T(),soonDays=T('number',3),date=T(),month=T(),day=T(),weekday=T(),time=T(),labels=T(default='{}')),
         'body tile month day weekday time place countdown','','','Events; appointments; deadlines',
@@ -25,16 +29,17 @@ CATALOGUE = {
         dict(label=T(),labels=T(default='{}')), 'body label count meter claim', '', 'claim', 'Community board; inventory; volunteering',
         'Claim admission, once and closing are checked by the world.'),
     'file': ('media', 'Read a converted photo, document, table, event, media or downloadable file.',
-        dict(labels=T(default='{}'),content=T('json',{}),target=T('fact'),name=T(),owner=T('fact'),variant=T(default='content'),stamp=T(),page=T('number',1),pageTarget=T(),pageRequest=T('number',0)), 'body preview page alt download status', 'table', 'quote alt rsvp calendar',
+        dict(labels=T(default='{}'),content=T('json',{}),target=T('fact'),name=T(),owner=T('fact'),variant=T(default='content'),stamp=T(),page=T('number',1),pageTarget=T(),pageRequest=T('number',0),
+             quoteMode=T(default='thread'),replyTarget=T('fact'),replyLabel=T(),startLabel=T(),replyGroup=T('fact')), 'body preview page alt download status quote-reply quote-text reply-text reply-send', 'table', 'quote reply start alt rsvp calendar',
         'Community board; file browser; reading room; photo gallery',
-        'Permission-checked Blob transport; no credentials or network in components. PDF pages show extracted text when no renderer is installed.'),
+        'quoteMode=inline shows a local draft and named reply destination. replyTarget uses the authored reply gesture; without it, start explicitly creates a discussion. No send on selection. Shared right-click Comment is unchanged. Permission-checked Blob transport; PDF pages show extracted text.'),
     'field-list': ('content', 'Show a kind declaration\'s fields in authored order, including neighbour-made kinds.',
         dict(fields=T(),labels=T(default='{}'),stamp=T()), 'body label value', '', '', 'Community board; inventory; directory',
         'Fields are displayed as text, never evaluated.'),
     'calendar': ('collections', 'A shared month and week calendar over any dated things: add an event, RSVP in one click, see who is coming.',
         dict(label=T(default='Calendar'),month=T(),date=T(),view=T(default='month'),weekStart=T('number',0),placeField=T(default='location'),
              openKey=T(),defaultTime=T(default='18:00'),labels=T(default='{}')),
-        'body heading grid event agenda', '', 'select add rsvp', 'Community events; meetings; club calendars; habit tracker',
+        'container body heading grid event agenda', '', 'select add rsvp', 'Community events; meetings; club calendars; habit tracker',
         'Children are the dated things (facts start, end, title, a place, text, going/maybe, coming, your_rsvp). Browser-local time. No recurrence or reminders; words come from the gestures arranged on it.'),
     'board': ('collections', 'Arrange lanes over shared tasks with quick add and filters.',
         dict(title=T(default='Task board'),subtitle=T(default='A clear mind, one thing at a time.'),
@@ -51,10 +56,14 @@ CATALOGUE = {
 }
 
 for name,category,purpose,settings,uses,limits in [
-    ('button','inputs','Press to say an authored word.',{},'Forms; settings; sign-in page',''),
-    ('input','inputs','Edit one line and commit a change.',dict(value=T(),hint=T()),'Forms; settings; chat; search',''),
+    ('button','inputs','Press to say an authored word, or select named view state.',
+     dict(selectKey=T(),value=T(),completionText=T(),noticeKey=T(default='actionNotice')),
+     'Forms; settings; sign-in page','completionText publishes the returned receipt to action-notice. Pending presses cannot repeat. selectKey changes only local view state.'),
+    ('input','inputs','Edit one line; commit=submit sends only on Enter or the explicit button, retaining refused drafts.',
+     dict(value=T(),hint=T(),commit=T(default='change'),submitLabel=T(default='Submit'),labels=T(default='{}')),
+     'Forms; settings; chat; search','commit=change emits change on blur; commit=submit emits submit, ignores IME Enter, and prevents duplicate pending submissions.'),
     ('editor','inputs','Edit plain text or Markdown source.',dict(value=T(),hint=T()),'Writing room; document editor; email','No collaborative rich text, pagination or desktop publishing engine.'),
-    ('choice','inputs','Choose one supplied option.',dict(value=T(),options=T(default='One|Two|Three')),'Forms; polls; settings',''),
+    ('choice','inputs','Choose one supplied option.',dict(value=T(),options=T(default='One|Two|Three'),selectKey=T()),'Forms; polls; settings','selectKey changes local view state; otherwise emits the authored change gesture.'),
     ('switch','inputs','Toggle a boolean setting.',dict(checked=T('boolean',False)),'Settings; form builder',''),
     ('text-block','content','Show selectable text.',dict(value=T(default='A little room to think.')),'Feed; rooms; writing room',''),
     ('markdown','content','Render safe Markdown headings, emphasis and checklists.',dict(value=T(default='## Welcome\n**Bring** a thought.\n- [ ] Make room')),'Feed; writing room; reading room','No raw HTML or concurrent document model.'),
@@ -80,7 +89,9 @@ for name,category,purpose,settings,uses,limits in [
     ('split-pane','layout','Two resizable content columns.',{},'Tiling window manager; file browser; email','Layout only; native window management uses window words.'),
     ('palette','overlays','Filter supplied commands by their displayed words.',{},'Command palette; search','Only supplied commands; no arbitrary shell execution.'),
 ]:
-    CATALOGUE[name]=(category,purpose,dict(COMMON,**settings),'body control','content','press change select',uses)
+    CATALOGUE[name]=(category,purpose,dict(COMMON,**settings),
+                     'body control submit status' if name == 'input' else 'body control',
+                     'content','press change select submit' if name == 'input' else 'press change select',uses)
     # Limits are prose on the same card, not an implicit promise in a name.
     CATALOGUE[name] += (limits,)
 

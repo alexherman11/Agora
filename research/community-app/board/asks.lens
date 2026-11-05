@@ -1,23 +1,36 @@
-root : column, role nb-asks
-  heading : text "Asks & offers"
-  ask : input, label "Ask for something", hint "What would help? Press Enter to post."
-    on change do board.post post_kind=ask seats=$view.asks_seats text=$value in=$view.asks_channel
-  offer : input, label "Offer something", hint "What can you share? Press Enter to post."
-    on change do board.post post_kind=offer seats=$view.asks_seats text=$value in=$view.asks_channel
+root : column, role nb-asks, gap 16
+  heading : text "Find help or share something"
+  outcome : action-notice, stateKey asksNotice, scopeKeys "channel opens thread search queue asksThread"
+    on undo do undo $value
+  filters : wrap, gap 12
+    side : choice, label "Show", options "all|ask|offer", value $view.asks_side, selectKey asks_side
+    status : choice, label "Status", options "active|open|matched|done|all", value $view.asks_status, selectKey asks_status
+  ask : input, label "Ask for something", hint "What would help? Press Enter to post.", commit submit, submitLabel "Post ask"
+    on submit do board.post post_kind=ask seats=$view.asks_seats text=$value in=$view.asks_channel
+  offer : input, label "Offer something", hint "What can you share? Press Enter to post.", commit submit, submitLabel "Post offer"
+    on submit do board.post post_kind=offer seats=$view.asks_seats text=$value in=$view.asks_channel
   entries : list, label "Asks and offers", of reading:"board.asks in=$view.channel side=$view.asks_side status=$view.asks_status" as a, limit 30, each ask-item
-ask-item : column, role nb-ask
-  line : row
+  conversation : board-thread, threadKey asksThread, replyKey asksReplyTo
+    only when $view.asksThread != ""
+    on reply do board.reply $target $fields
+    selected : column, of tag:post, prop:id=$view.asksThread as p, each ask-message
+    replies : column, of tag:post, prop:thread=$view.asksThread as p, by made, each ask-message
+ask-message : text-block, label "Message", value $p.text
+ask-item : column, role nb-ask, gap 12, padding 16
+  line : wrap, gap 12
     side : badge, label $a.side_label
     status : badge, label $a.status_label
     who : avatar, label $a.who, value $a.who
+      format value as initials
   what : text-block, label "What", value $a.what
   when : text-block, label "When", value $a.when
     format value as short-relative
   linked : text-block, label "Linked", value $a.linked
     only when $a.linked_count > 0
-  link : button, label $a.link_label
+  reply : button, label "Reply", selectKey "asksThread asksReplyTo", value $a.id
+  link : button, label $a.link_label, completionText "You are linked to this request.", noticeKey asksNotice
     only when $a.can_link = yes
     on press do claim $item
-  done : button, label "Mark done"
+  done : button, label "Mark done", completionText "Marked done.", noticeKey asksNotice
     only when $a.yours = yes and $a.status != done
     on press do set $item done=yes

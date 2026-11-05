@@ -1,6 +1,7 @@
 // Authored slots, world readings and guarded gestures; no network or native door.
 const uploadQueues=new Map();
 export default {mount(api,s){
+  api=feedbackAPI(api);
   const {P}=api,L=api.label,kind=api.node.component,v=api.view();
   const root=api.part('body','section',{class:'documents '+kind,'aria-label':L('label','Documents')});
   const status=api.part('status','p',{role:'status','aria-live':'polite'});
@@ -8,7 +9,7 @@ export default {mount(api,s){
   const folder=()=>v.documentsFolder||s.library;
   const choose=id=>api.select({documentsFolder:id,documentsOpen:''});
   if(kind==='document-library'){
-    root.append(api.part('heading','h2',{},api.display('title')||L('title','Research & documents')));
+    if(s.showHeading!==false&&s.showHeading!=='no'&&v.opens!=='documents')root.append(api.part('heading','h2',{},api.display('title')||L('title','Research & documents')));
     for(const child of api.children)root.append(api.render(child));
   }else if(kind==='document-toolbar'){
     const crumbs=api.part('breadcrumbs','nav',{'aria-label':L('path','Folder path')});
@@ -21,20 +22,22 @@ export default {mount(api,s){
     })).catch(api.tell);
     const input=api.part('name','input',{'aria-label':L('foldername','Folder name'),required:'',maxlength:200});
     // No <form>: the widget frame is sandboxed without allow-forms, so the browser drops submit events (3 Nov).
-    const make=api.guard(async()=>{if(!input.value.trim())return;try{await api.fire('folder',{parent:folder(),value:input.value.trim()});input.value=''}catch(e){status.textContent=String(e.message||e)}});
+    const make=api.guard(async()=>{if(!input.value.trim()){status.textContent=L('folderrequired','Enter a folder name first.');input.focus();return}try{await api.fire('folder',{parent:folder(),value:input.value.trim()});input.value=''}catch(e){status.textContent=String(e.message||e)}});
     input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();make()}});
     const form=P.node('div',{class:'document-folder-form'},P.node('label',{},L('foldername','Folder name'),input),P.press(L('newfolder','Make folder'),make));
     root.append(form,status);
   }else if(kind==='document-upload'){
-    const picker=api.part('picker','input',{type:'file',multiple:'','aria-label':L('upload','Upload files')});
-    const drop=api.part('drop','div',{tabindex:0,role:'button'},L('drop','Drop files here or choose from your computer'));
+    const picker=api.part('picker','input',{type:'file',multiple:'',hidden:'','aria-label':L('upload','Upload files')});
+    const choose=api.part('choose','button',{type:'button'},L('choose','Choose files'));
+    choose.addEventListener('click',()=>picker.click());
+    const drop=api.part('drop','div',{role:'group','aria-label':L('upload','Upload files')},P.node('p',{},L('drop','Drop files here')),choose);
     const prepare=api.guard(async files=>{
       // Files dropped while a batch is still uploading join it (3 Nov: they were silently dropped). Each keeps the
       // folder it was dropped into. The queue lives in this page only: File objects never go into a draft.
       const queue=uploadQueues.get(api.node.path)||[];uploadQueues.set(api.node.path,queue);
       for(const file of Array.from(files))queue.push({file,destination:folder()});
       if(api.draft.busy)return;
-      api.draft.busy=true;picker.disabled=true;
+      api.draft.busy=true;picker.disabled=choose.disabled=true;
       try{
         while(queue.length){const {file,destination}=queue.shift();
           status.textContent=L('preparing','Uploading and preparing')+' '+file.name;
@@ -52,11 +55,9 @@ export default {mount(api,s){
         }
         status.textContent=L('ready','Files are ready in this folder.');
       }catch(e){queue.length=0;api.tell(String(e.message||e))}
-      finally{api.draft.busy=false;picker.disabled=false;picker.value='';await api.redraw()}
+      finally{api.draft.busy=false;picker.disabled=choose.disabled=false;picker.value='';await api.redraw()}
     });
     picker.addEventListener('change',()=>prepare(picker.files));
-    drop.addEventListener('click',()=>picker.click());
-    drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();picker.click()}});
     drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over')});
     drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
     drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over');prepare(e.dataTransfer.files)});
@@ -88,7 +89,7 @@ export default {mount(api,s){
     details.append(destinations,button(L('move','Move into folder'),()=>api.fire(item.kind==='document-link'?'store':'move',{target:item.id,parent:destinations.value,saw:{[item.id]:item.rev}})));
     root.append(details,status);
     if(item.source_post){
-      const source=P.node('details',{},P.node('summary',{},L('frompost','From post')+': '+(item.source_title||L('post','Neighbour post'))),P.node('p',{},item.source_text||''));
+      const source=P.node('details',{},P.node('summary',{},L('frompost','From post')+': '+(item.source_title||String(item.source_text||'').replace(/\s+/g,' ').trim().slice(0,80)||L('post','Neighbour post'))),P.node('p',{},item.source_text||''));
       root.append(api.part('source','div',{},source));
     }
     if(!isFolder&&v.documentsOpen===item.id)root.append(api.child('preview',{target:item.file_id,name:item.name,owner:item.upload_owner}));
