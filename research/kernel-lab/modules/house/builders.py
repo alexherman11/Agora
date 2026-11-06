@@ -580,7 +580,7 @@ class Builders:
         (wake_cut_off). Only claiming, review and landing touch git, so only those are waited for."""
         if not self.house_restart_due or self.stopping:
             return
-        if self.land_controls or self.landing_blocker():
+        if self.land_controls or self.landing_blocker() or self.landing_lock.locked() or self.git_lock.locked():
             return
         if any(s['phase'] in ('reviewing', 'landing', 'asked', 'preparing') for s in self.states.values()):
             return

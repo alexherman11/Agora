@@ -1,5 +1,42 @@
 # Kernel House builders — implementation, 27 October
 
+## Adopting main's existing edits (6 November, dk3913)
+
+`house.adopt <path> [<path>...] text=<message>` is a steward-only Git seam.
+Paths are literal repository-relative files (forward slashes; quote spaces),
+including additions and deletions. It reads the author name and email from the
+repository's Git configuration, ignoring inherited Git identity overrides.
+It preserves the supplied commit message.
+
+The command refuses a busy landing queue, publication lock or Git lock, an
+external Git lock/merge/rebase, paths outside main, directories, symlinks, or a
+named file whose working content has no change from HEAD. It holds all three
+House locks and the real index lock while running the existing House baseline
+on the dirty main checkout with the pinned interpreter and hidden subprocesses.
+No source is copied into main for the checks.
+
+Private indexes select exactly the named files and preserve unnamed staged
+entries. Failed checks do not change HEAD, the real index or working files.
+Successful checks are followed by a checkout-change check, a new single-parent
+commit, a compare-and-swap advance of main, and replacement of the selected
+index entries. There is no stash, reset, checkout, hook execution or history
+rewrite. The command itself never writes working files. Tests that themselves
+edit source cause refusal, not an attempted restoration of their edits.
+
+Long requests use the accepted-call protocol. `house.adoptions` (stewards only)
+reads durable receipts, including commit, exact files, configured author,
+named checks and their output paths. A resident requester also receives a wake.
+Evidence and private indexes live under the House's `adoptions/` directory.
+An interrupted request is not automatically replayed. If publication succeeds
+but installing the prepared index fails, the receipt retains the commit and
+error and the index lock remains for explicit inspection.
+
+`test_adopt.py` uses scratch repositories under the worker's `.tmp/` only.
+No fixture runs adoption on the real main. The Lines/module boundary now
+also carries `positional`, preserving quoted argument boundaries for any
+module that needs exact file names; existing `target`, `words` and `kv` remain.
+Activation requires the normal kernel and House reload after landing.
+
 ## Restart reconciliation (builder implementation, 6 November, dk3639)
 
 Shutdown saves every active worker's interrupted phase before stopping children.

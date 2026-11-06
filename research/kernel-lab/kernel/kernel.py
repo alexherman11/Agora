@@ -1701,7 +1701,8 @@ class Kernel:
                 if not mid or not self.state.get(mid, "on") or not self.modules or not self.modules.running(mid):
                     raise stop(x, f"{s2.word} is unbound: {name} is not running")
                 ans = self.modules.call(mid, e.get("bound") or e["word"],
-                                        {"target": s2.target, "words": s2.words, "kv": s2.kv}, caller=actor)
+                                        {"target": s2.target, "words": s2.words, "kv": s2.kv,
+                                         "positional": getattr(s2, "positional", [])}, caller=actor)
                 if ans.get("refused"):
                     raise stop(x, f"{name}: {ans['refused']}")
                 asked.append((mid, ans.get("use")))
@@ -1924,7 +1925,8 @@ class Kernel:
         # the module is asked by the entry's bound name (DICTIONARY-ENTRY.md `bound=`), never the word as typed, so an
         # alias or a rename made in the world reaches a module that knows only its own name
         ans = self.modules.call(mid, entry.get("bound") or entry["word"],
-                                {"target": st.target, "words": st.words, "kv": st.kv}, caller=actor)
+                                {"target": st.target, "words": st.words, "kv": st.kv,
+                                 "positional": getattr(st, "positional", [])}, caller=actor)
         if ans.get("refused"):
             raise Refused(f"{mname}: {ans['refused']}")
         if entry.get("word_kind") == "do" and (ans.get("external") or entry.get('undo') == 'external'):

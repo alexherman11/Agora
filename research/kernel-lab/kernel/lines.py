@@ -73,4 +73,7 @@ def parse(text):
             target = t
         else:
             words.append(t)
-    return Step(text, word, target, kv, " ".join(words))
+    step = Step(text, word, target, kv, " ".join(words))
+    # Modules handling file paths need the original argument boundaries.
+    step.positional = [t for t in rest if not KEY.match(t)]
+    return step

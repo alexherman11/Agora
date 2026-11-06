@@ -1107,6 +1107,9 @@ class House:
             return self.builders.request_review(msg)
         if word == "house.land":
             return self.builders.land(msg)
+        if word in ("house.adopt", "house.adoptions"):
+            import adopt
+            return adopt.call(self, msg) if word == "house.adopt" else adopt.receipts(self, msg)
         if word == "house.land-cancel":
             return self.builders.cancel_landing(msg)
         if word == "house.import":
@@ -1343,6 +1346,15 @@ OFFER = [
      "help": "house.land-cancel <task>: request cancellation of a landing, for stewards. The House stops its check "
              "or Git child, releases its locks and records a blocked result with a wake. Cancellation does not undo "
              "source already published; the receipt retains its landed commit."},
+    {"word": "house.adopt", "kind": "do", "takes": "<path> [<path>...] text=<message>",
+     "undo": "external", "may": "stewards",
+     "help": "house.adopt <path> [<path>...] text=<message>: commit exactly these main-checkout files with the "
+             "repository's configured author identity. Use repository-relative file paths. Runs the House baseline "
+             "with the edits first; failure leaves them uncommitted. Refuses unchanged/outside paths or a busy "
+             "landing/Git step. Preserves unnamed edits and staging. No stash, reset or rewrite. "
+             "Long checks return starting; house.adoptions retains the final commit, files and check receipts."},
+    {"word": "house.adoptions", "kind": "see", "takes": "", "may": "stewards",
+     "help": "house.adoptions: saved adoption receipts, newest first, including failed checks and committed files."},
     {"word": "house.release", "kind": "do", "needs": TASK_NEEDS, "takes": "<id> [<why>]", "undo": "external", "may": "members",
      "help": "house.release <task> [why]: the card's worker ends for good (stopped first if running). Its worktree and "
              "branch are kept; the card is free for a new worker. Its owner, a steward or Alex may release it."},

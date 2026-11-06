@@ -4,6 +4,8 @@ What each file in `research/kernel-lab/modules/house/` does, read from the code 
 
 ## Code
 
+- **`adopt.py`**: steward-only `house.adopt`, dirty-main baseline checks, exact-file commits using repository identity, publication/Git exclusion, and durable `house.adoptions` receipts. `test_adopt.py` uses scratch Git repositories only.
+
 - **`handover.py`**: recoverable `house.hand` transfer. Journals intent before changing the card, recovers the recipient's chat, reconciles the canonical worker owner, and retries completion notices. A pending transfer fences lifecycle changes.
 
 - **`messages.py`**: reads the live Agent Book by heading whenever a message is built. The generic reader is `kernel/text_templates.py`; it uses `Kernel.fill_text`, alongside the existing `$` names. No source template or section cache.
