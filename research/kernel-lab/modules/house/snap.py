@@ -43,6 +43,8 @@ capturing it has a separate bounded allowance. Transport failures raise RuntimeE
 """
 import argparse
 import asyncio
+import base64
+import io
 import json
 import os
 import shutil
@@ -182,49 +184,80 @@ def resolve(what, door, token):
 TEXT = ("[document.body ? document.body.innerText : ''].concat([...document.querySelectorAll('iframe')].map(f => "
         "{ try { return f.contentDocument.body.innerText } catch (e) { return '' } })).join(' ')")
 
+PIXEL_PAINT = "painted (screenshot pixels)"
+FRAME_RECT = """(() => {
+    const surface = document.querySelector('#widget-surface');
+    if (!surface || surface.dataset.components === 'false') return null;
+    const frame = surface.querySelector('iframe');
+    if (surface.dataset.components !== 'true' || !frame) return false;
+    const r = frame.getBoundingClientRect();
+    const left = Math.max(0, Math.ceil(r.left)), top = Math.max(0, Math.ceil(r.top));
+    const right = Math.min(innerWidth, Math.floor(r.right)), bottom = Math.min(innerHeight, Math.floor(r.bottom));
+    return right > left && bottom > top ? [left, top, right, bottom] : false;
+})()"""
 
-async def _frame_painted(call):
-    """None for ordinary pages/widgets; otherwise read the sandbox frame's marker through CDP."""
-    result = await call("Runtime.evaluate", expression=(
-        "document.querySelector('#widget-surface') ? "
-        "(document.querySelector('#widget-surface').dataset.components || 'pending') : 'false'"),
-        returnByValue=True)
-    if result.get("result", {}).get("value") == "false":
-        return None
-    if result.get("result", {}).get("value") != "true":
-        return False
-    tree = await call("Page.getFrameTree")
 
-    def widget_frame(node):
-        if node.get("frame", {}).get("name") == "agora-widget":
-            return node["frame"]["id"]
-        return next((found for child in node.get("childFrames", [])
-                     if (found := widget_frame(child))), None)
+def _changed_pixels(before, after):
+    from PIL import ImageChops
+    red, green, blue = ImageChops.difference(before, after).split()
+    difference = ImageChops.lighter(ImageChops.lighter(red, green), blue)
+    return sum(difference.histogram()[13:])
 
-    frame = widget_frame(tree.get("frameTree", {}))
-    if not frame:
+
+def _frame_pixels(png, rect):
+    """Sample only the visible frame interior; host chrome must never count as paint."""
+    from PIL import Image
+    with Image.open(io.BytesIO(png)) as source:
+        left, top, right, bottom = rect
+        box = (max(0, left), max(0, top), min(source.width, right), min(source.height, bottom))
+        if box[2] <= box[0] or box[3] <= box[1]:
+            return False
+        picture = source.crop(box).convert("RGB")
+    picture.thumbnail((320, 200), Image.Resampling.NEAREST)
+    # The opaque sandbox's background cannot be read through the host DOM.
+    # Its most common pixel colour is the background estimate (also for dark themes).
+    background = max(picture.getcolors(picture.width * picture.height))[1]
+    changed = _changed_pixels(picture, Image.new("RGB", picture.size, background))
+    if changed <= picture.width * picture.height * 0.01:
         return False
-    try:
-        context = await call("Page.createIsolatedWorld", frameId=frame, worldName="agora-snap")
-        result = await call("Runtime.evaluate", contextId=context["executionContextId"],
-                            expression="document.documentElement.dataset.painter === 'components'",
-                            returnByValue=True)
-        return result.get("result", {}).get("value") is True
-    except RuntimeError:
-        # The host may replace a frame while starting/recovering. Try the current frame on the next poll.
+    return tuple(box), picture
+
+
+def _stable_pixels(before, after):
+    if before[0] != after[0] or before[1].size != after[1].size:
         return False
+    changed = _changed_pixels(before[1], after[1])
+    return changed <= after[1].width * after[1].height * 0.005
+
+
+async def _frame_painted(call, png=None):
+    """Read frame geometry and pixels, never the sandbox's DOM or first-paint marker."""
+    result = await call("Runtime.evaluate", expression=FRAME_RECT, returnByValue=True)
+    rect = result.get("result", {}).get("value", False)
+    if rect is False and png is not None:
+        return "paint not verified"
+    if rect is None or rect is False:
+        return rect
+    if png is None:
+        shot = await call("Page.captureScreenshot", format="png", fromSurface=True)
+        png = base64.b64decode(shot["data"])
+    return _frame_pixels(png, rect)
 
 
 async def _wait_for_paint(probe, deadline, *, clock=time.monotonic, sleep=asyncio.sleep):
-    """A frame can be ready and empty. Only its marker ends this wait; None means a non-component page."""
+    """Stop on two nonblank frame captures about one second apart."""
+    last = False
     while (remaining := deadline - clock()) > 0:
         try:
             painted = await asyncio.wait_for(probe(), remaining)
         except asyncio.TimeoutError:
             return False
-        if painted is not False:
+        if painted is None:
             return painted
-        await sleep(min(0.25, max(0, deadline - clock())))
+        if painted and last and _stable_pixels(last, painted):
+            return PIXEL_PAINT
+        last = painted
+        await sleep(min(1.0, max(0, deadline - clock())))
     return False
 
 
@@ -348,13 +381,22 @@ async def _shoot(ws_url, url, origin, token, out, size, wait, read_only, host_ke
             return True
 
         async def capture():
+            nonlocal painted
             # Edge/Chrome's software compositor can hand back a stale tile right after a load: take one, let two
             # frames pass, keep the next (hidden_evidence.py does the same)
             await call("Page.captureScreenshot", format="png", fromSurface=True)
             await js("new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")
             shot = await call("Page.captureScreenshot", format="png", fromSurface=True)
-            import base64
-            Path(out).write_bytes(base64.b64decode(shot["data"]))
+            png = base64.b64decode(shot["data"])
+            Path(out).write_bytes(png)
+            # Label the image actually returned, even if paint appeared at the deadline
+            # or disappeared between the readiness probe and this capture.
+            try:
+                observed = await asyncio.wait_for(_frame_painted(call, png), 2)
+                if observed is not None:
+                    painted = observed if isinstance(observed, str) else PIXEL_PAINT if observed else False
+            except asyncio.TimeoutError:
+                painted = "paint not verified"
             text = await js(TEXT)
             return " ".join(str(text or "").split()), state["blocked"]
 
@@ -367,6 +409,15 @@ async def _shoot(ws_url, url, origin, token, out, size, wait, read_only, host_ke
             # Readiness may use the entire deadline; still allow a bounded capture of what actually appeared.
             try:
                 text, blocked = await asyncio.wait_for(capture(), 20)
+                # Content can disappear after the stable pair. A blank final capture must
+                # spend the remaining paint budget before claiming the deadline was missed.
+                while painted is False and (remaining := deadline - time.monotonic()) > 0:
+                    try:
+                        painted = await asyncio.wait_for(
+                            _wait_for_paint(lambda: _frame_painted(call), deadline), remaining)
+                    except asyncio.TimeoutError:
+                        painted = False
+                    text, blocked = await asyncio.wait_for(capture(), 20)
             except asyncio.TimeoutError:
                 raise RuntimeError("the hidden browser took too long to capture the picture")
             return text, blocked, painted
@@ -562,7 +613,7 @@ def snap(what, token, out, *, door="http://127.0.0.1:8810", source=None, world=N
             box.__exit__(None, None, None)
     if not Path(out).is_file() or Path(out).stat().st_size == 0:
         raise RuntimeError("no picture was taken")
-    paint_status = "" if painted else f"not painted after {LIMIT:g} s"
+    paint_status = painted if isinstance(painted, str) else ("" if painted else f"not painted after {LIMIT:g} s")
     if paint_status:
         _label_picture(out, paint_status)
     where = f"from {Path(source).name} (a hidden copy of the world)" if box else "live, read-only"

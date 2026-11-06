@@ -10,6 +10,10 @@ kd_system: what the machine is doing, as a module (SHAPE 11): system.now (see) a
 Claude (PROOF a13428), 24 Oct 2026; the readings themselves are sysread.py (ctypes only, nothing installed).
 
     system.now    CPU, memory, network, volume, battery, the window in front and the programs open   (see)
+    system.processes    top 30 process memory/CPU readings and all-process group totals             (see)
+
+Process accounting runs in a background thread of this kernel-owned module, not in a worker or under the
+kernel lock. It adds the `agora` memory key; process_read.py documents the grouping and sampling limits.
 
 Every two seconds it writes <world>/modules/system/live.json, one key per reading (cpu, memory, network, volume,
 battery, focused, apps), each {value, detail}; the desk's live layer (live.py) paints them onto widgets that `shows=`
@@ -21,11 +25,13 @@ import json
 import os
 import sys
 import time
+import threading
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from modproto import Module, log                    # noqa: E402
+import process_read                                # noqa: E402
 
 HEADLESS = "--headless" in sys.argv
 OURS = ("python", "pythonw", "msedgewebview2")       # the desk's own windows are not "programs open"
@@ -82,17 +88,26 @@ class System:
     def __init__(self):
         self.home, self.last = None, {}
         self.reader = None
+        self.processes = process_read.Reader(os.getppid(), [])
         self.m = Module(offer=self.offer(), on_call=self.call, on_hello=self.hello, on_off=self.off)
 
     def offer(self):
         return [{"word": "system.now", "kind": "see", "takes": "", "may": "anyone",
                  "help": "system.now: what this machine is doing: CPU, memory, network, volume, battery, the window "
                          "in front and the programs open. Widgets show the same (make kind=widget bar=top "
-                         "side=right shows=cpu label=CPU order=30)."}]
+                         "side=right shows=cpu label=CPU order=30). The agora row sums the kernel's process tree "
+                         "and verified helper Chrome working sets and private bytes; shared pages may overlap. "
+                         "Process samples refresh every 30 seconds; see system.processes for detail."},
+                {"word": "system.processes", "kind": "see", "takes": "", "may": "anyone",
+                 "help": process_read.HELP}]
 
     def hello(self, msg):
         if msg.get("home"):
             self.home = Path(msg["home"])
+        self.processes.prefixes = process_read.profile_prefixes(HERE, self.home)
+        if HEADLESS:
+            self.processes.last = dict(process_read.snapshot(
+                {"processes": [], "profiles": []}, 0, []), at=0)
 
     def read(self):
         if HEADLESS:
@@ -103,12 +118,16 @@ class System:
         return self.reader.read_all()
 
     def call(self, msg):
+        if msg.get("word") == "system.processes":
+            return process_read.response(self.processes.last)
         live = self.last or shape(self.read())
+        live = dict(live, agora=process_read.agora_memory(self.processes.last))
         rows = [dict(v, key=k, kind="reading") for k, v in live.items()]
         return {"text": "\n".join(f"{k}: {v['value']} ({v['detail']})" for k, v in live.items()), "rows": rows}
 
     def write(self):
         self.last = shape(self.read())
+        self.last["agora"] = process_read.agora_memory(self.processes.last)
         if not HEADLESS:
             import native_shell
             path = native_shell.program_path(native_shell.u.GetForegroundWindow())
@@ -135,6 +154,8 @@ class System:
     def run(self):
         self.m.run_reader()
         self.m.ready.wait(30)
+        if not HEADLESS:
+            threading.Thread(target=self.processes.loop, args=(self.m.closed,), daemon=True).start()
         self.loop()
 
 
