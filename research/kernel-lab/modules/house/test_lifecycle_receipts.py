@@ -46,7 +46,7 @@ def test_real_hidden_git_landing_ends_once(manager, monkeypatch, case):
     with patch.object(B.threading.Thread, 'start'):
         assert manager.land(msg()).get('external')
     began = time.monotonic()
-    manager.guarded(s, manager.land_all)
+    manager.run_landing(s)
     assert time.monotonic() - began < 60
     manager.deliver_outcomes()
     assert len(agent.woken) == 1 and expected in agent.woken[0][0]
@@ -77,7 +77,7 @@ def test_every_failed_land_wakes_once_with_step_reason_and_next_move(manager, st
     with patch.object(B.threading.Thread, 'start'):
         assert manager.land(msg()).get('external')
     began = time.monotonic()
-    manager.guarded(s, manager.land_all)
+    manager.run_landing(s)
     assert time.monotonic() - began < 60
     manager.deliver_outcomes()
     manager.outcome(s)
@@ -89,7 +89,7 @@ def test_every_failed_land_wakes_once_with_step_reason_and_next_move(manager, st
     # A second accepted landing that hits the same problem is a new end.
     with patch.object(B.threading.Thread, 'start'):
         manager.land(msg())
-    manager.guarded(s, manager.land_all)
+    manager.run_landing(s)
     assert len(agent.woken) == 2
 
 
@@ -102,7 +102,7 @@ def test_successful_land_wakes_once_after_activation(manager):
     manager.activate = lambda st: st.update(activation='nothing needed restarting; it is live')
     with patch.object(B.threading.Thread, 'start'):
         manager.land(msg())
-    manager.guarded(s, manager.land_all)
+    manager.run_landing(s)
     manager.outcome(s)
     manager.deliver_outcomes()
     assert len(agent.woken) == 1

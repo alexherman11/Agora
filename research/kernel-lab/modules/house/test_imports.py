@@ -83,7 +83,7 @@ def world(tmp_path, monkeypatch):
     home.mkdir()
     receipt = dict(task=card, phase="landed", review_base=BASE, landed_commit=LAND)
     h.builders = SimpleNamespace(repo=tmp_path / "repo", home=home, states={card: receipt},
-                                 landing_lock=threading.Lock(), steward=k.is_steward)
+                                 landing_lock=threading.Lock(), steward=k.is_steward, landing_blocker=lambda: '')
     git = Snapshot()
     monkeypatch.setattr(I, "git", git)
     gate = Mock()
@@ -151,6 +151,15 @@ def test_lens_uses_same_boundary(world):
     out = world.run(target=world.lens, field="text")
     assert out["ok"] and out["rows"][0]["review"] == "not-applicable"
     assert world.k.state.get(world.lens, "text") == CONTENT
+
+
+def test_surviving_landing_child_refuses_import_with_reason(world):
+    world.h.builders.landing_blocker = lambda: 'landing child PID 43210 may still be running'
+    before = len(world.k.log.records)
+    out = world.run()
+    assert not out['ok'] and '43210' in out['text']
+    assert len(world.k.log.records) == before
+    assert world.k.state.get(world.component, 'code') == 'old'
 
 
 @pytest.mark.parametrize("reason", ["untouched", "stale", "symlink", "unlanded", "missing-receipt",

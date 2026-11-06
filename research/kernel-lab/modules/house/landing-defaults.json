@@ -1,0 +1,6 @@
+{
+  "landing_timeout": 1800,
+  "landing_wait_timeout": 120,
+  "landing_cleanup_timeout": 30,
+  "landing_poll_interval": 0.1
+}

@@ -24,6 +24,8 @@ What each file in `research/kernel-lab/modules/house/` does, read from the code 
 - **`../../tests/test_house_refresh.py`**: fresh conversations on demand: current prompt, charter, welcome, guide and soul; preserved transcript and old state; sleeping and busy agents; queued messages and restart recovery; both transport commands; stale child events; failure handling; steward-only Lines dispatch.
 - **`test_builders.py`**: the builder lifecycle: ownership and holds, restart uncertainty, retries, review and landing against a real git repo, Codex progress privacy. Its `manager` fixture is shared by the other tests.
 - **`test_builder_capacity.py`**: pool sizes from `house-settings` (default, allowed values 1–4, bad or ambiguous settings refuse) and admission limits.
+- **`landing_control.py`**, **`landing-defaults.json`**: world-configurable deadlines, cancellable lock/process waits, and safe fencing when child termination is denied.
+- **`test_ghost_landing.py`**: immediate attempt receipts, real kernel owner-write refusal, requester/owner wakes, crash recovery, cancellation and import-lock isolation.
 - **`test_manager.py`**: `manager.py`: approval checks fail closed, no escalation, deduplicated receipts, only approved fields are written.
 - **`test_levers.py`**: the 4 Nov levers: stop and release a worker, a worker whose card moved on or finished ends released, one-step landing (and checking again when main moved), the House restarting itself only when nobody is busy.
 - **`test_workers.py`**: resident workers: separate Claude and Codex pools, `work` making a card and starting a worker, turns going to the worker's chat, the turn limit, the Claude CLI running in the worktree.
