@@ -262,3 +262,66 @@ def test_reading_and_help_are_registered_and_reading_never_writes_world(folder, 
     assert json.loads(k.slow.path.read_text().splitlines()[-1]) == row
     with pytest.raises(Refused):
         slow.slow(k, Actor("outsider", "outsider", "person"), None, None, None, None)
+
+
+def test_registration_is_idempotent_across_concurrent_initializers(monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from kernel import words
+    other = {"word": "other", "bound": "other"}
+    handler = object()
+    monkeypatch.setattr(words, "KERNEL_ENTRIES", [other])
+    monkeypatch.setattr(words, "KERNEL", {"other": handler})
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(lambda _: slow.register(), range(32)))
+    assert len(words.KERNEL_ENTRIES) == 2
+    assert words.KERNEL_ENTRIES[0] is other
+    assert words.KERNEL == {"other": handler, "kernel.slow": slow.slow}
+    assert words.KERNEL_ENTRIES[1]["may"] == "stewards"
+
+
+@pytest.mark.parametrize("collision", ["handler", "entry"])
+def test_registration_refuses_collisions_without_changing_registry(monkeypatch, collision):
+    from kernel import words
+    entries = [{"word": "kernel.slow", "bound": "another"}] if collision == "entry" else []
+    handlers = {"kernel.slow": object()} if collision == "handler" else {}
+    monkeypatch.setattr(words, "KERNEL_ENTRIES", entries)
+    monkeypatch.setattr(words, "KERNEL", handlers)
+    before = list(entries), dict(handlers)
+    with pytest.raises(RuntimeError, match="registration conflicts"):
+        slow.register()
+    assert (entries, handlers) == before
+
+
+def test_registration_upgrades_existing_world_once_and_preserves_renamed_word(folder, monkeypatch):
+    from kernel import words
+    # A disposable old world from before this reading existed.
+    with monkeypatch.context() as old:
+        old.setattr(words, "KERNEL_ENTRIES", [
+            e for e in words.KERNEL_ENTRIES if e["bound"] != "kernel.slow"])
+        old.setattr(words, "KERNEL", {
+            name: handler for name, handler in words.KERNEL.items() if name != "kernel.slow"})
+        old.setattr(slow, "register", lambda: None)
+        k = Kernel(folder, {"tag": "ts", "name": "Test", "steward": {"account": "test", "name": "Test"}})
+        seq = len(k.log.records)
+        assert not any(k.state.get(e, "bound") == "kernel.slow" for e in k.things("word"))
+    k = Kernel(folder)
+    eid = k.find_entry("kernel.slow", None)
+    assert len(k.log.records) == seq + 1
+    person = next(p for p in k.things("person") if k.is_steward(p))
+    actor = Actor(person, person, "person")
+    # Model a previously customized dictionary, as the existing renamed-word
+    # replay tests do; ordinary set deliberately refuses dictionary entries.
+    from kernel.kernel import Tx
+    with k.lock:
+        tx = Tx(k)
+        tx.part("rename", eid, "customized dictionary fixture")
+        tx.set(eid, "word", "lock.events")
+        tx.set(eid, "help", "local help")
+        k._commit(tx, by=person, words="customized dictionary fixture")
+    seq = len(k.log.records)
+    k = Kernel(folder)
+    assert len(k.log.records) == seq
+    assert k.find_entry("lock.events", None) == eid
+    assert k.step(actor, "lock.events", mode="see")["rows"] == []
+    assert "local help" in k.step(actor, "help lock.events", mode="see")["text"]
+    assert sum(k.state.get(e, "bound") == "kernel.slow" for e in k.things("word")) == 1

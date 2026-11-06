@@ -106,7 +106,8 @@ class Kernel:
         self.state = self.log.replay()
         self.keep_dir = self.dir / "keep"
         self.keep_dir.mkdir(parents=True, exist_ok=True)
-        from .slow import SlowLog, TimedRLock
+        from .slow import SlowLog, TimedRLock, register
+        register()
         self.slow = SlowLog(self.keep_dir / "kernel-slow.jsonl")
         self.lock = TimedRLock(self.slow)
         from .refusals import Refusals

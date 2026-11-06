@@ -13,6 +13,28 @@ import time
 
 THRESHOLD = 0.300
 KEEP = 50
+_registration_lock = threading.Lock()
+
+
+def register():
+    """Install before genesis/replay upgrades, without editing the shared word table."""
+    from .words import KERNEL, KERNEL_ENTRIES, _k
+    entry = _k(
+        "kernel.slow", "see", "", "stewards", "no",
+        help="kernel.slow: the last 50 completed kernel lock waits and outer holds over 300 ms, newest first: "
+             "word or verb, module, caller, duration and code location. A wait also names the holder observed "
+             "when it began; other holders may intervene. Stewards only; no command arguments are kept. "
+             "Kept in memory and appended to keep/kernel-slow.jsonl beside the world, read back on start. "
+             "Events appear after release; this is not a live stack reading.")
+    with _registration_lock:
+        existing = [e for e in KERNEL_ENTRIES
+                    if e.get("bound") == "kernel.slow" or e.get("word") == "kernel.slow"]
+        if (KERNEL.get("kernel.slow", slow) is not slow or
+                any(e != entry for e in existing)):
+            raise RuntimeError("kernel.slow registration conflicts with another definition")
+        if not existing:
+            KERNEL_ENTRIES.append(entry)
+        KERNEL["kernel.slow"] = slow
 
 
 class SlowLog:
