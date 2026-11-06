@@ -207,9 +207,25 @@ KERNEL_ENTRIES = [
     _k("chat.receive", "do", "<id> text=<text> speaker=<name> external_id=<id>", "anyone", "yes",
        help="chat.receive <chat> text=... speaker=... external_id=...: import one external line; only the "
             "read-only chat's designated source module may use this. Duplicate ids do nothing; no local @name wakes."),
-    _k("chat", "see", "<id> [limit=<n>] [since=<id>]", "anyone", "no",
-       help="chat <chat> [limit=20] [since=<said line>]: its latest lines, oldest first, as you may see them. "
+    _k("chat", "see", "<id> [limit=<n>] [since=<id>] [before=<id>] [pinned=yes]", "anyone", "no",
+       help="chat <chat> [limit=20] [since=<said line>] [before=<said line>] [pinned=yes]: its latest lines, oldest "
+            "first, as you may see them, each with who said it (by_id, name, guest, badge), when (at, ts in epoch "
+            "seconds), its reply (an excerpt), edited, reactions, mentions and files. before= pages older, since= "
+            "newer; pinned=yes reads its pinned lines. A removed line shows (emptied) only while a reply points at it. "
             "make kind=chat name=<name> makes an open chat; with=\"<names>\" makes one only those people see."),
+    _k("react", "do", "<id> emoji=<emoji>", "members", "yes",
+       help="react <said line> emoji=<emoji>: add your reaction to a chat line, or take it back if it is already "
+            "yours (one per person per emoji; an emoji is 1-16 characters, no spaces; at most 20 different on a line). "
+            "Not sealed: the chat reading shows who reacted. undo takes it back too."),
+    _k("visitors", "do", "on|off [name=<name>]", "stewards", "yes",
+       help="visitors on [name=Visitor]: people who have not signed in read this world as its visitor, seeing only "
+            "what is shown to everyone (seen-by <thing> everyone); every act they try is refused 'sign in to send'. "
+            "visitors off: signed-out readers are refused again. undo takes either back."),
+    _k("seen-by", "do", "<id> everyone|place", "leaders", "yes",
+       help="seen-by <thing> everyone: show a thing the whole place sees to signed-out visitors too (visitors on). "
+            "On a group, its things that are seen by the place follow it, so a group of announcements opens at once; "
+            "things narrowed to members, leaders or a person stay narrowed. seen-by <thing> place: the place only "
+            "again. Leaders of the thing's group say it; undo takes it back."),
     _k("look", "see", "[<id>]", "anyone", "no", aliases="l",
        help="look: the feed, pinned posts first, then the newest.\nlook <thing>: one thing, as you may see it."),
     _k("help", "see", "[<word>]", "anyone", "no", aliases="?",
@@ -332,7 +348,8 @@ RESERVED.update(PROTECTED | {'pin_until', 'forget_reason'})
 RESERVED.add('via_actor')
 RESERVED.update({'conversation_agent', 'conversation_owner'})
 RESERVED.update({'outside', 'outside_not'})      # the kernel's answer to a module, never a fact (review, Low)
-RESERVED_PREFIX = ("in:", "like:", "member:", "answer:", "sees.", "vote:", "claim:", "contact:")
+RESERVED_PREFIX = ("in:", "like:", "member:", "answer:", "sees.", "vote:", "claim:", "contact:", "react:")
+RESERVED.update({'visitor', 'guest', 'guest_until'})
 
 FLOOR_HELP = {e["word"]: e["help"] for e in KERNEL_ENTRIES if e["word"] in FLOOR}
 
@@ -505,9 +522,15 @@ def like(k, actor, st, entry, tx, group, saw=None):
 
 def pin(k, actor, st, entry, tx, group, saw=None):
     t = st.target
-    if k.state.get(t, "kind") != "post":
-        raise Refused(f"{t} is not a post; only posts are pinned")
+    if k.state.get(t, "kind") not in ("post", "said"):
+        raise Refused(f"{t} is not a post or a chat line; only those are pinned")
     k.fence(actor, t, ["pinned"], saw)
+    if str(st.kv.get("off", "")).lower() in ("yes", "true"):
+        if not tx.get(t, "pinned"):
+            return {"text": f"{t} is not pinned; nothing changed"}
+        tx.set(t, "pinned")
+        tx.set(t, "pin_until")
+        return {"text": f"ok pin {t} off=yes [r?] · no longer pinned"}
     if tx.get(t, "pinned"):
         return {"text": f"{t} is already pinned (by {k.name(tx.get(t, 'pinned'))}); nothing changed"}
     tx.set(t, "pinned", actor.person)
@@ -515,6 +538,8 @@ def pin(k, actor, st, entry, tx, group, saw=None):
         from .world_words import utc
         utc(st.kv['until'])
         tx.set(t, 'pin_until', st.kv['until'])
+    if k.state.get(t, "kind") == "said":
+        return {"text": f"ok pin {t} [r?] · among its chat's pinned lines (chat <chat> pinned=yes)"}
     return {"text": f"ok pin {t} [r?] · it stays at the top of the feed"}
 
 
@@ -766,7 +791,8 @@ def make(k, actor, st, entry, tx, group, saw=None):
     if kind == 'file-settings' and not k.is_steward(actor.person):
         raise Refused('file-settings belongs to stewards')
     if sees is not None and sees not in SEES_SAID:
-        raise Refused("sees= says me, leaders, group or place: who besides the kernel may see it")
+        raise Refused("sees= says me, leaders, group or place: who besides the kernel may see it (make only narrows; "
+                      "seen-by <thing> everyone shows a thing to signed-out visitors)")
     closed = None
     if kind == "chat" and kv.get("with"):
         from .chat import closed_sees
@@ -927,12 +953,68 @@ def set_(k, actor, st, entry, tx, group, saw=None):
 def forget(k, actor, st, entry, tx, group, saw=None):
     t = st.target
     k.reaches(actor, "forget", k.state.get(t, "kind"), target=t, group=group)
-    if k.state.get(t, "kind") in RESERVED_KINDS:
+    # a chat line is removed by its speaker or the chat's leaders (may: maker or leaders), as any made thing is
+    if k.state.get(t, "kind") in RESERVED_KINDS and k.state.get(t, "kind") != "said":
         raise Refused(f"{t} is a {k.state.get(t, 'kind')}, which forget does not take")
     tx.set(t, "forgotten", actor.person)
     if st.kv.get('reason'):
         tx.set(t, 'forget_reason', st.kv['reason'])
     return {"text": f"ok forget {t} [r?] · out of every view; undo brings it back"}
+
+
+def visitors(k, actor, st, entry, tx, group, saw=None):
+    """visitors on|off: whether signed-out readers read this world, as its one visitor person."""
+    said = (st.words or st.target or "").strip().lower()
+    if said not in ("on", "off"):
+        raise Refused("visitors on|off: on lets people who have not signed in read what is shown to everyone")
+    now = k.visitor()
+    if said == "off":
+        if not now:
+            return {"text": "visitors are already off; nothing changed"}
+        tx.set("world", "visitor")
+        return {"text": "ok visitors off [r?] · signed-out readers are refused; undo lets them back"}
+    if now:
+        return {"text": f"visitors are already on, as {k.name(now)}; nothing changed"}
+    vid = next((p for p in k.things("person") if k.is_visitor(p) and not k.state.get(p, "forgotten")), None)
+    if vid is None:
+        vid = tx.mint()
+        tx.set(vid, "kind", "person")
+        tx.set(vid, "name", str(st.kv.get("name") or "Visitor")[:60])
+        tx.set(vid, "visitor", "yes")
+    tx.set("world", "visitor", vid)
+    return {"text": f"ok visitors on [r?] · signed-out readers read as {tx.get(vid, 'name') or 'Visitor'}, "
+                    f"and see only what is seen-by everyone"}
+
+
+NOT_SHOWN_ALONE = {"person", "agent", "module", "grant", "invite", "said", "file"}
+
+
+def seen_by(k, actor, st, entry, tx, group, saw=None):
+    """seen-by <thing> everyone|place: widen a place-wide thing to signed-out visitors, or narrow it back."""
+    t = st.target
+    to = (st.words or st.kv.get("to") or "").strip().lower()
+    if to not in ("everyone", "place"):
+        raise Refused("seen-by <thing> everyone|place: everyone adds signed-out visitors; place is the place only")
+    kind = k.state.get(t, "kind")
+    if kind in NOT_SHOWN_ALONE or t == "world":
+        raise Refused(f"a {kind} follows what it belongs to; open that instead")
+    if kind == "group" and not k.state.get(t, "open"):
+        raise Refused(f"{k.name(t)} is not open: its members see it, so it is not opened to visitors")
+    rule = k.state.get(t, "sees")
+    if rule not in (None, "place", "public", "everyone"):
+        raise Refused(f"{k.name(t)} is narrowed (seen by {rule}); seen-by opens only what the whole place sees")
+    if rule is None and any(k.state.get(g, "kind") == "group" and not k.state.get(g, "open") for g in k.groups_of(t)):
+        raise Refused(f"{k.name(t)} is in a group that is not open; seen-by opens only what the whole place sees")
+    if to == "everyone":
+        if rule == "everyone":
+            return {"text": f"{k.name(t)} is already seen by everyone; nothing changed"}
+        tx.set(t, "sees", "everyone")
+        return {"text": f"ok seen-by {t} everyone [r?] · signed-out visitors see it" + (
+            ", and its things the place sees" if kind in ("group", "place") else "")}
+    if rule in (None, "place"):
+        return {"text": f"{k.name(t)} is already seen by the place only; nothing changed"}
+    tx.set(t, "sees")
+    return {"text": f"ok seen-by {t} place [r?] · the place only, again"}
 
 
 def _about(k, actor, st, tx, t):
@@ -1296,7 +1378,7 @@ from .readings import who, recent, kinds, on, press
 from .refusals import refusals, failed
 from .kinds import mark, words_for, alike_word, aspects_word, NOT_FITTED as NOT_FITTED_KINDS
 from .bonds import turn                  # the graph's readings (around, nearby, preview) are held (28 Oct)
-from .chat import say, receive as chat_receive, chat as chat_word, closed_sees
+from .chat import say, receive as chat_receive, chat as chat_word, closed_sees, react as chat_react
 from .store import GONE
 from .next_steps import change as task_change
 from .card_signals import signal as card_signal
@@ -1333,4 +1415,4 @@ KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant":
           "vote": vote, "role": role, "rows": rows, "find": rows, "search": search, "verb": verb,
           "who": who, "recent": recent, "kinds": kinds, "on": on, "press": press, "say": say, "chat": chat_word,
           "refusals": refusals, "failed": failed, "mark": mark, "actions": words_for, "turn": turn,
-          "chat.receive": chat_receive, "alike": alike_word, "aspects": aspects_word}
+          "chat.receive": chat_receive, "react": chat_react, "visitors": visitors, "seen-by": seen_by, "alike": alike_word, "aspects": aspects_word}
