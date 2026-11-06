@@ -15,10 +15,11 @@ import time
 GROUPS = ("agora", "agora-helper-chrome", "other")
 HELP = ("system.processes: read-only top 30 processes by working set, plus totals for ALL processes "
         "in agora (kernel and live descendant tree), agora-helper-chrome (Chrome/Edge with a verified "
-        "Agora test/snap profile), and other. Rows: name, pid, parent_pid, working_set, private_bytes "
+        "Agora test/snap profile and their verified descendant trees), and other. Rows: name, pid, parent_pid, working_set, private_bytes "
         "(bytes), cpu_pct (percent of total machine CPU). Only helper profile folders are exposed; "
         "no titles or other command-line data. Samples refresh in the background every 30 seconds; "
-        "CPU is unknown until two samples, and for new/reused PIDs. Missing counters stay unknown. "
+        "Each refresh takes two CPU samples about 0.5 seconds apart, off the kernel lock. "
+        "CPU stays unknown for new/reused PIDs and missing counters. "
         "Working sets can share pages; their sum is not unique physical RAM. An untraceable orphan "
         "stays other unless its helper profile proves ownership. This reading never ends processes.")
 
@@ -37,19 +38,19 @@ def profile_prefixes(here, home):
 
 
 def helper_profile(folder, prefixes):
-    if not folder or not ntpath.isabs(folder):
+    if not folder or not ntpath.isabs(folder) or not ntpath.splitdrive(folder)[0]:
         return None
     folder = ntpath.normpath(folder)
     return folder if any(folder.casefold().startswith(p.casefold()) for p in prefixes) else None
 
 
-def collect(prefixes):
-    """Called only in the system module's background thread. Never at import."""
+def collect(prefixes, timeout=8):
+    """System-module sampling or explicit helper inventory; never at import."""
     result = subprocess.run(
         ["powershell.exe", "-NoProfile", "-NonInteractive", "-File",
          str(Path(__file__).with_suffix(".ps1"))],
         input=json.dumps({"prefixes": prefixes}), capture_output=True,
-        encoding="utf-8", timeout=8, creationflags=0x08000000)
+        encoding="utf-8", timeout=timeout, creationflags=0x08000000)
     if result.returncode:
         raise OSError("Process inventory unavailable")
     return json.loads(result.stdout)
@@ -59,12 +60,43 @@ def _number(value):
     return int(value) if value is not None else None
 
 
+def helper_processes(raw, prefixes):
+    """All verified helper-tree identities, including children lacking a profile flag.
+
+    Birth times bind both the command-line reading and each parent link. Neither
+    a browser's name alone nor a dead/reused parent is evidence of ownership.
+    The returned birth times are internal, used again at the termination handle.
+    """
+    processes = {int(p["pid"]): p for p in raw["processes"]}
+    browsers = {"chrome.exe", "msedge.exe"}
+    direct = {int(p["pid"]): helper_profile(p.get("profile"), prefixes)
+              for p in raw.get("profiles", [])
+              if p.get("born") and processes.get(int(p["pid"]), {}).get("born") == p["born"]
+              and processes[int(p["pid"])]["name"].lower() in browsers}
+    found = {}
+    for pid, row in processes.items():
+        current, seen = pid, set()
+        while current in processes and current not in seen:
+            seen.add(current)
+            child = processes[current]
+            if not child.get("born"):
+                break
+            if current in direct:
+                if direct[current]:
+                    found[pid] = dict(row, profile=direct[current])
+                break
+            parent_id = int(child["parent_pid"])
+            parent = processes.get(parent_id)
+            if not parent or not parent.get("born") or int(parent["born"]) > int(child["born"]):
+                break
+            current = parent_id
+    return found
+
+
 def snapshot(raw, kernel_pid, prefixes, previous=None, elapsed=0, cpus=1):
     """Sanitize, classify and aggregate every row BEFORE selecting the top 30."""
     processes = {int(p["pid"]): p for p in raw["processes"]}
-    profiles = {int(p["pid"]): helper_profile(p.get("profile"), prefixes)
-                for p in raw.get("profiles", [])
-                if p.get("born") and processes.get(int(p["pid"]), {}).get("born") == p["born"]}
+    helpers = helper_processes(raw, prefixes)
 
     def ours(pid):
         seen = set()
@@ -92,7 +124,10 @@ def snapshot(raw, kernel_pid, prefixes, previous=None, elapsed=0, cpus=1):
             delta = ticks - int(old["cpu_ticks"])
             if delta >= 0:
                 cpu = round(min(100, delta / 10_000_000 / elapsed / max(1, cpus) * 100), 2)
-        profile = profiles.get(pid) if p["name"].lower() in ("chrome.exe", "msedge.exe") else None
+        # Win32_Process includes the idle pseudo-process: it isn't CPU consumed.
+        if pid == 0:
+            cpu = 0.0
+        profile = helpers.get(pid, {}).get("profile")
         row = {"kind": "process", "name": p["name"], "pid": pid, "parent_pid": int(p["parent_pid"]),
                "working_set": _number(p.get("working_set")), "private_bytes": _number(p.get("private_bytes")),
                "cpu_pct": cpu,
@@ -117,21 +152,16 @@ class Reader:
     def __init__(self, kernel_pid, prefixes):
         self.kernel_pid, self.prefixes = kernel_pid, prefixes
         self.last = {"error": "Process inventory is warming up", "at": None}
-        self.previous, self.previous_at = None, None
 
     def sample(self):
         try:
             raw = collect(self.prefixes)
-            now = time.monotonic()
-            data = snapshot(raw, self.kernel_pid, self.prefixes, self.previous,
-                            now - self.previous_at if self.previous_at is not None else 0,
+            previous = {int(p["pid"]): p for p in raw.get("previous", [])}
+            data = snapshot(raw, self.kernel_pid, self.prefixes, previous, raw.get("elapsed", 0),
                             os.cpu_count() or 1)
-            self.previous = {int(p["pid"]): p for p in raw["processes"]}
-            self.previous_at = now
             self.last = dict(data, at=time.time())
         except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
             self.last = {"error": "Process inventory unavailable; no alternate access attempted", "at": time.time()}
-            self.previous, self.previous_at = None, None
 
     def loop(self, closed):
         while not closed.is_set():

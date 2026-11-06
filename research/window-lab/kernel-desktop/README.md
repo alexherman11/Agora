@@ -327,7 +327,7 @@ A button's `does` runs as whoever presses it. A pinned thing (`make kind=pin bar
 |---|---|
 | `kdesk.py` | the process: kernel + extension, the door with `/desk/`, the sign-in stand-in, the genesis of Alex's desktop world |
 | `kd_window.py` | the window module and the desktop host: WebView2 windows, AppBars on the top and bottom edges, drags, closes, full-screen step-back |
-| `kd_system.py`, `sysread.py` | the system module (`system.now`, live readings) and its readings: ctypes only, nothing installed (`sysread.py` written by Codex from Claude's brief, reviewed and run here) |
+| `kd_system.py`, `sysread.py` | the system module (`system.now`, live readings) and its readings; process accounting and explicit steward-only helper cleanup are described in [Process accounting](PROCESS-ACCOUNTING.md) |
 | `kd_media.py` | the media module: `media.play/next/prev/now` over window-lab's `media.py` |
 | `live.py` | the live layer: widgets carry module readings when painted, never recorded |
 | `lenses/topbar.lens`, `lenses/bars.style`, `lenses/bars.lines` | the top bar's lens, its style and its widgets, as made in the world |

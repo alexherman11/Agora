@@ -6,7 +6,8 @@ $ErrorActionPreference = 'Stop'
 try {
     $config = [Console]::In.ReadToEnd() | ConvertFrom-Json
     $fields = 'Name,ProcessId,ParentProcessId,CreationDate,WorkingSetSize,PrivatePageCount,KernelModeTime,UserModeTime'
-    $processes = @(Get-CimInstance -Query "SELECT $fields FROM Win32_Process" | ForEach-Object {
+    function Read-Processes {
+      @(Get-CimInstance -Query "SELECT $fields FROM Win32_Process" | ForEach-Object {
         @{
             name = $_.Name; pid = [int]$_.ProcessId; parent_pid = [int]$_.ParentProcessId
             born = if ($_.CreationDate) { $_.CreationDate.ToUniversalTime().Ticks.ToString() } else { $null }
@@ -15,7 +16,16 @@ try {
                 [decimal]$_.KernelModeTime + [decimal]$_.UserModeTime
             } else { $null }
         }
-    })
+      })
+    }
+    # Both samples belong to one collection, including the first after startup.
+    # Use a monotonic clock; wall-clock adjustments must not distort CPU rates.
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    $previous = @(Read-Processes)
+    $firstAt = $clock.Elapsed.TotalSeconds
+    Start-Sleep -Milliseconds 500
+    $processes = @(Read-Processes)
+    $elapsed = $clock.Elapsed.TotalSeconds - $firstAt
     $profiles = @()
     # Only browser processes matching an Agora-owned profile prefix are queried
     # for CommandLine. No general application/browser command-line dump.
@@ -48,7 +58,8 @@ try {
             }
         }
     }
-    @{processes = $processes; profiles = $profiles} | ConvertTo-Json -Depth 4 -Compress
+    @{processes = $processes; profiles = $profiles; previous = $previous; elapsed = $elapsed} |
+        ConvertTo-Json -Depth 4 -Compress
 } catch {
     # Never echo exception text: it can include query inputs or command lines.
     [Console]::Error.WriteLine('Process inventory unavailable.')
