@@ -61,6 +61,9 @@ ROOT = LAB.parents[1]                                   # the checkout this file
 DESK_REL = Path("research") / "window-lab" / "kernel-desktop"
 LIVE_WORLD = ROOT / DESK_REL / "state" / "world"
 PY = ROOT / ".venv" / "Scripts" / "python.exe"
+if not PY.is_file():
+    # Worker trees share the interpreter running their checks, as kdesk.py does.
+    PY = Path(sys.prefix) / "Scripts" / "python.exe"
 NO_WINDOW = 0x08000000
 LIMIT = 90.0                                            # seconds, for the whole snap
 
