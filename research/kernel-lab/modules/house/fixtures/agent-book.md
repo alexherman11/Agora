@@ -222,3 +222,10 @@ From $.name ($.role; $.owner stays in charge): $.words
 ### A picture failed
 
 ~ The picture of $.label failed: $.detail
+
+### House card write failed
+
+~ The House could not write its build receipt to $.card: $.reason
+The card may show stale status. Its lead and the coordination chat receive this
+notice independently of the worker's saved owner. Inspect the House receipt and
+the module's card-write scope before retrying.

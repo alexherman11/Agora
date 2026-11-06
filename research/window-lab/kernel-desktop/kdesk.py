@@ -27,6 +27,7 @@ import mimetypes
 import os
 import secrets
 import re
+import shlex
 import sys
 import time
 from pathlib import Path
@@ -89,7 +90,9 @@ def module_specs(headless=False):
         {"name": "twitch", "run": [str(VENV_PY), str(ADAPTERS)] + tail, "publishes": "twitch.*",
          "grants": "rows chat.receive", "only": "kind:chat,said", "for": "steward"},
         {"name": "house", "run": [py, str(HERE.parents[1] / "kernel-lab/modules/house/house.py")],
-         "publishes": "house.*", "grants": HOUSE_GRANTS, "for": "steward"},
+         "publishes": "house.*", "grants": HOUSE_GRANTS, "for": "steward",
+         "scoped_grants": json.loads(
+             (HERE.parents[1] / "kernel-lab/modules/house/grants.json").read_text(encoding="utf-8"))},
         {"name": "theme", "run": [py, str(HERE.parents[1] / "kernel-lab/theme/theme_module.py")],
          "publishes": "theme.*", "grants": THEME_GRANTS, "only": "kind:theme,theme-settings,theme-choice",
          "for": "steward"},
@@ -127,9 +130,10 @@ def after_genesis(k, headless=False):
     from kernel.kernel import Tx
     with k.lock:
         todo = []
+        specs = module_specs(headless)
         steward = next((t for t in k.things("person") if k.is_steward(t)), None)
         have = {k.state.get(m, "name") for m in k.things("module")}
-        new = [spec for spec in module_specs(headless) if spec["name"] not in have]
+        new = [spec for spec in specs if spec["name"] not in have]
         viewer_pin = not k.state.get(k.place, "viewer_installed")
         for m in k.things("module"):
             if k.state.get(m, "name") in ABOUT and steward and not k.state.get(m, "for"):
@@ -148,13 +152,13 @@ def after_genesis(k, headless=False):
                 todo.append((m, "about", ABOUT[name]))
             # a module whose program is gone from source (4 Nov: kd_twitch.py became the adapter source) follows what
             # source now runs it with; a run someone pointed at a program that exists is theirs and stays
-            spec = next((s for s in module_specs(headless) if s["name"] == name), None)
+            spec = next((s for s in specs if s["name"] == name), None)
             run = k.state.get(m, "run") or []
             if spec and run != spec["run"] and not all(Path(a).is_file() for a in run[1:2]):
                 todo.append((m, "run", spec["run"]))
         widen = []
         for m in k.things("module"):
-            spec = next((s for s in module_specs(headless) if s["name"] == k.state.get(m, "name")), None)
+            spec = next((s for s in specs if s["name"] == k.state.get(m, "name")), None)
             if spec is None or not k.state.get(m, "on"):
                 continue                 # `off <module>` takes its grants back; a start never hands them out again
             words, granted = spec["grants"].split(), set()
@@ -169,6 +173,21 @@ def after_genesis(k, headless=False):
                 widen.append((m, " ".join(more), spec.get("only")))
             if str(k.state.get(m, "asks") or "") != spec["grants"]:
                 todo.append((m, "asks", spec["grants"]))
+            # Words alone cannot describe a new field-limited capability: House already has
+            # `set` on several individual objects. Remember each (word, scope) request, even
+            # after source stops asking, so a steward's revocation is never undone by startup.
+            seen_scoped = list(k.state.get(m, "asks_scoped") or [])
+            asked_scoped = list(seen_scoped)
+            for request in _scoped_requests(spec):
+                if request in seen_scoped:
+                    continue
+                asked_scoped.append(request)
+                if not any(k.state.get(g, "only") == request["only"] and
+                           request["words"] in str(k.state.get(g, "words") or "").split()
+                           for g in k._grants_to(m)):
+                    widen.append((m, request["words"], request["only"]))
+            if asked_scoped != seen_scoped:
+                todo.append((m, "asks_scoped", asked_scoped))
         if not todo and not new and not viewer_pin:
             return _widen(k, steward, widen)
         tx = Tx(k)
@@ -192,17 +211,36 @@ def after_genesis(k, headless=False):
                 tx.set(g, a, v)
             if spec.get('only'):
                 tx.set(g, 'only', spec['only'])
+            scoped = _scoped_requests(spec)
+            if scoped:
+                tx.set(mid, "asks_scoped", scoped)
+                widen.extend((mid, r["words"], r["only"]) for r in scoped)
         k._commit(tx, by="kernel", words="install: what each module is, whose, and the window grant's narrowing")
     _widen(k, steward, widen)
+
+
+def _scoped_requests(spec):
+    """Additional module capabilities, each with an explicit target/field scope."""
+    requests = []
+    for grant in spec.get("scoped_grants", []):
+        only = grant.get("only")
+        if not isinstance(only, str) or not only.strip():
+            raise ValueError("scoped module grants require a nonempty only scope")
+        for word in grant["words"].split():
+            request = dict(words=word, only=only)
+            if request not in requests:
+                requests.append(request)
+    return requests
 
 
 def _widen(k, steward, widen):
     """Source now asks for words the world never granted a module (28 Oct: the House's `turn`, the window host's
     `who`): each is one more `grant`, said as the steward, as it would be said by hand; undo takes it back, and the
-    module's `asks` keeps it from coming back on the next start."""
+    module's `asks`/`asks_scoped` keeps it from coming back on the next start."""
     actor = k.actor_of(steward) if widen and steward else None
     for m, words, only in widen if actor else ():
-        out = k.run(actor, f'grant {m} words="{words}"' + (f" only={only}" if only else ""))
+        out = k.run(actor, f'grant {m} words={shlex.quote(words)}' +
+                    (f" only={shlex.quote(only)}" if only else ""))
         print(f"kdesk: {k.state.get(m, 'name')} now needs {words}: {out['text'].splitlines()[0]}", flush=True)
 
 
