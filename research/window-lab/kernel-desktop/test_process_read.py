@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import subprocess
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -90,7 +91,6 @@ class ProcessTests(unittest.TestCase):
         with patch.object(p, "collect", side_effect=OSError("secret command line")) as collect:
             reader.sample()
             collect.assert_called_once()
-        self.assertIsNone(reader.previous)
         self.assertEqual(p.agora_memory(reader.last)["value"], "unavailable")
         self.assertNotIn("secret", json.dumps(p.response(reader.last)))
         self.assertEqual(p.response(reader.last)["rows"], [])
@@ -107,6 +107,69 @@ class ProcessTests(unittest.TestCase):
             self.assertEqual(words["system.processes"]["kind"], "see")
             self.assertIn("profile", words["system.processes"]["help"])
             self.assertIn("system.processes", words["system.now"]["help"])
+
+    def test_first_refresh_has_cpu_and_does_not_use_last_refresh(self):
+        reader = p.Reader(1, PREFIXES)
+        raw = {"previous": [proc(1)], "processes": [proc(1, ticks=15_000_000), proc(2)],
+               "elapsed": 0.5}
+        with patch.object(p, "collect", return_value=raw), patch.object(p.os, "cpu_count", return_value=4):
+            reader.sample()
+            self.assertEqual(reader.last["rows"][0]["cpu_pct"], 25)
+            self.assertIsNone(reader.last["rows"][1]["cpu_pct"])
+            raw["previous"][0]["cpu_ticks"] = 100_000_000
+            raw["processes"][0]["cpu_ticks"] = 105_000_000
+            reader.sample()
+            self.assertEqual(reader.last["rows"][0]["cpu_pct"], 25)
+
+    def test_idle_is_not_counted_as_cpu_consumed(self):
+        raw = {"processes": [proc(0, name="System Idle Process", ticks=90_000_000)]}
+        data = p.snapshot(raw, 1, [], {0: proc(0)}, 1, 1)
+        self.assertEqual(data["totals"][2]["cpu_pct"], 0)
+
+    def test_cached_readings_do_not_wait_for_background_cpu_sampling(self):
+        system = kd_system.System()
+        system.last = kd_system.shape(kd_system.FIXED)
+        started, release, sampled = threading.Event(), threading.Event(), threading.Event()
+        reader_thread = []
+        def collect(prefixes):
+            reader_thread.append(threading.get_ident())
+            started.set()
+            assert release.wait(3)
+            sampled.set()
+            return {"processes": [], "previous": [], "elapsed": 0.5}
+        def main_loop():
+            assert started.wait(3)
+            self.assertNotEqual(reader_thread, [threading.get_ident()])
+            self.assertFalse(sampled.is_set())
+            self.assertIn("warming up", system.call({"word": "system.processes"})["text"])
+            self.assertIn("cpu:", system.call({"word": "system.now"})["text"])
+        system.m.run_reader = lambda: None
+        system.m.ready.set()
+        system.loop = main_loop
+        with patch.object(kd_system, "HEADLESS", False), patch.object(p, "collect", side_effect=collect):
+            try:
+                system.run()
+            finally:
+                system.m.closed.set()
+                release.set()
+                self.assertTrue(sampled.wait(3))
+
+    def test_helper_children_need_verified_ancestry_not_names(self):
+        raw = {"processes": [proc(8, name="chrome.exe", born="20"),
+                             proc(9, 8, "chrome.exe", born="21"),
+                             proc(10, 9, "chrome.exe", born="22"),
+                             proc(11, 8, "chrome.exe", born="19"),  # reused parent
+                             proc(12, 99, "chrome.exe"),  # missing parent
+                             proc(13, 8, "crashpad_handler.exe", born="22"),
+                             proc(14, 13, "utility.exe", born="23"),
+                             proc(15, 0, "crashpad_handler.exe", born="22")],
+               "profiles": [{"pid": 8, "born": "20", "profile": r"C:\Temp\kernel-shoot-abc"}]}
+        helpers = p.helper_processes(raw, PREFIXES)
+        self.assertEqual(set(helpers), {8, 9, 10, 13, 14})
+        data = p.snapshot(raw, 1, PREFIXES)
+        self.assertEqual(data["totals"][1]["count"], 5)
+        self.assertTrue(all(r.get("profile") == r"C:\Temp\kernel-shoot-abc"
+                            for r in data["rows"] if r["group"] == "agora-helper-chrome"))
 
     def test_powershell_collector_with_fixture_cim_only(self):
         # Shadow the cmdlet before loading the production script. No OS inventory.
@@ -139,6 +202,8 @@ function Get-CimInstance {
         self.assertEqual(result.returncode, 0, result.stderr)
         output = json.loads(result.stdout)
         self.assertEqual(output["processes"][0]["cpu_ticks"], 300)
+        self.assertEqual(output["previous"][0]["cpu_ticks"], 300)
+        self.assertGreaterEqual(output["elapsed"], 0.45)
         self.assertEqual(len(output["profiles"]), 3)
         self.assertEqual(output["profiles"][0]["profile"], r"C:\Agora\state\test profile")
         self.assertNotIn("never-output", result.stdout)

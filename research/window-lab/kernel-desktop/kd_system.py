@@ -11,9 +11,11 @@ Claude (PROOF a13428), 24 Oct 2026; the readings themselves are sysread.py (ctyp
 
     system.now    CPU, memory, network, volume, battery, the window in front and the programs open   (see)
     system.processes    top 30 process memory/CPU readings and all-process group totals             (see)
+    system.end-helpers  list (dry=yes) or end verified test/snap browser processes, stewards only   (do)
 
 Process accounting runs in a background thread of this kernel-owned module, not in a worker or under the
 kernel lock. It adds the `agora` memory key; process_read.py documents the grouping and sampling limits.
+Helper cleanup is explicit, uses the same classifier, and is disabled in headless mode.
 
 Every two seconds it writes <world>/modules/system/live.json, one key per reading (cpu, memory, network, volume,
 battery, focused, apps), each {value, detail}; the desk's live layer (live.py) paints them onto widgets that `shows=`
@@ -32,6 +34,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from modproto import Module, log                    # noqa: E402
 import process_read                                # noqa: E402
+import process_helpers                             # noqa: E402
 
 HEADLESS = "--headless" in sys.argv
 OURS = ("python", "pythonw", "msedgewebview2")       # the desk's own windows are not "programs open"
@@ -89,6 +92,7 @@ class System:
         self.home, self.last = None, {}
         self.reader = None
         self.processes = process_read.Reader(os.getppid(), [])
+        self.helpers_lock = threading.Lock()
         self.m = Module(offer=self.offer(), on_call=self.call, on_hello=self.hello, on_off=self.off)
 
     def offer(self):
@@ -99,7 +103,9 @@ class System:
                          "and verified helper Chrome working sets and private bytes; shared pages may overlap. "
                          "Process samples refresh every 30 seconds; see system.processes for detail."},
                 {"word": "system.processes", "kind": "see", "takes": "", "may": "anyone",
-                 "help": process_read.HELP}]
+                 "help": process_read.HELP},
+                {"word": "system.end-helpers", "kind": "do", "takes": "[dry=yes]",
+                 "may": "stewards", "undo": "no", "help": process_helpers.HELP}]
 
     def hello(self, msg):
         if msg.get("home"):
@@ -120,6 +126,20 @@ class System:
     def call(self, msg):
         if msg.get("word") == "system.processes":
             return process_read.response(self.processes.last)
+        if msg.get("word") == "system.end-helpers":
+            args = msg.get("args") or {}
+            kv = args.get("kv") or {}
+            if (args.get("words") or args.get("target") or set(kv) - {"dry"} or
+                    ("dry" in kv and kv["dry"] != "yes")):
+                return {"refused": "Use system.end-helpers [dry=yes]; no other selectors or options"}
+            if HEADLESS:
+                return {"text": "Headless: no helper processes read or ended", "rows": []}
+            if not self.helpers_lock.acquire(blocking=False):
+                return {"refused": "Helper cleanup is already running; nothing else started"}
+            try:
+                return process_helpers.end_helpers(self.processes.prefixes, dry=kv.get("dry") == "yes")
+            finally:
+                self.helpers_lock.release()
         live = self.last or shape(self.read())
         live = dict(live, agora=process_read.agora_memory(self.processes.last))
         rows = [dict(v, key=k, kind="reading") for k, v in live.items()]
