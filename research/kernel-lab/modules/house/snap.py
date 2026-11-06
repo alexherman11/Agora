@@ -36,7 +36,8 @@ Two modes, nothing on the screen in either:
                       --headless; theme, board and files as they are; every other module off, so no model, house,
                       window manager or guy), shot, then the kdesk and its whole process tree are ended (taskkill /T
                       on the pid started here) and the copy deleted, whatever happened.
-Everything is bounded by 90 s. Failures raise RuntimeError with a plain reason.
+Paint readiness is bounded by 90 s overall. A missed deadline returns a labelled picture;
+capturing it has a separate bounded allowance. Transport failures raise RuntimeError with a plain reason.
 
     python snap.py <what> <out.png> --token-file <file> [--source <tree>] [--door URL] [--size 1280x800] [--wait 4]
 """
@@ -179,6 +180,63 @@ TEXT = ("[document.body ? document.body.innerText : ''].concat([...document.quer
         "{ try { return f.contentDocument.body.innerText } catch (e) { return '' } })).join(' ')")
 
 
+async def _frame_painted(call):
+    """None for ordinary pages/widgets; otherwise read the sandbox frame's marker through CDP."""
+    result = await call("Runtime.evaluate", expression=(
+        "document.querySelector('#widget-surface') ? "
+        "(document.querySelector('#widget-surface').dataset.components || 'pending') : 'false'"),
+        returnByValue=True)
+    if result.get("result", {}).get("value") == "false":
+        return None
+    if result.get("result", {}).get("value") != "true":
+        return False
+    tree = await call("Page.getFrameTree")
+
+    def widget_frame(node):
+        if node.get("frame", {}).get("name") == "agora-widget":
+            return node["frame"]["id"]
+        return next((found for child in node.get("childFrames", [])
+                     if (found := widget_frame(child))), None)
+
+    frame = widget_frame(tree.get("frameTree", {}))
+    if not frame:
+        return False
+    try:
+        context = await call("Page.createIsolatedWorld", frameId=frame, worldName="agora-snap")
+        result = await call("Runtime.evaluate", contextId=context["executionContextId"],
+                            expression="document.documentElement.dataset.painter === 'components'",
+                            returnByValue=True)
+        return result.get("result", {}).get("value") is True
+    except RuntimeError:
+        # The host may replace a frame while starting/recovering. Try the current frame on the next poll.
+        return False
+
+
+async def _wait_for_paint(probe, deadline, *, clock=time.monotonic, sleep=asyncio.sleep):
+    """A frame can be ready and empty. Only its marker ends this wait; None means a non-component page."""
+    while (remaining := deadline - clock()) > 0:
+        try:
+            painted = await asyncio.wait_for(probe(), remaining)
+        except asyncio.TimeoutError:
+            return False
+        if painted is not False:
+            return painted
+        await sleep(min(0.25, max(0, deadline - clock())))
+    return False
+
+
+def _label_picture(out, label):
+    """Keep a deadline picture useful even when it is detached from its accompanying text."""
+    from PIL import Image, ImageDraw
+    with Image.open(out) as source:
+        picture = source.convert("RGB")
+    draw = ImageDraw.Draw(picture)
+    bounds = draw.textbbox((12, 10), label)
+    draw.rectangle((0, 0, picture.width, bounds[3] + 12), fill="#fff4ce")
+    draw.text((12, 10), label, fill="#302600")
+    picture.save(out)
+
+
 def _read_only_allows(method, url, body):
     """In live mode: may this request leave the browser? Reads only, loopback only."""
     u = urllib.parse.urlsplit(url)
@@ -209,6 +267,7 @@ async def _shoot(ws_url, url, origin, token, out, size, wait, read_only, host_ke
     w, h = size
     loop = asyncio.get_running_loop()
     pending, state = {}, {"n": 0, "blocked": 0}
+    deadline = time.monotonic() + max(0, budget)
 
     async with websockets.connect(ws_url, max_size=64 * 1024 * 1024) as ws:
         async def call(method, **params):
@@ -266,6 +325,9 @@ async def _shoot(ws_url, url, origin, token, out, size, wait, read_only, host_ke
                             "'complete' } catch (e) { return true } })"):
                     break
                 await asyncio.sleep(0.2)
+            painted = await _wait_for_paint(lambda: _frame_painted(call), deadline)
+            if painted is not None:
+                return painted
             # then at least `wait` seconds, and until what the page says has stopped changing for a second (a lens
             # paints after its scene arrives, which a busy kernel can take a while to send). A page that still says
             # next to nothing (a lens not painted yet; a component widget, whose sandboxed frame cannot be read)
@@ -280,6 +342,9 @@ async def _shoot(ws_url, url, origin, token, out, size, wait, read_only, host_ke
                 if now - began >= wait and (settled or now - began >= wait + 10):
                     break
                 await asyncio.sleep(0.25)
+            return True
+
+        async def capture():
             # Edge/Chrome's software compositor can hand back a stale tile right after a load: take one, let two
             # frames pass, keep the next (hidden_evidence.py does the same)
             await call("Page.captureScreenshot", format="png", fromSurface=True)
@@ -292,9 +357,16 @@ async def _shoot(ws_url, url, origin, token, out, size, wait, read_only, host_ke
 
         task = asyncio.ensure_future(reader())
         try:
-            return await asyncio.wait_for(run(), max(5.0, budget))
-        except asyncio.TimeoutError:
-            raise RuntimeError("the page took too long to show")
+            try:
+                painted = await asyncio.wait_for(run(), max(0, budget))
+            except asyncio.TimeoutError:
+                painted = False
+            # Readiness may use the entire deadline; still allow a bounded capture of what actually appeared.
+            try:
+                text, blocked = await asyncio.wait_for(capture(), 20)
+            except asyncio.TimeoutError:
+                raise RuntimeError("the hidden browser took too long to capture the picture")
+            return text, blocked, painted
         finally:
             task.cancel()
 
@@ -480,20 +552,24 @@ def snap(what, token, out, *, door="http://127.0.0.1:8810", source=None, world=N
         if not _loopback(url):
             raise RuntimeError("that window shows a page that is not on this machine")
         origin = "{0.scheme}://{0.netloc}".format(urllib.parse.urlsplit(url))
-        text, blocked = _shot(url, origin, token, out, (w, h), wait, read_only=box is None, host_key=host_key,
-                              deadline=deadline)
+        text, blocked, painted = _shot(url, origin, token, out, (w, h), wait, read_only=box is None,
+                                       host_key=host_key, deadline=deadline)
     finally:
         if box:
             box.__exit__(None, None, None)
     if not Path(out).is_file() or Path(out).stat().st_size == 0:
         raise RuntimeError("no picture was taken")
+    paint_status = "" if painted else f"not painted after {LIMIT:g} s"
+    if paint_status:
+        _label_picture(out, paint_status)
     where = f"from {Path(source).name} (a hidden copy of the world)" if box else "live, read-only"
     said = text[:240] + ("…" if len(text) > 240 else "")
     detail = (f"{label}, {w}x{h}, {where}, {time.monotonic() - started:.1f} s"
+              + (f"; {paint_status}" if paint_status else "")
               + (f"; {blocked} writes held back" if blocked else "")
               + (f"; widgets cannot paint here (no desktop host key)" if not host_key and "widget" in path else "")
               + (f"; the page says: {said}" if said else "; the page shows no text"))
-    return {"path": out, "shown": url, "detail": detail}
+    return {"path": out, "shown": url, "detail": detail, "paint_status": paint_status}
 
 
 def main():

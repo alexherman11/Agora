@@ -7,6 +7,7 @@ a free port) and never touch the live desktop world or its door: a hidden browse
 source mode a hidden copy of that test world served by a kdesk from this checkout's code. Nothing appears on screen.
 """
 import base64
+import asyncio
 import json
 import struct
 import sys
@@ -195,3 +196,154 @@ def test_live_mode_lets_only_readings_leave_the_browser():
         assert not allows("POST", door + path, body), path
     assert not allows("GET", "https://fonts.googleapis.com/css", None)       # nothing leaves this machine
     assert not allows("DELETE", door + "/see", None)
+
+
+class FakeFrame:
+    """The parent is ready at t=0, but its opaque component frame can paint much later."""
+    def __init__(self, paint_at=None, component="true"):
+        self.now, self.paint_at, self.component = 0, paint_at, component
+        self.contexts = []
+
+    async def sleep(self, seconds):
+        self.now += seconds
+
+    async def call(self, method, **params):
+        if method == "Page.getFrameTree":
+            return {"frameTree": {"frame": {"id": "parent"}, "childFrames": [
+                {"frame": {"id": "component-frame", "name": "agora-widget"}}]}}
+        if method == "Page.createIsolatedWorld":
+            assert params["frameId"] == "component-frame"
+            return {"executionContextId": 7}
+        assert method == "Runtime.evaluate"
+        if "contextId" not in params:
+            return {"result": {"value": self.component}}
+        self.contexts.append(params["contextId"])
+        assert params["contextId"] == 7
+        return {"result": {"value": self.paint_at is not None and self.now >= self.paint_at}}
+
+    def wait(self, deadline=90):
+        return asyncio.run(snap._wait_for_paint(
+            lambda: snap._frame_painted(self.call), deadline,
+            clock=lambda: self.now, sleep=self.sleep))
+
+
+def test_component_waits_past_old_blank_capture_until_frame_paints():
+    frame = FakeFrame(paint_at=13)
+    assert frame.wait() is True
+    assert frame.now == 13 and frame.contexts
+
+
+def test_component_without_marker_uses_remaining_deadline():
+    frame = FakeFrame()
+    frame.now = 17  # resolution and browser startup have already spent part of the overall budget
+    assert frame.wait() is False
+    assert frame.now == 90
+
+
+def test_widget_still_opening_does_not_count_as_painted():
+    frame = FakeFrame(component="pending")
+    assert frame.wait() is False
+    assert frame.now == 90 and not frame.contexts
+
+
+def test_ordinary_widget_keeps_existing_text_wait():
+    frame = FakeFrame(component="false")
+    assert frame.wait() is None
+    assert frame.now == 0
+
+
+def test_unresponsive_frame_probe_is_bounded():
+    async def run():
+        async def stuck():
+            await asyncio.Future()
+        return await snap._wait_for_paint(stuck, asyncio.get_running_loop().time() + 0.01,
+                                         clock=asyncio.get_running_loop().time)
+    assert asyncio.run(run()) is False
+
+
+def test_shoot_still_captures_when_paint_budget_expires(tmp_path, monkeypatch):
+    import websockets
+    calls = []
+
+    class FakeBrowser:
+        async def __aenter__(self):
+            self.messages = asyncio.Queue()
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            return await self.messages.get()
+
+        async def send(self, raw):
+            request = json.loads(raw)
+            method = request["method"]
+            calls.append(method)
+            result = {}
+            if method == "Runtime.evaluate":
+                expr = request["params"]["expression"]
+                result = {"result": {"value": True if "readyState" in expr else ""}}
+            elif method == "Page.captureScreenshot":
+                result = {"data": base64.b64encode(png()).decode()}
+            await self.messages.put(json.dumps({"id": request["id"], "result": result}))
+
+    async def never_painted(call):
+        return False
+
+    monkeypatch.setattr(websockets, "connect", lambda *a, **kw: FakeBrowser())
+    monkeypatch.setattr(snap, "_frame_painted", never_painted)
+    output = tmp_path / "deadline.png"
+    result = asyncio.run(snap._shoot("fake", "http://127.0.0.1:9/desk/widget.html",
+                                   "http://127.0.0.1:9", "synthetic-test-value",
+                                   output, (320, 200), 4, True, None, 0.02))
+    assert result == ("", 0, False)
+    assert output.read_bytes() == png()
+    assert calls.count("Page.captureScreenshot") == 2
+
+
+def test_deadline_picture_and_result_are_labelled(tmp_path, monkeypatch):
+    from PIL import Image
+    output = tmp_path / "unpainted.png"
+    monkeypatch.setattr(snap, "resolve", lambda *a: ("/desk/widget.html?widget=fixture", "the lens"))
+
+    def fake_shot(*args, **kwargs):
+        output.write_bytes(png(320, 200))
+        return "", 0, False
+
+    monkeypatch.setattr(snap, "_shot", fake_shot)
+    got = snap.snap("fixture", "synthetic-test-value", output, size=(320, 200))
+    assert got["paint_status"] == "not painted after 90 s"
+    assert "not painted after 90 s" in got["detail"]
+    with Image.open(output) as picture:
+        assert picture.getpixel((0, 0)) == (255, 244, 206)
+        assert picture.getpixel((0, 199)) == (30, 120, 90)
+        assert len(picture.crop((0, 0, 320, 35)).getcolors(11200)) > 1  # banner contains ink
+
+
+def test_house_preserves_deadline_label_in_wake_and_last(tmp_path, monkeypatch):
+    """Exercise the real method without starting House, a session, a thread or a world."""
+    import ast
+    import threading
+    import time
+    from types import SimpleNamespace
+    tree = ast.parse((HERE / "house.py").read_text(encoding="utf-8"))
+    method = next(node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == "snap")
+    namespace = {"Path": Path, "threading": threading, "time": time, "URL": "http://127.0.0.1:9"}
+    exec(compile(ast.Module(body=[method], type_ignores=[]), "house.py", "exec"), namespace)
+    messages = []
+    owner = SimpleNamespace(
+        snaps={}, snapping=0, snap_lock=threading.Lock(), home=tmp_path, world=None,
+        m=SimpleNamespace(see=lambda *a, **kw: {"rows": [{}]}),
+        builders=SimpleNamespace(session=lambda p: SimpleNamespace(token="synthetic-test-value")),
+        agents={"fixture": SimpleNamespace(wake=messages.append)},
+        message=lambda title, **kw: title + ": " + kw["label"])
+    monkeypatch.setattr(threading, "Thread", lambda target, **kw: SimpleNamespace(start=target))
+    monkeypatch.setattr(snap, "snap", lambda *a, **kw: {"paint_status": "not painted after 90 s"})
+    namespace["snap"](owner, {"args": {"target": "lens"}, "caller": {"person": "fixture"}})
+    last = namespace["snap"](owner, {"args": {"target": "last"}, "caller": {"person": "fixture"}})
+    assert "not painted after 90 s" in messages[0]
+    assert "not painted after 90 s" in last["text"] and "[image:" in last["text"]
