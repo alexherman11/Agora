@@ -702,9 +702,10 @@ class House:
         def go():
             try:
                 import snap as S
-                S.snap(target, token, out, door=URL, source=source, world=self.world, size=size)
-                self.snaps[person].update(path=str(out))
-                text = self.message("A picture is ready", label=label)
+                result = S.snap(target, token, out, door=URL, source=source, world=self.world, size=size)
+                shown = label + (f"; {result['paint_status']}" if result.get("paint_status") else "")
+                self.snaps[person].update(path=str(out), label=shown)
+                text = self.message("A picture is ready", label=shown)
             except Exception as exc:                  # noqa: BLE001
                 self.snaps[person].update(error=str(exc)[:500])
                 text = self.message("A picture failed", label=label, detail=str(exc)[:500])

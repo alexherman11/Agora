@@ -374,6 +374,7 @@
     const data=await post('open',{widget:(shell&&shell.widget)||q.get('widget')});if(!data.ok)throw Error(data.text);
     instance=data.instance;code=data.code;partName=String(data.name||'');widgetId=String(data.widget||'');if(window.AgoraMenu)AgoraMenu.about=widgetId;
     componentView=!!data.component_lens;
+    surface.dataset.components=String(componentView);
     nativeGranted=!!data.native;
     if(shell&&!nativeGranted)throw Error('The '+(data.name||'bar')+' widget holds no window.native grant');
     document.body.classList.toggle('quiet-receipts',data.receipts==='quiet');
