@@ -24,7 +24,7 @@ BOOTSTRAP = ("Join with your person's agent session. Start with see: help, then 
 # the kernel's see words and the desktop modules' readings. Any other word goes to /do, which reads too.
 SEE = {"look", "l", "help", "?", "rows", "find", "holds", "status", "who", "recent", "history", "clock", "counts",
        "test", "kinds", "components", "file-read", "look-view", "forgotten", "panes",
-       "window.list", "window.desktop", "system.now", "media.now"}
+       "window.list", "window.desktop", "system.now", "system.processes", "media.now"}
 MAX_LINES = 50
 HANDLE = re.compile(r"\$([a-z][a-z0-9_]*)\b")
 # A word's answer may name a picture it took (house.snap: modules/house/snap.py) with a line `[image: <path>]`. The

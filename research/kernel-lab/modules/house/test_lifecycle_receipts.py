@@ -152,6 +152,8 @@ def test_fallback_delivery_failure_does_not_wake_the_owner_twice(manager):
     gm = Agent()
     gm.name, gm.person = 'JEFF', 'dk827'
     manager.h.agents['dk827'] = gm
+    manager.wake_cut_off()  # settle startup before testing this operation's fallback receipt
+    gm.woken.clear()
     s = state(manager, 'blocked')
     s.update(land_attempt='attempt', land_step='merge', detail='painter.js conflict')
     wake = gm.wake

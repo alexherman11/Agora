@@ -319,6 +319,25 @@ class Agent:
             if not self.busy:
                 self._begin()
 
+    def wake_once(self, key, text):
+        """Accept a lifecycle receipt durably before acknowledging its sender."""
+        with self.lock:
+            receipts = self.state.setdefault("wake_receipts", [])
+            if key in receipts:
+                return
+            item = dict(text=text, chat=None, record=None, at=time.time(), wake_key=key)
+            self.state.setdefault("durable_wakes", {})[key] = item
+            receipts.append(key)
+            try:
+                self.save()
+            except Exception:
+                receipts.remove(key)
+                self.state["durable_wakes"].pop(key, None)
+                raise
+            self.inbox.append(item)
+            if not self.busy:
+                self._begin()
+
     def _begin(self):
         self.house.refresh_card_signals(self)
         if getattr(self, "refreshing", False) or self.cfg.get("want", "awake") == "asleep" or not self.inbox:
@@ -380,8 +399,10 @@ class Agent:
             self.log("error", f"could not build its message: {exc!r}")
         if said:
             # what this turn was told, until it ends: a House restart in between says it again when it is back
-            self.state["in_flight"] = [{k: i[k] for k in ("text", "chat", "record", "first_record", "at", "said_again")
+            self.state["in_flight"] = [{k: i[k] for k in ("text", "chat", "record", "first_record", "at", "said_again", "wake_key")
                                         if k in i} for i in items]
+            for item in items:
+                self.state.get("durable_wakes", {}).pop(item.get("wake_key"), None)
             if "paused" in self.state:
                 # Refresh persists the waiting inbox before replacing its process.
                 # Retire only the messages this new process actually received.
@@ -621,7 +642,8 @@ class House:
                     a.save()
         self.ready.set()
         for state in self.builders.states.values():
-            BM.notify(self.builders, state)
+            if not state.get('restart_pending') and state['phase'] not in ('recovery-needed', 'uncertain'):
+                BM.notify(self.builders, state)
         try:
             self.builders.wake_cut_off()
         except Exception as exc:                          # noqa: BLE001  a help, never a reason not to start
@@ -832,6 +854,8 @@ class House:
                 if cut or paused:
                     a.inbox = a.said_again(cut) + list(paused or []) + a.inbox
                     a.save()
+                keys = {i.get("wake_key") for i in a.inbox}
+                a.inbox += [i for key, i in a.state.get("durable_wakes", {}).items() if key not in keys]
                 self._catch_up(a)
             finally:
                 a.busy = busy
@@ -1247,7 +1271,7 @@ class House:
             self.builders.off()
         for a in list(self.agents.values()):
             with a.lock:
-                waiting = [{k: i[k] for k in ("text", "chat", "at", "said_again") if k in i}
+                waiting = [{k: i[k] for k in ("text", "chat", "at", "said_again", "wake_key") if k in i}
                            for i in a.inbox if not i.get("record")]
                 if "paused" in a.state:
                     # Refresh may have put a cut-off recorded turn back in the

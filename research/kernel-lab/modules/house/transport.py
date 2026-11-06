@@ -123,7 +123,7 @@ class Child:
                 continue  # the adapter's final aggregate duplicates already delivered public text
             if ev.get("type") == "result":
                 self.codex_streamed = False
-            for out in reduce(ev):
+            for out in effect_events(ev) + reduce(ev):
                 out["child"] = self                # whose event: a replaced process's late exit must not end its successor
                 self.events.put(out)
         self.events.put({"e": "exit", "code": self.proc.wait(), "child": self})
@@ -144,6 +144,37 @@ def kill_tree(proc):
         subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True, creationflags=NO_WINDOW)
     else:
         proc.kill()
+
+
+def effect_events(ev):
+    """Only correlation ids, never tool inputs/results, for restart safety.
+
+    A started tool without its completion is an unknown effect. Tracking is
+    separate from public activity (which intentionally omits tool results).
+    """
+    if ev.get('type') == 'codex_event':
+        item = (ev.get('data') or {}).get('item') or {}
+        if item.get('type') in ('commandExecution', 'mcpToolCall', 'dynamicToolCall', 'fileChange', 'webSearch'):
+            kind = {'item/started': 'effect-started', 'item/completed': 'effect-finished'}.get(ev.get('method'))
+            if kind:
+                if kind == 'effect-finished' and not item.get('id'):
+                    return []  # an uncorrelated result cannot prove an effect settled
+                if kind == 'effect-finished' and (item.get('error') or item.get('status') in ('failed', 'cancelled')):
+                    kind = 'effect-unknown'
+                return [dict(e=kind, id=item.get('id') or 'unknown', name=item['type'])]
+    if ev.get('type') in ('assistant', 'user'):
+        out = []
+        for block in ev.get('message', {}).get('content', []) or []:
+            if not isinstance(block, dict):
+                continue
+            if block.get('type') == 'tool_use':
+                out.append(dict(e='effect-started', id=block.get('id') or 'unknown',
+                                name=block.get('name', 'tool')))
+            elif block.get('type') == 'tool_result' and block.get('tool_use_id'):
+                out.append(dict(e='effect-unknown' if block.get('is_error') else 'effect-finished',
+                                id=block['tool_use_id'], name='tool'))
+        return out
+    return []
 
 
 def reduce(ev):

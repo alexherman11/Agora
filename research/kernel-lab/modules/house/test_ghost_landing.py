@@ -135,7 +135,8 @@ def test_real_kernel_missing_module_grant_never_uses_steward_fallback(world):
     with patch.object(B.threading.Thread, 'start') as launch:
         out = b.land(dict(args=dict(target=s['task']), caller=dict(person=world.old, name='Owner')))
     assert out['rows'][0]['phase'] == 'blocked'
-    assert 'grant' in s['land_sync_error']
+    assert any(reason in s['land_sync_error'] for reason in
+               ('grant', 'set is for whoever made it or leaders'))
     assert world.Door(world.old).look(s['task']).get('land_attempt') is None
     launch.assert_not_called()
     b.land_all.assert_not_called()

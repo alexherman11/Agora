@@ -108,10 +108,11 @@ def test_a_dead_pid_is_not_alive_and_this_process_is():
 def test_the_house_start_tells_each_owner_once_about_cut_off_workers(manager):
     s = state(manager, 'recovery-needed'); s.update(cut_phase='working', pid=0)
     agent = Agent(); agent.person = 'dk99'; manager.h.agents = {'dk99': agent}
+    manager.session = lambda person: manager.fixture_door
     manager.wake_cut_off()
     manager.wake_cut_off()
-    assert len(agent.woken) == 1 and 'cut these older workers off' in agent.woken[0][0]
-    assert 'Codex fixture (dk1)' in agent.woken[0][0] and s.get('awaiting')
+    assert len(agent.woken) == 1 and 'workers-await-reconciliation' in agent.woken[0][0]
+    assert 'Codex fixture' in agent.woken[0][0] and '"card": "dk1"' in agent.woken[0][0] and s.get('awaiting')
 
 
 def test_a_worker_cut_off_a_little_while_ago_carries_on_by_itself(manager):
