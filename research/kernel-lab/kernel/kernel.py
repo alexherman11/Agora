@@ -101,12 +101,14 @@ class Tx:
 class Kernel:
     def __init__(self, world_dir, genesis=None):
         self.dir = Path(world_dir)
-        self.lock = threading.RLock()
         self.changed = threading.Condition()
         self.log = Log(self.dir)
         self.state = self.log.replay()
         self.keep_dir = self.dir / "keep"
         self.keep_dir.mkdir(parents=True, exist_ok=True)
+        from .slow import SlowLog, TimedRLock
+        self.slow = SlowLog(self.keep_dir / "kernel-slow.jsonl")
+        self.lock = TimedRLock(self.slow)
         from .refusals import Refusals
         self.refusals = Refusals(self)                 # refused lines and errors, beside the world (refusals.py)
         self.accounts = self._keep_read("accounts.json", {})

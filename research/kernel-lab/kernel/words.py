@@ -281,6 +281,12 @@ KERNEL_ENTRIES = [
             "rule or agent; a module that died and a page's failure (failed) land here too. The same refusal again "
             "is counted (×N), not repeated. A steward sees everyone's; anyone else their own. errors leaves out "
             "plain refusals. Kept beside the world, never in it: a refusal writes nothing."),
+    _k("kernel.slow", "see", "", "stewards", "no",
+       help="kernel.slow: the last 50 completed kernel lock waits and outer holds over 300 ms, newest first: "
+            "word or verb, module, caller, duration and code location. A wait also names the holder observed "
+            "when it began; other holders may intervene. Stewards only; no command arguments are kept. "
+            "Kept in memory and appended to keep/kernel-slow.jsonl beside the world, read back on start. "
+            "Events appear after release; this is not a live stack reading."),
     _k("failed", "do", "why=<text> [line=<text>] [where=<page>]", "anyone", "no",
        help="failed why=\"…\" [line=\"…\"] [where=dock]: say that something failed outside any line (a frame "
             "stopped, a native call threw, a bar fell back), so it lands in refusals. Writes nothing in the world."),
@@ -1294,6 +1300,7 @@ from .blobs import upload, attach, file_result, file_read
 from .world_words import dictionary_copy, group_word, clock, forgotten
 from .readings import who, recent, kinds, on, press
 from .refusals import refusals, failed
+from .slow import slow as kernel_slow
 from .kinds import mark, words_for, alike_word, aspects_word, NOT_FITTED as NOT_FITTED_KINDS
 from .bonds import turn                  # the graph's readings (around, nearby, preview) are held (28 Oct)
 from .chat import say, receive as chat_receive, chat as chat_word, closed_sees
@@ -1332,5 +1339,5 @@ KERNEL = {"kit": kit, "take": take, "rename": rename, "module": module, "grant":
           "status": status, "make": make, "set": set_, "forget": forget, "holds": holds, "claim": claim,
           "vote": vote, "role": role, "rows": rows, "find": rows, "search": search, "verb": verb,
           "who": who, "recent": recent, "kinds": kinds, "on": on, "press": press, "say": say, "chat": chat_word,
-          "refusals": refusals, "failed": failed, "mark": mark, "actions": words_for, "turn": turn,
+          "refusals": refusals, "kernel.slow": kernel_slow, "failed": failed, "mark": mark, "actions": words_for, "turn": turn,
           "chat.receive": chat_receive, "alike": alike_word, "aspects": aspects_word}
