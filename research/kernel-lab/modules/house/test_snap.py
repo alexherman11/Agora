@@ -198,28 +198,72 @@ def test_live_mode_lets_only_readings_leave_the_browser():
     assert not allows("DELETE", door + "/see", None)
 
 
+@pytest.fixture
+def frame_images(tmp_path):
+    """Real PNGs: blank interior with busy host chrome, and a feed painted inside it."""
+    from PIL import Image, ImageDraw
+    picture = Image.new("RGB", (320, 240), "#faf9f5")
+    draw = ImageDraw.Draw(picture)
+    draw.rectangle((0, 0, 319, 39), fill="#225588")
+    draw.text((10, 10), "Host title must not count as component paint", fill="white")
+    blank = tmp_path / "blank.png"
+    picture.save(blank)
+    draw.rectangle((10, 50, 80, 220), fill="#d0ddd5")
+    draw.text((15, 60), "Channels", fill="#203020")
+    for y in (60, 110, 160):
+        draw.rectangle((95, y, 300, y + 35), fill="white", outline="#557766")
+        draw.text((105, y + 10), "A post in the feed", fill="#203020")
+    painted = tmp_path / "painted.png"
+    picture.save(painted)
+    draw.rectangle((90, 90, 250, 180), fill="#335577")
+    changed = tmp_path / "changed.png"
+    picture.save(changed)
+    return blank.read_bytes(), painted.read_bytes(), changed.read_bytes()
+
+
+def test_pixel_fixtures_ignore_host_chrome_and_detect_painted_frame(frame_images):
+    blank, painted, changed = frame_images
+    rect = [0, 40, 320, 240]
+    assert snap._frame_pixels(blank, rect) is False
+    first = snap._frame_pixels(painted, rect)
+    assert first
+    assert snap._stable_pixels(first, snap._frame_pixels(painted, rect))
+    assert not snap._stable_pixels(first, snap._frame_pixels(changed, rect))
+    assert not snap._stable_pixels(first, snap._frame_pixels(painted, [1, 40, 320, 240]))
+
+
+@pytest.mark.parametrize("background", [(255, 255, 255), (20, 22, 24)])
+def test_background_tolerance_and_small_specks_are_not_paint(background):
+    import io
+    from PIL import Image, ImageDraw
+    picture = Image.new("RGB", (200, 200), background)
+    draw = ImageDraw.Draw(picture)
+    draw.rectangle((0, 0, 199, 99), fill=tuple(c - 2 for c in background))
+    draw.point((50, 50), fill="red")
+    stream = io.BytesIO()
+    picture.save(stream, format="PNG")
+    assert snap._frame_pixels(stream.getvalue(), [0, 0, 200, 200]) is False
+
+
 class FakeFrame:
     """The parent is ready at t=0, but its opaque component frame can paint much later."""
-    def __init__(self, paint_at=None, component="true"):
-        self.now, self.paint_at, self.component = 0, paint_at, component
-        self.contexts = []
+    def __init__(self, frame_images, paint_at=None, component="true", content=None):
+        self.now, self.component = 0, component
+        self.content = content or (lambda now: frame_images[int(paint_at is not None and now >= paint_at)])
+        self.captures = 0
 
     async def sleep(self, seconds):
         self.now += seconds
 
     async def call(self, method, **params):
-        if method == "Page.getFrameTree":
-            return {"frameTree": {"frame": {"id": "parent"}, "childFrames": [
-                {"frame": {"id": "component-frame", "name": "agora-widget"}}]}}
-        if method == "Page.createIsolatedWorld":
-            assert params["frameId"] == "component-frame"
-            return {"executionContextId": 7}
+        if method == "Page.captureScreenshot":
+            self.captures += 1
+            return {"data": base64.b64encode(self.content(self.now)).decode()}
         assert method == "Runtime.evaluate"
-        if "contextId" not in params:
-            return {"result": {"value": self.component}}
-        self.contexts.append(params["contextId"])
-        assert params["contextId"] == 7
-        return {"result": {"value": self.paint_at is not None and self.now >= self.paint_at}}
+        assert "contextId" not in params  # Never try to read the opaque sandbox DOM.
+        assert params["expression"] == snap.FRAME_RECT
+        return {"result": {"value": {"false": None, "pending": False,
+                                    "true": [0, 40, 320, 240]}[self.component]}}
 
     def wait(self, deadline=90):
         return asyncio.run(snap._wait_for_paint(
@@ -227,29 +271,91 @@ class FakeFrame:
             clock=lambda: self.now, sleep=self.sleep))
 
 
-def test_component_waits_past_old_blank_capture_until_frame_paints():
-    frame = FakeFrame(paint_at=13)
-    assert frame.wait() is True
-    assert frame.now == 13 and frame.contexts
+def test_component_waits_past_old_blank_capture_until_frame_paints(frame_images):
+    frame = FakeFrame(frame_images, paint_at=13)
+    assert frame.wait() == snap.PIXEL_PAINT
+    assert frame.now == 14 and frame.captures == 15
 
 
-def test_component_without_marker_uses_remaining_deadline():
-    frame = FakeFrame()
+def test_component_without_marker_uses_remaining_deadline(frame_images):
+    frame = FakeFrame(frame_images)
     frame.now = 17  # resolution and browser startup have already spent part of the overall budget
     assert frame.wait() is False
     assert frame.now == 90
 
 
-def test_widget_still_opening_does_not_count_as_painted():
-    frame = FakeFrame(component="pending")
+def test_stored_painter_with_stable_content_captures_early_without_marker(frame_images):
+    frame = FakeFrame(frame_images, paint_at=0)
+    assert frame.wait() == snap.PIXEL_PAINT
+    assert frame.now == 1 and frame.captures == 2
+
+
+@pytest.mark.parametrize("sequence,settled_at", [
+    ([1, 2, 1, 1], 3),
+    ([1, 0, 1, 1], 3),
+])
+def test_changing_or_disappearing_content_restarts_stability_interval(frame_images, sequence, settled_at):
+    frame = FakeFrame(frame_images, content=lambda now: frame_images[sequence[min(int(now), len(sequence) - 1)]])
+    assert frame.wait() == snap.PIXEL_PAINT
+    assert frame.now == settled_at
+
+
+def test_transient_content_does_not_make_an_empty_frame_painted(frame_images):
+    frame = FakeFrame(frame_images, content=lambda now: frame_images[int(now < 1)])
     assert frame.wait() is False
-    assert frame.now == 90 and not frame.contexts
+    assert frame.now == 90
 
 
-def test_ordinary_widget_keeps_existing_text_wait():
-    frame = FakeFrame(component="false")
+def test_replaced_component_frame_is_retried(frame_images):
+    frame = FakeFrame(frame_images, paint_at=0)
+    original = frame.call
+
+    async def call(method, **params):
+        if method == "Runtime.evaluate" and frame.now < 2:
+            return {"result": {"value": False}}
+        return await original(method, **params)
+
+    frame.call = call
+    assert frame.wait() == snap.PIXEL_PAINT
+    assert frame.now == 3
+
+
+def test_widget_still_opening_does_not_count_as_painted(frame_images):
+    frame = FakeFrame(frame_images, component="pending")
+    assert frame.wait() is False
+    assert frame.now == 90 and not frame.captures
+
+
+def test_ordinary_widget_keeps_existing_text_wait(frame_images):
+    frame = FakeFrame(frame_images, component="false")
     assert frame.wait() is None
     assert frame.now == 0
+
+
+@pytest.mark.parametrize("content", ["", "<h1>Feed</h1><p>Channels and posts are painted.</p>"])
+def test_real_opaque_iframe_pixels_determine_paint(tmp_path, content):
+    """Exercise Chromium's actual sandbox and screenshot, without a world or a live session."""
+    import html
+    import time
+    from urllib.parse import quote
+    inside = '<style>body{background:#faf9f5;color:#203020}</style>' + content
+    page = ('<style>body{margin:0}iframe{border:0;width:320px;height:200px}</style>'
+            '<header style="height:40px;background:#225588;color:white">Host chrome</header>'
+            '<main id="widget-surface" data-components="true">'
+            f'<iframe sandbox="allow-scripts" srcdoc="{html.escape(inside, quote=True)}"></iframe></main>')
+    output = tmp_path / "opaque.png"
+    with snap.shoot.browser() as ws:
+        started = time.monotonic()
+        result = asyncio.run(snap._shoot(ws, "data:text/html," + quote(page),
+                                        "http://127.0.0.1:9", "synthetic-test-value",
+                                        output, (320, 240), 0, True, None, 8))
+        elapsed = time.monotonic() - started
+    assert result[2] == (snap.PIXEL_PAINT if content else False)
+    if content:
+        assert elapsed < 6
+    else:
+        assert elapsed >= 8
+    assert bool(snap._frame_pixels(output.read_bytes(), [0, 40, 320, 240])) == bool(content)
 
 
 def test_unresponsive_frame_probe_is_bounded():
@@ -261,7 +367,10 @@ def test_unresponsive_frame_probe_is_bounded():
     assert asyncio.run(run()) is False
 
 
-def test_shoot_still_captures_when_paint_budget_expires(tmp_path, monkeypatch):
+@pytest.mark.parametrize("at_capture", [0, 1, 2])
+@pytest.mark.parametrize("settled", [False, True])
+def test_shoot_labels_actual_pixels_even_after_deadline_or_paint_disappears(
+        tmp_path, monkeypatch, frame_images, at_capture, settled):
     import websockets
     calls = []
 
@@ -286,38 +395,53 @@ def test_shoot_still_captures_when_paint_budget_expires(tmp_path, monkeypatch):
             result = {}
             if method == "Runtime.evaluate":
                 expr = request["params"]["expression"]
-                result = {"result": {"value": True if "readyState" in expr else ""}}
+                value = [0, 40, 320, 240] if expr == snap.FRAME_RECT else True if "readyState" in expr else ""
+                result = {"result": {"value": value}}
             elif method == "Page.captureScreenshot":
-                result = {"data": base64.b64encode(png()).decode()}
+                result = {"data": base64.b64encode(frame_images[at_capture]).decode()}
             await self.messages.put(json.dumps({"id": request["id"], "result": result}))
 
-    async def never_painted(call):
-        return False
+    async def deadline_probe(probe, deadline):
+        # Exercise the outer readiness timeout, including a frame appearing only at capture.
+        if settled and "Page.captureScreenshot" not in calls:
+            return snap.PIXEL_PAINT
+        await asyncio.Future()
 
     monkeypatch.setattr(websockets, "connect", lambda *a, **kw: FakeBrowser())
-    monkeypatch.setattr(snap, "_frame_painted", never_painted)
+    monkeypatch.setattr(snap, "_wait_for_paint", deadline_probe)
     output = tmp_path / "deadline.png"
     result = asyncio.run(snap._shoot("fake", "http://127.0.0.1:9/desk/widget.html",
                                    "http://127.0.0.1:9", "synthetic-test-value",
-                                   output, (320, 200), 4, True, None, 0.02))
-    assert result == ("", 0, False)
-    assert output.read_bytes() == png()
-    assert calls.count("Page.captureScreenshot") == 2
+                                   output, (320, 240), 4, True, None, 0.5 if settled else 0.02))
+    assert result == ("", 0, snap.PIXEL_PAINT if at_capture else False)
+    assert output.read_bytes() == frame_images[at_capture]
+    assert calls.count("Page.captureScreenshot") == (4 if settled and not at_capture else 2)
 
 
-def test_deadline_picture_and_result_are_labelled(tmp_path, monkeypatch):
+def test_missing_frame_at_capture_is_unverified_not_background_only():
+    async def call(method, **params):
+        return {"result": {"value": False}}
+
+    assert asyncio.run(snap._frame_painted(call, png())) == "paint not verified"
+
+
+@pytest.mark.parametrize("painted,label", [
+    (False, "not painted after 90 s"),
+    (snap.PIXEL_PAINT, snap.PIXEL_PAINT),
+])
+def test_deadline_picture_and_result_are_labelled(tmp_path, monkeypatch, painted, label):
     from PIL import Image
     output = tmp_path / "unpainted.png"
     monkeypatch.setattr(snap, "resolve", lambda *a: ("/desk/widget.html?widget=fixture", "the lens"))
 
     def fake_shot(*args, **kwargs):
         output.write_bytes(png(320, 200))
-        return "", 0, False
+        return "", 0, painted
 
     monkeypatch.setattr(snap, "_shot", fake_shot)
     got = snap.snap("fixture", "synthetic-test-value", output, size=(320, 200))
-    assert got["paint_status"] == "not painted after 90 s"
-    assert "not painted after 90 s" in got["detail"]
+    assert got["paint_status"] == label
+    assert label in got["detail"]
     with Image.open(output) as picture:
         assert picture.getpixel((0, 0)) == (255, 244, 206)
         assert picture.getpixel((0, 199)) == (30, 120, 90)
