@@ -182,9 +182,35 @@ def resolve(what, door, token):
 TEXT = ("[document.body ? document.body.innerText : ''].concat([...document.querySelectorAll('iframe')].map(f => "
         "{ try { return f.contentDocument.body.innerText } catch (e) { return '' } })).join(' ')")
 
+UNMARKED_PAINT = "painted (no first-paint marker)"
+FRAME_CONTENT = """(() => {
+    const parts = [];
+    for (const el of document.body ? [document.body, ...document.body.querySelectorAll('*')] : []) {
+        if (el.matches('script, style, template, noscript')) continue;
+        const rect = el.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0 || rect.bottom <= 0 || rect.right <= 0 ||
+            rect.top >= innerHeight || rect.left >= innerWidth) continue;
+        let hidden = false;
+        for (let node = el; node; node = node.parentElement) {
+            const style = getComputedStyle(node);
+            if (style.display === 'none' || style.visibility !== 'visible' || Number(style.opacity) === 0) {
+                hidden = true; break;
+            }
+        }
+        if (hidden) continue;
+        const text = [...el.childNodes].filter(n => n.nodeType === Node.TEXT_NODE)
+            .map(n => n.textContent.trim()).join('');
+        const media = (el.matches('img') && el.complete && el.naturalWidth > 0) ||
+            (el.matches('svg') && el.children.length > 0) || el.matches('canvas, video, input, select, textarea');
+        if (text || media) parts.push([el.tagName, text, el.currentSrc || '', el.value || '',
+            rect.x, rect.y, rect.width, rect.height]);
+    }
+    return parts.length ? JSON.stringify(parts) : '';
+})()"""
+
 
 async def _frame_painted(call):
-    """None for ordinary pages/widgets; otherwise read the sandbox frame's marker through CDP."""
+    """None for ordinary pages; otherwise a marker bool or visible-content signature in the frame."""
     result = await call("Runtime.evaluate", expression=(
         "document.querySelector('#widget-surface') ? "
         "(document.querySelector('#widget-surface').dataset.components || 'pending') : 'false'"),
@@ -209,21 +235,33 @@ async def _frame_painted(call):
         result = await call("Runtime.evaluate", contextId=context["executionContextId"],
                             expression="document.documentElement.dataset.painter === 'components'",
                             returnByValue=True)
-        return result.get("result", {}).get("value") is True
+        if result.get("result", {}).get("value") is True:
+            return True
+        result = await call("Runtime.evaluate", contextId=context["executionContextId"],
+                            expression=FRAME_CONTENT, returnByValue=True)
+        content = result.get("result", {}).get("value")
+        # Include the context so replacing a frame restarts the stability interval.
+        return f"{context['executionContextId']}:{content}" if isinstance(content, str) and content else False
     except RuntimeError:
         # The host may replace a frame while starting/recovering. Try the current frame on the next poll.
         return False
 
 
 async def _wait_for_paint(probe, deadline, *, clock=time.monotonic, sleep=asyncio.sleep):
-    """A frame can be ready and empty. Only its marker ends this wait; None means a non-component page."""
+    """Prefer the marker; older painters may instead show stable content for three seconds."""
+    last, still = False, clock()
     while (remaining := deadline - clock()) > 0:
         try:
             painted = await asyncio.wait_for(probe(), remaining)
         except asyncio.TimeoutError:
             return False
-        if painted is not False:
+        if painted is True or painted is None:
             return painted
+        now = clock()
+        if painted != last:
+            last, still = painted, now
+        if painted and now - still >= 3:
+            return UNMARKED_PAINT
         await sleep(min(0.25, max(0, deadline - clock())))
     return False
 
@@ -348,6 +386,16 @@ async def _shoot(ws_url, url, origin, token, out, size, wait, read_only, host_ke
             return True
 
         async def capture():
+            nonlocal painted
+            if painted is False:
+                # The outer readiness timeout can interrupt the last poll. Check the actual frame
+                # again at capture time, within the capture allowance, even if it has not settled.
+                try:
+                    observed = await asyncio.wait_for(_frame_painted(call), 2)
+                    if observed:
+                        painted = True if observed is True else UNMARKED_PAINT
+                except asyncio.TimeoutError:
+                    pass
             # Edge/Chrome's software compositor can hand back a stale tile right after a load: take one, let two
             # frames pass, keep the next (hidden_evidence.py does the same)
             await call("Page.captureScreenshot", format="png", fromSurface=True)
@@ -562,7 +610,7 @@ def snap(what, token, out, *, door="http://127.0.0.1:8810", source=None, world=N
             box.__exit__(None, None, None)
     if not Path(out).is_file() or Path(out).stat().st_size == 0:
         raise RuntimeError("no picture was taken")
-    paint_status = "" if painted else f"not painted after {LIMIT:g} s"
+    paint_status = painted if painted == UNMARKED_PAINT else ("" if painted else f"not painted after {LIMIT:g} s")
     if paint_status:
         _label_picture(out, paint_status)
     where = f"from {Path(source).name} (a hidden copy of the world)" if box else "live, read-only"

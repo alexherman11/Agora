@@ -200,8 +200,9 @@ def test_live_mode_lets_only_readings_leave_the_browser():
 
 class FakeFrame:
     """The parent is ready at t=0, but its opaque component frame can paint much later."""
-    def __init__(self, paint_at=None, component="true"):
+    def __init__(self, paint_at=None, component="true", content=None):
         self.now, self.paint_at, self.component = 0, paint_at, component
+        self.content = content or (lambda now: "")
         self.contexts = []
 
     async def sleep(self, seconds):
@@ -219,6 +220,8 @@ class FakeFrame:
             return {"result": {"value": self.component}}
         self.contexts.append(params["contextId"])
         assert params["contextId"] == 7
+        if params["expression"] == snap.FRAME_CONTENT:
+            return {"result": {"value": self.content(self.now)}}
         return {"result": {"value": self.paint_at is not None and self.now >= self.paint_at}}
 
     def wait(self, deadline=90):
@@ -238,6 +241,48 @@ def test_component_without_marker_uses_remaining_deadline():
     frame.now = 17  # resolution and browser startup have already spent part of the overall budget
     assert frame.wait() is False
     assert frame.now == 90
+
+
+def test_stored_painter_with_stable_content_captures_early_without_marker():
+    frame = FakeFrame(content=lambda now: "feed, channels, posts" if now >= 13 else "")
+    assert frame.wait() == "painted (no first-paint marker)"
+    assert frame.now == 16 and frame.contexts
+
+
+@pytest.mark.parametrize("content", [
+    lambda now: "feed" if now < 2 else "feed and posts",
+    lambda now: "feed" if now < 2 or now >= 3 else "",
+])
+def test_changing_or_disappearing_content_restarts_stability_interval(content):
+    frame = FakeFrame(content=content)
+    assert frame.wait() == snap.UNMARKED_PAINT
+    assert frame.now == (5 if content(2) else 6)
+
+
+def test_marker_wins_while_unmarked_content_is_settling():
+    frame = FakeFrame(paint_at=1, content=lambda now: "feed")
+    assert frame.wait() is True
+    assert frame.now == 1
+
+
+def test_transient_content_does_not_make_an_empty_frame_painted():
+    frame = FakeFrame(content=lambda now: "loading" if now < 1 else "")
+    assert frame.wait() is False
+    assert frame.now == 90
+
+
+def test_replaced_component_frame_is_retried():
+    frame = FakeFrame(content=lambda now: "feed")
+    original = frame.call
+
+    async def call(method, **params):
+        if method == "Page.createIsolatedWorld" and frame.now < 2:
+            raise RuntimeError("frame replaced")
+        return await original(method, **params)
+
+    frame.call = call
+    assert frame.wait() == snap.UNMARKED_PAINT
+    assert frame.now == 5
 
 
 def test_widget_still_opening_does_not_count_as_painted():
@@ -261,7 +306,12 @@ def test_unresponsive_frame_probe_is_bounded():
     assert asyncio.run(run()) is False
 
 
-def test_shoot_still_captures_when_paint_budget_expires(tmp_path, monkeypatch):
+@pytest.mark.parametrize("at_capture,expected", [
+    (False, False),
+    ("visible changing feed", "painted (no first-paint marker)"),
+    (True, True),
+])
+def test_shoot_still_captures_when_paint_budget_expires(tmp_path, monkeypatch, at_capture, expected):
     import websockets
     calls = []
 
@@ -291,33 +341,42 @@ def test_shoot_still_captures_when_paint_budget_expires(tmp_path, monkeypatch):
                 result = {"data": base64.b64encode(png()).decode()}
             await self.messages.put(json.dumps({"id": request["id"], "result": result}))
 
-    async def never_painted(call):
-        return False
+    async def deadline_probe(probe, deadline):
+        # Exercise the outer readiness timeout, including a frame appearing only at capture.
+        await asyncio.Future()
+
+    async def observed_at_capture(call):
+        return at_capture
 
     monkeypatch.setattr(websockets, "connect", lambda *a, **kw: FakeBrowser())
-    monkeypatch.setattr(snap, "_frame_painted", never_painted)
+    monkeypatch.setattr(snap, "_wait_for_paint", deadline_probe)
+    monkeypatch.setattr(snap, "_frame_painted", observed_at_capture)
     output = tmp_path / "deadline.png"
     result = asyncio.run(snap._shoot("fake", "http://127.0.0.1:9/desk/widget.html",
                                    "http://127.0.0.1:9", "synthetic-test-value",
                                    output, (320, 200), 4, True, None, 0.02))
-    assert result == ("", 0, False)
+    assert result == ("", 0, expected)
     assert output.read_bytes() == png()
     assert calls.count("Page.captureScreenshot") == 2
 
 
-def test_deadline_picture_and_result_are_labelled(tmp_path, monkeypatch):
+@pytest.mark.parametrize("painted,label", [
+    (False, "not painted after 90 s"),
+    ("painted (no first-paint marker)", "painted (no first-paint marker)"),
+])
+def test_deadline_picture_and_result_are_labelled(tmp_path, monkeypatch, painted, label):
     from PIL import Image
     output = tmp_path / "unpainted.png"
     monkeypatch.setattr(snap, "resolve", lambda *a: ("/desk/widget.html?widget=fixture", "the lens"))
 
     def fake_shot(*args, **kwargs):
         output.write_bytes(png(320, 200))
-        return "", 0, False
+        return "", 0, painted
 
     monkeypatch.setattr(snap, "_shot", fake_shot)
     got = snap.snap("fixture", "synthetic-test-value", output, size=(320, 200))
-    assert got["paint_status"] == "not painted after 90 s"
-    assert "not painted after 90 s" in got["detail"]
+    assert got["paint_status"] == label
+    assert label in got["detail"]
     with Image.open(output) as picture:
         assert picture.getpixel((0, 0)) == (255, 244, 206)
         assert picture.getpixel((0, 199)) == (30, 120, 90)
