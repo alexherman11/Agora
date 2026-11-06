@@ -137,6 +137,9 @@ def call(house, msg):
         current, card = look(target), look(card_id)
         if (current.get("kind"), field) not in FIELDS:
             raise ValueError("import supports only component.code or lens.text; no grant/security fields")
+        blocker = house.builders.landing_blocker()
+        if blocker:
+            raise ValueError(blocker)
         # Do not wait for a long landing while holding a synchronous module call.
         if not house.builders.landing_lock.acquire(blocking=False):
             raise ValueError("a landing is in progress; retry after it finishes")

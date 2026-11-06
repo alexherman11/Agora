@@ -30,6 +30,7 @@ import manager as M
 from messages import message
 import review_suites
 import handover
+import landing_control
 
 ACTIVE = {'asked', 'preparing', 'working', 'reviewing', 'landing'}
 RESUMABLE = {'received', 'blocked', 'reviewed'}   # stopped, not landed or released: house.tell gives it a new turn
@@ -209,15 +210,25 @@ class Builders:
         self.handing = set()
         self.request_receipts = {}
         self.stopping = False
-        self.landing_lock = threading.Lock()          # one landing at a time; the next waits its turn, never refused
+        self.landing_lock = threading.Lock()          # only publication shares exclusion with imports
+        self.landing_queue_lock = threading.Lock()    # reviews queue here; imports only share publication
+        self.land_controls = {}
+        self.land_context = threading.local()
         self.house_restart_due = False                # a landed change to the House itself: restart once all is idle
         for path in self.home.glob('*/state.json'):
             state = json.loads(path.read_text(encoding='utf-8'))
             if state.get('superseded_by'):        # an earlier run of a card that has had a new one
                 continue
-            if state['phase'] in ACTIVE:
+            if state.get('land_child_pid') and not alive(state['land_child_pid']):
+                state.pop('land_child_pid')
+            if state['phase'] in ACTIVE or state.get('land_in_progress') or state.get('land_child_pid'):
                 state.update(cut_phase=state['phase'], cut_from=state.get('updated', ''), phase='recovery-needed',
                              updated=stamp(), detail=f"House restarted while it was {state['phase']}")
+                if state.get('land_attempt'):
+                    state.update(phase='blocked', outcome_pending=True, land_sync_pending=True,
+                                 land_in_progress=False,
+                                 detail='House restarted during landing at ' + state.get('land_step', 'unknown'))
+                    self.landing_receipt(state)
             rows=house.m.see('look '+state['task']).get('rows') or []
             if rows and rows[0].get('build_run') != state['run'] and state['phase'] not in ('released', 'landed'):
                 state.update(phase='released',detail='its card moved on to another worker; its worktree is kept')
@@ -260,19 +271,47 @@ class Builders:
 
     git_lock = threading.Lock()
 
+    def land_check(self):
+        control = getattr(self.land_context, 'control', None)
+        if control:
+            control.check()
+
+    def git_guard(self):
+        blocker = self.landing_blocker()
+        if blocker:
+            raise RuntimeError(blocker)
+        control = getattr(self.land_context, 'control', None)
+        return control.acquire(self.git_lock, 'git') if control else self.git_lock
+
+    def landing_blocker(self):
+        """A crash/OS denial may leave a child alive. Never guess that its writes stopped."""
+        for state in self.states.values():
+            pid = state.get('land_child_pid')
+            control = self.land_controls.get(state['task'])
+            if pid and (control is None or control.unstopped is not None) and alive(pid):
+                return f"landing child PID {pid} may still be running for {state['task']}; inspect it before retrying"
+        return ''
+
+    def landing_busy(self, state):
+        return (state['task'] in self.land_controls or
+                bool(state.get('land_child_pid') and alive(state['land_child_pid'])))
+
     def git(self, cwd, *args):
         """27 Oct: twice a git call finished its work but held the House past its timeout (a background repack, then
         two parallel reviews' `git add` stuck ~25 min). So: no auto gc/maintenance; one git at a time; stdin is empty,
         never the House's own kernel pipe; output goes to files, so no leftover child can hold a pipe open; and a
         timeout kills git's whole process tree."""
         cmd = ['git', '-c', 'gc.auto=0', '-c', 'maintenance.auto=false', '-C', str(cwd), *args]
-        with self.git_lock, tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+        self.land_check()
+        with self.git_guard(), tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
             proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=out, stderr=err, creationflags=T.NO_WINDOW)
             try:
-                code = proc.wait(timeout=120)
+                control = getattr(self.land_context, 'control', None)
+                code = control.wait(proc, 120) if control else proc.wait(timeout=120)
             except subprocess.TimeoutExpired:
-                subprocess.run(['taskkill', '/T', '/F', '/PID', str(proc.pid)], capture_output=True,
-                               stdin=subprocess.DEVNULL, timeout=30, creationflags=T.NO_WINDOW)
+                if not control:
+                    subprocess.run(['taskkill', '/T', '/F', '/PID', str(proc.pid)], capture_output=True,
+                                   stdin=subprocess.DEVNULL, timeout=30, creationflags=T.NO_WINDOW)
                 raise
             out.seek(0), err.seek(0)
             stdout = out.read().decode('utf-8', 'replace')
@@ -300,6 +339,7 @@ class Builders:
                     raise
 
     def phase(self, state, phase, detail, **facts):
+        self.land_check()
         state.update(phase=phase, detail=detail, updated=stamp())
         self.event(state, phase, detail)
         build = {'asked':'asked', 'preparing':'asked', 'working':'building', 'reviewing':'landing',
@@ -340,8 +380,14 @@ class Builders:
                 self.request_receipts.pop(request, None)
 
     def try_start_outcome(self, state):
-        with self.notification_lock:
+        # Lifecycle callers may hold self.lock. A notifier saves under self.lock:
+        # never wait for it here (notification_lock -> lock versus lock -> notification_lock).
+        if not self.notification_lock.acquire(blocking=False):
+            return
+        try:
             self._start_outcome(state)
+        finally:
+            self.notification_lock.release()
 
     def _start_outcome(self, state):
         if not state.get('start_notice'):
@@ -393,6 +439,8 @@ class Builders:
             return {'refused': 'managed builds use Codex workers'}
         p = PROVIDERS[provider]
         with self.lock:
+            if prev and self.landing_busy(prev):
+                return {'refused': 'the House is settling its landing; wait before replacing this worker'}
             if target in self.states and not again:
                 return {'text': 'existing request: ' + self.states[target]['phase'], 'rows': [self.row(self.states[target])]}
             queued = self.full(provider)       # every slot busy: it waits its turn (start_queued), never refused
@@ -508,6 +556,8 @@ class Builders:
         Agents mid-turn are said their turn again (house.py, in_flight); workers mid-turn carry on by themselves
         (wake_cut_off). Only claiming, review and landing touch git, so only those are waited for."""
         if not self.house_restart_due or self.stopping:
+            return
+        if self.land_controls or self.landing_blocker():
             return
         if any(s['phase'] in ('reviewing', 'landing', 'asked', 'preparing') for s in self.states.values()):
             return
@@ -746,6 +796,10 @@ class Builders:
 
     def wake_owner(self, state, text, receipt=None):
         routes = self.route(state)
+        if receipt and receipt[0] == 'outcome' and state.get('land_caller'):
+            caller = getattr(self.h, 'agents', {}).get(state['land_caller'])
+            if caller is not None and all(agent is not caller for agent, _ in routes):
+                routes.append((caller, ''))
         if not routes:
             raise RuntimeError('no owner is available for this receipt')
         delivery = None
@@ -800,7 +854,7 @@ class Builders:
     def resumable(self, state):
         """Stopped and safe for a new turn on its worktree: received, blocked or reviewed; or cut off mid-turn
         with its process gone (never mid-review or mid-landing, where main or its branch may be half moved)."""
-        if state['task'] in self.children or state.get('handover'):
+        if state['task'] in self.children or state.get('handover') or self.landing_busy(state):
             return False
         if state['phase'] in RESUMABLE:
             return True
@@ -809,13 +863,21 @@ class Builders:
 
     def outcome(self, state):
         """A House operation on the worker ended (review, landing, or a failure): the one in charge hears how."""
-        with self.notification_lock:
+        if not self.notification_lock.acquire(blocking=False):
+            state['outcome_pending'] = True
+            self.save(state)
+            return
+        try:
             self._outcome(state)
+        finally:
+            self.notification_lock.release()
 
     def _outcome(self, state):
         phase, task, name = state['phase'], state['task'], state['name']
         if self.stopping:
             return                       # the House is going down; wake_cut_off tells them when it is back
+        if state.get('land_in_progress'):
+            return                       # reviewed/landed are intermediate phases until activation settles
         if phase in ACTIVE or phase in ('received', 'released', QUEUED) or state.get('manager'):
             return                       # received: report_turn already woke them with the worker's words
         if state.pop('quiet', None):
@@ -837,12 +899,7 @@ class Builders:
         if checks_text:
             text += '\n' + checks_text
         if state.get('land_attempt'):
-            state['land_receipt'] = dict(attempt=state['land_attempt'], step=state.get('land_step'),
-                                        phase=phase, reason=state.get('detail', ''),
-                                        activation=state.get('activation', ''),
-                                        checks=state.get('checks', []),
-                                        next=(f'house.snap <thing>; verify {task}' if phase == 'landed'
-                                              else f'house.tell {task} <repair the reported step>; house.land {task}'))
+            self.landing_receipt(state)
             text += '\n' + json.dumps(state['land_receipt'])
         said = [phase, str(state.get('detail', ''))[:300], state.get('land_attempt')]
         if state.get('last_outcome') == said:
@@ -859,6 +916,8 @@ class Builders:
         """Retry undelivered receipts on the House's ordinary tick."""
         self.deliver_start_requests()
         for state in list(self.states.values()):
+            if state.get('land_sync_pending') and not state.get('land_in_progress'):
+                self.sync_landing(state)
             try:
                 handover.reconcile(self, state)
                 handover.deliver(self, state)
@@ -977,8 +1036,8 @@ class Builders:
             if not (self.may_act(state, msg) or self.alex(caller.get('person'))):
                 return {'refused': 'worker ownership changed; read house.who before acting'}
             child = self.children.get(state['task'])
-            if state['phase'] in ('reviewing', 'landing'):
-                return {'refused': 'the House is landing it, not a worker turn; it ends by itself in a few minutes'}
+            if state['phase'] in ('reviewing', 'landing') or self.landing_busy(state):
+                return {'refused': 'the House is landing it; a steward can use house.land-cancel'}
             if child is None:
                 if state['phase'] in ('asked', 'preparing'):
                     return {'refused': 'it is starting up; stop it in a moment, or house.release drops it now'}
@@ -1014,7 +1073,7 @@ class Builders:
                 return {'refused': 'it already landed; nothing to release'}
             if state['phase'] == 'released':
                 return {'text': 'it was already released', 'external': True}
-            if state['phase'] in ('reviewing', 'landing'):
+            if state['phase'] in ('reviewing', 'landing') or self.landing_busy(state):
                 return {'refused': 'the House is landing it now; release it after, if you still want to'}
             child = self.children.get(state['task'])
             if child is not None:
@@ -1122,7 +1181,8 @@ class Builders:
         """A stopped worker (received, blocked, reviewed) takes a new turn in the same worktree. A review's receipts
         are about a result that is about to change, so they move to `earlier_reviews` instead of standing as current."""
         was = state['phase']
-        for key in ('land_attempt', 'land_step', 'outcome_pending'):
+        for key in ('land_attempt', 'land_step', 'land_receipt', 'land_caller', 'land_sync_pending',
+                    'land_sync_error', 'land_in_progress', 'outcome_pending'):
             state.pop(key, None)
         if was != 'received':
             old = {k: state.pop(k) for k in ('review_base', 'candidate', 'checks', 'self_proof_sha256') if k in state}
@@ -1188,6 +1248,8 @@ class Builders:
         if not state or not self.may_act(state, msg):
             return {'refused':'only the requester may retry this startup'}
         with self.lock:
+            if self.landing_busy(state):
+                return {'refused': 'the House is settling its landing; wait before retrying this worker'}
             if state.get('handover'):
                 return {'refused': handover.PENDING}
             if not (self.may_act(state, msg)):
@@ -1226,6 +1288,8 @@ class Builders:
         if task.get('build_run') != state['run']:
             return {'refused':f'its card has moved on to another worker; house.release {state["task"]} drops this one'}
         with self.lock:
+            if self.landing_busy(state):
+                return {'refused': 'the House is settling its landing; wait for the result before another turn'}
             if state.get('handover'):
                 return {'refused': handover.PENDING}
             if not (self.may_tell(state, task, msg)):
@@ -1332,6 +1396,7 @@ class Builders:
                             acceptance=task.get("acceptance", ""))
 
     def assert_owned(self, state):
+        self.land_check()
         M.check_state(self, state)
         task = self.session(state['requester']).look(state['task'])
         # Alex, 4 Nov: nothing sits blocked. A worker whose card moved on or finished is released, quietly; a card
@@ -1355,6 +1420,8 @@ class Builders:
         if not state or not self.may_act(state, msg):
             return {'refused': 'only the requester may review this build'}
         with self.lock:
+            if self.landing_busy(state):
+                return {'refused': 'the House is settling its landing; wait for the result before another review'}
             if state.get('handover'):
                 return {'refused': handover.PENDING}
             if not (self.may_act(state, msg)):
@@ -1399,6 +1466,8 @@ class Builders:
                               + str(state.get('last_words') or '(none kept)') + '\n', encoding='utf-8')
             self.event(state, 'self-proof', 'no BUILD-RESULT.md; the House wrote one from its last words')
         # Never erase or stash worker edits: commit them to its branch, then check that exact commit.
+        if getattr(self.land_context, 'control', None):
+            self.landing_step(state, 'commit')
         self.commit_worker(state, tree)
         if self.git(tree, 'status', '--porcelain', '--untracked-files=no'):
             raise RuntimeError('worker has uncommitted tracked changes; source review held')
@@ -1410,7 +1479,10 @@ class Builders:
         self.save(state)
         if base != state['base']:
             if state.get('land_attempt'):
-                state['land_step'] = 'merge'
+                if getattr(self.land_context, 'control', None):
+                    self.landing_step(state, 'merge')
+                else:
+                    state['land_step'] = 'merge'
             try:
                 self.git(tree, 'merge', '--no-edit', base)
             except RuntimeError:
@@ -1423,7 +1495,10 @@ class Builders:
                                    + '; merge main into the worker branch by hand, then review again') from None
         candidate = self.git(tree, 'rev-parse', 'HEAD')
         if state.get('land_attempt'):
-            state['land_step'] = 'checks'
+            if getattr(self.land_context, 'control', None):
+                self.landing_step(state, 'checks')
+            else:
+                state['land_step'] = 'checks'
         state.update(review_base=base, candidate=candidate, checks=[])
         self.phase(state, 'reviewing', 'independent kernel and hidden desktop checks on '+candidate[:12])
         folder = self.home/state['run']/('review-' + uuid.uuid4().hex)
@@ -1448,8 +1523,10 @@ class Builders:
                     env = T.clean_env('off')
                     env['AGORA_TMP'] = str(tree / '.tmp' / 'house-review' / state['run'] / str(i))
                     env['AGORA_REVIEW_EVIDENCE'] = receipt['artifacts']
-                    proc = subprocess.run(command, cwd=tree, env=env, stdout=out, stderr=subprocess.STDOUT,
-                                          timeout=suite['timeout'], creationflags=T.NO_WINDOW)
+                    control = getattr(self.land_context, 'control', None)
+                    run = control.run if control else subprocess.run
+                    proc = run(command, cwd=tree, env=env, stdout=out, stderr=subprocess.STDOUT,
+                               timeout=suite['timeout'], creationflags=T.NO_WINDOW)
                     receipt.update(returncode=proc.returncode, status='passed' if proc.returncode == 0 else 'failed')
                 except Exception as exc:
                     receipt.update(status='blocked' if isinstance(exc, RuntimeError) else 'failed',
@@ -1457,6 +1534,7 @@ class Builders:
                     out.write('\n' + receipt['error'] + '\n')
             receipt['sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
             self.save(state)
+            self.land_check()
             if receipt['status'] != 'passed':
                 failures.append(f"{suite['name']}; see {path}")
         if failures:
@@ -1479,6 +1557,118 @@ class Builders:
             return len(current) == len(CHECKS)
         return state['review_suites'] == review_suites.fingerprint(current)
 
+    def landing_receipt(self, state):
+        state.setdefault('land_step', 'started')
+        state['land_receipt'] = dict(attempt=state['land_attempt'], step=state['land_step'],
+                                    phase=state['phase'], reason=state.get('detail', ''),
+                                    checks=state.get('checks', []), activation=state.get('activation', ''),
+                                    landed_commit=state.get('landed_commit', ''),
+                                    next=(f'house.snap <thing>; verify {state["task"]}' if state['phase'] == 'landed'
+                                          else f'house.tell {state["task"]} <repair the reported step>; '
+                                               f'house.land {state["task"]}'))
+        state.setdefault('land_attempts', {})[state['land_attempt']] = state['land_receipt']
+        return state['land_receipt']
+
+    def sync_landing(self, state, strict=False):
+        """Keep a refused card write visible locally, without borrowing a steward's rights."""
+        try:
+            self.update(state, land_attempt=state['land_attempt'], land_step=state['land_step'],
+                        land_receipt=json.dumps(self.landing_receipt(state)),
+                        build='blocked' if state['phase'] == 'blocked' else
+                              'landed' if state['phase'] == 'landed' else 'landing',
+                        build_phase=state['phase'], build_detail=state.get('detail', '')[:1500])
+            state.pop('land_sync_pending', None)
+            state.pop('land_sync_error', None)
+        except Exception as exc:
+            state['land_sync_pending'] = True
+            state['land_sync_error'] = f'{type(exc).__name__}: {exc}'
+            if strict:
+                raise
+        finally:
+            self.save(state)
+
+    def landing_step(self, state, step):
+        self.land_check()
+        state['land_step'] = step
+        self.landing_receipt(state)
+        self.event(state, step, f"landing {state['land_attempt']}: {step}")
+        self.sync_landing(state, strict=True)
+
+    def settle_landing(self, state, exc):
+        state.update(phase='blocked', detail=f'{type(exc).__name__}: {exc}'[:2000], updated=stamp(),
+                     outcome_pending=True, land_sync_pending=True)
+        self.landing_receipt(state)
+        self.event(state, 'blocked', state['detail'])
+
+    def run_landing(self, state):
+        """The whole asynchronous boundary, including setup and BaseException, has a durable result."""
+        control = self.land_controls[state['task']]
+        try:
+            control.policy = landing_control.policy(self.settings())
+            control.deadline = control.started + control.policy['landing_timeout']
+            def track_child(proc):
+                if proc is None:
+                    state.pop('land_child_pid', None)
+                else:
+                    state['land_child_pid'] = proc.pid
+                self.save(state)
+            control.on_child = track_child
+            self.land_context.control = control
+            blocker = self.landing_blocker()
+            if blocker:
+                raise RuntimeError(blocker)
+            self.sync_landing(state, strict=True)
+            self.land_all(state)
+            self.land_check()
+        except BaseException as exc:
+            self.settle_landing(state, exc)
+        finally:
+            self.land_context.control = None
+            self.landing_receipt(state)
+            state['outcome_pending'] = True
+            state['land_in_progress'] = False
+            self.save(state)                   # notification/card failures cannot erase the result
+            self.sync_landing(state)
+            try:
+                M.notify(self, state)
+            except Exception as exc:
+                self.event(state, 'unsaid', f'manager wake: {exc!r}')
+            try:
+                self.outcome(state)
+            except Exception as exc:
+                self.event(state, 'unsaid', f'landing outcome wake: {exc!r}')
+            if control.unstopped is not None and control.unstopped.poll() is None:
+                state['land_child_pid'] = control.unstopped.pid
+                self.save(state)
+                def clear_after_exit():
+                    control.unstopped.wait()
+                    with self.lock:
+                        state.pop('land_child_pid', None)
+                        self.land_controls.pop(state['task'], None)
+                        self.save(state)
+                threading.Thread(target=clear_after_exit, daemon=True).start()
+            else:
+                self.land_controls.pop(state['task'], None)
+            try:
+                self.start_queued()
+                self.idle_check()
+            except Exception as exc:
+                self.event(state, 'unsaid', f'queue or restart check: {exc!r}')
+
+    def cancel_landing(self, msg):
+        caller = (msg.get('caller') or {}).get('person')
+        if not caller or not (self.steward(caller) or self.alex(caller)):
+            return {'refused': 'house.land-cancel is for stewards'}
+        task = (msg.get('args') or {}).get('target')
+        state, control = self.states.get(task), self.land_controls.get(task)
+        if not state or not control:
+            return {'refused': 'no active landing for this card'}
+        control.cancel('landing cancelled by ' + str((msg.get('caller') or {}).get('name') or caller))
+        # The owning thread stops its child before releasing any publication lock.
+        # Do not label cancellation complete until that unwind has finished.
+        return {'text': 'landing cancellation requested; its stopped result will wake the owner',
+                'external': True, 'rows': [dict(self.landing_receipt(state), cancellation='requested')]}
+
     def land(self, msg):
         """house.land <card>: one step (Alex, 4 Nov). The House runs the checks, lands the worker's work on main and
         switches it on; the owner hears once, when it is live or what stopped it. One landing at a time: the next
@@ -1497,59 +1687,104 @@ class Builders:
             if state['task'] in self.children or phase in ('asked', 'preparing', 'working'):
                 return {'refused': f'it is still working; house.land {state["task"]} once its turn ends '
                                    f'(or house.stop {state["task"]} first)'}
+            if state['task'] in self.land_controls:
+                return {'text': 'it is already landing; you hear when it is live', 'external': True,
+                        'rows': [self.landing_receipt(state)]}
             if phase in ('reviewing', 'landing'):
-                return {'text': 'it is already landing; you hear when it is live', 'external': True}
+                return {'refused': 'an earlier review or landing is unresolved; reconcile it before retrying'}
             if phase in ('landed', 'released', QUEUED):
                 return {'refused': f'it is {phase}; nothing to land'}
             if state.get('pending'):
                 return {'refused': "you told it something it hasn't read yet; let that turn run, then land it"}
             if not state.get('tree'):
                 return {'refused': 'it stopped before it had a worktree; nothing to land'}
+            if self.landing_blocker():
+                return {'refused': self.landing_blocker()}
             if phase in CUT and (self.cut_phase(state) not in ('working', 'reviewing') or alive(state.get('pid'))):
                 return {'refused': f'it was cut off while {self.cut_phase(state) or "busy"}; house.release it and '
                                    f'start afresh with house.build {state["task"]}'}
             state['land_from'] = phase
             state['land_attempt'] = uuid.uuid4().hex
-            state['land_step'] = 'checks'
+            state['land_step'] = 'started'
+            state['land_started'] = stamp()
+            state['land_in_progress'] = True
+            state['land_caller'] = (msg.get('caller') or {}).get('person')
+            state.pop('outcome_pending', None)
+            state['checks'] = [] if phase != 'reviewed' else state.get('checks', [])
+            state['detail'] = 'landing started'
             state.pop('quiet', None)
             state.pop('activation', None)
             state['phase'] = 'reviewing'
             state.pop('awaiting', None)
             state.pop('reminded', None)
-            self.save(state)
-            threading.Thread(target=self.guarded, args=(state, self.land_all), daemon=True).start()
+            self.landing_receipt(state)
+            self.event(state, 'started', 'landing ' + state['land_attempt'] + ' started')
+            try:
+                self.land_controls[state['task']] = landing_control.Control({})
+                threading.Thread(target=self.run_landing, args=(state,), daemon=True).start()
+            except BaseException as exc:
+                self.land_controls.pop(state['task'], None)
+                state['land_in_progress'] = False
+                self.settle_landing(state, exc)
         return {'text': 'landing: the House runs the checks, lands it on main and switches it on; you hear once, '
-                        'when it is live or what stopped it', 'external': True}
+                        'when it is live or what stopped it', 'external': True,
+                'rows': [dict(state['land_receipt'])]}
 
     def land_all(self, state):
         reviewed = state.pop('land_from', '') == 'reviewed'
-        with self.landing_lock:
+        control = getattr(self.land_context, 'control', None)
+        queue_guard = control.acquire(self.landing_queue_lock, 'landing queue') if control else self.landing_queue_lock
+        if control:
+            self.landing_step(state, 'waiting')
+        with queue_guard:
             for attempt in range(2):            # main may move between checks and landing (someone else landed)
                 main = self.git(self.repo, 'rev-parse', 'main')
                 if not (reviewed and state.get('candidate') and state.get('review_base') == main
                         and self.suites_current(state)):
-                    state['land_step'] = 'checks'
+                    if control:
+                        self.landing_step(state, 'checks')
+                    else:
+                        state['land_step'] = 'checks'
                     self.review(state)
-                state['land_step'] = 'publication'
+                if control:
+                    self.landing_step(state, 'publication')
+                else:
+                    state['land_step'] = 'publication'
                 state['phase'] = 'landing'
                 self.save(state)
                 try:
-                    self.publish(state)
+                    guard = control.acquire(self.landing_lock, 'publication') if control else self.landing_lock
+                    with guard:
+                        self.land_check()
+                        self.publish(state)
                     break
                 except RuntimeError as exc:
                     if 'main advanced' not in str(exc) or attempt:
                         raise
                     reviewed = False
-        state['land_step'] = 'activation'
+        if control:
+            self.landing_step(state, 'activation')
+        else:
+            state['land_step'] = 'activation'
         self.activate(state)
 
     def activate(self, state):
         """Switch the landed change on: restart what it made stale (kd_reload, detached). A change to the House itself
         restarts the House as soon as no git step is under way; who it cuts off resumes (idle_check)."""
         reload = T.REPO / 'research' / 'window-lab' / 'kernel-desktop' / 'kd_reload.py'
+        self.land_check()
         try:
-            result = subprocess.run([str(T.PY), str(reload), '--dry'], capture_output=True, text=True, timeout=120,
-                                    creationflags=T.NO_WINDOW)
+            control = getattr(self.land_context, 'control', None)
+            if control:
+                with tempfile.TemporaryFile() as out:
+                    result = control.run([str(T.PY), str(reload), '--dry'], stdout=out, stderr=subprocess.STDOUT,
+                                         timeout=120, creationflags=T.NO_WINDOW)
+                    out.seek(0)
+                    result.stdout = out.read().decode('utf-8', 'replace')
+                    result.stderr = ''
+            else:
+                result = subprocess.run([str(T.PY), str(reload), '--dry'], capture_output=True, text=True, timeout=120,
+                                        creationflags=T.NO_WINDOW)
             if getattr(result, 'returncode', 0):
                 raise RuntimeError('activation inspection failed: ' + (result.stderr or result.stdout)[:500])
             dry = result.stdout
@@ -1557,10 +1792,14 @@ class Builders:
             state['activation'] = f'not switched on ({exc}); ask JEFF to house.restart what it needs'
             self.event(state, 'activation', state['activation'])
             self.save(state)
+            if control:
+                raise
             return
         lines = [x.strip() for x in dry.splitlines() if x.strip()]
         if not lines:
             state['activation'] = 'activation inspection returned no result; ask JEFF to check before restarting'
+            if control:
+                raise RuntimeError(state['activation'])
         elif any('nothing is stale' in x for x in lines):
             state['activation'] = 'nothing needed restarting; it is live'
         else:
@@ -1568,10 +1807,13 @@ class Builders:
             others = [x for x in lines if not x.startswith('house:')]
             if others:
                 try:
+                    self.land_check()
                     self.spawn_reload(['--skip', 'house'] if house else [], self.home / state['run'] / 'activation.log')
                 except Exception as exc:
                     state['activation'] = f'not switched on ({exc}); ask JEFF to house.restart what it needs'
                     self.event(state, 'activation', state['activation'])
+                    if control:
+                        raise
                     return
             if house:
                 self.house_restart_due = True
@@ -1657,6 +1899,15 @@ class Builders:
         return late
 
     def show(self, rev, f):
+        control = getattr(self.land_context, 'control', None)
+        if control:
+            with self.git_guard(), tempfile.TemporaryFile() as out:
+                result = control.run(['git', '-C', str(self.repo), 'cat-file', '--filters', f'{rev}:{f}'],
+                                     stdout=out, stderr=subprocess.STDOUT, timeout=60, creationflags=T.NO_WINDOW)
+                if result.returncode:
+                    raise RuntimeError('git cat-file failed during landing')
+                out.seek(0)
+                return out.read()
         with self.git_lock:
             return subprocess.run(['git', '-C', str(self.repo), 'cat-file', '--filters', f'{rev}:{f}'], capture_output=True, check=True,
                                   stdin=subprocess.DEVNULL, timeout=60, creationflags=T.NO_WINDOW).stdout
@@ -1669,8 +1920,13 @@ class Builders:
                 p = Path(d)/name
                 p.write_bytes(data)
                 paths.append(str(p))
-            proc = subprocess.run(['git', 'merge-file', *paths], capture_output=True, stdin=subprocess.DEVNULL,
-                                  timeout=60, creationflags=T.NO_WINDOW)
+            control = getattr(self.land_context, 'control', None)
+            if control:
+                proc = control.run(['git', 'merge-file', *paths], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                   timeout=60, creationflags=T.NO_WINDOW)
+            else:
+                proc = subprocess.run(['git', 'merge-file', *paths], capture_output=True, stdin=subprocess.DEVNULL,
+                                      timeout=60, creationflags=T.NO_WINDOW)
             return Path(paths[0]).read_bytes() if proc.returncode == 0 else None
 
     def row(self, state):
@@ -1684,6 +1940,9 @@ class Builders:
                     owner_name=state.get('requester_name',''),
                     handoff_status='unresolved' if state.get('handover') else '',
                     handoff_to=(state.get('handover') or {}).get('name', ''),
+                    land_attempt=state.get('land_attempt', ''), land_step=state.get('land_step', ''),
+                    land_receipt=state.get('land_receipt', {}), land_sync_error=state.get('land_sync_error', ''),
+                    land_child_pid=state.get('land_child_pid'),
                     first_words_ms=None, error=state.get('detail','') if phase=='blocked' else '',
                     acts=[], acts_text='', waiting=0, session=state.get('session',''))
 

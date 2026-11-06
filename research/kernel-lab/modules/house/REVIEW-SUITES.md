@@ -42,6 +42,13 @@ structurally. Each review uses fresh evidence directories. Changed card
 definitions invalidate a saved review, including when a previously reviewed
 card acquires its first suite.
 
+During `house.land`, House settings `landing_timeout` bounds the entire attempt
+and `landing_wait_timeout` bounds queue/Git/publication lock waits. A steward
+can request `house.land-cancel <card>`. Overall timeout or cancellation stops
+the attempt and preserves completed and interrupted suite receipts; it does
+not continue to subsequent suites. Reviews do not hold the import/publication
+lock. See `BUILDERS.md` for receipts, restart recovery and OS-denial limits.
+
 The hidden real-drag check creates a disposable kernel world, an ordinary
 captioned Win32 window and a production `GuiScreen` Agora lens window. Mouse
 down/move/up go only to those hidden HWND queues, including Agora's production

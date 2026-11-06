@@ -1,5 +1,64 @@
 # Kernel House builders — implementation, 27 October
 
+## Bounded landing attempts (builder draft, 5 November, dk3384)
+
+`house.land` saves an attempt id and a `started` activity before starting its
+thread. Its answer and `house.who` include the receipt. `land_attempts` retains
+earlier receipts. The card receives `land_attempt`, `land_step`, `land_receipt`
+and its build phase through the saved owner's existing door. If that door
+refuses, the attempt blocks before Git/checks; the refusal is retained as
+`land_sync_error` and remains readable in `house.who`. It never retries with
+another person's authority. Both the owner and the steward who requested the
+attempt receive its terminal receipt. Notification failure remains pending
+for the ordinary tick; repeated delivery is deduplicated.
+
+This repairs a specific silent failure: steward admission did not change the
+saved requester used for card writes or wake routing. A saved owner who could
+no longer write the card left its old `landing, received` facts intact, while
+the actual blocked state stayed private and the caller heard nothing. Duplicate
+builder chats are a separate handoff refusal; landing does not resolve chats.
+Neither a desktop suite nor WM activation is reached after this early refusal.
+
+House settings `landing_timeout` and `landing_wait_timeout` are positive finite
+seconds, reread per attempt. Defaults are data in `landing-defaults.json`
+(1800 seconds overall, 120 seconds per lock wait). A landing records
+`started`, `waiting`, `commit`, `merge` when needed, `checks`, `publication`,
+and `activation`. Overall cancellation/deadline checks surround Git, checks,
+publication and activation inspection. Existing network door timeouts still
+bound in-flight requests; cancellation may wait for such a request to finish.
+Named suite timeouts continue to apply independently.
+The same settings data supplies `landing_cleanup_timeout` (30 seconds per
+termination/exit wait) and `landing_poll_interval` (0.1 seconds between
+cancellation checks).
+
+`house.land-cancel <card>` is a steward-only cancellation request. The owning
+thread stops its own child tree, unwinds and releases its locks, then records
+`blocked` with a reason and wake. It does not undo a commit already published.
+Child exit, timeout, spawn failure, thread `BaseException` and interrupted
+attempts found at House startup all retain terminal receipts. A restart during
+activation is recovered even though publication already set the phase to
+`landed`. Retrying/handing/replacing a worker cannot overtake a settling attempt.
+
+Reviews queue on their own bounded lock. Imports share only the short
+publication lock, so a long check does not monopolize `house.import`.
+Notification acquisition on lifecycle paths is nonblocking, avoiding the
+notification-lock / state-lock inversion; the tick retries delivery.
+
+OS termination denial is an explicit exception to automatic cleanup. It is
+reported with the child PID; the House thread settles promptly, while locks
+protecting a possibly writing child remain fenced until it exits. A persisted
+child PID also fences Git and imports after a House crash until exit is known.
+No alternate authority or termination method follows a denial. The parent
+process exiting is not proof about independently detached descendants; suite
+scripts still own their hidden-desktop cleanup contract.
+
+`test_ghost_landing.py` includes a real in-process kernel permission mismatch,
+immediate and duplicate receipts, thread failure/crash recovery, bounded queue
+and Git waits, cancellation, denied termination fencing, wake routing, and
+import availability during review. Process-tree termination is exercised with
+process doubles in the worker sandbox; a host-side hidden check is still needed
+to verify actual Windows tree termination.
+
 ## Recoverable ownership handoffs (builder draft, 5 November, dk3259)
 
 `house.hand` uses the existing word; this is a mechanism fix (`Source: fix`,
@@ -85,7 +144,8 @@ The six admission checks:
    ordinary world record retains the import Line, set bytes and revision evidence;
    undo reverses the field edit.
 
-Import refuses while House is landing, pins main during inspection and rechecks
+Import refuses while House is publishing or a surviving landing child may still
+write, pins main during inspection and rechecks
 it before returning. Git and kernel are separate stores: no cross-store atomic
 transaction is claimed. A later landing does not retroactively change the imported
 blob; the receipt identifies exactly which committed snapshot was inspected.

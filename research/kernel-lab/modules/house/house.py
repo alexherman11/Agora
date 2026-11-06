@@ -1083,6 +1083,8 @@ class House:
             return self.builders.request_review(msg)
         if word == "house.land":
             return self.builders.land(msg)
+        if word == "house.land-cancel":
+            return self.builders.cancel_landing(msg)
         if word == "house.import":
             import imports
             return imports.call(self, msg)
@@ -1310,7 +1312,13 @@ OFFER = [
              "and switches it on (restarts what it touched; a change to the House itself restarts the House once "
              "nobody is busy). You hear once, when it is live or what stopped it. One landing at a time; the next "
              "waits its turn. Runs the card's test_suites as well as the baseline, reports every result, and checks "
-             "again if its suite definition changed since review (see help house.review)."},
+             "again if its suite definition changed since review (see help house.review). Each request returns an "
+             "attempt receipt, also visible in house.who. House settings landing_timeout and landing_wait_timeout "
+             "bound execution and lock waits. Stewards can use house.land-cancel <task>."},
+    {"word": "house.land-cancel", "kind": "do", "needs": TASK_NEEDS, "takes": "<id>", "undo": "external", "may": "stewards",
+     "help": "house.land-cancel <task>: request cancellation of a landing, for stewards. The House stops its check "
+             "or Git child, releases its locks and records a blocked result with a wake. Cancellation does not undo "
+             "source already published; the receipt retains its landed commit."},
     {"word": "house.release", "kind": "do", "needs": TASK_NEEDS, "takes": "<id> [<why>]", "undo": "external", "may": "members",
      "help": "house.release <task> [why]: the card's worker ends for good (stopped first if running). Its worktree and "
              "branch are kept; the card is free for a new worker. Its owner, a steward or Alex may release it."},

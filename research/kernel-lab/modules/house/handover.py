@@ -143,7 +143,7 @@ def hand(b, msg):
             return receipt(state, PENDING, 'unresolved')
         if not pending and to.person == state['requester']:
             return receipt(state, f'{to.name} is already in charge of {state["name"]}', 'handed')
-        if state['task'] in b.children or state['phase'] in ACTIVE:
+        if state['task'] in b.children or state['phase'] in ACTIVE or b.landing_busy(state):
             return {'refused': f"it is {state['phase']} now; hand it on once it stops"}
         if state['phase'] == 'released':
             return {'refused': 'it was released; house.build starts a new worker on the card'}
