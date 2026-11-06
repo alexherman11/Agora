@@ -18,9 +18,11 @@ from test_workers import Agent
 
 
 @pytest.fixture
-def world(tmp_path):
+def world(tmp_path, request):
     k = Kernel(tmp_path / 'kernel', dict(tag='hf', name='Hidden handoff fixture',
-               steward=dict(account='owner', name='Owner')))
+               steward=dict(account='owner', name='Owner'),
+               modules=[dict(name='house', run=['never-started'], publishes='house.*',
+                             grants='house.* rows look', **{'for': 'steward'})]))
     old = k.accounts['owner']
     new = k.join('recipient', 'Recipient', invite={'admitted': 'steward'})['person']
     stranger = k.join('stranger', 'Stranger', invite={'admitted': 'steward'})['person']
@@ -46,12 +48,17 @@ def world(tmp_path):
 
     task = Door(old).call('/do', 'make kind=taskboard-task title=Repair who=Owner lead=Owner '
                          'build_run=fixture-run')['made'][0]
+    mid = k.module_named('house')
+    if getattr(request, 'param', True):
+        fields = ','.join(sorted(B.M.BUILD_FIELDS))
+        Door(old).call('/do', f'grant house words=set only="thing:{task};fields:{fields}"')
     book = (HERE / 'fixtures/agent-book.md').read_text(encoding='utf-8')
     home = tmp_path / 'house'
     home.mkdir()
     module = SimpleNamespace(
         see=lambda line, **kw: dict(rows=[dict(text=book)]) if line == 'look "Agent Book"'
-        else k.run(actors[old], line, mode='see'), happen=lambda *a: None)
+        else k.module_own(mid, line, mode='see'),
+        do=lambda line, **kw: k.module_own(mid, line, **kw), happen=lambda *a: None)
     agents = {}
     for person, name in ((old, 'Owner'), (new, 'Recipient'), (stranger, 'Stranger')):
         a = Agent()
@@ -73,7 +80,7 @@ def world(tmp_path):
                     caller=dict(person=person, name=agents[person].name))
 
     return SimpleNamespace(k=k, b=b, s=s, old=old, new=new, stranger=stranger, Door=Door,
-                           request=request, writes=writes, house=house)
+                           request=request, writes=writes, house=house, mid=mid)
 
 
 def assert_owner(w, person):

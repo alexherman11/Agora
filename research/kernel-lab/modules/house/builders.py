@@ -31,6 +31,7 @@ from messages import message
 import review_suites
 import handover
 import landing_control
+import bookkeeping
 
 ACTIVE = {'asked', 'preparing', 'working', 'reviewing', 'landing'}
 RESUMABLE = {'received', 'blocked', 'reviewed'}   # stopped, not landed or released: house.tell gives it a new turn
@@ -322,16 +323,30 @@ class Builders:
 
     def update(self, state, **facts):
         M.check_state(self, state)
-        door = self.session(state['requester'])
+        if not facts or not set(facts) <= M.BUILD_FIELDS:
+            raise RuntimeError('task bookkeeping fields outside House build scope')
+        try:
+            return self._update_build_fields(state, facts)
+        except Exception as exc:
+            bookkeeping.failed(self, state, exc)
+            raise
+
+    def _update_build_fields(self, state, facts):
         for attempt in range(4):
-            task = door.look(state['task'])
+            out = self.h.m.see('look ' + state['task'])
+            if out.get('ok') is False or out.get('refused'):
+                raise RuntimeError(out.get('text') or out.get('refused') or 'task reading refused')
+            rows = out.get('rows') or []
+            if len(rows) != 1 or rows[0].get('id') != state['task']:
+                raise RuntimeError('task bookkeeping target is not visible to the House')
+            task = rows[0]
+            state['bookkeeping_lead'] = task.get('lead', '')
             if task.get('build_run') != state['run']:
                 raise RuntimeError('claim changed; the previous builder cannot update this task')
             try:
                 if state.get('manager'):
                     return M.write_task(self, state, task, facts)
-                return door.call('/do', 'set ' + state['task'] + ' ' + ' '.join(k+'='+q(v) for k,v in facts.items()),
-                                 saw={state['task']: int(task['rev'])})
+                return M.write_facts(self, task, facts)
             except RuntimeError as exc:
                 # 28 Oct: JEFF, as lead, set the card between this read and write; the run blocked before its
                 # worktree. The claim is re-read each time, so another writer's facts are never overwritten blind.
@@ -868,6 +883,7 @@ class Builders:
             self.save(state)
             return
         try:
+            bookkeeping.deliver(self, state)
             self._outcome(state)
         finally:
             self.notification_lock.release()
@@ -916,6 +932,7 @@ class Builders:
         """Retry undelivered receipts on the House's ordinary tick."""
         self.deliver_start_requests()
         for state in list(self.states.values()):
+            bookkeeping.deliver(self, state)
             if state.get('land_sync_pending') and not state.get('land_in_progress'):
                 self.sync_landing(state)
             try:
@@ -1570,12 +1587,13 @@ class Builders:
         return state['land_receipt']
 
     def sync_landing(self, state, strict=False):
-        """Keep a refused card write visible locally, without borrowing a steward's rights."""
+        """Publish House-owned facts; retain any refused module write locally."""
         try:
             self.update(state, land_attempt=state['land_attempt'], land_step=state['land_step'],
                         land_receipt=json.dumps(self.landing_receipt(state)),
                         build='blocked' if state['phase'] == 'blocked' else
                               'landed' if state['phase'] == 'landed' else 'landing',
+                        outcome='failed' if state['phase'] == 'blocked' else 'unverified',
                         build_phase=state['phase'], build_detail=state.get('detail', '')[:1500])
             state.pop('land_sync_pending', None)
             state.pop('land_sync_error', None)
@@ -1720,12 +1738,14 @@ class Builders:
             self.landing_receipt(state)
             self.event(state, 'started', 'landing ' + state['land_attempt'] + ' started')
             try:
+                self.sync_landing(state, strict=True)
                 self.land_controls[state['task']] = landing_control.Control({})
                 threading.Thread(target=self.run_landing, args=(state,), daemon=True).start()
             except BaseException as exc:
                 self.land_controls.pop(state['task'], None)
                 state['land_in_progress'] = False
                 self.settle_landing(state, exc)
+                self.sync_landing(state)
         return {'text': 'landing: the House runs the checks, lands it on main and switches it on; you hear once, '
                         'when it is live or what stopped it', 'external': True,
                 'rows': [dict(state['land_receipt'])]}
@@ -1942,6 +1962,9 @@ class Builders:
                     handoff_to=(state.get('handover') or {}).get('name', ''),
                     land_attempt=state.get('land_attempt', ''), land_step=state.get('land_step', ''),
                     land_receipt=state.get('land_receipt', {}), land_sync_error=state.get('land_sync_error', ''),
+                    bookkeeping_notices=[{k: n[k] for k in
+                        ('key', 'reason', 'lead', 'delivered', 'lead_error', 'chat_error') if k in n}
+                        for n in state.get('bookkeeping_failures', {}).values()],
                     land_child_pid=state.get('land_child_pid'),
                     first_words_ms=None, error=state.get('detail','') if phase=='blocked' else '',
                     acts=[], acts_text='', waiting=0, session=state.get('session',''))

@@ -4,18 +4,70 @@
 
 `house.land` saves an attempt id and a `started` activity before starting its
 thread. Its answer and `house.who` include the receipt. `land_attempts` retains
-earlier receipts. The card receives `land_attempt`, `land_step`, `land_receipt`
-and its build phase through the saved owner's existing door. If that door
-refuses, the attempt blocks before Git/checks; the refusal is retained as
-`land_sync_error` and remains readable in `house.who`. It never retries with
-another person's authority. Both the owner and the steward who requested the
+earlier receipts. Before launching the thread, the card receives `land_attempt`,
+`land_step`, `land_receipt`, outcome and build phase through the House module's
+own `see`/`do` channel. All lifecycle build updates use that same channel,
+constrained to build bookkeeping fields, the current `build_run` and a fresh
+card revision. Requester credentials are not needed for these writes. The
+requester's authority still gates lifecycle commands, claims and handoffs.
+Manager runs retain their existing task approval, ownership and hold checks.
+If the module write refuses, the attempt blocks before Git/checks; the refusal
+is retained as `land_sync_error` and remains readable in `house.who`. There is
+no fallback to a person's session. Both the owner and the steward who requested the
 attempt receive its terminal receipt. Notification failure remains pending
 for the ordinary tick; repeated delivery is deduplicated.
 
-This repairs a specific silent failure: steward admission did not change the
+Every failed build-field write also queues an independent durable notice for
+the **current card lead** and the coordination chat named by House settings
+`bookkeeping_failure_chat` (Shop talk in this desktop). Resident leads receive
+a House wake; other leads receive `notification.send`, keyed by the failure.
+The chat receives a House-authored `say` about the card. Each destination is
+retried independently on the ordinary tick, even for managed runs and even
+after a later card write succeeds. A lost chat reply is reconciled by reading
+the matching notice before another send. A lead wake interrupted before its
+delivery checkpoint can be repeated after a crash. Missing routes or refused
+notification grants remain visible in `house.who`'s `bookkeeping_notices`;
+they never trigger another person's session. The prose comes from the live
+Agent Book section **House card write failed**; the structured failure evidence
+is included even if that section is missing.
+
+Build bookkeeping uses an explicitly scoped module grant: `set` on
+`kind:taskboard-task` and only these fields:
+`builder,build,build_run,build_phase,build_detail,builder_chat,result_received,reviewed_commit,landed_commit,outcome,land_attempt,land_step,land_receipt`.
+`grants.json` declares it alongside the module source. Desktop startup
+(`kdesk.after_genesis`) installs that extra scope once through the ordinary
+steward `grant` command. The module's `asks_scoped` remembers each command and
+scope separately; an existing `set` grant on another object cannot mask a
+missing scope. Repeated startup does not duplicate it, a revoked scope stays
+revoked (even across source removal/readdition), and an off module gets no
+new grants. The House cannot grant itself authority. This requires the desktop
+kernel's next authorized startup after landing; restarting House alone does
+not run the installer. No live startup is part of the worker's checks.
+
+Equivalent manual line, if needed by a steward:
+
+```text
+grant house words=set only="kind:taskboard-task;fields:builder,build,build_run,build_phase,build_detail,builder_chat,result_received,reviewed_commit,landed_commit,outcome,land_attempt,land_step,land_receipt"
+```
+
+For notices, `say` must reach only the configured chat;
+`notification.send` must reach the relevant cards for nonresident leads.
+Set `bookkeeping_failure_chat` to the coordination chat in House settings.
+These notice routes remain world configuration for an authorized steward.
+They are not fallback authority to acquire after a refusal. Fixtures prove
+that `text`, ownership and other unrelated fields cannot be written through
+the build update path, and that the shipped grant rejects non-card targets
+and mixed writes containing an unrelated field.
+
+The initial fix exposed a specific silent failure: steward admission did not change the
 saved requester used for card writes or wake routing. A saved owner who could
 no longer write the card left its old `landing, received` facts intact, while
-the actual blocked state stayed private and the caller heard nothing. Duplicate
+the actual blocked state stayed private and the caller heard nothing. The
+6 November correction routes those writes through the House itself and records
+the started card receipt synchronously. The House still needs the
+kernel `set` grant installed by desktop startup or an authorized steward.
+Without one, it reports the refusal and does not
+launch the landing. Duplicate
 builder chats are a separate handoff refusal; landing does not resolve chats.
 Neither a desktop suite nor WM activation is reached after this early refusal.
 
@@ -59,11 +111,19 @@ import availability during review. Process-tree termination is exercised with
 process doubles in the worker sandbox; a host-side hidden check is still needed
 to verify actual Windows tree termination.
 
+`test_bookkeeping.py` adds the four-person case (maker, lead, landing steward
+and saved worker owner are distinct), lead/Shop talk delivery, independent
+retry, and lost-reply reconciliation. Its memory variant runs real kernel
+permission checks and transactions with storage doubled; the disk variant
+also uses the existing isolated kernel fixture. Neither starts a worker or
+activates a desktop component.
+
 ## Recoverable ownership handoffs (builder draft, 5 November, dk3259)
 
 `house.hand` uses the existing word; this is a mechanism fix (`Source: fix`,
-`Missing-word: none`). The saved worker `requester` is the authority used by
-landing, notifications and `house.who`. Listings also expose its person id as
+`Missing-word: none`). The saved worker `requester` is the owner used by
+landing admission, notifications and `house.who`; House-owned lifecycle facts
+are written through the module's own grants. Listings also expose its person id as
 `owner`, alongside `owner_name`, and `handoff_status`/`handoff_to` while unresolved.
 Editing a card's `who` alone never grants worker authority.
 

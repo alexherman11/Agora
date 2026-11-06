@@ -36,6 +36,7 @@ def manager(tmp_path):
     door=WorldDoor()
     book=(HERE/'fixtures/agent-book.md').read_text(encoding='utf-8')
     m=SimpleNamespace(see=lambda line,**k:dict(rows=[dict(text=book) if line == 'look "Agent Book"' else dict(door.task)]),
+                      do=lambda line,**kw:door.call('/do',line,**kw),
                       happen=lambda *a:None)
     h=SimpleNamespace(home=home,world=world,m=m,builder_url='http://127.0.0.1:1')
     b=B.Builders(h,tmp_path/'repo'); b.fixture_door=door
@@ -305,6 +306,8 @@ def test_a_stale_card_write_is_reread_and_written_again(manager):
                 raise RuntimeError('refused: stale: dk1 changed since it was read; nothing was done')
             return super().call(route,line,**kw)
     busy=Busy();busy.task['build_run']=s['run'];manager.session=lambda _:busy
+    manager.h.m.see=lambda line:dict(rows=[busy.look(s['task'])])
+    manager.h.m.do=lambda line,**kw:busy.call('/do',line,**kw)
     manager.update(s,build_phase='preparing')
     assert busy.task['build_phase']=='preparing' and busy.task['next_action']=='the lead wrote this'
 
@@ -328,6 +331,7 @@ def test_unknown_door_outcome_is_not_retried(manager):
         calls=0
         def call(self,*a,**k):self.calls+=1;raise TimeoutError('lost reply')
     lost=Lost();lost.task['build_run']=s['run'];manager.session=lambda _:lost
+    manager.h.m.do=lambda line,**kw:lost.call('/do',line,**kw)
     with pytest.raises(TimeoutError):manager.update(s,build='building')
     assert lost.calls==1
 
@@ -354,7 +358,8 @@ def test_real_kernel_claim_fence_and_git_lifecycle(tmp_path, monkeypatch):
             return out
     door=KernelDoor()
     h=SimpleNamespace(home=home,world=world,builder_url='http://127.0.0.1:1',
-                      m=SimpleNamespace(see=lambda line,**kw:door.call('/see',line),happen=lambda *a:None))
+                      m=SimpleNamespace(see=lambda line,**kw:door.call('/see',line),
+                                        do=lambda line,**kw:door.call('/do',line,**kw),happen=lambda *a:None))
     repo=tmp_path/'repo';repo.mkdir();b=B.Builders(h,repo);b.session=lambda _:door
     b.git(repo,'init','-b','main');b.git(repo,'config','user.name','Fixture');b.git(repo,'config','user.email','fixture@invalid')
     (repo/'value.txt').write_text('before');(repo/'other.txt').write_text('preserved')

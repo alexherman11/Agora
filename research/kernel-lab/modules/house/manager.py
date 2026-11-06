@@ -15,7 +15,10 @@ from pathlib import Path
 
 OPS = {'build':'start', 'tell':'tell', 'retry':'retry', 'review':'request_review', 'land':'land'}
 NOTE_FIELDS = {'status','blocker','next_action','result','evidence','review_note','verified_evidence'}
-WRITE_FIELDS = NOTE_FIELDS | {'builder','build','build_run','build_phase','build_detail','builder_chat','result_received','reviewed_commit','landed_commit','outcome'}
+BUILD_FIELDS = {'builder','build','build_run','build_phase','build_detail','builder_chat',
+                'result_received','reviewed_commit','landed_commit','outcome',
+                'land_attempt','land_step','land_receipt'}
+WRITE_FIELDS = NOTE_FIELDS | BUILD_FIELDS
 TERMINAL = {'received', 'reviewed', 'landed', 'blocked', 'uncertain', 'recovery-needed'}
 
 
@@ -110,9 +113,14 @@ def write_task(builders, state, task, facts):
             raise RuntimeError('task is held; bookkeeping did not change it')
         if state.get('basis') and any(task.get(k,'') != v for k,v in state['basis'].items()):
             raise RuntimeError('task instructions changed; bookkeeping held for owner review')
+    return write_facts(builders, task, facts)
+
+
+def write_facts(builders, task, facts):
+    """Use the House's existing module grants, never a requester/steward session."""
     def q(v):return '"'+str(v).replace('\\','\\\\').replace('"','\\"')+'"'
-    out=builders.h.m.do('set '+state['task']+' '+' '.join(k+'='+q(v) for k,v in facts.items()),
-                        saw={state['task']:int(task['rev'])})
+    out=builders.h.m.do('set '+task['id']+' '+' '.join(k+'='+q(v) for k,v in facts.items()),
+                        saw={task['id']:int(task['rev'])})
     if 'did not answer' in str(out.get('refused') or out.get('text') or ''):
         raise TimeoutError('task bookkeeping outcome uncertain; inspect receipt before retry')
     if out.get('ok') is False or out.get('refused'):

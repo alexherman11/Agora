@@ -5,6 +5,7 @@ import subprocess
 import sys
 import threading
 import time
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
@@ -37,6 +38,8 @@ def test_started_receipt_precedes_thread_and_duplicate_keeps_attempt(manager):
     assert out['rows'][0]['attempt'] == saved['land_attempt']
     assert saved['land_step'] == 'started'
     assert saved['activity'][-1]['what'] == 'started'
+    assert manager.fixture_door.task['land_attempt'] == saved['land_attempt']
+    assert manager.fixture_door.task['land_step'] == 'started'
     assert manager.land(msg())['rows'][0]['attempt'] == saved['land_attempt']
 
 
@@ -65,23 +68,19 @@ def test_pending_notice_cannot_wake_a_mid_landing_reviewed_result(manager):
     assert 'publication failed' in manager.h.agents['dk99'].woken[0][0]
 
 
-def test_dk1156_shape_refused_owner_write_is_not_a_ghost(manager):
-    """A steward can request land, but saved owner lacks card-write rights.
-
-    Duplicate chats, a stale card and desktop suite never reach review: the
-    first ownership/card update is the failing boundary.
-    """
+def test_refused_house_write_is_not_a_ghost(manager):
+    """An absent module grant blocks before any checks, with no authority fallback."""
     s = setup(manager)
     manager.fixture_door.task.update(build='landing', build_phase='received', builder_chat='dk2530',
         test_suites=json.dumps([dict(name='Hidden real drag', runner='python',
                                     paths=['hidden_real_drag.py'], timeout=180, desktop=True)]))
-    manager.fixture_door.call = Mock(side_effect=B.DoorRefused('set is for its maker or lead'))
+    manager.h.m.do = Mock(return_value=dict(ok=False, text='House holds no grant for set'))
     manager.review = Mock()
     manager.activate = Mock()
     attempt = admit(manager)['rows'][0]['attempt']
-    manager.run_landing(s)
+    manager.deliver_outcomes()
     assert s['phase'] == 'blocked'
-    assert 'set is for its maker or lead' in s['detail']
+    assert 'House holds no grant for set' in s['detail']
     assert s['land_receipt']['attempt'] == attempt
     assert manager.row(s)['land_sync_error']
     assert s['land_sync_pending']
@@ -89,27 +88,111 @@ def test_dk1156_shape_refused_owner_write_is_not_a_ghost(manager):
     assert attempt in manager.h.agents['dk99'].woken[0][0]
     manager.review.assert_not_called()
     manager.activate.assert_not_called()
+    assert not manager.land_controls
+    assert not manager.fixture_door.writes
     assert manager.landing_lock.acquire(blocking=False)
     manager.landing_lock.release()
 
 
-def test_real_kernel_owner_mismatch_wakes_owner_and_requesting_steward(world):
+def test_real_kernel_owner_mismatch_records_card_and_wakes_both_people(world):
     b, s, old, new = world.b, world.s, world.old, world.new
     # Card remains owned by the steward; saved worker requester is another person.
     s.update(requester=new, requester_name='Recipient')
     b.start_queued = lambda: None
     b.idle_check = lambda: None
-    b.review = Mock()
+    # This is the old failing boundary, proved against kernel permissions.
+    with pytest.raises(B.DoorRefused, match='set is for'):
+        b.session(new).call('/do', f'set {s["task"]} build_phase=reviewing')
+    b.session(old).call('/do', f'set {s["task"]} build=landing build_phase=received')
+    def check(st):
+        b.phase(st, 'reviewing', 'hidden checks started')
+        raise RuntimeError('hidden check failed')
+    b.land_all = Mock(side_effect=check)
     with patch.object(B.threading.Thread, 'start'):
         out = b.land(dict(args=dict(target=s['task']), caller=dict(person=old, name='Owner')))
     assert out.get('external'), out
+    card = b.session(old).look(s['task'])
+    assert card['land_attempt'] == s['land_attempt'] and card['land_step'] == 'started'
+    assert card['build_phase'] == 'reviewing'
+    assert json.loads(card['land_receipt'])['attempt'] == s['land_attempt']
     b.run_landing(s)
     assert s['phase'] == 'blocked'
-    assert 'refused' in s['land_sync_error']
-    assert b.session(old).look(s['task']).get('land_attempt') is None
+    assert not s.get('land_sync_error')
+    card = b.session(old).look(s['task'])
+    assert card['build_phase'] == card['build'] == 'blocked'
+    assert card['outcome'] == 'failed'
+    assert 'hidden check failed' in card['build_detail']
+    assert json.loads(card['land_receipt'])['phase'] == 'blocked'
     assert len(b.h.agents[new].woken) == len(b.h.agents[old].woken) == 1
     assert s['land_attempt'] in b.h.agents[old].woken[0][0]
-    b.review.assert_not_called()
+    b.land_all.assert_called_once_with(s)
+
+
+@pytest.mark.parametrize('world', [False], indirect=True)
+def test_real_kernel_missing_module_grant_never_uses_steward_fallback(world):
+    b, s = world.b, world.s
+    b.land_all = Mock()
+    with patch.object(B.threading.Thread, 'start') as launch:
+        out = b.land(dict(args=dict(target=s['task']), caller=dict(person=world.old, name='Owner')))
+    assert out['rows'][0]['phase'] == 'blocked'
+    assert 'grant' in s['land_sync_error']
+    assert world.Door(world.old).look(s['task']).get('land_attempt') is None
+    launch.assert_not_called()
+    b.land_all.assert_not_called()
+
+
+def bookkeeping():
+    """Isolate the module boundary; these checks need no disk or credentials."""
+    b = B.Builders.__new__(B.Builders)
+    s = dict(task='card', run='run', requester='former-owner')
+    card = dict(id='card', build_run='run', rev=7)
+    b.h = SimpleNamespace(m=SimpleNamespace(
+        see=Mock(return_value=dict(rows=[card])),
+        do=Mock(return_value=dict(ok=True, record='receipt'))))
+    b.session = Mock(side_effect=AssertionError('must not borrow any person session'))
+    b.save = Mock()
+    return b, s, card
+
+
+def test_module_bookkeeping_does_not_need_requester_credentials():
+    b, s, card = bookkeeping()
+    out = b.update(s, build_phase='blocked', outcome='failed')
+    assert out['records'] == ['receipt']
+    assert b.h.m.do.call_args.kwargs['saw'] == {'card': 7}
+    assert 'build_phase="blocked"' in b.h.m.do.call_args.args[0]
+    b.session.assert_not_called()
+
+
+@pytest.mark.parametrize('field', ['who', 'lead', 'text', 'test_suites', 'lane'])
+def test_module_bookkeeping_cannot_edit_task_instructions(field):
+    b, s, card = bookkeeping()
+    with pytest.raises(RuntimeError, match='fields'):
+        b.update(s, **{field: 'replacement'})
+    b.h.m.do.assert_not_called()
+
+
+def test_module_bookkeeping_rechecks_claim_after_a_stale_answer():
+    b, s, card = bookkeeping()
+    def raced(*args, **kwargs):
+        card.update(build_run='new-run', rev=8)
+        return dict(ok=False, text='stale: card changed')
+    b.h.m.do.side_effect = raced
+    with pytest.raises(RuntimeError, match='claim changed'):
+        b.update(s, build_phase='blocked')
+    assert b.h.m.do.call_count == 1
+    assert b.h.m.see.call_count == 2
+
+
+@pytest.mark.parametrize('answer,error', [
+    (dict(ok=False, text='House holds no grant for set'), RuntimeError),
+    (dict(ok=False, refused='the kernel did not answer'), TimeoutError)])
+def test_module_bookkeeping_refusal_or_uncertainty_never_borrows_authority(answer, error):
+    b, s, card = bookkeeping()
+    b.h.m.do.return_value = answer
+    with pytest.raises(error):
+        b.update(s, build_phase='blocked')
+    assert b.h.m.do.call_count == 1
+    b.session.assert_not_called()
 
 
 @pytest.mark.parametrize('error', [RuntimeError('broken'), TimeoutError('door timed out'),

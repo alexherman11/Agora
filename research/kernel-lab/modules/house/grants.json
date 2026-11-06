@@ -1,0 +1,6 @@
+[
+  {
+    "words": "set",
+    "only": "kind:taskboard-task;fields:builder,build,build_run,build_phase,build_detail,builder_chat,result_received,reviewed_commit,landed_commit,outcome,land_attempt,land_step,land_receipt"
+  }
+]
