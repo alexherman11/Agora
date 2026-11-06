@@ -11,7 +11,6 @@ agent session, just as residents use their own door sessions (MOVING-IN D3).
 Received work is reviewed independently; neither a model result nor landing
 closes the user's task. Restart uncertainty is held for explicit reconciliation.
 """
-import calendar
 import hashlib
 import json
 import os
@@ -32,6 +31,7 @@ import review_suites
 import handover
 import landing_control
 import bookkeeping
+import restart_recovery
 
 ACTIVE = {'asked', 'preparing', 'working', 'reviewing', 'landing'}
 RESUMABLE = {'received', 'blocked', 'reviewed'}   # stopped, not landed or released: house.tell gives it a new turn
@@ -39,18 +39,10 @@ CUT = {'recovery-needed', 'uncertain'}             # cut off (House restart, los
 WAITING = RESUMABLE | CUT                          # stopped and waiting on the one in charge of it
 FINISHED = {'done', 'verified', 'finished', 'completed', 'released', 'cancelled', 'trashed'}   # a card's lane or status
 QUEUED = 'queued'                                  # asked for while every slot of its kind was busy: starts when one frees
-CUT_RESUME_HOURS = 6                               # a worker a restart cut off this recently is picked back up by itself
 
 
 class Released(Exception):
     """Its card no longer holds this worker (moved on to another run, or finished): it ends quietly as released."""
-
-
-def age_hours(when):
-    try:
-        return (time.time() - calendar.timegm(time.strptime(str(when), '%Y-%m-%dT%H:%M:%SZ'))) / 3600
-    except (TypeError, ValueError):
-        return float('inf')
 
 
 def alive(pid):
@@ -177,7 +169,9 @@ class Builders:
         return int(value)
 
     def full(self, provider):
-        busy = sum((s['phase'] in ACTIVE or s['task'] in self.children) and s.get('provider', 'codex') == provider
+        busy = sum((s['phase'] in ACTIVE or s['task'] in self.children
+                    or (s['phase'] in WAITING and (alive(s.get('pid')) or alive(s.get('land_child_pid')))))
+                   and s.get('provider', 'codex') == provider
                    for s in self.states.values())
         return busy >= self.capacity_for(provider)
 
@@ -223,13 +217,17 @@ class Builders:
             if state.get('land_child_pid') and not alive(state['land_child_pid']):
                 state.pop('land_child_pid')
             if state['phase'] in ACTIVE or state.get('land_in_progress') or state.get('land_child_pid'):
-                state.update(cut_phase=state['phase'], cut_from=state.get('updated', ''), phase='recovery-needed',
-                             updated=stamp(), detail=f"House restarted while it was {state['phase']}")
+                restart_recovery.park(self, state, f"House restarted while it was {state['phase']}")
                 if state.get('land_attempt'):
                     state.update(phase='blocked', outcome_pending=True, land_sync_pending=True,
                                  land_in_progress=False,
                                  detail='House restarted during landing at ' + state.get('land_step', 'unknown'))
                     self.landing_receipt(state)
+            elif state['phase'] == 'blocked' and state.get('detail') == restart_recovery.SHUTDOWN:
+                # Migrate the old shutdown failure that startup used to ignore.
+                cut = self.cut_phase(state)
+                restart_recovery.park(self, state, state['detail'])
+                state['cut_phase'] = cut
             rows=house.m.see('look '+state['task']).get('rows') or []
             if rows and rows[0].get('build_run') != state['run'] and state['phase'] not in ('released', 'landed'):
                 state.update(phase='released',detail='its card moved on to another worker; its worktree is kept')
@@ -240,6 +238,7 @@ class Builders:
                 handover.finish(self, state, rows[0])
             self.states[state['task']] = state
             self.save(state)
+        self.recovery = restart_recovery.Recovery(self)
 
     def save(self, state):
         with self.lock:
@@ -355,6 +354,9 @@ class Builders:
 
     def phase(self, state, phase, detail, **facts):
         self.land_check()
+        if self.stopping and phase in ACTIVE:
+            restart_recovery.park(self, state, restart_recovery.SHUTDOWN)
+            raise RuntimeError(restart_recovery.SHUTDOWN)
         state.update(phase=phase, detail=detail, updated=stamp())
         self.event(state, phase, detail)
         build = {'asked':'asked', 'preparing':'asked', 'working':'building', 'reviewing':'landing',
@@ -495,12 +497,16 @@ class Builders:
         except Exception as exc:
             halted, releasing = state.pop('halted_by', None), state.pop('releasing', None)
             uncertain=isinstance(exc,(TimeoutError,ConnectionError,urllib.error.URLError,subprocess.TimeoutExpired))
+            if uncertain:
+                state['effects_unknown'] = True
             if releasing:
                 self.released(state, releasing)
                 return
             if halted:
                 state.update(phase='blocked', detail=f"stopped by {halted}; house.tell {state['task']} <words> starts it "
                                                      f"again with new words, house.release {state['task']} drops it")
+            elif self.stopping and (state['phase'] in ACTIVE or state.get('restart_pending')):
+                restart_recovery.park(self, state, restart_recovery.SHUTDOWN)
             else:
                 state.update(phase='uncertain' if uncertain else 'blocked', detail=str(exc)[:2000])
             self.event(state, state['phase'], state['detail'])
@@ -542,6 +548,8 @@ class Builders:
     def start_queued(self):
         """A slot came free: queued workers start, then queued follow-ups, oldest first. Nothing waiting is refused."""
         with self.lock:
+            if self.stopping:
+                return
             waiting = sorted((s for s in self.states.values() if s['phase'] == QUEUED or s.get('queued_turn')),
                              key=lambda s: s.get('queued_turn') or s.get('created') or '')
             for state in waiting:
@@ -656,8 +664,11 @@ class Builders:
         child = T.Child(cmd, tree, env, events, lambda *_: None, stderr=folder/'stderr.log')
         self.children[state['task']] = child
         state['pid'] = child.proc.pid
+        state['effect_tracking'] = True
         self.phase(state, 'preparing', f'adapter started; awaiting authenticated {label} thread', builder_chat=state['chat'])
         if not child.send(prompt):
+            state['effects_unknown'] = True
+            self.save(state)
             raise RuntimeError('initial send uncertain; no replay')
         ended = False
         said = []                    # this turn's words, the last of which go to the resident in the worker's chat
@@ -672,6 +683,19 @@ class Builders:
                         raise RuntimeError('stopped')       # house.stop / house.release: guarded says how it ended
                     continue
                 kind = e.get('e')
+                if kind in ('effect-started', 'effect-finished', 'effect-unknown'):
+                    with self.lock:
+                        effects = state.setdefault('in_flight_effects', {})
+                        if kind in ('effect-started', 'effect-unknown'):
+                            effects[e['id']] = e['name']
+                            if kind == 'effect-unknown':
+                                state['effects_unknown'] = True
+                        else:
+                            effects.pop(e['id'], None)
+                        self.save(state)
+                    continue
+                if self.stopping and kind != 'text':
+                    raise RuntimeError(restart_recovery.SHUTDOWN)
                 if kind == 'init':
                     state['session'] = e['session']
                     state['thread_started'] = stamp()
@@ -685,11 +709,15 @@ class Builders:
                     self.phase(state, 'working', f'authenticated {label} turn running')
                 if kind == 'turn_started' or (claude and kind in ('init', 'tool', 'text')):
                     self.followup_started(state)
+                    if state.pop('restart_context', None) is not None:
+                        self.save(state)
                 if kind == 'tool':
                     activity = T.worker_activity.tool(e)
                     self.event(state, 'act', activity['summary'] if activity else e.get('name', 'tool'),
                                activity['detail'] if activity else None)
                 elif kind == 'text':
+                    state['last_words'] = e['text']
+                    state['interrupted_words'] = e['text']
                     self.event(state, 'said', e['text'])
                     said.append(e['text'])
                 elif kind == 'result':
@@ -706,6 +734,8 @@ class Builders:
                     if pending:
                         self.event(state, 'heard', 'delivering queued owner follow-up')
                         if not child.send(self.message("Follow-up", state, owner_words='\n'.join(pending))):
+                            state['effects_unknown'] = True
+                            self.save(state)
                             raise RuntimeError('follow-up send uncertain; no replay')
                         continue
                     self.phase(state, 'received', 'worker ended; result received, not yet independently reviewed',
@@ -716,7 +746,7 @@ class Builders:
         finally:
             child.stop()
             self.children.pop(state['task'], None)
-            if state['phase']=='received' and state.get('pending'):
+            if not self.stopping and state['phase']=='received' and state.get('pending'):
                 with self.lock:
                     state['phase']='preparing'
                     self.save(state)
@@ -858,8 +888,10 @@ class Builders:
             return state['cut_phase']
         for e in reversed(state.get('activity') or []):
             what = e.get('what')
-            if what in ('said', 'act', 'heard', 'working', 'preparing', 'asked', 'reopened', 'received'):
+            if what in ('said', 'act', 'heard', 'working'):
                 return 'working'
+            if what in ('preparing', 'asked', 'reopened', 'received'):
+                return what
             if what in ('reviewing', 'review-again', 'committed'):
                 return 'reviewing'
             if what in ('reviewed', 'landing', 'carried'):
@@ -930,8 +962,12 @@ class Builders:
 
     def deliver_outcomes(self):
         """Retry undelivered receipts on the House's ordinary tick."""
+        self.recovery.deliver()
+        self.start_queued()
         self.deliver_start_requests()
         for state in list(self.states.values()):
+            if state.get('restart_sync_pending'):
+                restart_recovery.sync_card(self, state)
             bookkeeping.deliver(self, state)
             if state.get('land_sync_pending') and not state.get('land_in_progress'):
                 self.sync_landing(state)
@@ -963,35 +999,8 @@ class Builders:
         return self.message("Waiting worker row", state, since=since, detail=str(state.get("detail", ""))[:200])
 
     def wake_cut_off(self):
-        """House start: owners hear, once, about workers a restart cut off (each gets one wake listing them)."""
-        heard = {}
-        with self.lock:
-            for state in self.states.values():
-                if state['phase'] not in CUT or state.get('cut_told') or state.get('manager') or self.card_done(state):
-                    continue
-                state['cut_told'] = stamp()
-                # 4 Nov: a worker cut off mid-turn a little while ago simply carries on, by itself (nobody is woken;
-                # its owner hears when that turn ends). Older ones go to their owner to decide.
-                if (self.resumable(state) and state.get('session')
-                        and age_hours(state.get('cut_from')) < CUT_RESUME_HOURS):
-                    state["resume_note"] = {"heading": "When a restart cut it off"}
-                    state['queued_turn'] = stamp()
-                    self.event(state, 'picked-up', 'cut off by a House restart; it carries on by itself')
-                    self.save(state)
-                    continue
-                for agent, prefix in self.route(state):
-                    heard.setdefault(agent.person, (agent, []))[1].append((state, prefix))
-        for agent, items in heard.values():
-            lines = []
-            for state, prefix in items:
-                self.stopped(state)
-                lines.append(self.waiting_line(state))
-                if prefix:
-                    lines.append(prefix)
-            agent.wake(self.message("The House restarted and cut older workers off", list="\n".join(lines)))
-            for state, _ in items:
-                self.event(state, 'told', f'woke {agent.name} about the cut-off')
-        self.start_queued()
+        """Startup and retry use the same durable reconciliation receipts."""
+        self.recovery.deliver()
 
     def remind(self, person):
         """A turn of theirs ended and workers still wait on them: one reminder per stopped result, never more."""
@@ -1210,6 +1219,13 @@ class Builders:
             state["resume_note"] = {"heading": "When a restart cut it off"}
         state['reopened_from'] = was if was != 'received' else state.get('reopened_from', '')
         state['phase'] = 'preparing'
+        state['detail'] = 'retained worker continuation preparing'
+        state.pop('restart_pending', None)
+        state.pop('cut_phase', None)
+        state.pop('cut_from', None)
+        state.pop('cut_told', None)
+        state.pop('effects_unknown', None)
+        state.pop('in_flight_effects', None)
         state.pop('awaiting', None)
         state.pop('reminded', None)
         self.save(state)
@@ -1254,6 +1270,8 @@ class Builders:
             self.save(state)
         notes = [self.message(note["heading"], state, **note.get("facts", {}))
                  if isinstance(note, dict) else note for note in notes]
+        if state.get('restart_context'):
+            notes.append(json.dumps(state['restart_context'], ensure_ascii=False))
         prompt=self.message("Follow-up", state, owner_words="\n".join(notes+pending))
         if not state.get('session'):      # stopped before any model thread: the worker has not read its task yet
             prompt=self.prompt(state,self.session(state['requester']).look(state['task']))+'\n'+prompt
@@ -1994,6 +2012,16 @@ class Builders:
         return {'text':'\n'.join(lines), 'rows':[dict(person=task, name=state['name'], log='\n'.join(rendered), lines=len(lines))]}
 
     def off(self):
-        self.stopping = True
+        with self.lock:
+            self.stopping = True
+            for state in self.states.values():
+                if state['phase'] in ACTIVE:
+                    restart_recovery.park(self, state, restart_recovery.SHUTDOWN)
+                    state['restart_sync_pending'] = True
+                    self.save(state)
+        # Persist all interruptions before any potentially slow stop or write.
+        for state in list(self.states.values()):
+            if state.get('restart_sync_pending'):
+                restart_recovery.sync_card(self, state)
         for child in list(self.children.values()):
             child.stop()

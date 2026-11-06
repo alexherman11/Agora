@@ -1,5 +1,45 @@
 # Kernel House builders — implementation, 27 October
 
+## Restart reconciliation (builder implementation, 6 November, dk3639)
+
+Shutdown saves every active worker's interrupted phase before stopping children.
+Startup also recognises the older blocked `House shutting down; preserve work
+and reconcile before retry` receipt. It repairs stopped workers' stale card
+build fields through the existing House bookkeeping channel and claim/revision
+guards. Refused writes remain pending and use the existing bookkeeping notices;
+there is no alternate credential or grant path.
+
+An interrupted working turn resumes its existing session and worktree, with its
+last public words included in the continuation. Age is no longer a cutoff.
+Current ownership, holds, manager approval, process exit and provider capacity
+still apply. A full pool keeps the continuation queued and the summary names
+its actual phase and queue state; admission is not reported as an authenticated
+running turn. Interrupted preparation, review, landing, unresolved transfers,
+unknown effects and possibly live processes wait for their owner.
+
+The stream records tool start/completion correlation ids, without arguments or
+results. An unfinished or uncorrelated tool, a lost send/result, or an older
+worker with tool activity but no completion receipts prevents automatic replay.
+This is conservative: an operation may have completed even though the House
+never observed its completion. It must be reconciled by the owner.
+
+Each startup produces one restart wake and one reconciliation summary for the
+agent with the general-manager role. Owners receive a grouped receipt naming
+waiting cards and reasons. Structured receipts use the existing live Agent Book
+`Someone woke them` heading; continuation prose uses `When a restart cut it off`.
+No book edit is required. Receipt data survives a missing template.
+`builders/restart-receipts.json` retains undelivered destinations. Agent
+`wake_once` persists the delivery key and message together before acknowledging
+acceptance, including while busy or asleep. The ordinary House tick retries
+receipts and card writes without issuing another model turn for a reconciled
+worker. Finished/superseded cards are not resumed.
+
+Hidden coverage is in `test_restart_recovery.py`, with the three-worker restart,
+legacy shutdown failures, stale card fields, repeated restarts, capacity, unsafe
+effects, failed delivery, card-write retry and durable busy-agent inboxes.
+Activation is a House restart after landing; for this card the owner requested
+landing with no other work running. These fixtures do not restart the live House.
+
 ## Bounded landing attempts (builder draft, 5 November, dk3384)
 
 `house.land` saves an attempt id and a `started` activity before starting its
