@@ -16,7 +16,7 @@ Full vision: [docs/Agora.md](docs/Agora.md) and [docs/Agora Constitution.md](<do
 
 ## Where it stands
 
-Agora is a working research prototype. What runs today is the first stage, the Dynamic Desk: a desktop, AI interface and application system built all out of the same substrate. To someone less technical, it should appear like a regular, modern desktop interface. However, the curious mind will quickly discover that what seems simple is actually the foundation of an entire ecosystem. The later stages are plans, and plenty is still open.
+Agora is a working research prototype. What runs today is the first stage, the Dynamic Desk: a desktop, AI interface and application system built all out of the same substrate. It might only look like a regular modern desktop interface, however, what seems simple is actually the foundation of an entire ecosystem. This system is still very much in development but I believe it has lots of potential.
 
 ## The big idea: take applications apart
 
