@@ -1,0 +1,513 @@
+"""EDITING THE KERNEL (Alex, 4 Nov 2026; AGENTS.md "Source edits go down over time").
+The kernel changes only to give every world a general capability: a word, a check, a kind of fact any app, module or
+person can use. It never names its tenants: no app, module, person, kind or field name appears in this code except the
+kernel's own (word, rule, kind, grant, person, ...). If your change needs `if kind == "..."`, a person's name or one app's
+field, stop: the missing piece is a general word (a kind's policy, a rule step, a reading). Build that, or put it on the
+Board. Names already here are debt (docs/design/source-edits/SOURCE-AUDIT-KERNEL.md lists them); take them out when you can.
+
+Help that teaches (epic: a terminal that teaches itself, Alex 26 Oct 2026).
+
+`help` alone shows a short first screen: how a line works and the words most worth knowing, not every word.
+`help <anything>` helps with that thing: a word (help window.open), a topic (help windows), a module (help theme),
+a kind of thing (help taskboard-task), one thing (help dk74), or, failing those, the words whose names or help
+mention it. It never ends at "nothing answers".
+
+The pages are world data. A topic is an ordinary thing, `make kind=topic name=windows aliases=window
+words="window.* wm.*" text="…"`, so fixing a page is `set <topic> text=…` from Lines, and fixing a word's help is
+`word-set <word> help=…`. Each answer ends with the line that fixes it, for whoever may.
+`help all` is the old full listing (one line per word, each word once).
+"""
+import difflib
+import fnmatch
+import re
+
+START = ("Lines: type a line, the world answers. A line is a word, then what it acts on, then settings:\n"
+         "  window.open feed to=left      word, then a thing, then key=value\n"
+         "  set dk74 at=40,40             a thing is named by its id (dk74); ids show in every answer\n"
+         "  post \"hello there\"            quote text that has spaces\n"
+         "  search Seabright              things of any kind by name, title or text\n"
+         "Every act gets a receipt [r812]; undo takes back your latest act (undo r812 takes back that one).\n"
+         "A refused line or a broken button is kept: refusals lists what, who and why.")
+USEFUL = ("look", "help", "rows", "search", "window.list", "window.open", "make", "set", "forget", "undo", "history", "post",
+          "theme.use", "task.add", "verb", "rule", "who", "recent", "refusals")
+
+
+LIVE = re.compile(r"\$\[\[([^\]\n]+)\]\]\.([A-Za-z_][A-Za-z0-9_-]*)|\$\.([A-Za-z_][A-Za-z0-9_-]*)")
+
+
+def live(k, actor, text, own):
+    """Help that stays current (Alex, 5 Nov 2026): in a page or a word's help, $.<fact> is a fact of the page's own
+    thing (or the word's own entry) and $[[thing|label]].<fact> a fact of another thing, read with the reader's own
+    sight each time the page is shown. A fact the reader can't read shows as a named gap, never a guess. Other $ words
+    ($today, $1, $target) are what help explains, so they stay as written; $$ writes a literal $."""
+    if "$" not in str(text or ""):
+        return text
+
+    def fill(m):
+        target, prop, local = m.groups()
+        try:
+            if local:
+                values = own or {}
+            else:
+                ref = target.split("|", 1)[0].strip()
+                t = ref if ref in k.state.things else None
+                if t is None:
+                    hits = k.named(actor, ref)
+                    t = hits[0][0] if len(hits) == 1 else None
+                values = (k.shown(actor.person, t) or {}) if t else {}
+            value = values.get(prop or local)
+            if value not in (None, ""):
+                return str(value)
+        except Exception:                                  # noqa: BLE001  a page never fails on one fill
+            pass
+        return f"(not known here: {m.group(0)})"
+    parts = str(text).split("$$")
+    return "$".join(LIVE.sub(fill, p) for p in parts)
+
+
+# ---------------------------------------------------------------------------------------------------- small pieces
+def _variants(w):
+    w = w.casefold().strip()
+    out = [w]
+    if w.endswith("ies"):
+        out.append(w[:-3] + "y")
+    if w.endswith("es"):
+        out.append(w[:-2])
+    if w.endswith("s"):
+        out.append(w[:-1])
+    return out
+
+
+def _split_help(word, text):
+    """'window.open <lens> [to=..]: open a window. More…' -> ('window.open <lens> [to=..]', 'open a window')."""
+    first = (text or "").strip().splitlines()[0] if (text or "").strip() else ""
+    usage, desc = "", first
+    cut, quoted = None, False
+    for i, ch in enumerate(first[:160]):
+        if ch == '"':
+            quoted = not quoted
+        elif ch == ":" and not quoted and first[i + 1:i + 2] in (" ", ""):
+            cut = i
+            break
+    if cut is not None and (first[:cut].split() or [""])[0].casefold() in (word.casefold(),
+                                                                         word.replace("-", ".").casefold()):
+        usage, desc = first[:cut], first[cut + 1:].strip()
+    desc = re.split(r"(?<!e\.g\.)(?<!i\.e\.)(?<=[.!?])\s", desc, maxsplit=1)[0].rstrip(".")
+    if len(desc) > 72:
+        desc = desc[:70].rsplit(" ", 1)[0] + "…"
+    return usage, desc
+
+
+def _dropped(k):
+    """Module words whose running module no longer offers them (kernel.dropped), as {word: entry}."""
+    return {k.state.get(e, "word"): e for e in k.entries() if hasattr(k, "dropped") and k.dropped(e)}
+
+
+def _visible_entries(k, actor, group):
+    """Each word once: the entry nearest the line's group, if the reader may see it. Words a running module no
+    longer offers are left out (help check names them)."""
+    from .dictionary import localized
+    out = {}
+    for e in k.entries():
+        if k.shown(actor.person, e) is None or (hasattr(k, "dropped") and k.dropped(e)):
+            continue
+        a = localized(k, actor.person, k.entry(e))
+        w = a.get("word")
+        if not w or w in out:
+            continue
+        try:
+            nearest = k.find_entry(w, group)
+        except Exception:
+            nearest = e
+        if nearest not in (None, e):
+            a = localized(k, actor.person, k.entry(nearest))
+        out[w] = a
+    return out
+
+
+def _line(k, actor, a, group, width=18):
+    _, desc = _split_help(a["word"], a.get("help", ""))
+    mark = "" if k.may(actor, a, None, group) else f"  ({a.get('may')} only)"
+    frm = str(a.get("from") or "")
+    if frm.startswith("module:"):
+        mid = k.module_named(frm[7:])
+        if mid and not k.state.get(mid, "on"):
+            mark += f"  ({frm[7:]} is off)"
+    return f"  {a['word']:<{width}} {desc}{mark}"
+
+
+def _listing(k, actor, entries, group):
+    width = min(22, max([len(a["word"]) for a in entries] + [8]) + 1)
+    return [_line(k, actor, a, group, width) for a in entries]
+
+
+def _matching(pool, patterns):
+    """In the order the patterns are written (a topic lists its most useful words first), each word once."""
+    out = {}
+    for p in [p.casefold() for p in str(patterns or "").split() if p]:
+        for w, a in sorted(pool.items()):
+            if w not in out and fnmatch.fnmatchcase(w.casefold(), p):
+                out[w] = a
+    return list(out.values())
+
+
+def _can_edit_thing(k, actor, t):
+    a = k.state.things.get(t, {})
+    return a.get("made_by") in (actor.id, actor.person) or k.is_steward(actor.person) or any(
+        k.is_leader(actor.person, g) for g in k.groups_of(t))
+
+
+def _can_edit_entry(k, actor, a):
+    scope = a.get("lives")
+    return k.is_steward(actor.person) or bool(scope and k.is_leader(actor.person, scope))
+
+
+def _ws(k):
+    """What the word-set entry is called here now (word.set since 27 Oct; a world may rename it)."""
+    try:
+        e = k.find_entry("word-set")
+    except Exception:
+        e = None
+    return k.state.get(e, "word") if e else "word-set"
+
+
+def _ask_hint(k, t):
+    try:
+        return f"unclear? ask {t} text=\"what confused you\"" if k.find_entry("ask") else ""
+    except Exception:
+        return ""
+
+
+# ---------------------------------------------------------------------------------------------------- the pages
+def topics(k, actor):
+    out = []
+    for t in k.things("topic"):
+        a = k.shown(actor.person, t)
+        if a is not None and a.get("name"):
+            out.append((t, a))
+    return sorted(out, key=lambda ta: (str(ta[1].get("order", "50")).zfill(3), ta[1].get("name")))
+
+
+def topic_named(k, actor, w):
+    for v in _variants(w):
+        for t, a in topics(k, actor):
+            names = {str(a.get("name", "")).casefold(), *str(a.get("aliases", "")).casefold().split()}
+            if v in names:
+                return t, a
+    return None
+
+
+def _topic_page(k, actor, group, t, a, pool):
+    k.mark(actor, t, a)
+    text = live(k, actor, str(a.get("text", "")).replace("\\n", "\n"), a)   # a topic's text may say \n for a new line
+    lines = [f"{a.get('title') or a.get('name')}: {text}" if text else str(a.get('title') or a.get('name'))]
+    pats = str(a.get("words") or "").split()
+    named = _matching(pool, " ".join(p for p in pats if "*" not in p))
+    more = [x for x in _matching(pool, " ".join(p for p in pats if "*" in p)) if x not in named]
+    found = named + more
+    lines += _listing(k, actor, named, group)
+    if more:
+        lines.append("  more: " + ", ".join(x["word"] for x in more))
+    tail = ["help <word> says more"]
+    if _can_edit_thing(k, actor, t):
+        tail.append(f"fix this page: set {t} text=\"…\" words=\"…\"")
+    elif _ask_hint(k, t):
+        tail.append(_ask_hint(k, t))
+    lines.append(" · ".join(tail))
+    return {"text": "\n".join(lines), "rows": [dict(a, id=t, rev=k.state.rev.get(t, 0))] +
+            [{"word": x["word"], "kind": x.get("word_kind")} for x in found]}
+
+
+def _module_page(k, actor, group, m, pool):
+    name = k.state.get(m, "name")
+    found = _matching(pool, f"{name}.*")
+    if not found:
+        return None
+    about = k.state.get(m, "about") or f"the {name} module's words"
+    on = "" if k.state.get(m, "on") else f" (off: nothing answers until a steward turns {name} on)"
+    lines = [f"{name}: {about}{on}"] + _listing(k, actor, found, group)
+    tail = ["help <word> says more"]
+    if k.is_steward(actor.person):
+        tail.append(f"make this a page: make kind=topic name={name} words=\"{name}.*\" text=\"…\"")
+    lines.append(" · ".join(tail))
+    return {"text": "\n".join(lines), "rows": [{"word": x["word"], "kind": x.get("word_kind")} for x in found]}
+
+
+def _mentions(pool, term):
+    """Entries whose name or help mentions term, best first."""
+    term = term.casefold()
+    rx = re.compile(r"(?<![a-z0-9])" + re.escape(term) + r"(s|es)?(?![a-z0-9])")
+    scored = []
+    for w, a in pool.items():
+        name = w.casefold()
+        score = (6 if name == term else 4 if term in re.split(r"[.\-]", name) else 2 if term in name else 0)
+        score += min(3, len(rx.findall(str(a.get("help", "")).casefold())))
+        score += 1 if rx.search(str(a.get("takes", "")).casefold()) else 0
+        if score:
+            scored.append((-score, w, a))
+    return [a for _, _, a in sorted(scored)]
+
+
+def _kind_page(k, actor, group, kind, pool):
+    seen = [t for t in k.things(kind) if k.shown(actor.person, t) is not None]
+    if not seen:
+        return None
+    found = _mentions(pool, kind)[:10]
+    lines = [f"{kind}: {len(seen)} you can see. rows {kind} lists them with ids; look <id> shows one."]
+    if found:
+        lines.append(f"words that mention {kind}:")
+        lines += _listing(k, actor, found, group)
+    lines.append("any thing: look <id> · set <id> key=value · forget <id> · history <id>")
+    return {"text": "\n".join(lines), "rows": [{"word": x["word"], "kind": x.get("word_kind")} for x in found]}
+
+
+def _entry_page(k, actor, e):
+    from .dictionary import localized
+    a = localized(k, actor.person, k.entry(e))
+    k.mark(actor, e, k.shown(actor.person, e))
+    facts = [f"{a['word']} ({e}), a {a.get('word_kind')} word", f"takes: {a.get('takes') or 'nothing'}",
+             f"who may: {a.get('may')}"]
+    if a.get("aliases"):
+        facts.insert(1, "also said: " + ", ".join(str(a["aliases"]).split()))
+    for key in ("once", "sealed", "undo"):
+        if a.get(key):
+            facts.append(f"{key}: {a[key]}")
+    facts.append(f"from: {a.get('from')}" + (f" ({a['bound']})" if a.get("bound") and a.get("bound") != a["word"] else ""))
+    if a.get("from", "").startswith("module:"):
+        mid = k.module_named(a["from"][7:])
+        if not mid or not k.state.get(mid, "on") or not k.modules or not k.modules.running(mid):
+            facts.append("unbound: this community must grant and run the module")
+    text = live(k, actor, a.get("help", ""), a) + "\n" + " · ".join(facts)
+    if _can_edit_entry(k, actor, a):
+        text += f"\nfix this help: {_ws(k)} {a['word']} help=\"…\""
+    elif _ask_hint(k, e):
+        text += "\n" + _ask_hint(k, e)
+    return {"text": text, "rows": [dict(a)]}
+
+
+def _search_page(k, actor, group, w, pool):
+    found = _mentions(pool, w)[:8]
+    for v in _variants(w)[1:]:
+        if not found:
+            found = _mentions(pool, v)[:8]
+    if not found:
+        return None
+    lines = [f"no word called {w}; these mention it:"] + _listing(k, actor, found, group)
+    lines.append("help <word> says more · help shows how lines work")
+    return {"text": "\n".join(lines), "rows": [{"word": x["word"], "kind": x.get("word_kind")} for x in found]}
+
+
+def suggest(k, actor, w, group, pool=None):
+    """What to type instead of an unknown word: a help page that exists, or the nearest names."""
+    pool = pool if pool is not None else _visible_entries(k, actor, group)
+    if topic_named(k, actor, w) or any(k.module_named(v) for v in _variants(w)) or any(
+            k.things(v) for v in _variants(w)):
+        return f"help {w} shows the words for it"
+    names = list(pool) + [x for a in pool.values() for x in str(a.get("aliases", "")).split()]
+    near = difflib.get_close_matches(w.casefold(), names, n=3, cutoff=0.6)
+    tails = [n for n in names if n.split(".")[-1] == w.casefold()]
+    near = list(dict.fromkeys(tails + near))[:3]
+    if near:
+        return "did you mean " + " or ".join(near) + "?"
+    return f"help {w} searches the words; help shows how lines work"
+
+
+def check_page(k, actor, group, pool):
+    """help check: help that would mislead, with the line that fixes each. A reading; nothing changes."""
+    names = set(pool) | {x for a in pool.values() for x in str(a.get("aliases", "")).split()}
+    problems, long = [], []
+    for w, a in sorted(pool.items()):
+        text = str(a.get("help", "")).strip()
+        first = text.splitlines()[0] if text else ""
+        said = []
+        head = (first.split() or [""])[0].rstrip(":")
+        if head and head != w and re.fullmatch(r"[a-z][a-z0-9]*[.-][a-z0-9.-]+", head) and head not in names:
+            said.append(f"its example says {head}, but the word is {w}")
+        elif not first.casefold().startswith(w.casefold()):
+            said.append("no usage line: start with the word and what it takes")
+        ghosts = sorted({m for m in re.findall(r"(?<![\w./<-])([a-z]+[.-][a-z][a-z0-9-]*)(?= |$)", text)
+                         if m not in names and m.split(".")[0] in {n.split(".")[0] for n in names if "." in n}
+                         and m != head})
+        if ghosts:
+            said.append("mentions " + ", ".join(ghosts[:3]) + ", which nothing answers to")
+        if len(first) > 220:
+            long.append(w)
+        if said:
+            problems.append((w, said))
+    lines = [f"help check: {len(problems)} of {len(pool)} words have help that may mislead"]
+    for w, said in problems[:30]:
+        lines.append(f"  {w}: " + "; ".join(said))
+    if len(problems) > 30:
+        lines.append(f"  … and {len(problems) - 30} more (rows hold them all)")
+    if long:
+        lines.append(f"long first lines (over 220 characters), worth trimming: " + ", ".join(long))
+    gone = sorted(_dropped(k))
+    if gone:
+        lines.append("no longer offered by their running module (left out of help): " + ", ".join(gone)
+                     + f". Retire one: {_ws(k)} {gone[0]} status=hidden")
+    lines.append(f"fix one: help <word>, then {_ws(k)} <word> help=\"<word> <what it takes>: what it does.\"")
+    return {"text": "\n".join(lines), "rows": [{"word": w, "problems": said} for w, said in problems]}
+
+
+def _who(k, actor):
+    me = k.name(actor.id) if actor.id in k.state.things else k.name(actor.person)
+    if actor.id != actor.person:
+        return f"You are {me}, acting with {k.name(actor.person)}'s rights, in {k.name(k.place)}."
+    return f"You are {me}, in {k.name(k.place)}."
+
+
+def start_page(k, actor, group, pool):
+    hit = topic_named(k, actor, "start")
+    if hit:
+        page = _topic_page(k, actor, group, hit[0], hit[1], pool)
+        body, _, tail = page["text"].rpartition("\n")
+        page["text"] = "\n".join([_who(k, actor), body, "help <anything> helps with that: help windows · help theme · "
+                                  "help window.open · help all", tail])
+    else:
+        found = [pool[w] for w in USEFUL if w in pool]
+        lines = [_who(k, actor), START, "", "words worth knowing:"] + _listing(k, actor, found, group)
+        lines.append("help <anything> helps with that: help windows · help theme · help window.open · help all")
+        page = {"text": "\n".join(lines), "rows": []}
+    # only the top of each layered page: a subtopic (under=<topic>, or named <topic>-<more>) is found from its page
+    tops = {str(a.get("name", "")).casefold() for _, a in topics(k, actor)}
+    names = [n for _, a in topics(k, actor) if (n := a.get("name")) and n != "start" and not a.get("under")
+             and not ("-" in n and n.casefold().rsplit("-", 1)[0] in tops)]
+    mods = [k.state.get(m, "name") for m in k.things("module") if k.shown(actor.person, m) is not None
+            and _matching(pool, f"{k.state.get(m, 'name')}.*")]
+    more = list(dict.fromkeys(names + [m for m in mods if not topic_named(k, actor, m)]))
+    if more:
+        page["text"] += "\ntopics: " + " · ".join(more)
+    # rows stay the whole dictionary, as the Help window reads them
+    page["rows"] = [{"word": w, "kind": a.get("word_kind"), "yours": bool(k.may(actor, a, None, group))}
+                    for w, a in sorted(pool.items())]
+    return page
+
+
+def all_page(k, actor, group, pool):
+    mine = [a for _, a in sorted(pool.items()) if k.may(actor, a, None, group)]
+    others = [a for _, a in sorted(pool.items()) if not k.may(actor, a, None, group)]
+    text = [f"all {len(pool)} words here, each once:"] + _listing(k, actor, mine, group)
+    if others:
+        text.append("not yours here: " + ", ".join(f"{a['word']} ({a.get('may')})" for a in others))
+    return {"text": "\n".join(text), "rows": [{"word": a["word"], "kind": a.get("word_kind"), "yours": True} for a in mine]
+            + [{"word": a["word"], "kind": a.get("word_kind"), "yours": False} for a in others]}
+
+
+FILL_IN_WORDS = {"fill-in", "fill-ins", "fillin", "fillins", "fills", "blanks", "blank", "handles", "handle", "dollar"}
+
+# every $ fill-in the kernel and its painter fill: (fill, where it works, what it says, how long it lasts). Kept beside
+# Kernel.SUPPLIED and verb_note's fill; a new fill-in gets a row here (dk1368).
+FILL_INS = (
+    ("$.<fact>", "prose templates", "a supplied fact of the thing the message is about", "one rendering"),
+    ("$[[thing|label]].<fact>", "prose templates", "a visible fact read from another thing; label is optional", "one rendering"),
+    ("$.<fact>, $[[thing]].<fact>", "help pages and word help", "the page's own fact, or another thing's, as the reader "
+     "sees it now; $$ is a plain $", "one showing"),
+    ("$<name>", "any line", "the thing a line made with as=<name>", "this sign-in, until the kernel restarts"),
+    ("$new", "any line, verb steps", "the last thing made by an earlier line or step", "this sign-in"),
+    ("$me", "any line, verb steps", "who is acting (an agent is itself)", "the line"),
+    ("$here", "any line, verb steps", "the place", "the line"),
+    ("$today", "any line, verb steps, lenses", "the kernel's date, YYYY-MM-DD (UTC)", "the line"),
+    ("$now", "any line, verb steps, lenses", "the kernel's time, YYYY-MM-DDTHH:MM:SSZ", "the line"),
+    ("$1 $2 … $9", "verb steps", "the verb's words, in order", "one use of the verb"),
+    ("$*", "verb steps", "all the verb's words", "one use of the verb"),
+    ("$target, $this", "verb steps", "the thing the verb was said on", "one use of the verb"),
+    ("$<setting>", "verb steps", "the setting given as <setting>=…; one nobody gave is left out", "one use"),
+    ("$target, $item", "a rule's do=", "the thing the happening was about", "one firing"),
+    ("$by", "a rule's do=", "who did the happening", "one firing"),
+    ("$said", "a rule's do=", "the exact message made by the happening, or empty", "one firing"),
+    ("$carried", "a lens drop gesture", "the thing dragged and dropped", "one drop"),
+    ("$view $viewer.<x> $item.<x>", "component lenses", "the view, who reads it, the row being painted", "one paint"),
+)
+FILL_INS_NOT_HERE = ("not carried from the old desk: $reach, $house, $session, $me.<prop> and other .<prop> chains, "
+                     "${…} and $( … ). A name kept with set <name> = <id> is as= now, for the sign-in")
+
+
+def fill_ins_page(k, actor, w):
+    """help $: every $ fill-in, where it works, and the as= names this sign-in holds now."""
+    lines = ["$ fill-ins: words starting with $ that are filled when the line runs. They fill where a thing goes, "
+             "never inside quoted text, so a note about $today keeps its words. "
+             "Prose templates fill quoted text too, once only; values are data. "
+             "$now and $today also work in prose; a missing fact names the gap."]
+    width = max(len(f) for f, *_ in FILL_INS)
+    lines += [f"  {f.ljust(width)}  {says}; {where}; lasts {lasts}" for f, where, says, lasts in FILL_INS]
+    names = k.names.get((actor.id, actor.session)) or {}
+
+    def called(t):                                     # what it is called, never its id (Alex's rule, a5143)
+        a = k.shown(actor.person, t) or {}
+        return str(a.get("title") or a.get("name") or a.get("label") or a.get("kind") or "something gone")
+    if names:
+        lines.append("your names now: " + ", ".join(f"${n} = {called(t)}" for n, t in names.items()))
+    else:
+        lines.append("your names now: none. make … as=card, then $card in any later line")
+    lines.append("as= can't take a fill-in's own name (as=me is refused). A $name nothing fills is refused, saying why.")
+    lines.append(FILL_INS_NOT_HERE)
+    rows = [{"fill": f, "where": where, "says": says, "lasts": lasts} for f, where, says, lasts in FILL_INS]
+    rows += [{"fill": f"${n}", "where": "any line", "says": called(t), "thing": t, "lasts": "this sign-in",
+              "yours": True}
+             for n, t in names.items()]
+    return {"text": "\n".join(lines), "rows": rows}
+
+
+def answer(k, actor, words, group):
+    """help [<anything>] -> {text, rows}."""
+    from . import lines as L
+    pool = _visible_entries(k, actor, group)
+    w = (words or "").split()[0].casefold() if (words or "").strip() else ""
+    if not w:
+        return start_page(k, actor, group, pool)
+    # help wm drag: a subtopic named or aliased "wm-drag" or "wm drag" answers before the first word alone, so a
+    # layered page can be explored the way it reads (Alex, 5 Nov: explore the help, not a wall of text)
+    rest = (words or "").split()
+    for n in range(len(rest), 1, -1):
+        for joined in ("-".join(rest[:n]), " ".join(rest[:n])):
+            hit = topic_named(k, actor, joined.casefold())
+            if hit:
+                return _topic_page(k, actor, group, hit[0], hit[1], pool)
+    if w in ("all", "everything") or (w == "words" and not topic_named(k, actor, w)):
+        return all_page(k, actor, group, pool)
+    if w == "check":
+        return check_page(k, actor, group, pool)
+    if w.startswith("$") or w in FILL_IN_WORDS:
+        return fill_ins_page(k, actor, w)
+    try:
+        e = k.find_entry(w, group)
+    except Exception:
+        e = None
+    if e is not None and k.shown(actor.person, e) is not None:
+        return _entry_page(k, actor, e)
+    hit = topic_named(k, actor, w)
+    if hit:
+        return _topic_page(k, actor, group, hit[0], hit[1], pool)
+    namespace = [a for name, a in sorted(pool.items()) if name.startswith(w + ".")]
+    if namespace and not k.module_named(w):
+        return {"text": "\n\n".join([f"{w}: related words"] + [a.get("help", a["word"]) for a in namespace]),
+                "rows": [{"word": a["word"], "kind": a.get("word_kind")} for a in namespace]}
+    family = [a for name, a in sorted(pool.items()) if "." in name and name.rsplit(".", 1)[1] == w]
+    if family:
+        lines = [f"{w} <thing>: a plain word. It runs the family's own {w} for the kind of thing you name, "
+                 f"and asks when two could fit:"] + _listing(k, actor, family, group)
+        lines.append(f"e.g. {w} <name or id> · help <word> says more")
+        return {"text": "\n".join(lines), "rows": [{"word": x["word"], "kind": x.get("word_kind")} for x in family]}
+    for v in _variants(w):
+        m = k.module_named(v)
+        if m and k.state.get(m, "kind") == "module":
+            page = _module_page(k, actor, group, m, pool)
+            if page:
+                return page
+    for v in _variants(w):
+        page = _kind_page(k, actor, group, v, pool)
+        if page:
+            return page
+    if L.ID.fullmatch(w):
+        a = k.shown(actor.person, w)
+        if a is not None:
+            kind = a.get("kind")
+            if kind == "topic":                              # help <a topic's id> is that page
+                return _topic_page(k, actor, group, w, a, pool)
+            k.mark(actor, w, a)
+            page = (topic_named(k, actor, kind) and _topic_page(k, actor, group, *topic_named(k, actor, kind), pool)) \
+                or _kind_page(k, actor, group, kind, pool) or {"text": "", "rows": []}
+            page["text"] = f"{w} is a{'n' if str(kind)[:1] in 'aeiou' else ''} {kind}: {k.name(w)}. look {w} shows its facts.\n" \
+                + page["text"]
+            return page
+    return _search_page(k, actor, group, w, pool)

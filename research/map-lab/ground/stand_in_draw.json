@@ -1,7 +1,0 @@
-{"channel": "agora-map/1", "op": "draw",
- "pins": [
-  {"id": "p1", "rev": 1, "lat": 51.519371, "lon": -0.127114, "height": 0, "label": "British Museum", "icon": "1", "colour": "#e0603a"},
-  {"id": "p2", "rev": 1, "lat": 51.518174, "lon": -0.125872, "height": 0, "label": "Museum Tavern", "icon": "2", "colour": "#e0603a"},
-  {"id": "p3", "rev": 1, "lat": 51.51771, "lon": -0.124729, "height": 0, "label": "St George's Bloomsbury", "icon": "3", "colour": "#e0603a"}
- ],
- "routes": [{"id": "r1", "rev": 1, "label": "Museum walk", "pins": ["p1", "p2", "p3"]}]}

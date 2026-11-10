@@ -1,7 +1,0 @@
-[
-{"steps":[{"action":"sim.step","args":{"dt":0.05}}],"assert":[{"expr":["get",["record","simulation","main"],"steps"],"equals":1},{"expr":["lt",["abs",["sub",["get",["record","bodies","ember"],"x"],128.1]],0.000000001],"equals":true},{"expr":["lt",["abs",["sub",["get",["record","bodies","ember"],"y"],117.2]],0.000000001],"equals":true}]},
-{"steps":[{"action":"body.drag","args":{"id":"ember","x":999,"y":639}},{"action":"sim.step","args":{"dt":1}}],"assert":[{"expr":["use","motion.poseX",{"id":"ember"}],"equals":41},{"expr":["use","motion.poseY",{"id":"ember"}],"equals":23}]},
-{"steps":[{"action":"body.drag","args":{"id":"cobalt","x":-30,"y":700}}],"assert":[{"expr":["use","motion.poseX",{"id":"cobalt"}],"equals":0},{"expr":["use","motion.poseY",{"id":"cobalt"}],"equals":0},{"expr":["get",["record","bodies","cobalt"],"x"],"equals":290}]},
-{"steps":[{"action":"body.drag","args":{"id":"missing","x":50,"y":50},"ok":false}],"assert":[{"expr":["get",["record","bodies","ember"],"x"],"equals":126},{"expr":["get",["record","simulation","main"],"steps"],"equals":0}]},
-{"steps":[{"action":"sim.step","args":{"dt":0.05}},{"action":"body.drag","args":{"id":"ember","dx":40,"dy":-18}},{"action":"sim.step","args":{"dt":0.05}}],"assert":[{"expr":["get",["record","bodies","ember"],"dragX"],"equals":40},{"expr":["get",["record","bodies","ember"],"dragY"],"equals":-18},{"expr":["gt",["use","motion.poseX",{"id":"ember"}],["get",["record","bodies","ember"],"x"]],"equals":true}]}
-]

@@ -1,9 +1,0 @@
-{
-  "name": "anchors-experiment",
-  "private": true,
-  "version": "0.0.1",
-  "description": "Do comment cursors survive whole-text updateText writes as well as splice operations? (Sable, round 3)",
-  "type": "module",
-  "scripts": { "run": "node anchors.mjs" },
-  "dependencies": { "@automerge/automerge": "3.5.0" }
-}

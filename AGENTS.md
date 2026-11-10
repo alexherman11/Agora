@@ -41,7 +41,7 @@ Alex's rules. Read before working. Rules should only enter below if they are gen
 
 Agora is a personal computing environment shared by one person, Alex, and a persistent agent, JEFF. It is built on one substrate wherever possible, so that anything on a computer can be represented, viewed, changed and extended in the same way. Read Agora (`docs/Agora.md`) for the vision. It is the larger goal everything here works toward.
 
-Right now Agora is Alex's **desktop**: the kernel (`research/kernel-lab/`), served on 8810 by `research/window-lab/kernel-desktop/`, changed through Lines. It is both the prototype we are building and the place the team lives and works. The old text desk (`research/text-desk-lab/notation/`) was archived on 27 Oct; its world is kept read-only at `C:/Projects/Agora/archive/frontier-2026-10/`.
+Right now Agora is Alex's **desktop**: the kernel (`src/agora/`), served on 8810 by `src/desktop/kernel-desktop/`, changed through Lines. It is both the prototype we are building and the place the team lives and works. The old text desk (`src/text-desk/notation/`) was archived on 27 Oct; its world is kept read-only at `C:/Projects/Agora/archive/frontier-2026-10/`.
 
 **Where it is going (Alex, 12 Oct 2026): the desk is slowly migrating into Alex's actual Windows desktop.** Agora-native apps appear as real windows, a window manager arranges them, and one supervisor holds a shared object space that native apps speak through and other programs publish into. Agents will increasingly act on the PC itself, not only inside the desk.
 
@@ -100,7 +100,7 @@ You are here to help build the larger vision, and that means more than finishing
   - Every note basename stays unique, so `[[links]]` resolve.
   - Design content is never deleted: supersede it with a banner, or move it to `research/archive/`.
   - Never rewrite Alex's own words without his direction; mark your drafts so he can tell them apart.
-- **Research** lives in `research/<lab>/`. `research/window-lab/` holds the Windows host work; *Current Implementation* describes the desk only until that work is written into it.
+- **Research** lives in `research/<lab>/`. `src/desktop/` holds the Windows host work; *Current Implementation* describes the desk only until that work is written into it.
 - **The archive** is `research/archive/`. `C:/Projects/Agora` is a data and archive location (Alex's vault, world data, frozen transports); never commit there.
 
 ## Practical rules

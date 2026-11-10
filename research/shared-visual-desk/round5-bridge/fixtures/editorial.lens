@@ -1,9 +1,0 @@
-reading : column, role sheet
-  masthead : text Field observations, role heading
-  contents : column, of tag:essay, each article
-article : column, role card.plain
-  title : text $title, role heading, on click do read $item
-  attribution : text $kind / $id / $item, role meta
-  body : text $text, role body, on edit do do rewrite $item text="$value"
-  tags : row, over $tags, each badge
-badge : text $it, role tag

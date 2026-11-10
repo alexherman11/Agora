@@ -1,7 +1,7 @@
 [project]
-name = "agora3"
+name = "agora"
 version = "0.1.0"
-description = "A programmable computing environment shared with JEFF"
+description = "A personal operating system you can reshape while you use it, shared with a resident AI"
 requires-python = ">=3.12"
 dependencies = [
     "jsonschema==4.26.0",
@@ -12,27 +12,20 @@ dependencies = [
     "loro==1.17.1",
 ]
 
-[project.scripts]
-agora3 = "agora3.cli:main"
-
-[build-system]
-requires = ["hatchling>=1.27,<2"]
-build-backend = "hatchling.build"
+[tool.uv]
+package = false
 
 [dependency-groups]
 dev = ["ruff==0.16.6", "pytest==9.1.1", "pycdlib==1.14.0"]
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/agora3"]
-
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["worlds", "machines", "artifacts", "local", "examples/jeff-authored-notes", "experiments/visual-presentation"]
+extend-exclude = ["worlds", "local", "src/text-desk/notation/sessions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["src/agora/tests"]
 pythonpath = ["."]

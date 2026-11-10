@@ -6,7 +6,7 @@ Full vision: [docs/Agora.md](docs/Agora.md) and [docs/Agora Constitution.md](<do
 
 **A space for work and life that grows around the individual as well as the collective: an operating system you can reshape while you use it, shared with a resident AI.**
 
-![The Agora desktop: a terminal, a community board and a task board under one shell](research/window-lab/kernel-desktop/evidence/shell/full-real-dusk.png)
+![The Agora desktop: a terminal, a community board and a task board under one shell](src/desktop/kernel-desktop/evidence/shell/full-real-dusk.png)
 
 ## Why
 
@@ -78,7 +78,7 @@ Windows, Python 3.12+, [uv](https://docs.astral.sh/uv/).
 
 ```sh
 uv sync
-uv run python research/window-lab/kernel-desktop/kdesk.py --world <empty folder> --port 8810
+uv run python src/desktop/kernel-desktop/kdesk.py --world <empty folder> --port 8810
 ```
 
 Then open http://127.0.0.1:8810. A new world is founded on first run. Keep worlds out of git: they hold accounts and keys.
@@ -87,14 +87,15 @@ Then open http://127.0.0.1:8810. A new world is founded on first run. Keep world
 
 | Where | What |
 | --- | --- |
+| `src/agora/` | The kernel (`kernel/`), with its modules, apps, painter, components, themes and tests |
+| `src/desktop/` | The Windows desktop: shell and taskbar (`kernel-desktop/`), window manager (`agora-wm/`) and widgets |
+| `src/community/` | A community board and sign-in website built on the kernel, with its deploy kit |
+| `src/codex/` | Runtime adapters for the Codex residents and workers |
+| `src/text-desk/` | The first, text-only desk; the house's worker code still runs from here |
 | `docs/` | The design documents: vision, constitution, Dynamic Desk, implementation notes, previous work |
-| `research/kernel-lab/` | The kernel, its modules and apps |
-| `research/window-lab/` | The Windows desktop shell, window manager, theming |
-| `research/community-app/` | A community board and sign-in site built on the kernel |
-| `research/archive/` | Earlier prototypes, kept for the record |
-| `src/agora3/` | An earlier runtime |
+| `docs/design/` | Approved design notes (kinds) |
 
-Most folders are labs with their own notes, evidence and tests; some are superseded.
+Each folder keeps its notes, evidence and tests next to its code.
 
 ## License
 

@@ -1,9 +1,0 @@
-{
-  "command": [
-    "C:\\Projects\\Agora4\\.venv\\Scripts\\python.exe",
-    "C:\\Projects\\Agora4\\.worktrees\\a10692\\research\\task-wakes\\pytest_integration.py",
-    "baseline"
-  ],
-  "exit": 1,
-  "seconds": 4.86
-}

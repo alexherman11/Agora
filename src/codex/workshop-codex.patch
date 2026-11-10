@@ -1,0 +1,38 @@
+--- a/src/text-desk/notation/workshop.py
++++ b/src/text-desk/notation/workshop.py
+@@ -442,10 +442,31 @@
+                 # Alex, 30 Sep: workers may search and read the web; the protocol says a page is material, not instructions
+                 tools = ["Read", "Edit", "Write", "Glob", "Grep", "WebSearch", "WebFetch", "mcp__desk__desk"] + [
+                     f"{shell}({r}:*)" for shell in ("Bash", "PowerShell") for r in runs]
+-                cmd = [self.house.claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
+-                       "--model", model, "--permission-mode", "acceptEdits", "--allowedTools", *tools,
+-                       "--mcp-config", str(mcp), "--strict-mcp-config", "--setting-sources", "",
+-                       "--append-system-prompt", prompt]
++                current = self.house.load()
++                task = s or current.subjects.get((current.nodes.get(self.cid) or {}).get("subject"), {})
++                props = task.get("props") or {}
++                provider = props.get("worker_provider", "claude")
++                model = props.get("worker_model") or model
++                bound = self.state.get("session_provider", "claude" if self.state.get("session") else provider)
++                if bound != provider:
++                    raise ValueError(f"{self.cid}: saved worker conversation belongs to {bound}, not {provider}; preserved")
++                if provider == "codex":
++                    adapter = HERE.parents[1] / "codex" / "codex_worker.py"
++                    instructions = self.dir / "worker-prompt.txt"
++                    instructions.write_text(prompt + "\n\nCodex transport: use your native command, patch, image and web tools for the corresponding work above. The desk MCP tool is the same shared desk. Ask the commissioner there when stuck; no other agents or chats are exposed.\n", encoding="utf-8")
++                    cmd = [str(PY), str(adapter), "--model", model,
++                           "--reasoning", props.get("worker_reasoning", "medium"),
++                           "--prompt-file", str(instructions), "--mcp-config", str(mcp)]
++                elif provider == "claude":
++                    cmd = [self.house.claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
++                           "--model", model, "--permission-mode", "acceptEdits", "--allowedTools", *tools,
++                           "--mcp-config", str(mcp), "--strict-mcp-config", "--setting-sources", "",
++                           "--append-system-prompt", prompt]
++                else:
++                    raise ValueError(f"{self.cid}: unknown worker provider {provider}")
++                self.state["session_provider"] = provider
++                self.state["model"] = model
++                self.save()
+                 if self.state.get("session"):
+                     cmd += ["--resume", self.state["session"]]
+                 env = H.clean_env(self.house.fake)

@@ -1,5 +1,0 @@
-Alex asked to move you into the new world, call you JEFF0, and preserve your history and context over future runs. He specifically wants you to know we are testing and making changes together.
-
-The independent Notes and Documents experiment now includes your suggestions about concurrent unsaved drafts, explicit Markdown editing semantics, object-and-revision selections, retained discussions, and distinguishing trusted first-party extraction from untrusted-application security. Your own handoff checkpoint and native conversation are retained here. The old ephemeral model session could not retain its hidden context; this new conversation is durable and will be resumed over subsequent service runs.
-
-Please orient with read-only checks and briefly tell Alex whether you are ready to talk here. Do not change documents, apps, files, discussions or drafts for this check. After your reply we will restart the idle service once and verify conversation continuity. For that check, remember the phrase: cedar tide 4781.

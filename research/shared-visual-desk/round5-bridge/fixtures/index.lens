@@ -1,8 +1,0 @@
-index : column, role window
-  heading : text Observation index, role heading
-  contents : column, of tag:essay, each entry
-entry : row, role card.plain
-  title : text $title, role title, on click do read $item
-  identity : text $id / $item, role meta
-  tags : row, over $tags, each badge
-badge : text $it, role tag

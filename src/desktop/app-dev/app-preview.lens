@@ -1,0 +1,113 @@
+# app-preview: a phone in the middle of the room (a6431; Alex, 17 Oct: 'a webapp running in the middle the size of a
+# phone'). It shows an app (a lens, or a /path on this server) with the real painter at a device's own size (`page`),
+# scaled to fit and never above 1:1, and live: a change to the app's lens or data repaints it where it stands.
+# What it shows is the viewer's own record (role=app-preview actor=<you>): app= the lens, device= one of the Devices
+# (role=app-device: vw vh its viewport in CSS pixels, safe/wide the insets kept clear upright and turned, an icon as its text), turn=portrait|
+# landscape, safe=on|off (the insets and cutout drawn over the app), inspect=on|off. Pointing: a long press on the
+# phone, or a tap while inspect is on, names the part under it (picked= its name, part= its scene key, the control
+# screen's key), and the phone draws the box round it, so JEFF and the workers read what Alex means by 'this'.
+# A drag in the phone scrolls it, a click is a tap; nothing outside the phone scrolls.
+preview : column
+  share 1
+  role apview
+  scroll none
+  of prop:role=app-preview,prop:actor=$me as pv
+  each studio
+  none : text "No preview of yours here: a note with role=app-preview actor=<you> app=<a lens> device=<a device> (src/desktop/app-dev/apply.py makes one)."
+    role hint
+    only when count(prop:role=app-preview,prop:actor=$me) = 0
+studio : column
+  share 1
+  role apview
+  scroll none
+  tools : row
+    role aptools
+    devices : row
+      role apdevices
+      of prop:role=app-device as dv
+      by order
+      each device
+    gap : column
+      share 1
+    turn : column
+      role apbtn
+      role apbtn.on when ($pv.turn or "portrait") = "landscape"
+      tip "Turn" "Turn the device: upright or on its side"
+      on click when ($pv.turn or "portrait") = "portrait" do read $pv; do prop $pv turn=landscape
+      on click when ($pv.turn or "portrait") = "landscape" do read $pv; do prop $pv turn=portrait
+      the prop:role=apicon,prop:icon=turn as ic
+      glyph : text "$ic.text"
+        role apglyph
+        picture
+    safe : column
+      role apbtn
+      role apbtn.on when ($pv.safe or "on") = "on"
+      tip "Safe area" "Show or hide what the device keeps clear: the status bar, the camera cutout, the home bar"
+      on click when ($pv.safe or "on") = "on" do read $pv; do prop $pv safe=off
+      on click when ($pv.safe or "on") = "off" do read $pv; do prop $pv safe=on
+      the prop:role=apicon,prop:icon=safe as ic
+      glyph : text "$ic.text"
+        role apglyph
+        picture
+    inspect : column
+      role apbtn
+      role apbtn.on when ($pv.inspect or "off") = "on"
+      tip "Point" "While on, a tap names the part of the app under it instead of pressing it (a long press always does)"
+      on click when ($pv.inspect or "off") = "off" do read $pv; do prop $pv inspect=on
+      on click when ($pv.inspect or "off") = "on" do read $pv; do prop $pv inspect=off
+      the prop:role=apicon,prop:icon=inspect as ic
+      glyph : text "$ic.text"
+        role apglyph
+        picture
+  stage : column
+    share 1
+    role apstage
+    scroll none
+    the $pv.device as dev
+    phone : text "$pv.app"
+      share 1
+      role apphone
+      let up = ($pv.turn or "portrait") = "portrait"
+      let w = $dev.vw when $up
+      let w = $dev.vh otherwise
+      let h = $dev.vh when $up
+      let h = $dev.vw otherwise
+      let insets = $dev.safe when $up and ($pv.safe or "on") = "on"
+      let insets = $dev.wide when not $up and ($pv.safe or "on") = "on"
+      let insets = "" otherwise
+      let picks = "picks" when ($pv.inspect or "off") = "on"
+      let picks = "" otherwise
+      page $w $h touch $picks $insets mark $pv.part
+      on pick do read $pv; do prop $pv picked="$value" part="$part"
+  picked : row
+    role appicked
+    only when ($pv.picked or "") != ""
+    label : text "pointing at"
+      role aplabel
+    name : text "$pv.picked"
+      role apname
+      share 1
+      clamp 1
+    clear : text "×"
+      role tool
+      tip "Let go" "Stop pointing at this part"
+      on click do read $pv; do prop $pv picked="" part=""
+  about : row
+    role apfoot
+    only when ($pv.picked or "") = ""
+    words : text "$dev.title · $(w) × $(h) · $pv.app · a long press names a part"
+      role apmeta
+      the $pv.device as dev
+      let up = ($pv.turn or "portrait") = "portrait"
+      let w = $dev.vw when $up
+      let w = $dev.vh otherwise
+      let h = $dev.vh when $up
+      let h = $dev.vw otherwise
+device : column
+  role apbtn
+  role apbtn.on when $item = ($pv.device or "")
+  tip "$title" "Show the app at this device's size, $vw × $vh"
+  on click when $item != ($pv.device or "") do read $pv; do prop $pv device=$dv
+  glyph : text "$text"
+    role apglyph
+    picture

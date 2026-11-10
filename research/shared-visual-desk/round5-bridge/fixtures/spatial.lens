@@ -1,8 +1,0 @@
-desk : column, role window
-  heading : text Field observations, role heading
-  canvas : free, of tag:essay, each card
-card : column, role card, at item, on drag do do move $item x=$x y=$y
-  heading : text $title, role title, on edit do do retitle $item title="$value"
-  body : text $text, role body, clamp 2
-  tags : row, over $tags, each badge
-badge : text $it, role tag

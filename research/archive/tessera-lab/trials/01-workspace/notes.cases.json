@@ -1,6 +1,0 @@
-[
-  {"steps":[{"action":"notes.create","args":{"id":"new-note","title":"  Field notes  ","body":"Observe the shared workspace."}}],"assert":[{"expr":["get",["record","items","new-note"],"title"],"equals":"Field notes"},{"expr":["get",["record","items","new-note"],"body"],"equals":"Observe the shared workspace."},{"expr":["count",["filter",["query","notes.visible"],["eq",["row","id"],"new-note"]]],"equals":1}]},
-  {"steps":[{"action":"item.rename","args":{"id":"welcome","title":"Revised shared note"}},{"action":"notes.editBody","args":{"id":"welcome","body":"A revised observation."}}],"assert":[{"expr":["get",["record","items","welcome"],"title"],"equals":"Revised shared note"},{"expr":["get",["record","items","welcome"],"body"],"equals":"A revised observation."}]},
-  {"steps":[{"action":"notes.archive","args":{"id":"welcome"}}],"assert":[{"expr":["count",["filter",["query","notes.visible"],["eq",["row","id"],"welcome"]]],"equals":0},{"expr":["count",["filter",["query","notes.archived"],["eq",["row","id"],"welcome"]]],"equals":1}]},
-  {"steps":[{"action":"notes.archive","args":{"id":"welcome"}},{"action":"notes.restore","args":{"id":"welcome"}}],"assert":[{"expr":["count",["filter",["query","notes.visible"],["eq",["row","id"],"welcome"]]],"equals":1},{"expr":["count",["filter",["query","notes.archived"],["eq",["row","id"],"welcome"]]],"equals":0}]}
-]

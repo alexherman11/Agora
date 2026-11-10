@@ -1,0 +1,27 @@
+founding: forty neighbours and three agents sign in (1 pm)
+  ok   forty people and three agents · 41 persons (Alex and 40 neighbours), 3 agents
+  ok   the agenda module brings the agenda in as one act · 1 record, 6 things, by the agenda module for Dana
+  ok   only a leader may load an agenda · refused: agenda.load is for leaders of Council watch; help agenda.load says more
+before: carpools and comment slots (3 pm to 5:50 pm)
+  ok   twelve riders press for nine carpool seats at once · 9 seats taken, 3 told the car is full: refused: sb121 is taken (3 seats, all claimed); look shows what is open
+  ok   sixteen sign up at once for twelve two-minute slots · 12 slots claimed, 4 told it is taken
+  ok   once each: a second sign-up is refused · refused: you have already said claim on sb116; once each. undo takes yours back
+  ok   undo gives a slot back, and the next neighbour takes it · Bea gave theirs back; Priya took it
+  ok   sign-up closes at a time of day · refused: sign-up for sb116 closed at 2026-10-29T00:45Z (a seat was free)
+  ok   speakers' phone numbers are seen only by leaders · absent from a neighbour's look and both of their pages; present in Dana's look and floor page
+  ok   the feed is a slow lane · refused: you have said post 5 times today, the most it takes from one person in a day
+during: thirty phones follow the meeting (6 pm)
+  ok   forty vote at once in a sealed pulse poll · yes 32 · no 8; 20 typed, 20 pressed
+  ok   no record and no view says who voted how · 40 vote records, all by 'sealed', none naming a voter
+  ok   one vote each; undo lets a neighbour change theirs · a second vote: 'refused: you have already said vote on sb129; once each. undo takes yours back'; Maya changed hers; still 40 votes
+  ok   two leaders press Next at once: the meeting moves one item · one moved it; the other: 'refused: stale: sb113 changed since it was painted (now, r140); nothing was done. The view will repaint.'
+  ok   a neighbour's Next is refused · refused: agenda.next is for leaders of Council watch; help agenda.next says more
+  ok   agents' summaries are labelled as agents · 7 summaries, each made by an agent for its person; the page says 'agent for Maya' on hers
+  ok   thirty phones follow every 'now speaking' · 5 moves × 30 phones; seen within p50 235.2 ms, p95 479.3 ms, max 562.7 ms; 0 missed
+after: the outcome, pinned (7:30 pm)
+  ok   the outcome is a pinned announcement, with the staff report linked · two records from one line (r142, r143); first in a neighbour's feed
+  ok   a neighbour may not pin · refused: pin is for leaders of Seabright; help pin says more
+  ok   the tally module (Node) reads the feed as Sam may see it · most liked:
+the whole: replay and timings
+  ok   replaying the log gives the same world · 144 records replayed
+21 of 21 checks passed · 144 records · acts p50 22.2 ms · evidence in C:\Projects\Agora4\src\agora\proof\evidence\council-night.json

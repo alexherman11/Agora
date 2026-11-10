@@ -1,7 +1,0 @@
-# Verification status
-
-The implementation passed 14 local unit tests in the designated guest (2026-09-10), before the guest became unavailable. The exact test runner and baseline data are at /root/agora-bootstrap/packet-work/test_packet.py and *.baseline.json. The existing 12 studio.research test_import/test_review tests also passed with the refresh patch. Browser candidate inspection passed at 1440px and 390px with no script errors or horizontal overflow. Candidate views are read-only: this does NOT prove live packet actions, editing/import interaction, atomic native commits, or reload.
-
-The native Python package build is blocked by a VirtualBox session lock on Agora3-bootstrap-a2-yard-92a2edfd. Subsequent guest.execute reports VirtualBox did not respond successfully. No new package installation has been claimed or performed. See implementation report object research-packet-implementation-report for latest state.
-
-Recovery: restore the designated guest/test yard through administrator controls, inspect guest.status, then build current studio.packets and studio.research source revisions. Exercise candidates; install against current installation revisions; rediscover tools. Only activate the browser candidate after the packet backend and refresh support install. Execute native and browser integration checks before claiming completion. Do not confuse shell source revision 13 with installed shell revision 11.

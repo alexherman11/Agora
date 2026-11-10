@@ -1,0 +1,202 @@
+# home-tiling: the home base's panels, laid out by each person (a5496; made to work by a5994). Alex, 16 Oct: 'I need
+# things to be draggable around this screen. It should snap to various sizes as I move it around, pushing other things
+# out of the way ... Double-clicking a window should make it fill the screen or the dominant space ... while leaving
+# the chat here.' Where each panel is, is the viewer's own world data: a surface (role=home-layout, actor=$me) holding
+# column surfaces (span=1|2|3, its share of the width), each holding panel notes (role=home-panel): lens= what it shows,
+# lesser= its one-line view, shelf=yes put away, pin=yes pinned, shows=<id> the one thing a home-thing panel shows.
+# On the layout: full= the panel that fills the space.
+# EQUAL FOOTING (Alex, 17 Oct): the viewer (lens home-viewer: what the person's viewer has open, with its pins and
+# Back) and JEFF's chat (lens jeff-chat) are panels like any other, in the same columns, with the same header, drag,
+# snap, fill and shelf. A pin (◆ in the header) is a property of any panel: when another panel fills the space, the
+# pinned ones stay beside it and the rest become a rail of titles. The viewer stands beside a filled panel too while
+# it has something open, so a name pressed inside the filled panel opens where it can be seen.
+# Drag a panel by its title. Over another panel, the landing box shows where it goes: near its left or right edge, a
+# new column there; near its top or bottom, above or below it; its middle, the two trade places. Over a column's empty
+# foot, it goes last there and takes that room (near the foot's left or right edge, a new column there). A column left
+# empty goes, and the others take its width. Each drop is one use of the verb drop-panel (Home base). ⇔ widens a
+# column: a third, a half, two thirds of the room. A double-click on a title fills the room with that panel; again,
+# or ⤡, gives it back. – shelves it (the dock's panels). Nothing moves by itself.
+# While one fills the room, its header, the pinned ones' and the rail's titles still drag (Alex, 20 Oct 12:48: 'window
+# dragging no longer seems to be working' was a filled board, whose header had no carry); a drop gives the room back.
+stage : column
+  share 1
+  role stage
+  of prop:role=home-layout,prop:actor=$me as lay
+  each desk
+  lost : text "No layout of yours here: a surface in Home base with role=home-layout actor=<you>, holding column surfaces of panel notes (src/desktop/home-layout/layout-alex.desk makes Alex's)."
+    role hint
+    only when count(prop:role=home-layout,prop:actor=$me) = 0
+desk : column
+  share 1
+  role stage
+  let showing = count(prop:role=home-view,prop:actor=$me,prop:viewing,-prop:viewing=a5080)
+  top : row
+    role top
+    left : row
+      share 1
+      role top
+      scroll none
+      widgets : row
+        lens home-widgets
+      brand : text "AGORA"
+        role brand
+    search : column
+      lens home-search
+    right : row
+      share 1
+      role top
+      scroll none
+      gap : column
+        share 1
+      ends : row
+        lens home-widgets-end
+      keys : text "Ctrl+Alt+J or Esc closes"
+        role meta
+        tip "Panels" "Drag a title anywhere; double-click a title to fill the room; ⇔ widens a column; ◆ pins a panel beside a filled one; – shelves it."
+  body : row
+    share 1
+    role body
+    scroll none
+    tiling : row
+      share 1
+      role tiling
+      scroll none
+      only when ($lay.full or "") = ""
+      of kind:surface,in:$lay.item as col
+      each column
+    filled : row
+      share 1
+      role tiling
+      scroll none
+      only when ($lay.full or "") != ""
+      rail : column
+        role rail
+        scroll none
+        of kind:note,in:$lay.item,prop:role=home-panel,prop:shelf=no as r
+        each railitem
+      room : row
+        share 1
+        role tiling
+        scroll none
+        of kind:note,in:$lay.item,prop:role=home-panel,prop:shelf=no as p
+        each fullpanel
+column : column
+  let span = ($col.span or 1)
+  share $span
+  role tilecol
+  scroll none
+  only when count(kind:note,in:$col.item,prop:role=home-panel,prop:shelf=no) > 0
+  of kind:note,in:$col.item,prop:role=home-panel,prop:shelf=no as p
+  each panel
+  foot : column
+    role tilefoot
+    on drop grip at left do drop-panel left $carried $col $col $lay
+    on drop grip at right do drop-panel right $carried $col $col $lay
+    on drop grip do drop-panel end $carried $col $col $lay
+panel : column
+  share 1
+  role pane
+  scroll none
+  on drop grip at left do drop-panel left $carried $p $col $lay
+  on drop grip at right do drop-panel right $carried $p $col $lay
+  on drop grip at top do drop-panel top $carried $p $col $lay
+  on drop grip at bottom do drop-panel bottom $carried $p $col $lay
+  on drop grip do drop-panel swap $carried $p $col $lay
+  grip : row
+    role panehead
+    carry
+    let was = ($lay.full or "")
+    on double when ($lay.full or "") = "" do prop $lay full=$p
+    title : text "$title"
+      role panetitle
+    sum : column
+      role panesum
+      share 1
+      only when ($p.lesser or "") != ""
+      lens $p.lesser
+    gap : column
+      share 1
+      only when ($p.lesser or "") = ""
+    pin : text "◆"
+      role tool
+      role tool.on when ($p.pin or "") = "yes"
+      tip "Pin" "A pinned panel stays beside one that fills the space."
+      let pinned = ($p.pin or "")
+      on click when ($p.pin or "") != "yes" do prop $p pin=yes
+      on click when ($p.pin or "") = "yes" do prop $p pin=no
+    wider : text "⇔"
+      role tool
+      let next = 2 when ($col.span or 1) = 1
+      let next = 3 when ($col.span or 1) = 2
+      let next = 1 otherwise
+      on click do prop $col span=$next
+    away : text "–"
+      role tool
+      let out = ($shelf or "")
+      on click do prop $p shelf=yes
+    close : text "×"
+      role tool
+      only when ($p.shows or "") != ""
+      on click do close-panel $p $col
+  body : column
+    share 1
+    scroll scroll
+    role panebody
+    lens $p.lens
+railitem : column
+  role railitem
+  only when $item != ($lay.full or "") and ($r.pin or "") != "yes" and not (($r.lens or "") = "home-viewer" and showing > 0)
+  let was = ($lay.full or "")
+  on click do prop $lay full=$r
+  grip : column
+    carry
+    name : text "$title"
+      role chipname
+      clamp 1
+    sum : column
+      role chipsum
+      only when ($r.lesser or "") != ""
+      lens $r.lesser
+fullpanel : column
+  let big = 13 when $item = ($lay.full or "")
+  let big = 6 otherwise
+  share $big
+  role pane
+  scroll none
+  only when $item = ($lay.full or "") or ($p.pin or "") = "yes" or (($p.lens or "") = "home-viewer" and showing > 0)
+  on drop grip at left do drop-panel left $carried $p $p.in $lay
+  on drop grip at right do drop-panel right $carried $p $p.in $lay
+  on drop grip at top do drop-panel top $carried $p $p.in $lay
+  on drop grip at bottom do drop-panel bottom $carried $p $p.in $lay
+  on drop grip do drop-panel swap $carried $p $p.in $lay
+  grip : row
+    role panehead
+    carry
+    let was = ($lay.full or "")
+    on double when $item = ($lay.full or "") do prop $lay full=""
+    on double when $item != ($lay.full or "") do prop $lay full=$p
+    title : text "$title"
+      role panetitle
+    gap : column
+      share 1
+    pin : text "◆"
+      role tool
+      role tool.on when ($p.pin or "") = "yes"
+      tip "Pin" "A pinned panel stays beside one that fills the space."
+      let pinned = ($p.pin or "")
+      on click when ($p.pin or "") != "yes" do prop $p pin=yes
+      on click when ($p.pin or "") = "yes" do prop $p pin=no
+    back : text "⤡"
+      role tool
+      only when $item = ($lay.full or "")
+      on click do prop $lay full=""
+    away : text "–"
+      role tool
+      let out = ($shelf or "")
+      on click when $item = ($lay.full or "") do prop $p shelf=yes; do prop $lay full=""
+      on click when $item != ($lay.full or "") do prop $p shelf=yes
+  body : column
+    role panebody
+    share 1
+    scroll scroll
+    lens $p.lens

@@ -1,0 +1,325 @@
+{
+  "scope": "one fake enrolled child/grandchild; no native engine",
+  "browser_or_mail_launched": false,
+  "child_started": true,
+  "runtime_closure": "unknown: external delegation not certified",
+  "source_sha256": {
+    "sandbox_job.py": "c8e64ab3f68fc0d48dfb2826c2c79101ab493f73cdee45b9540eaccbda88fb72",
+    "sandbox_window.py": "1f158a3a4987666e6eda14617953686e70414655714e9eb7c50ff98984f46770",
+    "sandbox_birth.py": "6857f08867e5ad36f029a5c97234ee6e806448237d675eb1c91c919aeff57690",
+    "sandbox_receipts.py": "3216c1d5e2735bbf151bea47e229aec0fc608fcbf6f1d0878284ff872f3d0e83",
+    "check_sandbox_job_guarded.py": "6851deadb919bfe780c94cc5f23bbc041f6e471ab410abf4e4ece21460ceb241"
+  },
+  "house_preflight": {
+    "admitted": true,
+    "observation": {
+      "schema": "house-guard-context-v2",
+      "issuer": "house",
+      "issuer_pid": 31124,
+      "observed_at": 1792644735.7131116,
+      "uptime_ms": 276116500,
+      "notification_result": 0,
+      "notification_state": 2,
+      "foreground_known": true,
+      "foreground_exe": "chatgpt.exe",
+      "foreground_hud": false,
+      "guard_nongame": [
+        "chatgpt.exe",
+        "chrome.exe",
+        "code.exe",
+        "codex.exe",
+        "explorer.exe",
+        "firefox.exe",
+        "msedge.exe",
+        "pythonw.exe"
+      ],
+      "input_desktop": "Default",
+      "full_screen": true,
+      "game": null,
+      "admitted": true
+    },
+    "limit": "managed-sandbox read-only house snapshot; not continuous screen monitoring"
+  },
+  "house_before_effect": {
+    "admitted": true,
+    "observation": {
+      "schema": "house-guard-context-v2",
+      "issuer": "house",
+      "issuer_pid": 31124,
+      "observed_at": 1792644735.7131116,
+      "uptime_ms": 276116500,
+      "notification_result": 0,
+      "notification_state": 2,
+      "foreground_known": true,
+      "foreground_exe": "chatgpt.exe",
+      "foreground_hud": false,
+      "guard_nongame": [
+        "chatgpt.exe",
+        "chrome.exe",
+        "code.exe",
+        "codex.exe",
+        "explorer.exe",
+        "firefox.exe",
+        "msedge.exe",
+        "pythonw.exe"
+      ],
+      "input_desktop": "Default",
+      "full_screen": true,
+      "game": null,
+      "admitted": true
+    },
+    "limit": "managed-sandbox read-only house snapshot; not continuous screen monitoring"
+  },
+  "job": {
+    "schema": 1,
+    "id": "b05814f9f9b94f0f8772f45c07c5dd63",
+    "creator": {
+      "pid": 60796,
+      "created": 134371183384135841,
+      "exe": "c:\\users\\alex\\appdata\\local\\programs\\python\\python312\\python.exe"
+    },
+    "limits": 8192,
+    "breakaway": false,
+    "scope": "new enrolled family; external delegation unverified"
+  },
+  "pid": 98952,
+  "birth_manifest": {
+    "pids": [
+      98952
+    ],
+    "owners": [
+      {
+        "method": "CreateProcessW-suspended-v1",
+        "exe": "c:\\users\\alex\\appdata\\local\\programs\\python\\python312\\python.exe",
+        "parent": {
+          "pid": 60796,
+          "created": 134371183384135841,
+          "exe": "c:\\users\\alex\\appdata\\local\\programs\\python\\python312\\python.exe"
+        },
+        "profile": "c:\\projects\\agora4\\.worktrees\\a9868\\src\\desktop\\.tmp-agora\\agora-sandbox\\job-a9868-b7176d8721-fake-profile",
+        "desktop": "WinSta0\\agora-sandbox-job-a9868-b7176d8721",
+        "profile_scope": "launch argument only",
+        "pid": 98952,
+        "created": 134371183386072795,
+        "job_id": "b05814f9f9b94f0f8772f45c07c5dd63"
+      }
+    ],
+    "at": 1792644738.5995588,
+    "job": {
+      "schema": 1,
+      "id": "b05814f9f9b94f0f8772f45c07c5dd63",
+      "creator": {
+        "pid": 60796,
+        "created": 134371183384135841,
+        "exe": "c:\\users\\alex\\appdata\\local\\programs\\python\\python312\\python.exe"
+      },
+      "limits": 8192,
+      "breakaway": false,
+      "scope": "new enrolled family; external delegation unverified"
+    },
+    "launches": [
+      {
+        "status": "running",
+        "at": 1792644738.5995588,
+        "intent": {
+          "method": "CreateProcessW-suspended-v1",
+          "exe": "c:\\users\\alex\\appdata\\local\\programs\\python\\python312\\python.exe",
+          "parent": {
+            "pid": 60796,
+            "created": 134371183384135841,
+            "exe": "c:\\users\\alex\\appdata\\local\\programs\\python\\python312\\python.exe"
+          },
+          "profile": "c:\\projects\\agora4\\.worktrees\\a9868\\src\\desktop\\.tmp-agora\\agora-sandbox\\job-a9868-b7176d8721-fake-profile",
+          "desktop": "WinSta0\\agora-sandbox-job-a9868-b7176d8721",
+          "profile_scope": "launch argument only"
+        },
+        "job_id": "b05814f9f9b94f0f8772f45c07c5dd63",
+        "pid": 98952,
+        "job_assigned": true,
+        "owner": {
+          "method": "CreateProcessW-suspended-v1",
+          "exe": "c:\\users\\alex\\appdata\\local\\programs\\python\\python312\\python.exe",
+          "parent": {
+            "pid": 60796,
+            "created": 134371183384135841,
+            "exe": "c:\\users\\alex\\appdata\\local\\programs\\python\\python312\\python.exe"
+          },
+          "profile": "c:\\projects\\agora4\\.worktrees\\a9868\\src\\desktop\\.tmp-agora\\agora-sandbox\\job-a9868-b7176d8721-fake-profile",
+          "desktop": "WinSta0\\agora-sandbox-job-a9868-b7176d8721",
+          "profile_scope": "launch argument only",
+          "pid": 98952,
+          "created": 134371183386072795,
+          "job_id": "b05814f9f9b94f0f8772f45c07c5dd63"
+        },
+        "resume_result": 1
+      }
+    ],
+    "pid": 98952
+  },
+  "manifest_complete": true,
+  "fixture_members": {
+    "child": 98952,
+    "grandchild": 90800
+  },
+  "job_before_cleanup": {
+    "pids": [
+      60040,
+      78884,
+      90800,
+      98952
+    ],
+    "active": 4,
+    "total": 4,
+    "terminated": 0
+  },
+  "grandchild_proven_in_job": true,
+  "cleanup": {
+    "ok": true,
+    "reason": "job confirmed empty",
+    "scope": "enrolled job only",
+    "receipt": "C:\\Projects\\Agora4\\.worktrees\\a9868\\src\\desktop\\.tmp-agora\\agora-sandbox\\job-a9868-b7176d8721.closed-1792644738709973500.json"
+  },
+  "cleanup_manifest": {
+    "pids": [
+      98952
+    ],
+    "owners": [
+      {
+        "method": "CreateProcessW-suspended-v1",
+        "exe": "c:\\users\\alex\\appdata\\local\\programs\\python\\python312\\python.exe",
+        "parent": {
+          "pid": 60796,
+          "created": 134371183384135841,
+          "exe": "c:\\users\\alex\\appdata\\local\\programs\\python\\python312\\python.exe"
+        },
+        "profile": "c:\\projects\\agora4\\.worktrees\\a9868\\src\\desktop\\.tmp-agora\\agora-sandbox\\job-a9868-b7176d8721-fake-profile",
+        "desktop": "WinSta0\\agora-sandbox-job-a9868-b7176d8721",
+        "profile_scope": "launch argument only",
+        "pid": 98952,
+        "created": 134371183386072795,
+        "job_id": "b05814f9f9b94f0f8772f45c07c5dd63"
+      }
+    ],
+    "at": 1792644738.5995588,
+    "job": {
+      "schema": 1,
+      "id": "b05814f9f9b94f0f8772f45c07c5dd63",
+      "creator": {
+        "pid": 60796,
+        "created": 134371183384135841,
+        "exe": "c:\\users\\alex\\appdata\\local\\programs\\python\\python312\\python.exe"
+      },
+      "limits": 8192,
+      "breakaway": false,
+      "scope": "new enrolled family; external delegation unverified"
+    },
+    "launches": [
+      {
+        "status": "running",
+        "at": 1792644738.5995588,
+        "intent": {
+          "method": "CreateProcessW-suspended-v1",
+          "exe": "c:\\users\\alex\\appdata\\local\\programs\\python\\python312\\python.exe",
+          "parent": {
+            "pid": 60796,
+            "created": 134371183384135841,
+            "exe": "c:\\users\\alex\\appdata\\local\\programs\\python\\python312\\python.exe"
+          },
+          "profile": "c:\\projects\\agora4\\.worktrees\\a9868\\src\\desktop\\.tmp-agora\\agora-sandbox\\job-a9868-b7176d8721-fake-profile",
+          "desktop": "WinSta0\\agora-sandbox-job-a9868-b7176d8721",
+          "profile_scope": "launch argument only"
+        },
+        "job_id": "b05814f9f9b94f0f8772f45c07c5dd63",
+        "pid": 98952,
+        "job_assigned": true,
+        "owner": {
+          "method": "CreateProcessW-suspended-v1",
+          "exe": "c:\\users\\alex\\appdata\\local\\programs\\python\\python312\\python.exe",
+          "parent": {
+            "pid": 60796,
+            "created": 134371183384135841,
+            "exe": "c:\\users\\alex\\appdata\\local\\programs\\python\\python312\\python.exe"
+          },
+          "profile": "c:\\projects\\agora4\\.worktrees\\a9868\\src\\desktop\\.tmp-agora\\agora-sandbox\\job-a9868-b7176d8721-fake-profile",
+          "desktop": "WinSta0\\agora-sandbox-job-a9868-b7176d8721",
+          "profile_scope": "launch argument only",
+          "pid": 98952,
+          "created": 134371183386072795,
+          "job_id": "b05814f9f9b94f0f8772f45c07c5dd63"
+        },
+        "resume_result": 1
+      }
+    ],
+    "pid": 98952,
+    "cleanup_complete": true,
+    "job_closure": "proven empty",
+    "remaining_pids": [],
+    "runtime_closure": "unknown: external delegation not certified",
+    "cleanup": [
+      {
+        "kind": "job",
+        "job_id": "b05814f9f9b94f0f8772f45c07c5dd63",
+        "status": "empty",
+        "before": {
+          "pids": [
+            60040,
+            78884,
+            90800,
+            98952
+          ],
+          "active": 4,
+          "total": 4,
+          "terminated": 0
+        },
+        "after": {
+          "pids": [],
+          "active": 0,
+          "total": 4,
+          "terminated": 0
+        }
+      }
+    ]
+  },
+  "receipt_path": "C:\\Projects\\Agora4\\.worktrees\\a9868\\src\\desktop\\.tmp-agora\\agora-sandbox\\job-a9868-b7176d8721.closed-1792644738709973500.json",
+  "job_final": {
+    "pids": [],
+    "active": 0,
+    "total": 4,
+    "terminated": 0
+  },
+  "guard": {
+    "code": 0,
+    "verdict": "unknown Alex-screen continuity: local foreground unavailable; house snapshots are bounded admission only"
+  },
+  "house_postflight": {
+    "admitted": true,
+    "observation": {
+      "schema": "house-guard-context-v2",
+      "issuer": "house",
+      "issuer_pid": 31124,
+      "observed_at": 1792644738.7175124,
+      "uptime_ms": 276119500,
+      "notification_result": 0,
+      "notification_state": 2,
+      "foreground_known": true,
+      "foreground_exe": "chatgpt.exe",
+      "foreground_hud": false,
+      "guard_nongame": [
+        "chatgpt.exe",
+        "chrome.exe",
+        "code.exe",
+        "codex.exe",
+        "explorer.exe",
+        "firefox.exe",
+        "msedge.exe",
+        "pythonw.exe"
+      ],
+      "input_desktop": "Default",
+      "full_screen": true,
+      "game": null,
+      "admitted": true
+    },
+    "limit": "managed-sandbox read-only house snapshot; not continuous screen monitoring"
+  },
+  "result": "PASS: enrolled fake job confirmed empty; engine delegation unverified"
+}

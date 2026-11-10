@@ -1,0 +1,15 @@
+01 ok both processes offered 
+02 ok dictionary may and once held in world 
+TIMING status: 141.2 ms
+03 ok real Ollama tags/status local model is up; selected qwen3.5:9b; loaded: none
+TIMING card-1: 6370.8 ms
+04 FAIL task card real model summary 1 None
+Traceback (most recent call last):
+  File "C:\Projects\Agora4\src\agora\proof\local_model.py", line 201, in <module>
+    run()
+  File "C:\Projects\Agora4\src\agora\proof\local_model.py", line 97, in run
+    check('task card real model summary '+str(priority), 'local model · qwen3.5:9b' in row.get('short_source',''),row.get('short'))
+  File "C:\Projects\Agora4\src\agora\proof\local_model.py", line 56, in check
+    assert yes, (name, detail)
+           ^^^
+AssertionError: ('task card real model summary 1', None)

@@ -1,6 +1,0 @@
-{
-  "stdout": "baseline/agora.shell.json 336612 bytes\nbaseline/studio.research.json 37210 bytes\nbaseline/studio.packets.json 39803 bytes\nlive-markdown.js 9656 bytes\npackage-lock.json 25063 bytes\ndebug-context2.mjs 5016 bytes\ndebug-context.mjs 5078 bytes\neditor-integration.inc.js 6840 bytes\nlive-markdown.css 882 bytes\nlive-markdown.bundle.js 517336 bytes\nnode_modules/.package-lock.json 12386 bytes\npackage.json 340 bytes\ncitation-fixtures.json 2682 bytes\ntest-context-ui.mjs 4939 bytes\nwidget-receipt.json 135 bytes\ntest-widget.mjs 1900 bytes\ntest-widget.py 1937 bytes\ncitation-ui.inc.js 5384 bytes\ncontext-ui-receipt.json 306 bytes\ntest-shell.html 773982 bytes\n",
-  "stderr": "",
-  "exit_code": 0,
-  "truncated": false
-}

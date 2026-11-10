@@ -1,0 +1,62 @@
+/* kd.css: the host chrome of the desktop's own pages. It wears the theme: every colour, radius and type choice below is a
+   --ag-* variable from theme.css (src/agora/theme/THEMES.md), with today's calm look as the fallback, so a page
+   that loses theme.css still reads. The short names (--paper, --ink ...) are kept for the pages that already use them. */
+:root {
+  --paper: var(--ag-surface, #f4f5f3); --card: var(--ag-raised, #ffffff); --ink: var(--ag-ink, #253645);
+  --accent: var(--ag-accent, #476d86); --warn: var(--ag-warn, #A24E2C); --mark: var(--ag-info, #7A5C2E);
+  --line: var(--ag-border, #d4dee4);
+  --faint: color-mix(in srgb, var(--ag-border, #e1e7ea) 70%, var(--ag-surface, #f4f5f3));
+  --quiet: color-mix(in srgb, var(--ag-ink, #3b5060) 82%, var(--ag-surface, #f4f5f3));
+  --hush: var(--ag-ink-muted, #617484);
+  --gap: var(--ag-gap-inner, 8px);
+  --font: var(--ag-font-ui, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif);
+  --mono: var(--ag-font-mono, "Cascadia Mono", Consolas, monospace);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--paper); color: var(--ink); font: var(--ag-text, 15px)/1.5 var(--font); overflow: hidden; }
+body { display: flex; flex-direction: column; border: var(--ag-border-w, 1px) solid var(--line); border-radius: var(--ag-radius-l, 12px); }
+body.away::after { content: "the kernel is away; waiting for it"; position: fixed; right: 12px; bottom: 32px; font-size: 12px;
+                   color: var(--warn); background: var(--card); padding: 2px 8px; border-radius: var(--ag-radius-s, 4px); border: 1px solid var(--faint); }
+button { font: inherit; color: inherit; }
+img[src^="icons/"] { filter: var(--ag-icon-filter, none); }
+.strip { display: flex; align-items: center; gap: var(--gap); height: 44px; padding: 0 8px 0 20px; border-bottom: 1px solid var(--faint);
+         background: var(--card); user-select: none; flex: none; }
+.strip .name { font-weight: 600; font-size: 14px; letter-spacing: .015em; color: var(--ag-ink-muted, #4b6477); }
+.strip .grow { flex: 1; align-self: stretch; }
+.strip button { border: 0; background: transparent; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+                border-radius: var(--ag-radius-s, 6px); color: var(--hush); font-size: 18px; cursor: pointer; }
+.strip button:hover { background: var(--ag-hover, var(--faint)); color: var(--ink); }
+.strip button img { width: 16px; height: 16px; opacity: .7; pointer-events: none; }
+.strip button:last-child:hover { background: var(--ag-danger-soft, #fae8e5); }
+main { flex: 1; overflow: auto; padding: 24px 26px 38px; }
+.grip { position: fixed; right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize;
+        background: linear-gradient(135deg, transparent 55%, var(--line) 55%, var(--line) 62%, transparent 62%, transparent 72%, var(--line) 72%, var(--line) 79%, transparent 79%); }
+.receipt { position: fixed; left: 0; right: 18px; bottom: 0; min-height: 24px; padding: 3px 14px; font: 12.5px/1.4 var(--mono); color: var(--hush);
+           background: var(--paper); border-top: 1px solid var(--faint); white-space: pre-wrap; max-height: 40%; overflow: auto; }
+.receipt:empty { display: none; }
+.receipt.refused { color: var(--warn); background: var(--ag-danger-soft, #FBF1EC); }
+.card { background: var(--card); border: 1px solid var(--faint); border-radius: var(--ag-radius-l, 14px); padding: 20px 22px; margin-bottom: 14px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, .03); }
+.meta { font-size: 12.5px; letter-spacing: .02em; color: var(--hush); }
+.tag { font-size: 12px; color: var(--accent); background: var(--ag-accent-soft, rgba(63, 93, 115, .12)); padding: 1px 6px; border-radius: var(--ag-radius-s, 3px); }
+.mark { font-size: 12px; color: var(--mark); background: var(--ag-info-soft, rgba(122, 92, 46, .10)); padding: 1px 6px; border-radius: var(--ag-radius-s, 3px); }
+.act { border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--paper)); background: var(--ag-accent-soft, #eaf0f4); border-radius: var(--ag-radius-m, 9px);
+       min-height: 34px; padding: 6px 14px; cursor: pointer; color: var(--accent); font-size: 13.5px; font-weight: 600; }
+.act:hover { background: color-mix(in srgb, var(--accent) 18%, var(--paper)); border-color: var(--accent); }
+.act.on { color: var(--accent); background: var(--ag-accent-soft, rgba(63, 93, 115, .12)); border-color: var(--accent); }
+input, textarea { font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: var(--ag-radius-m, 10px); padding: 10px 13px; }
+input:focus, textarea:focus { outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); border-color: var(--accent); }
+input::placeholder { color: var(--ag-ink-faint, #7a8c98); }
+button:focus-visible { outline: 2px solid var(--ag-focus, #6e99b6); outline-offset: 2px; }
+h1 { font-size: 24px; letter-spacing: -.025em; margin: 0 0 12px; font-weight: 600; font-family: var(--ag-font-display, var(--font)); }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--hush); margin: 24px 0 8px; font-weight: 600; }
+pre { font: 13.5px/1.65 var(--mono); white-space: pre-wrap; margin: 0; overflow-wrap: anywhere; }
+.hint { line-height: 1.8; }
+.hint code { padding: 3px 7px; background: var(--ag-hover, #e7edf1); border-radius: var(--ag-radius-s, 5px); white-space: nowrap; }
+#log { border-radius: var(--ag-radius-l, 14px) !important; padding: 16px 18px !important; }
+.said { padding-top: 12px; margin-top: 12px !important; border-top: 1px solid var(--faint); }
+.word { border: 1px solid var(--faint) !important; border-radius: var(--ag-radius-m, 12px); padding: 13px 16px !important; margin-bottom: 8px; background: var(--card); text-align: left; width: 100%; }
+.word:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--paper)) !important; background: var(--ag-accent-soft, #f6fafc); }
+.word b { min-width: 138px !important; }
+#filter { width: 100%; margin: 4px 0 16px; }
+[hidden] { display: none !important; }

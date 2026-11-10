@@ -1,0 +1,20 @@
+[Unit]
+Description=Seabright entry service (sign-in, invites; loopback 8817)
+After=network.target
+
+[Service]
+User=seabright
+Group=seabright
+EnvironmentFile=/etc/seabright/env
+WorkingDirectory=/srv/seabright/app/src/community/site
+ExecStart=/srv/seabright/venv/bin/python run.py
+Restart=always
+RestartSec=2
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+ReadWritePaths=/srv/seabright/entry-data
+
+[Install]
+WantedBy=multi-user.target

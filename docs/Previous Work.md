@@ -100,7 +100,7 @@ The notation lab ran 47 Terra trials over nine rounds. They produced the line no
 
 ## 8. The text desk lived in, and the move to the kernel (23 Sep to 27 Oct)
 
-The desk (`frontier`) became where the team lived: JEFF, residents, a house that landed workers' code, about 100 lenses, adapters, card rules. The kernel was built from 23 Oct as a new kernel with the same language, and took over Alex's desktop. On 27 Oct Alex moved JEFF, Sable and Pike in and archived the old world whole. On 3 Nov workers began bringing back what he used daily: Twitch, card rules, music and a universal viewer. What came over: `research/kernel-lab/OLD-WORLD-AUDIT-20261103.md`.
+The desk (`frontier`) became where the team lived: JEFF, residents, a house that landed workers' code, about 100 lenses, adapters, card rules. The kernel was built from 23 Oct as a new kernel with the same language, and took over Alex's desktop. On 27 Oct Alex moved JEFF, Sable and Pike in and archived the old world whole. On 3 Nov workers began bringing back what he used daily: Twitch, card rules, music and a universal viewer. What came over: `src/agora/OLD-WORLD-AUDIT-20261103.md`.
 
 ## Reusable lessons
 
@@ -133,7 +133,7 @@ The desk (`frontier`) became where the team lived: JEFF, residents, a house that
 | Parallel work and WIP | `codex/parallel-worldline`; `codex/wip-*` branches |
 | Private worlds (not in git) | `C:/Projects/Agora/worlds/` (`parallel-desk` is JEFF0's live desk) |
 | Presentation experiment, authored examples | `C:/Projects/Agora4/experiments/`, `examples/` |
-| Labs | `C:/Projects/Agora4/research/archive/` (arrangement-lab, tessera-lab, language-interface, security, graph-memory, the reviews, text-desk-lab-v1); tessera evidence and notation trial runs parked in `C:/Projects/Agora/research-archive/` |
+| Labs | `C:/Projects/Agora4/research/archive/` (arrangement-lab, tessera-lab, language-interface, security, graph-memory, the reviews, text-desk-v1); tessera evidence and notation trial runs parked in `C:/Projects/Agora/research-archive/` |
 | Shared visual desk | branch `research/shared-visual-desk`; rounds 7 and 8 uncommitted on 23 September |
 | The text desk's world (frontier) | `C:/Projects/Agora/archive/frontier-2026-10/` (read-only JSON; README first) |
 

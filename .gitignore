@@ -28,30 +28,30 @@ local/
 # Claude Code session lock (per-machine)
 .claude/scheduled_tasks.lock
 
-research/text-desk-lab/notation/sessions/*.lock
-research/text-desk-lab/notation/sessions/*.writer
+src/text-desk/notation/sessions/*.lock
+src/text-desk/notation/sessions/*.writer
 
 # research evidence parked under C:/Projects/Agora/research-archive (not in git)
-research/text-desk-lab/notation/runs/
+src/text-desk/notation/runs/
 research/archive/tessera-lab/evidence/
 
 # the house: resident transcripts and live state (outside the world, never committed)
-research/text-desk-lab/notation/house-state/
-research/window-lab/.tmp-agora/
-research/text-desk-lab/notation/fake-model-log.jsonl
-research/text-desk-lab/notation/house-test.log
+src/text-desk/notation/house-state/
+src/desktop/.tmp-agora/
+src/text-desk/notation/fake-model-log.jsonl
+src/text-desk/notation/house-test.log
 
 # live building: reaches nothing answered (evidence, per world), workers' git worktrees
-research/text-desk-lab/notation/reaches/
+src/text-desk/notation/reaches/
 .worktrees/
 
 # screen.py shots (29 Sep)
 screen-*.png
 
 # sandbox browser scratch space (AGORA_TMP; isolated per worktree)
-research/window-lab/.tmp-*/
+src/desktop/.tmp-*/
 
-# a5941: films and pictures a person puts here for the desk to show (media_links.FOLDERS); like window-lab's demos/
+# a5941: films and pictures a person puts here for the desk to show (media_links.FOLDERS); like desktop's demos/
 /media/
 
 # House-owned paired proof data and synthetic log-world fixtures are never source.
@@ -63,5 +63,8 @@ research/window-lab/.tmp-*/
 /pytest-cache-files-pgxvchi0/
 
 # Never public: old desk worlds and world dumps
-research/text-desk-lab/notation/sessions/
+src/text-desk/notation/sessions/
 desk-export*.txt
+
+# Made by test runs
+.resident-fixtures/

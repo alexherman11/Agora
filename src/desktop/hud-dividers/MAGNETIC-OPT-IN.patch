@@ -1,0 +1,243 @@
+diff --git a/src/text-desk/notation/desk-shell/partition-ui.js b/src/text-desk/notation/desk-shell/partition-ui.js
+index e000718..7d09b25 100644
+--- a/src/text-desk/notation/desk-shell/partition-ui.js
++++ b/src/text-desk/notation/desk-shell/partition-ui.js
+@@ -208,11 +208,50 @@
+       const a = g.el._n.acts.find(a => a.on === "partition-focus");
+       if (a) await api.send(g.el._n, a.line.replace(/\$value\b/g, () => id));
+     }
+-    async function commit(g, tree, focus) {
++    async function commit(g, tree, focus, restore) {
+       if (active || armed || pending || api.busy()) return;
+       pending = true; api.hold(true);
+       try { await api.send(g.el._n, P.command(g.el._n, tree, focus)); }
+-      finally { pending = false; api.hold(false); api.refresh(); }
++      finally {
++        pending = false; api.hold(false);
++        if (restore) { try { await api.refresh(); } finally { restore(); } }
++        else api.refresh();
++      }
++    }
++    function continuity(g) {
++      // Scroll offsets do not require intrinsic measurements. Keep the actual
++      // editors, never a cloned/replaced app, and restore after authoritative
++      // refresh as well as cancellation. Viewer owns continuity across repaints.
++      const elements = [...g.members.values()].flatMap(el => [el, ...el.querySelectorAll("*")]);
++      const scroll = elements.map(el => [el, el.scrollLeft, el.scrollTop]);
++      const focused = document.activeElement;
++      return () => {
++        // Reflow may hide the focused tab and send focus to body. Recover that
++        // loss, but never override an intentional move to another editor.
++        // Retained editors own their current caret, including typing during a
++        // delayed send; replaying a pickup-time range would lose that progress.
++        if (focused?.isConnected && focused.getClientRects().length && elements.includes(focused) &&
++            (!document.activeElement || document.activeElement === document.body || document.activeElement === focused)) {
++          if (document.activeElement !== focused) focused.focus?.({ preventScroll: true });
++        }
++        for (const [el, x, y] of scroll) if (el.isConnected) {
++          if (x !== undefined) el.scrollLeft = x;
++          if (y !== undefined) el.scrollTop = y;
++        }
++      };
++    }
++    function showCandidate(a, plan) {
++      const next = plan?.tree || null;
++      a.preview.hidden = !plan;
++      a.preview.title = plan?.fallback === "tabs" ? "Not enough room for a split; previewing tabs" : "";
++      if (plan?.box) place(a.preview, plan.box);
++      // No work for a stationary snapped target: geometry changes only when
++      // the candidate changes, not for every ghost position.
++      const key = next ? JSON.stringify(next) : "";
++      if (key === a.previewKey) return;
++      a.previewKey = key; a.next = next;
++      a.g.chrome.forEach(e => e.remove()); a.g.chrome = [];
++      render(a.g, next || a.g.tree, next ? "" : a.g.focus, false);
+     }
+     function listen(pid, moving, done) {
+       const move = e => { if (e.pointerId === pid) moving(e); };
+@@ -245,7 +284,7 @@
+       if (!cancel && a.external?.target) {
+         pending = true;
+         a.external.release().finally(() => { pending = false; api.refresh(); });
+-        render(a.g);
++        render(a.g); a.restore?.();
+       } else if (!cancel && a.next) {
+         a.external?.cancel();
+         const focus = a.kind === "carry" ? "" : a.g.focus;
+@@ -255,8 +294,8 @@
+         // otherwise an invisible old divider can intercept the next title press.
+         a.g.chrome.forEach(e => e.remove()); a.g.chrome = [];
+         render(a.g, a.next, focus, false);
+-        commit(a.g, a.next, focus);
+-      } else { a.external?.cancel(); render(a.g); api.refresh(); }
++        commit(a.g, a.next, focus, a.restore);
++      } else { a.external?.cancel(); render(a.g); a.restore?.(); api.refresh(); }
+     }
+     function carry(grip, e) {
+       const g = groups.find(g => g.el.contains(grip));
+@@ -299,7 +338,8 @@
+             pointerEvents: "none", zIndex: "40", opacity: ".85", animation: "none", transition: "none" });
+           document.body.appendChild(ghost); whole.style.opacity = ".35";
+           const preview = document.createElement("div"); preview.className = "landing-box"; g.el.appendChild(preview);
+-          active = { kind: "carry", g, ghost, preview, whole, next: null,
++          active = { kind: "carry", g, ghost, preview, whole, next: null, previewKey: "",
++            bounds: rect(g.el), boxes: g.geometry.boxes, restore: g.magnetic ? continuity(g) : null, snap: null,
+             external: host.CarryTargets?.session(paint, { el: grip, n: grip._n }, api.send, g.el) };
+           // Only a threshold drag changes selection policy; clicks and app
+           // controls retain their normal focus/caret behavior.
+@@ -312,12 +352,23 @@
+         m.preventDefault();
+         active.ghost.style.transform = `translate(${m.clientX - start.x}px,${m.clientY - start.y}px)`;
+         if (active.external?.move(m)) {
+-          active.next = null; active.preview.hidden = true; return;
++          if (g.magnetic) { active.snap = null; showCandidate(active, null); }
++          else { active.next = null; active.preview.hidden = true; }
++          return;
++        }
++        if (!g.magnetic) {
++          const target = P.hit(rect(g.el), g.geometry.boxes, pagePoint(g, m), id);
++          const p = P.plan(g.tree, id, target, rect(g.el), g.options);
++          active.next = p?.tree; active.preview.hidden = !p;
++          if (p?.box) place(active.preview, p.box);
++          return;
+         }
+-        const target = P.hit(rect(g.el), g.geometry.boxes, pagePoint(g, m), id);
+-        const p = P.plan(g.tree, id, target, rect(g.el), g.options);
+-        active.next = p?.tree; active.preview.hidden = !p;
+-        if (p?.box) place(active.preview, p.box);
++        const prior = active.snap;
++        const snap = P.magneticHit(active.bounds, active.boxes, pagePoint(g, m), id, prior);
++        if (snap === active.snap) return;
++        active.snap = snap;
++        if (prior && snap && JSON.stringify(prior.target) === JSON.stringify(snap.target)) return;
++        showCandidate(active, P.previewPlan(g.tree, id, snap?.target, active.bounds, g.options));
+       }, cancel => { armed = false; if (taken) finish(cancel); });
+       return true;
+     }
+@@ -330,13 +381,15 @@
+       if (e.key === " " && !active && !armed && !pending && !api.busy()) {
+         e.preventDefault(); api.hold(true);
+         const preview = document.createElement("div"); preview.className = "landing-box"; g.el.appendChild(preview);
+-        active = { g, kind: "carry", whole, id: whole._n.paint.partition_item, preview, next: null };
++        active = { g, kind: "carry", whole, id: whole._n.paint.partition_item, preview, next: null,
++          previewKey: "", restore: g.magnetic ? continuity(g) : null };
+       } else if (active?.g === g && active.kind === "carry") {
+         const side = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "top", ArrowDown: "bottom" }[e.key];
+         if (side) {
+           e.preventDefault();
+-          const plan = P.plan(g.tree, active.id, { global: true, side }, rect(g.el), g.options);
+-          active.next = plan?.tree; if (plan?.box) place(active.preview, plan.box);
++          const plan = (g.magnetic ? P.previewPlan : P.plan)(g.tree, active.id, { global: true, side }, rect(g.el), g.options);
++          if (g.magnetic) showCandidate(active, plan);
++          else { active.next = plan?.tree; if (plan?.box) place(active.preview, plan.box); }
+         } else if (e.key === "Enter") { e.preventDefault(); finish(false); }
+       }
+       return true;
+@@ -358,7 +411,7 @@
+           else n.kids.forEach(visit); })(tree.root);
+         const intrinsic = Object.fromEntries([...members].filter(([id]) => content.has(id)).map(([id, e]) =>
+           [id, measure(e, el.clientWidth, spec.minimum)]));
+-        const g = { el, members, visible, tree, focus: spec.focus || "", chrome: [],
++        const g = { el, members, visible, tree, focus: spec.focus || "", magnetic: spec.magnetic === true, chrome: [],
+           options: { minimum: spec.minimum, gap: spec.gap, intrinsic } };
+         g.options.visible = visible;
+         el.dataset.partition = "1"; el.style.position = "relative"; el.style.display = "block"; el.style.padding = "0"; el.style.gap = "0";
+diff --git a/src/text-desk/notation/desk-shell/partition.js b/src/text-desk/notation/desk-shell/partition.js
+index 32d23e9..cead9dd 100644
+--- a/src/text-desk/notation/desk-shell/partition.js
++++ b/src/text-desk/notation/desk-shell/partition.js
+@@ -217,12 +217,46 @@
+     const projected = geometry(next.root, bounds, options);
+     return { tree: next, box: projected.boxes[dragged], target };
+   }
++  function magneticHit(bounds, boxes, point, dragged, previous, margin = 12) {
++    // Always use pickup geometry, never boxes moved by our own preview.
++    const target = hit(bounds, boxes, point, dragged);
++    if (!target) return null;
++    const same = (a, b) => a && b && a.global === b.global && a.target === b.target && a.side === b.side;
++    if (previous && !same(target, previous.target)) {
++      const dx = previous.point.x - point.x, dy = previous.point.y - point.y, distance = Math.hypot(dx, dy);
++      const scale = distance ? Math.min(1, Math.max(0, margin) / distance) : 0;
++      const inward = hit(bounds, boxes, { x: point.x + dx * scale, y: point.y + dy * scale }, dragged);
++      if (same(inward, previous.target)) return previous;
++    }
++    return { target, point: { ...point } };
++  }
++  function previewPlan(tree, dragged, target, bounds, options = {}) {
++    // Ordinary model/resize behavior is unchanged. A carry must not introduce
++    // a preview that only fits by scaling below the declared physical minima.
++    const opt = { minimum: [240, 140], gap: 16, tab: 28, ...options };
++    function feasible(t) {
++      if (!t) return false;
++      const root = opt.visible ? project(t.root, opt.visible) : t.root;
++      if (!root) return false;
++      const min = minimum(root, opt);
++      return min[0] <= bounds.w && min[1] <= bounds.h;
++    }
++    let proposed = plan(tree, dragged, target, bounds, options);
++    if (proposed && feasible(proposed.tree)) return proposed;
++    // Reuse the existing tab operation; preserve the rest of the slicing tree.
++    // If that tree also cannot fit, refuse rather than flatten/reset it.
++    if (target && target.side !== "centre") {
++      proposed = plan(tree, dragged, { ...target, side: "centre" }, bounds, options);
++      if (proposed && feasible(proposed.tree)) return { ...proposed, fallback: "tabs" };
++    }
++    return null;
++  }
+   function escape(value) { return String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/\n/g, "\\n"); }
+   function command(n, tree, focus) {
+     return n.acts.find(a => a.on === "arrange").line.replace(/\$(value|partition_focus)\b/g,
+       (_, key) => escape(key === "value" ? JSON.stringify(encoded(tree)) : focus || ""));
+   }
+-  const exports = { ids, model, encoded, prune, project, replace, activate, minimum, fit, geometry, drop, resize, hit, plan, nodeAt, command };
++  const exports = { ids, model, encoded, prune, project, replace, activate, minimum, fit, geometry, drop, resize, hit, plan, magneticHit, previewPlan, nodeAt, command };
+   if (typeof module !== "undefined") module.exports = exports;
+   else host.Partition = exports;
+ })(typeof window !== "undefined" ? window : globalThis);
+diff --git a/src/text-desk/notation/scene.py b/src/text-desk/notation/scene.py
+index 58f228c..73c243f 100644
+--- a/src/text-desk/notation/scene.py
++++ b/src/text-desk/notation/scene.py
+@@ -111,7 +111,7 @@ the one form. The words:
+     carry                        this part's thing can be picked up (pointer or keys) and put down on a part that says `on drop`
+     resize <prop> min <pixels>    shared repeated frames: drag the gap between neighbours, save both weights as this prop;
+                                  arrows adjust, Enter saves, Escape cancels. Minimum outer sizes scale if the viewport is too small.
+-    partition <prop> min <w> <h> gap <pixels> [focus <prop>]
++    partition <prop> min <w> <h> gap <pixels> [focus <prop>] [magnetic]
+                                  bounded split/tab tree stored as JSON in that world prop; direct bound children are
+                                  leaves, ordinary fenced prop writes save drops, tabs, content sizes and divider weights.
+     companion <expression>       a partition child stays beside the focused child when this expression holds.
+@@ -1674,10 +1674,12 @@ def _w_resize(node, p, val, n, env):
+ 
+ 
+ def _w_partition(node, p, val, n, env):
+-    m = re.fullmatch(r"([a-zA-Z_][\w-]*) min ([1-9]\d*) ([1-9]\d*) gap (\d+)(?: focus ([a-zA-Z_][\w-]*))?", val.strip())
++    m = re.fullmatch(r"([a-zA-Z_][\w-]*) min ([1-9]\d*) ([1-9]\d*) gap (\d+)(?: focus ([a-zA-Z_][\w-]*))?( magnetic)?", val.strip())
+     if not m:
+-        raise LensRefusal(f"line {n}: `partition <prop> min <width> <height> gap <pixels> [focus <prop>]`; got {p!r}")
++        raise LensRefusal(f"line {n}: `partition <prop> min <width> <height> gap <pixels> [focus <prop>] [magnetic]`; got {p!r}")
+     node["partition"] = dict(prop=m[1], minimum=[int(m[2]), int(m[3])], gap=int(m[4]), focus_prop=m[5])
++    if m[6]:
++        node["partition"]["magnetic"] = True
+ 
+ 
+ def _w_companion(node, p, val, n, env):
+@@ -2023,7 +2025,7 @@ WORDS = {
+     "light": ('light "<passages>"', _w_light),
+     "peek": ("peek [lines]", _w_peek),
+     "carry": ("carry", _w_carry),
+-    "partition": ("partition <prop> min <width> <height> gap <pixels> [focus <prop>]", _w_partition),
++    "partition": ("partition <prop> min <width> <height> gap <pixels> [focus <prop>] [magnetic]", _w_partition),
+     "companion": ("companion <expression>", _w_companion),
+     "sizing": ("sizing <expression>", _w_companion),
+     "chrome": ("chrome <expression>", _w_companion),
+@@ -2741,7 +2743,8 @@ def to_text(scene, name, who, at, roots=None, part=None):
+         if n.get("partition"):
+             spec = n["partition"]
+             bits.append(f"partition {spec['prop']} min {spec['minimum']} gap {spec['gap']}"
+-                        + (f" focus {spec['focus_prop']}={spec.get('focus') or '(none)'}" if spec.get("focus_prop") else ""))
++                        + (f" focus {spec['focus_prop']}={spec.get('focus') or '(none)'}" if spec.get("focus_prop") else "")
++                        + (" magnetic" if spec.get("magnetic") else ""))
+         if n.get("companion") is not None:
+             bits.append(f"companion {n['companion']}")
+         for word in ("sizing", "chrome"):
