@@ -85,3 +85,45 @@ Read primary API contracts:
   termination is asynchronous; check the return and wait on the same handle.
 - [CommandLineToArgvW](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-commandlinetoargvw):
   native quoting rules and `LocalFree` for the returned buffer.
+
+## Live activation receipt, 20 Oct 2026, 15:56 PDT
+
+Outside Codex completed the explicitly authorised handoff after Alex confirmed
+he was not in a game. The queued fallback was held before effects and the claim
+was recorded on the activation task and in Shop talk.
+
+Ran the documented main-checkout `agora_start.py --stop`; confirmed both old
+supervisor processes had exited before running `hud.py --stop`. The latter
+reported identity-verified termination of both old HUD processes. Then the
+documented WMI Create launched only the pinned `pythonw.exe agora_start.py`,
+with `research/window-lab` as its working directory. It returned success.
+
+Observed the new supervisor start at 15:56:32, first confirmed HUD miss at
+15:56:34, second at 15:56:40, and running HUD at 15:56:46. The new logical
+supervisor is launcher 55188 / interpreter 72092; the new logical HUD is
+launcher 81296 / interpreter 88772. These are historical receipt identities,
+never targets for a later stop.
+
+Read-only verification found exactly one responsive native home-base window,
+`visible=False`, and an existing correctly scoped single-instance mutex.
+Capture launcher 79448 / interpreter 74024 belongs to HUD 88772; its log reports
+ready. All old supervisor/HUD/capture identities were gone. Keeper, door and
+house retained their six original launcher/interpreter identities, including
+full creation FILETIME and executable. The saved chat draft was unchanged.
+Source hashes remained equal before and after activation, including music.
+The external recovery watchdog remained running and observed the new launcher.
+
+One initial post-start whole-Python inventory was inconclusive; a subsequent
+read-only inventory succeeded. No second restart was attempted. Local evidence
+is retained under ignored `local/home-base-activation-20261020/` (baseline,
+post-state and verification helper). Source activation is established by the
+new processes, unchanged reviewed files, mutex and new supervisor log sequence.
+Hotkey operation, visual music acceptance and Spotify account actions were not
+tested; no keys or desktop interaction were used. Registration-log evidence is
+unavailable: HUD prints it to stdout, which the supervisor sends to DEVNULL.
+
+The preserved `parked/20261020-140956` branch contains separate launcher recovery
+changes, including an OS lease and persistent off switch, alongside the unsafe
+HUD PID-removal path superseded by this protection. It was reviewed for intent
+but neither merged nor overwritten. This activation does not claim those parked
+recovery features are present in the newly running supervisor.

@@ -165,7 +165,9 @@ def install(KM):
             k = host.kernel
             home = Path(k.dir) / "modules" / str(k.state.get(mid, "name") or mid)
             LINK.mods[mid] = self
-            r = LINK.request({"t": "start", "mid": mid, "argv": list(argv), "cwd": str(cwd), "env": dict(os.environ),
+            # a module (and all it starts) never gets AGORA_KEEPER: a House review's test kernel joined the live keeper
+            # with it and knocked Alex's kernel off (28 Oct 21:24)
+            r = LINK.request({"t": "start", "mid": mid, "argv": list(argv), "cwd": str(cwd), "env": {e: v for e, v in os.environ.items() if e != "AGORA_KEEPER"},
                               "log": str(home / "stderr.log")})
             self.proc = _Proc(r.get("pid"), self)
             self.adopted = bool(r.get("adopted"))

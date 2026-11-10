@@ -25,7 +25,7 @@ Or start `community-entry` from `.claude/launch.json` in the app's browser pane.
 C:/Projects/Agora4/.venv/Scripts/python.exe research/community-app/site/scenario/evening.py
 ```
 
-Unit tests underneath (78, about 30 s):
+Unit tests underneath (109, about 45 s):
 
 ```bash
 C:/Projects/Agora4/.venv/Scripts/python.exe -m pytest research/community-app/site/tests -q -p no:cacheprovider
@@ -57,20 +57,25 @@ The cost is two pieces of the standard library's missing crypto written here and
 
 ## How it works
 
+- **Guest passes** (Claude, 5 Nov). An invite can be marked "Guests can join with just their name" (a box on the Invites form, ticked for event QR codes; a button on each invite turns it on or off later). Opened signed-out, such an invite asks only "Your name" (1 to 60 characters), with "Have an account? Sign in" and "Make an account instead". That makes an account with no email (method `guest`), counts the invite's use, and joins the kernel like anyone else, with answers `{display_name}`. The pass ends at 23:59:59 on the day after joining in `SITE_TIMEZONE` (default America/Los_Angeles); after that the session is gone and they are a signed-out visitor. Freezing the invite ends its guests' sessions at once, and they stay ended if it is unfrozen. Limits: `guest_ip` 80 an hour, `guest_invite` 300 a day.
+- **Keeping a guest's account.** A guest also gets a separate HttpOnly claim cookie (random, stored hashed) lasting 14 days past the pass (`SITE_GUEST_CLAIM_DAYS`). Signing in by email or Google in that browser, with an address no account has, turns the guest into a full member in place: same account id, so the kernel person and their messages stay, and the kernel is told again. An address that already has an account just signs into that account (no merging). The emailed link must be finished in the guest's browser (or the code typed there); elsewhere it says so. Signing out drops the claim.
 - **Invites.** A leader makes one link per channel ("Instagram", "Nextdoor", "25 Oct meeting"), each with a maker, a use count (unlimited or a maximum), an expiry (1 day to 1 year) and a record of who came through it. Freezing one link leaves every other link open, and unfreezing reopens it. An event invite has a printable QR poster. One invite can be put on the public site as its Join button. A use counts only when an account is made, in the same transaction as the account.
 - **Ways in.** "Continue with Google" is OpenID Connect's code flow with `state`, `nonce` and PKCE (S256). The nonce, verifier and invite stay on the server, keyed to a 10-minute cookie, so a callback opened in another browser finds nothing. The ID token's signature, issuer, audience, `azp`, expiry, `iat`, nonce and `email_verified` are all checked. **Emailed sign-in** sends a link and a 6-digit code: the link works on any device, and the code works in the tab that asked, for when a phone's mail app opens links in its own browser. Both work once, for 15 minutes, and asking again cancels the older ones. The link opens a "Continue" button rather than signing in, because mail scanners open links too. Five wrong codes end the request. There are no passwords.
 - **Nothing says whether an address is a member.** The page after "Email me a link" is the same for everyone. The email tells the truth: a link, or "you'll need an invite". The "you'll need an invite" note goes to an address at most once a day, so the form can't be used to flood someone.
 - **Questions.** They are data in `content/questions.json`: text, one choice or many choices, with help text and placeholders. Leaders can reword them without code. The loader refuses any question that asks where someone lives, and requires a `display_name` question, because real names are shown in chat. Google's name is offered as a starting point.
 - **Sessions.** These are random cookies, stored only as hashes: `HttpOnly`, `SameSite=Lax`, and `__Host-` plus `Secure` on https. They last 90 days at most and end after 30 idle days. "Sign out" and "sign out on every device" are both there. A new sign-in always gets a new session.
 - **CSRF.** Every form carries a token tied to a per-browser cookie, and every POST whose browser sends an `Origin` must come from the site's own origin.
-- **Rate limits** (fixed windows, in the store, so they survive restarts):
+- **No SMTP or Google yet.** Live mode starts without either: the sign-in pages then say "Email sign-in isn't set up yet — ask a leader", the Google button is hidden, and no mail is written anywhere (live mode never uses the outbox). Leaders get in with `python -m agora_entry signin-link <email>` (from the site folder, with the server's settings): it prints a sign-in link for a `SITE_LEADERS` address or an existing member, once-only and for 15 minutes like an emailed one.
+- **Where people land.** The board (the kernel) is the landing page at `/`; the mission page is at `/about`. After joining or signing in, people go to `SITE_HOME` (default `/`). Run alone, this service sends `/` to `/about`, or `/home` when signed in.
+- **Rate limits** (fixed windows, in the store, so they survive restarts). Each is a setting, `SITE_LIMIT_<KIND>=<count>` (kinds as in `web.LIMITS`, e.g. `SITE_LIMIT_EMAIL_IP`), and `SITE_IP_LIMITS=off` turns off every per-IP limit while the per-address, per-invite and per-account ones stay: for a server where every client arrives from one proxy address.
 
   | What | Limit |
   |---|---|
   | sign-in emails | 5 per address and 60 per IP an hour (a meeting's whole room shares one wifi address) |
   | codes | 30 per IP an hour |
   | Google starts | 30 per IP every 10 minutes |
-  | invite pages | 120 per IP an hour |
+  | invite pages | 300 per IP an hour |
+  | guest passes | 80 per IP an hour, 300 per invite a day |
   | invites made | 100 per leader a day |
 
 - **Headers.** A strict CSP (`default-src 'none'`, own styles and one small optional script), `frame-ancestors 'none'`, `nosniff`, `no-referrer` (sign-in links never leak in a Referer), HSTS on https, and `no-store` on every page. The server log never prints query strings. Any other host name is redirected to the one configured address.
@@ -89,6 +94,8 @@ The cost is two pieces of the standard library's missing crypto written here and
 | `agora_entry/qr.py` | QR codes as SVG |
 | `agora_entry/seam.py` | `may`, the account record, and `/internal/*` for the kernel |
 | `agora_entry/mailer.py` | the outbox file (test) or SMTP (live) |
+| `agora_entry/__main__.py` | runs the server; `signin-link <email>` prints a one-time sign-in link |
+| `static/invite_form.js` | ticks "Guests can join" when a leader picks an event QR code (optional) |
 | `agora_entry/kernel_client.py` | the call into the kernel when someone joins (`/keep/account`) |
 | `scenario/evening.py`, `cdp.py`, `qr_read.py` | the evening in a hidden browser, the browser driver, and the QR reader |
 | `content/` | site copy, questions and privacy page, all data |
@@ -136,6 +143,7 @@ The cost is two pieces of the standard library's missing crypto written here and
 **Not verified:**
 - real Google (no keys yet), and real SMTP delivery (no provider yet);
 - any phone's camera scanning the QR codes. The encoder matches another encoder bit for bit, and the reader written here reads the printed poster's pixels, but both follow my reading of the standard. A real phone has not scanned one.
+- guest passes (5 Nov) in a real browser or on a phone, and against the real kernel: the tests stand in for `/keep/account`. On Windows without the `tzdata` package, the zone comes from built-in US rules (`config.local_zone`); the server's Python uses the system's tz database.
 - behaviour behind Cloudflare, and load. The test server is the standard library's threaded one; for 200 people it is probably enough (**imagined**), and the deploy story may put it behind a sturdier WSGI server.
 
 ## Not done yet

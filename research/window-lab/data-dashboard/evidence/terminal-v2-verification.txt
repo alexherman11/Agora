@@ -1,0 +1,67 @@
+Agora terminal observatory revision — 22 October 2026
+
+RAN
+Pinned Python: C:/Projects/Agora4/.venv/Scripts/python.exe
+test_data_graphics.py: Ran 23 tests in 0.130s — OK
+test_preview.py: Ran 9 tests in 0.546s — OK
+preview.py --fixture terminal-edge-cases.json --check:
+  observatory 68748 bytes compiled
+  studio 22656 bytes compiled
+
+Hidden IAB rendered UI:
+- Live 480x640: paint scrollWidth/clientWidth 480/480; all bar rx/ry=0.
+- Live 640x600: paint scrollWidth/clientWidth 640/640; seven residents,
+  two active workers with task titles, separate account quota and evidence fold.
+- Resting panel computed animation names: [].
+- Jeff evidence opened by text click; keyboard Enter on focused disclosure closed it.
+- Synthetic 640x640: seven residents and four active workers, zero/full/unknown/stale,
+  long title clamped in row and complete in expanded evidence; inactive worker fold works.
+- Expanded long-task view: vertical scroll, no horizontal overflow (625/625).
+- Synthetic screenshot explicitly labels SYNTHETIC EDGE CASES.
+- Studio rechecked 900x700: original styling, 3px bar corners, illustrative data.
+- Screenshots are viewport captures, not scaled wide screenshots.
+
+New files copied to repository evidence:
+terminal-v2-live-480.jpg (41256 bytes)
+terminal-v2-live-640.jpg (46069 bytes)
+terminal-v2-edge-cases-640.jpg (52590 bytes)
+terminal-v2-library-manifest.json — not saved to Library, reason below.
+
+Library action failed before preparation:
+"Library prepare_uploads is not available"
+No upload result or Library IDs returned. Required workflow prohibits switching a
+started helper write to a direct action. No retry/direct substitution attempted.
+Local files remain verified for parent-coordinated delivery. Earlier Library files unchanged.
+
+Owned revision changes:
+research/text-desk-lab/notation/data_graphics.py
+research/text-desk-lab/notation/test_data_graphics.py
+research/window-lab/data-dashboard/preview.py
+research/window-lab/data-dashboard/observatory.lens
+research/window-lab/data-dashboard/test_preview.py
+research/window-lab/data-dashboard/README.md
+research/window-lab/data-dashboard/terminal.style (new)
+research/window-lab/data-dashboard/terminal-edge-cases.json (new)
+research/window-lab/data-dashboard/evidence/terminal-v2-* (new)
+
+Pure graphics API unchanged: graphic(config, records=None).
+Optional corner_radius 0..4 default3 and mark_height4..64 default10.
+SHA256 data_graphics.py:
+3FB6440DA030BB33F1F3B2D538ED6192410CEF6FEA89C72B0E55052800F3CBE3
+
+Read Board foundation note a9341 "Building together: the stream as a room, Agora as
+a medium", JEFF response c10248, live charter a6529. Revision and correction recorded
+on existing task a10926 comment c11049 and Rough spots a10929 comment c11050.
+Earlier charts-disabled freshness attribution corrected: modules still loaded made
+that comparison inconclusive. Architecture peer owns the independently isolated
+field-collision fix in scene.py/lens_ir.py and reports116 affected tests passing;
+this worker does not claim those tests as its own or alter their files.
+
+Limits
+Preview only, no live world installation or house restart. Context = last reported
+tokens/capacity, measurement age unknown; account quota independent, expired unknown.
+No hidden thinking/context composition/billing/elapsed data fabricated.
+No actual reduced-motion media emulation available; terminal requests no continuous
+animation, native fold transitions use existing reduced-motion-aware styles.
+No Windows native gesture/held-action proof claimed.
+

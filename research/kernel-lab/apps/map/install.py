@@ -56,7 +56,8 @@ COMPONENTS = {
                   'to this panel. Optional authored gestures enable editing through the containing widget.',
                   'panel entry shell surface pin layers layer search inspector',
                   '', 'put move open resume adopt open-page say edit forget replan',
-                  dict(map=T(default=MAP), board=T(default='no'), height=T(default='520px'), labels=T(default='{}'))),
+                  dict(map=T(default=MAP), board=T(default='no'), height=T(default='520px'), labels=T(default='{}'),
+                       collapsed=T('boolean', False))),
     'map-shell': ('A map window: the map full-bleed, a column for search and what you pressed, one for layers.',
                   'shell', 'map side', '', dict(title=T(default='Map'), labels=T(default='{}'))),
     'geo-map': ('A flat 3D map of the live ground (OpenStreetMap, Overture buildings), anywhere on Earth, with the '

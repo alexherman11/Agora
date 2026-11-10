@@ -125,14 +125,39 @@ Real subprocess tests verified contention, release after a crash, and child
 termination after adapter death. Scheduler tests cover pool limits, session
 reuse, repeated failures and recovery of a prepared usage-limit handoff.
 
-`house_supervisor.ps1 -Install` installs the hidden, limited-user Windows login
-task `AgoraHouseRecovery`. It recognizes the existing keeper; if that keeper
-is absent, it adopts surviving house/door processes and starts only missing
-ones, with a 60-second start backoff. This fallback does not replace the keeper's
-landing rollback or documentation watcher. It polls service presence every
-10 seconds and does not wake residents on a timer.
-`house_supervisor.ps1 -Stop` disables this watchdog without stopping live
-services; `-Install` clears that stop marker and enables it again.
+`house_supervisor.ps1 -Install` installs the hidden, limited-user Windows sign-in
+task `AgoraHouseRecovery`. It watches `research/window-lab/agora_start.py` every
+10 seconds and restarts an absent launcher, with a 60-second start backoff.
+The launcher is the one owner of Desk startup: on a cold start it starts the
+keeper, then the HUD when the door answers. The HUD starts hidden, available on
+the Windows key or Ctrl+Alt+J. An OS file lease excludes duplicate launchers,
+including the existing `Agora.lnk` Startup shortcut, and stale PID files cannot
+block startup after reboot. Inspection failures start no services.
+
+The launcher adopts existing keeper/house/door/HUD processes. If the keeper
+dies with surviving children, it restores only missing house/door processes;
+that fallback does not supply the keeper's landing rollback or docs watcher.
+The house resumes unfinished working cards and pending instructions from saved
+state. Waiting cards still need an answer or new work; resident timers stay off.
+Startup runs at Alex's Windows sign-in, not before login or while the PC sleeps.
+
+To pause automatic recovery without stopping live services, run both
+`house_supervisor.ps1 -Stop` and `agora_start.py --stop`. The launcher stop persists
+until `--resume` or `--install`; the watchdog respects it. To enable both again,
+run `house_supervisor.ps1 -Install` and `agora_start.py --install`.
+Status is in `local/codex-residents/house-supervisor/status.json` and
+`research/window-lab/state/agora_start.status.json`.
+
+Ran for sign-in recovery on 20 October: six focused startup tests passed,
+including real OS-lease contention and release after process death. Existing
+builder restart/resume checks passed; repository pytest reported 201 passed,
+2 skipped; changed Python Ruff and PowerShell parsing passed. The sign-in task
+is running. A forced launcher exit was recovered by the watchdog within its
+60-second start backoff, with the same keeper, house, door, HUD and capture
+processes throughout. A duplicate launcher exited without starting services.
+Windows itself was not rebooted or signed out. The documentation checker still
+reports the pre-existing missing image in Dynamic Desk. Native receipts: a6631
+and Handbook a639.
 
 Both runtime locks now pin a repository-local ignored copy at
 `local/codex-residents/runtime/896a0166b774037a/codex.exe`,
@@ -465,3 +490,22 @@ Neither browser execution nor Git checkpointing is operational for this worker
 yet. Permissions were not relaxed. A verified 21-file source backup, excluding
 worlds and setup files, was saved outside its checkout as
 `local/codex-residents/a1666-source-20261001T205549Z.zip`.
+
+## Resident provider handover (activated 20 October 2026)
+
+Jeff can explicitly hand over between Claude and Codex Sol while keeping the same
+world identity, memory and tasks. See [the implementation and prioritized audit](resident-provider-handoff.md)
+and [verification evidence](resident-provider-evidence.json). This extends the
+existing adapter. Alex approved activation: Jeff completed six live Sol turns
+using ChatGPT authentication; all 167 other saved session IDs were preserved.
+The house now has exclusive ownership and subscription-only Codex worker guards.
+The worker pool and tool grants were not changed.
+The read-only `preflight_resident.py` checks existing subscription authentication
+and exact model metadata without running inference, changing credentials or pins.
+
+## Recovery update, 22 October 2026
+
+Jeff now prefers Astra/low. Linked home-chat replies, runtime recovery
+and automatic subscription failover are live after a guarded house reload. The October 20
+activation evidence above is historical: later integration regressions were found.
+See [current findings, tests, activation and rollback](quota-recovery-oct22.md).

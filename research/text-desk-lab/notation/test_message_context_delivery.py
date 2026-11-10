@@ -46,6 +46,11 @@ def delivery(tmp_path, monkeypatch):
     h.world, h.dir, h.claude, h.fake = "frontier", tmp_path, "mock-model-process", False
     h.load = lambda: w
     h.welcome_for = lambda _: "Welcome"
+    # Charter startup now reports a receipt. This fixture owns only in-memory
+    # delivery, so it must never route that report to the real Frontier world.
+    h.act = Mock(return_value="fixture charter receipt")
+    monkeypatch.setattr(house.desk_mcp, "run_desk", Mock(
+        side_effect=AssertionError("delivery fixture attempted a real Desk call")))
 
     def popen(*args, **kwargs):
         # Close the real temporary stderr handle; this is only a fake process.

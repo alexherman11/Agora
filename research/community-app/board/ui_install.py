@@ -10,7 +10,7 @@ DESKTOP = LAB.parent / 'window-lab/kernel-desktop'
 sys.path[:0] = [str(HERE), str(LAB), str(DESKTOP)]
 from painter.install import upsert, widget_source, taskboard, Q
 from painter.catalogue import cards, T
-from install import install as install_world, modules
+from install import install as install_world, modules, CHANNEL_KEYS
 from protocol import line
 
 NAMES = {
@@ -24,6 +24,7 @@ NAMES = {
     'board-thread': ('Two reply levels and an exact-passage reply form.', 'body reply status', 'posts replies', 'reply'),
     'board-notice': ('Visible leader-hide reason and receipt-specific undo.', 'body', '', 'undo'),
     'board-search': ('Filtered search results or a leaders-only queue reading.', 'body', 'results', ''),
+    'board-chat': ('One chat: grouped lines, day and New dividers, replies, reactions, edit, remove, pin, mentions, older pages.', 'body composer edit', 'lines', 'send edit remove react pin unpin seen reseen'),
     'board-composer': ('Kind-declared fields, private upload and attach after admission.', 'body upload status', '', 'post attach hide report decide edit pin'),
 }
 TOKENS = {
@@ -44,13 +45,19 @@ TOKENS = {
     'nb-kind-discussion':'#59685f','nb-kind-question':'#805000','nb-kind-event':'#315d86',
     'nb-kind-poll':'#684b87','nb-kind-ask':'#884a35','nb-kind-offer':'#315f52',
     'nb-kind-document':'#4f596c','nb-kind-announcement':'#315f52','nb-kind-decision':'#315f52',
+    'nb-chat-chrome':'190px','nb-phone-chat-chrome':'128px','nb-chat-min':'420px','nb-chat-gutter':'40px',
+    'nb-mention-soft':'#fff6dc','nb-mention-edge':'#d9a63a','nb-new-line':'#c8553d','nb-danger':'#a8402f',
     'motion-pulse':json.dumps(dict(**{'from':dict(opacity=.6),'to':dict(opacity=1)},duration=180)),
 }
 VIEW = dict(channel='',order='',offset=0,thread='',replyTo='',focus='',compose='no',search='',queue='no',opens='',calendarView='',calendarDate='',calendarAdd='no',calendarEvent='',
-            kind='',person='',since='',before='',quote='',source='',page=1,documentPage=1,documentFile='',documentRequest=0,hide='',report='',decide='',edit='',pin='')
+            kind='',person='',since='',before='',quote='',source='',page=1,documentPage=1,documentFile='',documentRequest=0,chat='',navOpen='no',hide='',report='',decide='',edit='',pin='')
+# The map opens as a list entry (opens=map), so its panel starts unfolded (map-panel's own view key for root/map).
+VIEW['map.root/map.open']='yes'
 GRANTS = ('window.surface rows look look-view history components help component-health component-action '
           'board.* forgotten file-read upload files.convert attach like vote claim pin forget make set undo model.ask model.status '
-          'hear:make hear:set hear:forget hear:undo hear:component hear:component-action hear:board.* hear:like hear:vote hear:claim')
+          'chat say react '
+          'hear:make hear:set hear:forget hear:undo hear:component hear:component-action hear:board.* hear:like hear:vote hear:claim '
+          'hear:say hear:react hear:pin')
 
 
 def install_ui(door):
@@ -72,14 +79,14 @@ def install_ui(door):
             door.say(line('set',kind['id'],fields=' '.join(fields),**extra))
     compose={
         'discussion':('Share something','News, an idea, or a conversation.','☰'),
-        'question':('Ask a question','Find an answer from your neighbours.','?'),
+        'question':('Ask a question','Find an answer from your neighbors.','?'),
         'event':('Plan an event','Choose a time and place to meet.','▦'),
         'poll':('Run a poll','Give everyone a choice.','▥'),
         'ask':('Ask for help','Find a few hands for something useful.','↗'),
         'offer':('Offer help','Share your time or something useful.','♡'),
         'document':('Share a document','Keep useful information together.','▤'),
         'announcement':('Make an announcement','Share important news with everyone.','⌖'),
-        'decision':('Share a decision','Let neighbours know what was agreed.','✓')}
+        'decision':('Share a decision','Let neighbors know what was agreed.','✓')}
     defaults={'discussion':'','question':'','announcement':'until','event':'','poll':'','ask':'closes','offer':'closes','document':'','decision':''}
     for kind in door.rows('kind'):
         # Neighbour-authored post kinds (e.g. Lost pet) declare fields too.
@@ -97,7 +104,7 @@ def install_ui(door):
             if changed:
                 door.say('look '+kind['id']);door.say(line('set',kind['id'],field_labels=json.dumps(labels)))
         if not kind.get('compose_label') and (kind.get('compose_scope')=='board' or kind.get('name') in compose or ('fields' in kind and not kind.get('compose_scope'))):
-            label,description,icon=compose.get(kind.get('name'),(kind.get('name','Post'),'Share this with your neighbours.','✦'))
+            label,description,icon=compose.get(kind.get('name'),(kind.get('name','Post'),'Share this with your neighbors.','✦'))
             door.say('look '+kind['id']);door.say(line('set',kind['id'],compose_label=label,compose_description=description,compose_icon=icon))
         if kind.get('name') in defaults and 'card_fields' not in kind:
             # Empty facts are removed by set, so a sentinel explicitly displays
@@ -120,15 +127,16 @@ def install_ui(door):
             door.say('look '+tid);door.say('component '+tid)
     for name,(purpose,parts,slots,gestures) in NAMES.items():
         schema=dict(labels=T(default='{}'))
-        if name=='board-shell':schema.update(title=T(default='Seabright'),subtitle=T(default='The neighbourhood board'),extras=T(default='feed'))
+        if name=='board-shell':schema.update(title=T(default='Seabright'),subtitle=T(default='The neighborhood board'),extras=T(default='feed'))
         if name=='board-post':schema.update(layout=T(default='compact'),detail=T('boolean',False),excerptLines=T('number',3),stamp=T(),date=T(),initials=T())
         if name=='board-entry':schema.update(stamp=T())
         if name=='board-thread':schema.update(threadKey=T(default='thread'),replyKey=T(default='replyTo'))
         if name=='board-catchup':schema.update(previewCount=T('number',3))
+        if name=='board-chat':schema.update(chatKey=T(default='chat'),longPressMs=T('number',450),title=T(default=''),emoji=T(default='👍 ❤️ 😂 🎉 😮 😢 🙏 👀'),groupMinutes=T('number',7),pageSize=T('number',50),maxComposerHeight=T('number',200),signinUrl=T(default='/signin'))
         if name=='board-composer':schema.update(advancedFields=T(default='closes place'),kindScope=T(default='board'))
         tid=upsert(door,'component',name,category='community',purpose=purpose,settings=json.dumps(schema),
                    parts=json.dumps({p:dict(facts='bound visible row') for p in parts.split()}),slots=json.dumps(slots.split()),
-                   gestures=gestures,example=f'root : {name}',uses='Community board; feed; neighbourhood',
+                   gestures=gestures,example=f'root : {name}',uses='Community board; feed; neighborhood',
                    limitations='Presentation and guarded world-word gestures. A channel opens its own view by its opens fact (a calendar today). No map or notification routing.',code=code)
         if door.rows('component',name=name)[0].get('reviewed_code')!=hashlib.sha256(code.encode()).hexdigest():
             door.say('look '+tid);door.say('component '+tid)
@@ -140,8 +148,17 @@ def install_ui(door):
             changes={key:definition[key] for key in ('compose_fields_first','compose_message_rows') if key in definition and kind.get(key)!=definition[key]}
             if changes:door.say('look '+kind['id']);door.say(line('set',kind['id'],**changes))
     for definition in data['channels']:
-        for channel in door.rows('board-channel',title=definition['name']):
-            changes={k:definition[k] for k in ('opens','opens_label') if k in definition and channel.get(k)!=definition[k]}
+        existing=door.rows('board-channel',title=definition['name'])
+        facts={k:definition[k] for k in CHANNEL_KEYS if k in definition}
+        if not existing and definition.get('opens')=='chat':
+            # a list entry new since this world was installed: its chat and its board-channel thing
+            chats=[c for c in door.rows('chat') if c.get('name')==definition['name']]
+            cid=chats[0]['id'] if chats else door.say(line('make',kind='chat',name=definition['name']))['made'][0]
+            door.say(line('make',kind='board-channel',chat=cid,title=definition['name'],**facts));continue
+        if not existing and definition.get('group')=='no':
+            door.say(line('make',kind='board-channel',title=definition['name'],**facts));continue
+        for channel in existing:
+            changes={k:v for k,v in facts.items() if channel.get(k)!=v}
             if changes:door.say('look '+channel['id']);door.say(line('set',channel['id'],**changes))
     for definition in data['kinds']:
         for kind in door.rows('kind',name=definition['name']):

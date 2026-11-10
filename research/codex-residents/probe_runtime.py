@@ -89,7 +89,8 @@ def main():
             profile = empty_profile(temp)
             with (
                 CodexClient(
-                    build_config(temp, str(args.binary), profile), approval_handler=deny
+                    build_config(temp, str(args.binary), profile, model=args.model),
+                    approval_handler=deny
                 ) as client,
                 child_job(client._proc),
             ):

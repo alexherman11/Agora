@@ -1,11 +1,18 @@
 {
   "channels": [
     {"name": "Announcements", "post_may": "leaders", "posts_per_day": 4, "replies_per_day": 30},
-    {"name": "Meetings & events", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30, "opens": "calendar", "opens_label": "Calendar"},
-    {"name": "Research & documents", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30, "opens": "documents", "opens_label": "Documents"},
-    {"name": "Asks & offers", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30, "opens": "asks", "opens_label": "Asks & offers"},
-    {"name": "Neighbours", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30},
-    {"name": "Off-topic", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30}
+    {"name": "Meetings & events", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30, "opens": "calendar", "opens_label": "Calendar", "label": "Calendar", "compose_default": "yes"},
+    {"name": "Map", "opens": "map", "group": "no"},
+    {"name": "Research & documents", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30, "opens": "documents", "opens_label": "Documents", "label": "Documents"},
+    {"name": "Legal", "opens": "chat", "section": "Chats"},
+    {"name": "Media", "opens": "chat", "section": "Chats"},
+    {"name": "Buyout", "opens": "chat", "section": "Chats"},
+    {"name": "Website", "opens": "chat", "section": "Chats"},
+    {"name": "Wishes", "opens": "chat", "section": "Chats"},
+    {"name": "Bugs", "opens": "chat", "section": "Chats"},
+    {"name": "Asks & offers", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30, "opens": "asks", "opens_label": "Asks & offers", "hidden": "yes"},
+    {"name": "Neighbors", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30, "hidden": "yes"},
+    {"name": "Off-topic", "post_may": "members", "posts_per_day": 5, "replies_per_day": 30, "hidden": "yes"}
   ],
   "kinds": [
     {"name": "discussion", "fields": "", "compose_scope": "board"},

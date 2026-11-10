@@ -1,0 +1,486 @@
+<title>The Work Tree</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; the tree diagram and the questions are the two working surfaces. */
+:root {
+  --bg: #eef2ee;
+  --panel: #f8faf7;
+  --ink: #17201b;
+  --muted: #56645b;
+  --line: #c9d3cb;
+  --moss: #2f6b40;
+  --moss-soft: #dcebdf;
+  --amber: #a85f00;
+  --amber-soft: #f6e6cc;
+  --rose: #a33a3a;
+  --rose-soft: #f5dddd;
+  --sky: #2d5f8a;
+  --sky-soft: #dbe7f1;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111713; --panel: #18201b; --ink: #e3ebe5; --muted: #9aaa9f; --line: #2f3b33;
+    --moss: #7cc391; --moss-soft: #1f3326; --amber: #eba948; --amber-soft: #3a2c15;
+    --rose: #e68a8a; --rose-soft: #3a1f1f; --sky: #8bb8e0; --sky-soft: #1b2b3a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111713; --panel: #18201b; --ink: #e3ebe5; --muted: #9aaa9f; --line: #2f3b33;
+  --moss: #7cc391; --moss-soft: #1f3326; --amber: #eba948; --amber-soft: #3a2c15;
+  --rose: #e68a8a; --rose-soft: #3a1f1f; --sky: #8bb8e0; --sky-soft: #1b2b3a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 16px/1.55 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+}
+main { max-width: 780px; margin: 0 auto; display: grid; gap: 44px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(2rem, 6vw, 2.9rem); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.45rem; font-weight: 700; }
+h3 { font-size: 1.05rem; font-weight: 600; font-family: var(--body); }
+p { margin: 0; max-width: 66ch; }
+section { display: grid; gap: 14px; }
+.eyebrow { font: 500 0.74rem/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lede { font-size: 1.08rem; }
+blockquote { margin: 0; padding: 12px 16px; border-left: 3px solid var(--moss); background: var(--panel); font-size: 1.02rem; }
+blockquote cite { display: block; margin-top: 6px; font: 400 0.8rem var(--mono); color: var(--muted); font-style: normal; }
+code, .mono { font-family: var(--mono); font-size: 0.86em; }
+.how { font: 500 0.7rem/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 6px; border-radius: 4px; white-space: nowrap; vertical-align: 1px; }
+.how.read { background: var(--sky-soft); color: var(--sky); }
+.how.ran { background: var(--moss-soft); color: var(--moss); }
+.how.imagined { background: var(--amber-soft); color: var(--amber); }
+
+/* what changed */
+.changes { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.changes li { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: baseline; }
+.changes li > div { min-width: 0; }
+
+/* tree */
+.toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; width: fit-content; }
+.toggle button { font: 500 0.9rem var(--body); padding: 7px 14px; border: 0; background: var(--panel); color: var(--muted); cursor: pointer; }
+.toggle button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.toggle button:focus-visible, .opt:focus-visible, .ev:focus-visible, textarea:focus-visible, .copy:focus-visible { outline: 2px solid var(--moss); outline-offset: 2px; }
+.treebox { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
+.treebox svg { display: block; width: 100%; min-width: 620px; height: auto; }
+svg text { font-family: var(--body); fill: var(--ink); }
+svg .sub { font-family: var(--mono); font-size: 10.5px; fill: var(--muted); }
+svg .node rect { fill: var(--bg); stroke: var(--line); stroke-width: 1.2; }
+svg .node.alex rect { fill: var(--ink); stroke: var(--ink); }
+svg .node.alex text { fill: var(--bg); }
+svg .node.wip rect { stroke: var(--amber); stroke-dasharray: 4 3; }
+svg .node.missing rect { stroke: var(--rose); stroke-dasharray: 2 3; }
+svg .node.lit rect { stroke: var(--moss); stroke-width: 2.4; }
+svg .edge { stroke: var(--line); stroke-width: 1.6; fill: none; }
+svg .edge.lit { stroke: var(--moss); stroke-width: 3; }
+svg .edge.missing { stroke: var(--rose); stroke-dasharray: 4 4; }
+svg .elabel { font-family: var(--mono); font-size: 10px; fill: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.85rem; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 18px; height: 10px; margin-right: 6px; vertical-align: -1px; border-radius: 2px; border: 1.5px solid var(--line); }
+.legend .l-wip::before { border-color: var(--amber); border-style: dashed; }
+.legend .l-missing::before { border-color: var(--rose); border-style: dotted; }
+.legend .l-lit::before { border-color: var(--moss); border-width: 2.5px; }
+
+/* simulator */
+.events { display: flex; flex-wrap: wrap; gap: 8px; }
+.ev { font: 500 0.9rem var(--body); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; text-align: left; }
+.ev[aria-pressed="true"] { border-color: var(--moss); background: var(--moss-soft); }
+.path { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.path > div { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; display: grid; gap: 8px; align-content: start; }
+.path ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 0.95rem; }
+.verdict { font-size: 0.9rem; padding-top: 6px; border-top: 1px solid var(--line); color: var(--muted); }
+.verdict b { color: var(--ink); }
+
+/* table */
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 0.93rem; }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+th { font: 500 0.74rem var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+.chip { display: inline-block; font: 500 0.72rem var(--mono); padding: 2px 7px; border-radius: 999px; white-space: nowrap; }
+.chip.live { background: var(--moss-soft); color: var(--moss); }
+.chip.wip { background: var(--amber-soft); color: var(--amber); }
+.chip.gap { background: var(--rose-soft); color: var(--rose); }
+
+/* proposal */
+.moves { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.moves li { display: grid; grid-template-columns: 2.2rem 1fr; gap: 10px; }
+.moves .n { font: 700 1.3rem var(--display); color: var(--moss); }
+.moves li > div { min-width: 0; display: grid; gap: 4px; }
+
+/* questions */
+.qs { display: grid; gap: 16px; }
+.q { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 10px; }
+.q.answered { border-color: var(--moss); }
+.qhead { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.qhead h3 { min-width: 0; }
+.state { font: 500 0.72rem var(--mono); color: var(--muted); white-space: nowrap; }
+.q.answered .state { color: var(--moss); }
+.opts { display: grid; gap: 8px; }
+.opt { display: grid; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: 400 0.95rem/1.4 var(--body); cursor: pointer; }
+.opt b { font-weight: 600; }
+.opt small { color: var(--muted); font-size: 0.85rem; }
+.opt[aria-pressed="true"] { border-color: var(--moss); background: var(--moss-soft); box-shadow: inset 3px 0 0 var(--moss); }
+.rec { font: 500 0.68rem var(--mono); color: var(--moss); letter-spacing: 0.05em; text-transform: uppercase; }
+textarea { width: 100%; min-height: 64px; resize: vertical; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: 400 0.95rem/1.45 var(--body); }
+.savebar { position: sticky; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); border-radius: 10px; padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; font-size: 0.9rem; }
+.copy { font: 600 0.88rem var(--body); padding: 7px 12px; border-radius: 7px; border: 0; background: var(--bg); color: var(--ink); cursor: pointer; }
+.fine { font-size: 0.85rem; color: var(--muted); }
+
+@media (max-width: 560px) {
+  .path { grid-template-columns: 1fr; }
+  .moves li { grid-template-columns: 1.6rem 1fr; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  svg .edge, svg .node rect { transition: stroke 0.25s, stroke-width 0.25s; }
+}
+</style>
+
+<main>
+  <header style="display:grid;gap:14px">
+    <div class="eyebrow">Design for Alex · second draft by Claude · 28 Oct 2026 · card: A tree of conversations</div>
+    <h1>The Work Tree</h1>
+    <blockquote>"Think of it like a tree where jeff manages three conversations with agents, agents manage and talk to workers, and then i get all the important stuff at the top."<cite>Alex, 27 Oct</cite></blockquote>
+    <p class="lede">I rewrote this against the code as it stands tonight. Most of the tree's middle layer has been built since the first draft, so the questions changed. Answer with the buttons at the bottom. Every choice saves as you click, and I read it from here. Comments are not needed.</p>
+  </header>
+
+  <section aria-labelledby="changed">
+    <div class="eyebrow">Since the first draft</div>
+    <h2 id="changed">What changed in the code</h2>
+    <ul class="changes">
+      <li><span class="how ran">ran</span><div><b>JEFF's continuity is live.</b> He reads his own task rows when he wakes and after compaction, and wakes again when they change. At 11:19 today he picked up seven cards nobody had mentioned to him in chat.</div></li>
+      <li><span class="how ran">ran</span><div><b>Sable lives in the new world.</b> She answered in Shop talk in 22 seconds and reads her own task rows when she wakes. She is woken only when someone addresses her. She has no builder session, so she cannot start workers.</div></li>
+      <li><span class="how read">read</span><div><b>Rowan, a new manager agent, is being built in another session</b> (uncommitted, approved by you). Rowan gets its own builder session and a guarded word, <code>house.manage &lt;task&gt; action=build|tell|retry|review|land|report|note</code>, limited to three named cards. When one of its workers finishes, gets blocked or lands, the House wakes Rowan once. Rowan coordinates with JEFF in Shop talk.</div></li>
+      <li><span class="how read">read</span><div><b>Worker slots are becoming a setting</b> (<code>house-settings builder_capacity</code>, 1 to 4, default 2). One pool covers starts, follow-ups, reviews and landings.</div></li>
+      <li><span class="how read">read</span><div><b>Still true:</b> only you (through my session or the Codex coordinator) can start ordinary builders. JEFF is refused because he has no builder session.</div></li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="shape">
+    <div class="eyebrow">The shape</div>
+    <h2 id="shape">Who talks to whom</h2>
+    <div class="toggle" role="group" aria-label="Which tree to show">
+      <button id="v-now" type="button" aria-pressed="false">Today</button>
+      <button id="v-next" type="button" aria-pressed="true">With this design</button>
+    </div>
+    <div class="treebox"><svg id="tree" viewBox="0 0 720 400" role="img" aria-label="The work tree diagram"></svg></div>
+    <div class="legend"><span>exists</span><span class="l-wip">being built</span><span class="l-missing">missing</span><span class="l-lit">the path of the event below</span></div>
+  </section>
+
+  <section aria-labelledby="follow">
+    <div class="eyebrow">Try it</div>
+    <h2 id="follow">Follow one event</h2>
+    <p>Pick something that happens to a worker. You'll see where the news goes today and with this design. The tree above lights the designed path.</p>
+    <div class="events" id="events"></div>
+    <div class="path">
+      <div><span class="eyebrow">Today</span><ol id="p-now"></ol><div class="verdict" id="v-now-t"></div></div>
+      <div><span class="eyebrow">With this design</span><ol id="p-next"></ol><div class="verdict" id="v-next-t"></div></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="pieces">
+    <div class="eyebrow">Where each piece stands</div>
+    <h2 id="pieces">The tree, piece by piece</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Piece</th><th>Now</th><th>Where</th></tr></thead>
+      <tbody>
+        <tr><td>JEFF sees his tasks on every wake</td><td><span class="chip live">live</span></td><td class="mono">next_steps.py, house.py</td></tr>
+        <tr><td>A resident lives in the world and answers</td><td><span class="chip live">live: Sable</span></td><td class="mono">move_resident.py</td></tr>
+        <tr><td>An agent starts, steers, reviews and lands its own workers</td><td><span class="chip wip">building: Rowan</span></td><td class="mono">manager.py (house.manage)</td></tr>
+        <tr><td>A worker's result wakes the agent that leads it</td><td><span class="chip wip">building: Rowan</span></td><td class="mono">manager.notify</td></tr>
+        <tr><td>The lead's news, not the worker's, wakes JEFF</td><td><span class="chip gap">missing</span></td><td>JEFF wakes on every builder change on cards he is named on</td></tr>
+        <tr><td>Residents (Sable, Pike) can lead workers</td><td><span class="chip gap">missing</span></td><td>no builder session, no house.manage entry</td></tr>
+        <tr><td>Rules saying what rises to JEFF and to you</td><td><span class="chip gap">missing</span></td><td>the rules have nothing on it</td></tr>
+        <tr><td>A view of the tree you can click into</td><td><span class="chip gap">missing</span></td><td>house.who is a flat list</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section aria-labelledby="design">
+    <div class="eyebrow">The design</div>
+    <h2 id="design">Four moves on top of what exists</h2>
+    <p>Each move reuses a word or a field that is already there. Nothing on this list is built yet <span class="how imagined">imagined</span>.</p>
+    <ul class="moves">
+      <li><span class="n">1</span><div><h3>One way to lead workers, for any agent you list</h3><p>Rowan's guarded entry becomes the only way an agent leads workers, and it is not Rowan's alone. The list of who may lead, and which cards each leads, stays in a local file only you can change, as Rowan's is. An agent can never widen its own reach. Sable and Pike get a builder session and a line in that file when you add them.</p></div></li>
+      <li><span class="n">2</span><div><h3>Workers report to their lead, and JEFF hears the lead</h3><p>Today a worker's result would wake both Rowan and JEFF: JEFF's task rows still count builder changes on cards that name him. On a card with a lead, builder changes stop waking JEFF. He wakes when the lead writes the card's status, blocker or result. Same rows, one field list changed.</p></div></li>
+      <li><span class="n">3</span><div><h3>Three kinds of news rise a level</h3><p><b>Done and checked</b> against what was asked. <b>Needs someone above</b>: a permission, a decision, something only you can do. <b>The job changed</b>: it turned out to be a different job. Everything else stays with the lead. This goes into the rules for leads and for JEFF, and the card's <code>resolver</code> field names who it waits on.</p></div></li>
+      <li><span class="n">4</span><div><h3>You see the whole tree, and can talk to any part of it</h3><p>The work view groups workers under their lead, and leads under JEFF. Click a worker to open its chat. The lead is in that chat too, so what you say there reaches it.</p></div></li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="cost">
+    <div class="eyebrow">Costs and doubts</div>
+    <h2 id="cost">What it costs, and what would change my mind</h2>
+    <p><b>Cost.</b> Every lead is a model conversation that wakes on its workers' results. With two leads running two workers each, a busy hour is about 4 worker turns, 4 to 8 short lead turns and a few JEFF turns. Move 2 removes JEFF's duplicate wakes, which is the cheapest saving on the list.</p>
+    <p><b>What would change my mind.</b> If leads only relay, and every worker event still climbs to JEFF in practice, the middle layer is pure cost. After a week of Rowan I'd count two things: lines reaching you per finished card (aim: one or two), and how often a lead caught a problem before JEFF or you did. If the second is near zero, flatten back to JEFF and workers.</p>
+    <p><b>A word on "three".</b> Rowan was built with exactly three cards. I first read your "three conversations" as three agents under JEFF. Question 2 asks which you meant.</p>
+  </section>
+
+  <section aria-labelledby="ask">
+    <div class="eyebrow">Your call</div>
+    <h2 id="ask">Six questions</h2>
+    <p class="fine" id="savenote">Your answers save to this page as you click. If saving is unavailable in your viewer, use "Copy answers" and paste them to me.</p>
+    <div class="qs" id="qs"></div>
+    <div class="savebar"><span id="saved">No answers yet.</span><button class="copy" id="copy" type="button">Copy answers</button></div>
+  </section>
+
+  <footer class="fine">Grounded in modules/house (builders.py, house.py, uncommitted manager.py), kernel/next_steps.py, agents/ROWAN-MANAGER-20261028.md, SABLE-MOVE.md and MOVING-IN.md (D1, D5, D6), read 28 Oct 13:00–13:20. Sable's and JEFF's live behaviour was run today. Everything under "The design" is imagined.</footer>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  // ---------- tree ----------
+  var N = {
+    alex:  { x: 360, y: 40,  w: 120, t: "Alex", s: "you", cls: "alex" },
+    jeff:  { x: 360, y: 128, w: 150, t: "JEFF", s: "Conversation" },
+    coord: { x: 600, y: 128, w: 170, t: "Codex coordinator", s: "agent for Alex" },
+    rowan: { x: 140, y: 230, w: 140, t: "Rowan", s: "manager" },
+    sable: { x: 360, y: 230, w: 140, t: "Sable", s: "resident" },
+    pike:  { x: 560, y: 230, w: 140, t: "Pike", s: "moving in" },
+    w1:    { x: 70,  y: 340, w: 120, t: "worker", s: "screenshot paste" },
+    w2:    { x: 210, y: 340, w: 120, t: "worker", s: "dock unpinning" },
+    w3:    { x: 360, y: 340, w: 120, t: "worker", s: "Sable's card" },
+    w4:    { x: 600, y: 340, w: 150, t: "workers", s: "everything today" }
+  };
+  var VIEWS = {
+    now: {
+      nodes: { alex: "", jeff: "", coord: "", rowan: "wip", sable: "", pike: "wip", w1: "wip", w2: "wip", w4: "" },
+      edges: [
+        ["alex", "jeff", "", "Conversation"], ["alex", "coord", "", "you ask"], ["jeff", "coord", "", "Shop talk"],
+        ["coord", "w4", "", "starts, reviews"], ["jeff", "rowan", "wip", "Shop talk"], ["rowan", "w1", "wip", "house.manage"],
+        ["rowan", "w2", "wip", ""], ["jeff", "sable", "", "@Sable"], ["jeff", "pike", "wip", ""]
+      ]
+    },
+    next: {
+      nodes: { alex: "", jeff: "", rowan: "", sable: "", pike: "", w1: "", w2: "", w3: "missing" },
+      edges: [
+        ["alex", "jeff", "", "Conversation"], ["jeff", "rowan", "", "card fields + Shop talk"], ["jeff", "sable", "", ""],
+        ["jeff", "pike", "", ""], ["rowan", "w1", "", "house.manage"], ["rowan", "w2", "", ""], ["sable", "w3", "missing", "house.manage"]
+      ]
+    }
+  };
+  var view = "next", lit = { nodes: [], edges: [] };
+  var svg = document.getElementById("tree");
+  var NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, text) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function draw() {
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var v = VIEWS[view];
+    v.edges.forEach(function (e) {
+      var a = N[e[0]], b = N[e[1]];
+      var isLit = lit.edges.indexOf(e[0] + ">" + e[1]) >= 0 && view === "next";
+      var y1 = a.y + 18, y2 = b.y - 18, my = (y1 + y2) / 2;
+      var d = "M" + a.x + "," + y1 + " C" + a.x + "," + my + " " + b.x + "," + my + " " + b.x + "," + y2;
+      if (a.y === b.y) d = "M" + (a.x + a.w / 2) + "," + a.y + " L" + (b.x - b.w / 2) + "," + b.y;
+      svg.appendChild(el("path", { d: d, "class": "edge " + (e[2] || "") + (isLit ? " lit" : "") }));
+      if (e[3]) {
+        var lx = a.y === b.y ? (a.x + b.x) / 2 : (a.x + b.x) / 2 + 4, ly = a.y === b.y ? a.y - 6 : my - 3;
+        svg.appendChild(el("text", { x: lx, y: ly, "class": "elabel", "text-anchor": "middle" }, e[3]));
+      }
+    });
+    Object.keys(v.nodes).forEach(function (id) {
+      var n = N[id], cls = "node " + (n.cls || "") + " " + v.nodes[id];
+      if (lit.nodes.indexOf(id) >= 0 && view === "next") cls += " lit";
+      var g = el("g", { "class": cls });
+      g.appendChild(el("rect", { x: n.x - n.w / 2, y: n.y - 18, width: n.w, height: 36, rx: 8 }));
+      g.appendChild(el("text", { x: n.x, y: n.y - 2, "text-anchor": "middle", "font-size": "13.5", "font-weight": "600" }, n.t));
+      g.appendChild(el("text", { x: n.x, y: n.y + 12, "text-anchor": "middle", "class": "sub" }, n.s));
+      svg.appendChild(g);
+    });
+  }
+  function setView(v) {
+    view = v;
+    document.getElementById("v-now").setAttribute("aria-pressed", String(v === "now"));
+    document.getElementById("v-next").setAttribute("aria-pressed", String(v === "next"));
+    draw();
+  }
+  document.getElementById("v-now").addEventListener("click", function () { setView("now"); });
+  document.getElementById("v-next").addEventListener("click", function () { setView("next"); });
+
+  // ---------- events ----------
+  var EVENTS = [
+    { k: "done", label: "A worker finishes",
+      now: ["The House writes build=landing, phase received on the card.",
+            "Rowan's worker: Rowan is woken once (being built).",
+            "Ordinary worker: nobody is woken. You or the coordinator must notice and review.",
+            "JEFF is also woken if the card names him, because builder fields count in his task rows."],
+      nowV: "<b>Two agents wake</b> for one result, or none do.",
+      next: ["The receipt wakes the lead (Rowan).", "Rowan reads the report and asks for independent checks (house.manage review).",
+             "Checks pass: Rowan lands it and writes result= on the card.", "That one write wakes JEFF. He tells you in one line: done and checked."],
+      nextV: "<b>One line reaches you</b>, after the checks.",
+      nodes: ["w1", "rowan", "jeff", "alex"], edges: ["rowan>w1", "jeff>rowan", "alex>jeff"] },
+    { k: "perm", label: "A worker needs your permission",
+      now: ["The worker stops and says so in BUILD-RESULT.md.", "The card shows blocked. Nobody owns the question.",
+            "It reaches you only if someone reads the card and asks."],
+      nowV: "<b>It can wait for hours</b> unseen.",
+      next: ["The lead reads it and checks that only you can answer.", "The lead writes blocker= and resolver=Alex on the card.",
+             "JEFF wakes and asks you in the Conversation, with one click to approve."],
+      nextV: "<b>One question reaches you</b>, already narrowed.",
+      nodes: ["w1", "rowan", "jeff", "alex"], edges: ["rowan>w1", "jeff>rowan", "alex>jeff"] },
+    { k: "fail", label: "Checks fail at review",
+      now: ["The run goes back to blocked with the failing test named.", "Only the requester (you, through a session) may tell the worker or retry."],
+      nowV: "<b>It falls to you</b> or the coordinator.",
+      next: ["The lead reads which test failed.", "The lead tells the worker what to fix (house.manage tell), then asks for review again.",
+             "Nothing rises unless it fails twice or the job turns out different."],
+      nextV: "<b>Nothing reaches you.</b> It stays with the lead.",
+      nodes: ["w1", "rowan"], edges: ["rowan>w1"] },
+    { k: "shape", label: "The job turns out different",
+      now: ["The worker writes it in its result.", "It surfaces when someone reads the result."],
+      nowV: "<b>Found late</b>, if at all.",
+      next: ["The lead sees the job changed and stops the worker.", "The lead writes the new shape on the card, with resolver=JEFF.",
+             "JEFF decides, or brings it to you if it's a design (you are the design gate)."],
+      nextV: "<b>JEFF decides first</b>. You see it only if it's a new design.",
+      nodes: ["w1", "rowan", "jeff"], edges: ["rowan>w1", "jeff>rowan"] }
+  ];
+  var evBox = document.getElementById("events");
+  function list(id, items) {
+    var ol = document.getElementById(id);
+    while (ol.firstChild) ol.removeChild(ol.firstChild);
+    items.forEach(function (t) { var li = document.createElement("li"); li.textContent = t; ol.appendChild(li); });
+  }
+  function pick(ev) {
+    Array.prototype.forEach.call(evBox.children, function (b) { b.setAttribute("aria-pressed", String(b.dataset.k === ev.k)); });
+    list("p-now", ev.now); list("p-next", ev.next);
+    document.getElementById("v-now-t").innerHTML = ev.nowV;
+    document.getElementById("v-next-t").innerHTML = ev.nextV;
+    lit = { nodes: ev.nodes, edges: ev.edges };
+    if (view !== "next") setView("next"); else draw();
+  }
+  EVENTS.forEach(function (ev) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "ev"; b.textContent = ev.label; b.dataset.k = ev.k;
+    b.addEventListener("click", function () { pick(ev); });
+    evBox.appendChild(b);
+  });
+  pick(EVENTS[0]);
+
+  // ---------- questions ----------
+  var QS = [
+    { id: "q1", t: "Who leads workers first?", o: [
+      ["rowan", "Rowan only, as it's being built", "Learn from one manager for a week before adding more.", true],
+      ["rowan-sable", "Rowan now, Sable next", "Sable gets a builder session and a line in the leads file right after Rowan proves out."],
+      ["residents", "Residents only, drop Rowan", "Sable and Pike lead. Rowan isn't created."] ] },
+    { id: "q2", t: "What did \"three\" mean?", o: [
+      ["agents", "Three agents under JEFF", "JEFF holds about three conversations. Each lead has as many workers as slots allow.", true],
+      ["tasks", "Three cards per lead", "How Rowan is built: each lead is limited to three named cards."],
+      ["both", "Both", "About three leads, three cards each."] ] },
+    { id: "q3", t: "What wakes JEFF on a card that has a lead?", o: [
+      ["lead", "Only the lead's writes", "Status, blocker and result. Builder changes stop waking him (move 2).", true],
+      ["all", "Every change, as today", "JEFF stays fully informed and costs more turns."] ] },
+    { id: "q4", t: "What should reach you?", o: [
+      ["three", "Only the three kinds", "Done and checked, needs you, the job changed (as a design).", true],
+      ["judge", "Whatever JEFF judges you'd want", "No fixed rule. JEFF decides each time."],
+      ["landed", "The three kinds, plus every landing", "One line each time code lands, even if nothing needs you."] ] },
+    { id: "q5", t: "Who may land a worker's code?", o: [
+      ["lead", "The lead, after independent checks", "As Rowan is built. JEFF hears the result.", true],
+      ["jeff", "The lead asks JEFF first", "JEFF says go in Shop talk, then the lead lands."],
+      ["alex", "You approve each landing", "Slowest. Every landing becomes a question for you."] ] },
+    { id: "q6", t: "How many workers may run at once?", o: [
+      ["2", "Two", "Today's default. Fewest model turns.", true],
+      ["3", "Three", ""], ["4", "Four", "The most the House allows."] ] }
+  ];
+  var answers = {};
+  try { answers = JSON.parse(localStorage.getItem("work-tree-answers") || "{}") || {}; } catch (e) { answers = {}; }
+  var db = null, qsBox = document.getElementById("qs"), savedEl = document.getElementById("saved");
+  var noteTimers = {};
+
+  function renderQs() {
+    while (qsBox.firstChild) qsBox.removeChild(qsBox.firstChild);
+    QS.forEach(function (q, i) {
+      var a = answers[q.id] || {};
+      var box = document.createElement("div");
+      box.className = "q" + (a.choice ? " answered" : "");
+      var head = document.createElement("div"); head.className = "qhead";
+      var h = document.createElement("h3"); h.textContent = (i + 1) + ". " + q.t;
+      var st = document.createElement("span"); st.className = "state"; st.textContent = a.choice ? "answered" : "open";
+      head.appendChild(h); head.appendChild(st); box.appendChild(head);
+      var opts = document.createElement("div"); opts.className = "opts";
+      q.o.forEach(function (o) {
+        var b = document.createElement("button");
+        b.type = "button"; b.className = "opt"; b.setAttribute("aria-pressed", String(a.choice === o[0]));
+        var top = document.createElement("span");
+        var bl = document.createElement("b"); bl.textContent = o[1]; top.appendChild(bl);
+        if (o[3]) { var r = document.createElement("span"); r.className = "rec"; r.textContent = "  · my pick"; top.appendChild(r); }
+        b.appendChild(top);
+        if (o[2]) { var sm = document.createElement("small"); sm.textContent = o[2]; b.appendChild(sm); }
+        b.addEventListener("click", function () { choose(q.id, o[0]); });
+        opts.appendChild(b);
+      });
+      box.appendChild(opts);
+      var ta = document.createElement("textarea");
+      ta.id = "note-" + q.id; ta.placeholder = "Anything to add or change? (optional)";
+      ta.setAttribute("aria-label", "Note for question " + (i + 1));
+      ta.value = a.note || "";
+      ta.addEventListener("input", function () {
+        clearTimeout(noteTimers[q.id]);
+        noteTimers[q.id] = setTimeout(function () { setNote(q.id, ta.value); }, 700);
+      });
+      box.appendChild(ta);
+      qsBox.appendChild(box);
+    });
+    var n = QS.filter(function (q) { return answers[q.id] && answers[q.id].choice; }).length;
+    if (!savedEl.dataset.msg) savedEl.textContent = n ? n + " of " + QS.length + " answered." : "No answers yet.";
+  }
+  function keepLocal() { try { localStorage.setItem("work-tree-answers", JSON.stringify(answers)); } catch (e) {} }
+  function status(msg) { savedEl.dataset.msg = "1"; savedEl.textContent = msg; setTimeout(function () { delete savedEl.dataset.msg; renderQs(); }, 2500); }
+  function save(id) {
+    keepLocal();
+    if (!db) { status("Saved in this browser only. Use Copy answers to send them."); return; }
+    var a = answers[id];
+    db.doc("answers/" + id).set({ choice: a.choice || "", note: a.note || "", at: new Date().toISOString() })
+      .then(function () { status("Saved. Claude can read it."); })
+      .catch(function () { status("Couldn't save to the page. Use Copy answers instead."); });
+  }
+  function choose(id, choice) { answers[id] = answers[id] || {}; answers[id].choice = choice; renderQs(); save(id); }
+  function setNote(id, note) { answers[id] = answers[id] || {}; answers[id].note = note; save(id); }
+
+  document.getElementById("copy").addEventListener("click", function () {
+    var lines = QS.map(function (q, i) {
+      var a = answers[q.id] || {}, o = q.o.filter(function (x) { return x[0] === a.choice; })[0];
+      return (i + 1) + ". " + q.t + " " + (o ? o[1] : "(open)") + (a.note ? " (note: " + a.note + ")" : "");
+    });
+    var text = "Work Tree answers\n" + lines.join("\n");
+    try {
+      navigator.clipboard.writeText(text).then(function () { status("Copied. Paste it to Claude."); },
+        function () { status("Copy was blocked. Select the answers by hand."); });
+    } catch (e) { status("Copy was blocked. Select the answers by hand."); }
+  });
+
+  setView("next");
+  renderQs();
+
+  // Saving lights up when the page's store answers.
+  if (window.claude && typeof window.claude.use === "function") {
+    window.claude.use("db").then(function (d) {
+      if (!d) { document.getElementById("savenote").textContent = "Saving to the page isn't available in this view. Your choices stay in this browser; use Copy answers to send them."; return; }
+      db = d;
+      db.collection("answers").onSnapshot(function (snap) {
+        var docs = (snap && snap.docs) || [];
+        docs.forEach(function (doc) {
+          var data = typeof doc.data === "function" ? doc.data() : doc.data;
+          if (!data) return;
+          var id = doc.id || (doc.ref && doc.ref.id);
+          if (!id) return;
+          var mine = answers[id] || {};
+          answers[id] = { choice: data.choice || mine.choice, note: document.activeElement && document.activeElement.id === "note-" + id ? mine.note : (data.note != null ? data.note : mine.note) };
+        });
+        if (!(document.activeElement && document.activeElement.tagName === "TEXTAREA")) renderQs();
+      }, function () {});
+    }, function () {});
+  }
+})();
+</script>

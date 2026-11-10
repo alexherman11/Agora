@@ -9,9 +9,9 @@ from conftest import LEADER, Client, last_mail, mail_code, make_invite
 
 def test_public_page_is_plain_and_marked_draft(app):
     c = Client(app)
-    r = c.get("/")
+    r = c.get("/about")
     assert r.status == 200
-    assert "Seabright Neighbours" in r.text
+    assert "Save Seabright Plaza" in r.text
     assert "Draft wording" in r.text
     assert "How to join" in r.text
     # Nothing loaded from anywhere else, no scripts on the public page.
@@ -30,7 +30,7 @@ def test_newcomer_joins_through_an_invite_by_emailed_link(app, leader):
     maya.email_signin("Maya@Example.com ", invite["code"])
     mail = last_mail(app)
     assert mail["to"] == "maya@example.com"
-    assert "join Seabright Neighbours" in mail["subject"]
+    assert "join Save Seabright Plaza" in mail["subject"]
 
     # Opening the link only shows a button: mail scanners open links too.
     link = mail["links"][0]
@@ -42,7 +42,7 @@ def test_newcomer_joins_through_an_invite_by_emailed_link(app, leader):
     r = maya.follow_last_link()
     assert r.status == 303 and r.location == "/welcome"
     r = maya.get("/welcome")
-    assert "Your name, as neighbours will see it" in r.text
+    assert "Your name, as neighbors will see it" in r.text
     maya.onboard("Maya R.", ["meetings", "research"])
     r = maya.get("/home")
     assert r.status == 200 and "Hi, Maya" in r.text
@@ -175,7 +175,7 @@ def test_existing_member_needs_no_invite(app, leader):
     leader.post("/signout")
     c = Client(app)
     c.email_signin(LEADER)
-    assert c.follow_last_link().location == "/home"
+    assert c.follow_last_link().location == app.cfg.home_path
 
 
 def test_leaders_only(app, leader):
@@ -209,11 +209,11 @@ def test_printable_qr_and_public_join_button(app, leader):
     assert app.invite_url(invite) in r.text
     assert Client(app).get("/join").status == 200  # no public link yet: explains invites
     leader.post(f"/leader/invites/{invite['id']}/public")
-    r = Client(app).get("/")
+    r = Client(app).get("/about")
     assert f'/join/{invite["code"]}' in r.text
     assert Client(app).get("/join").location == f"/join/{invite['code']}"
     leader.post(f"/leader/invites/{invite['id']}/freeze")
-    assert f'/join/{invite["code"]}' not in Client(app).get("/").text
+    assert f'/join/{invite["code"]}' not in Client(app).get("/about").text
 
 
 def test_names_are_escaped_everywhere(app, leader):
@@ -271,7 +271,7 @@ def test_a_link_opened_on_another_device_says_so_first(app, leader):
     assert "Signing in on another device?" in page.text and "Sign in on this device" in page.text
     # Leaving it there keeps the code good for the laptop.
     r = laptop.post("/signin/code", {"code": mail_code(last_mail(app))})
-    assert r.location == "/home"
+    assert r.location == app.cfg.home_path
     # The tab that asked sees no such note.
     laptop2 = Client(app)
     laptop2.email_signin(LEADER)

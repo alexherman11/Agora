@@ -74,7 +74,9 @@ class Chats(unittest.TestCase):
         self.assertEqual(self.k.state.get(line, "acts"), "look dk1")
         self.run_as(self.jeff, f'look {line}; set {line} acts="look dk1 · rows chat"')
         self.assertEqual(self.k.state.get(line, "acts"), "look dk1 · rows chat")
-        self.run_as(self.jeff, f'look {line}; set {line} text=rewritten', ok=False)
+        # 5 Nov: its speaker may now edit its words (text=, kept as edited); every other fact stays the kernel's
+        self.run_as(self.jeff, f'look {line}; set {line} chat=dk1', ok=False)
+        self.run_as(self.pike, f'look {line}; set {line} text=forged', ok=False)
         self.run_as(self.pike, f'look {line}; set {line} acts=forged', ok=False)
         self.assertIn("rows chat", self.run_as(self.alex, f"chat {shop}")["text"])
 

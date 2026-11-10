@@ -141,6 +141,14 @@ def deliver(msg):
 def the_map(call, name=None):
     if name:
         m = call.look(name)
+        if (not m or m.get("kind") != "map") and not re.fullmatch(r"[A-Za-z]+\d+", name):
+            # a name another thing shares (the place itself is often called what its map is) makes look refuse;
+            # the maps of that name are what is meant here (found 5 Nov on the Seabright world)
+            try:
+                maps, _ = call.see("rows map name=" + q(name))
+            except ValueError:
+                maps = []
+            m = maps[0] if len(maps) == 1 else m
         if not m or m.get("kind") != "map":
             raise ValueError(f"{name} is not a map (make kind=map name=… centre=lat,lon)")
         return m

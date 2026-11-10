@@ -1,0 +1,44 @@
+[
+  {
+    "file": "observatory-wide.jpg",
+    "library_file_id": "libfile_50661842008881919c41445f42e593fb",
+    "file_id": "file_000000001f8c81fdb00d597638fb82c7",
+    "version": 1,
+    "bytes": 85027
+  },
+  {
+    "file": "studio-wide.jpg",
+    "library_file_id": "libfile_54a3e18de7748191a3ab2e9dbc6ee63e",
+    "file_id": "file_00000000cd0081fd9a91f2fc86ace62d",
+    "version": 0,
+    "bytes": 66480
+  },
+  {
+    "file": "observatory-compact.jpg",
+    "library_file_id": "libfile_7da493ed07548191b06225d00f876443",
+    "file_id": "file_00000000510882309126b81c4e487f44",
+    "version": 0,
+    "bytes": 47629
+  },
+  {
+    "file": "studio-compact.jpg",
+    "library_file_id": "libfile_6cf4b30c106481918ef9398103a9ab17",
+    "file_id": "file_00000000021481fd8eeb1e536863df52",
+    "version": 0,
+    "bytes": 37734
+  },
+  {
+    "file": "observatory-details.jpg",
+    "library_file_id": "libfile_71975551e01c819182cd9f7dc1e64727",
+    "file_id": "file_00000000ffb8822fa22cfe5bd4797e22",
+    "version": 0,
+    "bytes": 73522
+  },
+  {
+    "file": "studio-details.jpg",
+    "library_file_id": "libfile_fe17d587ea1481919274b98af2ab779f",
+    "file_id": "file_000000000c4c81f89c9e5067c8cb389c",
+    "version": 0,
+    "bytes": 66054
+  }
+]

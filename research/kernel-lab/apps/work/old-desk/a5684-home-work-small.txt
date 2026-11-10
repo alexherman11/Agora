@@ -1,0 +1,6 @@
+s5683 note "home-work-small" · appears at a5684 · tags lens · style=home-style
+---
+# home-work-small: who is at work, in one line (a5496), for its panel title and the shelf.
+n : text "$(count(house doing=working) + count(prop:commission=working)) at work"
+  role summary
+---

@@ -15,7 +15,7 @@ from pathlib import Path
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS accounts (
     id              TEXT PRIMARY KEY,
-    email           TEXT NOT NULL UNIQUE,
+    email           TEXT UNIQUE,
     email_verified  INTEGER NOT NULL DEFAULT 1,
     google_sub      TEXT UNIQUE,
     display_name    TEXT,
@@ -26,7 +26,9 @@ CREATE TABLE IF NOT EXISTS accounts (
     onboarded_at    INTEGER,
     disabled_at     INTEGER,
     kernel_person   TEXT,
-    kernel_refused  TEXT
+    kernel_refused  TEXT,
+    guest_until     INTEGER,
+    guest_claim_hash TEXT UNIQUE
 );
 CREATE TABLE IF NOT EXISTS answers (
     account_id      TEXT NOT NULL,
@@ -47,7 +49,8 @@ CREATE TABLE IF NOT EXISTS invites (
     expires_at      INTEGER NOT NULL,
     frozen_at       INTEGER,
     frozen_by       TEXT,
-    created_at      INTEGER NOT NULL
+    created_at      INTEGER NOT NULL,
+    guest_ok        INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS invite_uses (
     invite_id       TEXT NOT NULL,
@@ -63,7 +66,8 @@ CREATE TABLE IF NOT EXISTS email_requests (
     created_at      INTEGER NOT NULL,
     expires_at      INTEGER NOT NULL,
     used_at         INTEGER,
-    attempts        INTEGER NOT NULL DEFAULT 0
+    attempts        INTEGER NOT NULL DEFAULT 0,
+    guest_id        TEXT
 );
 CREATE INDEX IF NOT EXISTS email_requests_email ON email_requests(email);
 CREATE TABLE IF NOT EXISTS oidc_flows (
@@ -120,8 +124,38 @@ class Store:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._local = threading.local()
         self._raw().executescript(SCHEMA)
-        self._add_columns("accounts", {"kernel_person": "TEXT", "kernel_refused": "TEXT"})
+        self._add_columns("accounts", {"kernel_person": "TEXT", "kernel_refused": "TEXT",
+                                       "guest_until": "INTEGER"})
+        self._add_columns("invites", {"guest_ok": "INTEGER NOT NULL DEFAULT 0"})
+        self._add_columns("email_requests", {"guest_id": "TEXT"})
         self._rename_column("sessions", "agent", "user_agent")
+        self._email_may_be_empty()
+        self._raw().execute("CREATE UNIQUE INDEX IF NOT EXISTS accounts_guest_claim"
+                            " ON accounts(guest_claim_hash)")
+
+    def _email_may_be_empty(self) -> None:
+        """Guests (5 Nov) have no email: rebuild a store made when `email` was NOT NULL.
+
+        SQLite cannot drop NOT NULL in place, so the table is copied in one transaction.
+        """
+        conn = self._raw()
+        cols = {r["name"]: r for r in conn.execute("PRAGMA table_info(accounts)")}
+        if not cols["email"]["notnull"]:
+            return
+        if "guest_claim_hash" not in cols:
+            conn.execute("ALTER TABLE accounts ADD COLUMN guest_claim_hash TEXT")
+        create = SCHEMA.split("CREATE TABLE IF NOT EXISTS accounts", 1)[1].split(");", 1)[0] + ")"
+        names = ", ".join(r["name"] for r in conn.execute("PRAGMA table_info(accounts)"))
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            conn.execute("CREATE TABLE accounts_new" + create)
+            conn.execute(f"INSERT INTO accounts_new({names}) SELECT {names} FROM accounts")
+            conn.execute("DROP TABLE accounts")
+            conn.execute("ALTER TABLE accounts_new RENAME TO accounts")
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
 
     def _add_columns(self, table: str, columns: dict[str, str]) -> None:
         have = {r["name"] for r in self._raw().execute(f"PRAGMA table_info({table})")}

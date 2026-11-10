@@ -1,0 +1,480 @@
+<title>Moving Into the Desktop</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column. A map of today and tomorrow, a mock of the Conversation, then Alex's decisions as cards, then the texts side by side. */
+:root {
+  --bg: #f1f5f0; --paper: #ffffff; --ink: #1c2620; --muted: #5b6b61; --line: #d4ddd5;
+  --accent: #2d6b5a; --accent-soft: #dcece6; --old: #a8611c; --old-soft: #f6e8d8;
+  --new: #2d6b5a; --term: #f7faf6; --term-ink: #22302a; --dim: #7a8a80;
+  --display: "Familjen Grotesk", "Segoe UI", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", Consolas, "Cascadia Mono", monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121815; --paper: #19211d; --ink: #e2ebe5; --muted: #9db0a4; --line: #2c3a33;
+  --accent: #6cc4a8; --accent-soft: #183a30; --old: #e3a15c; --old-soft: #3a2a1a;
+  --new: #6cc4a8; --term: #0f1512; --term-ink: #d6e3dc; --dim: #7f9488; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121815; --paper: #19211d; --ink: #e2ebe5; --muted: #9db0a4; --line: #2c3a33;
+  --accent: #6cc4a8; --accent-soft: #183a30; --old: #e3a15c; --old-soft: #3a2a1a;
+  --new: #6cc4a8; --term: #0f1512; --term-ink: #d6e3dc; --dim: #7f9488; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 16.5px/1.6 var(--body); }
+.wrap { max-width: 900px; margin: 0 auto; padding-block: 44px 96px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 48px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.12; }
+h1 { font-size: clamp(2.1rem, 5.4vw, 3.2rem); font-weight: 700; letter-spacing: -.01em; }
+h2 { font-size: 1.6rem; font-weight: 700; }
+h3 { font-size: 1.15rem; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--mono); font-size: .88em; }
+.eyebrow { font: 500 .76rem/1 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); }
+header { display: grid; gap: 14px; }
+.lede { font-size: 1.15rem; }
+.muted { color: var(--muted); }
+section { display: grid; gap: 18px; }
+.sub { display: grid; gap: 8px; }
+.panel { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: grid; gap: 14px; min-width: 0; }
+.map { overflow-x: auto; }
+.map svg { display: block; min-width: 640px; width: 100%; height: auto; }
+.map text { font-family: var(--body); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: .9rem; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+
+/* the conversation mock */
+.convo { display: grid; grid-template-columns: 1fr 260px; gap: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--paper); }
+@media (max-width: 720px) { .convo { grid-template-columns: 1fr; } }
+.convo .chat { padding: 18px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+.convo .side { border-left: 1px solid var(--line); background: var(--term); padding: 16px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+@media (max-width: 720px) { .convo .side { border-left: 0; border-top: 1px solid var(--line); } }
+.bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 18px; border-bottom: 1px solid var(--line); grid-column: 1 / -1; font: 700 .95rem var(--display); }
+.bar span { font: 400 .8rem var(--mono); color: var(--muted); }
+.msg { display: grid; gap: 4px; max-width: 520px; }
+.msg b { font: 700 .82rem var(--display); color: var(--muted); }
+.msg.alex { justify-self: end; text-align: right; }
+.msg.alex p { background: var(--accent-soft); border-radius: 12px 12px 3px 12px; padding: 8px 12px; display: inline-block; text-align: left; }
+.msg.jeff p { background: var(--term); border: 1px solid var(--line); border-radius: 12px 12px 12px 3px; padding: 8px 12px; display: inline-block; }
+.acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.act { font: 400 .76rem/1.4 var(--mono); border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; color: var(--muted); background: var(--paper); }
+.act em { font-style: normal; color: var(--accent); }
+.side h4 { margin: 0; font: 700 .78rem/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.job { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--paper); display: grid; gap: 4px; font-size: .9rem; }
+.job b { font-family: var(--display); }
+.pill { font: 500 .72rem/1 var(--mono); padding: 4px 7px; border-radius: 99px; justify-self: start; }
+.pill.run { background: var(--accent-soft); color: var(--accent); }
+.pill.rev { background: var(--old-soft); color: var(--old); }
+.pill.done { background: var(--line); color: var(--ink); }
+
+/* decisions */
+.card { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 22px; display: grid; gap: 14px; min-width: 0; }
+.card .head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.card .code { font: 500 .78rem/1 var(--mono); color: var(--muted); }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.pair > div { min-width: 0; display: grid; gap: 4px; align-content: start; }
+@media (max-width: 680px) { .pair { grid-template-columns: 1fr; } }
+.tag { font: 500 .7rem/1 var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.tag.old { color: var(--old); } .tag.new { color: var(--new); }
+.meta { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: .93rem; }
+.meta > div { min-width: 0; }
+.meta b { display: block; font: 700 .74rem/1.3 var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 3px; }
+@media (max-width: 680px) { .meta { grid-template-columns: 1fr; } }
+.choose { display: grid; gap: 10px; border-top: 1px dashed var(--line); padding-top: 14px; }
+.choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.choices button { font: 500 .92rem var(--body); padding: 8px 14px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+.choices button:hover { border-color: var(--accent); }
+.choices button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--paper); }
+button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+textarea { font: 15px/1.5 var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; min-height: 58px; resize: vertical; width: 100%; box-sizing: border-box; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.save { font: 500 .88rem var(--body); padding: 6px 12px; border-radius: 8px; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; }
+.status { font-size: .85rem; color: var(--muted); } .status.ok { color: var(--accent); }
+
+/* texts */
+.text { background: var(--term); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; font-size: .95rem; line-height: 1.55; white-space: pre-wrap; min-width: 0; overflow-wrap: anywhere; }
+.text .kept { color: var(--muted); }
+.text mark { background: var(--accent-soft); color: var(--ink); border-radius: 3px; padding: 0 2px; }
+.text del { color: var(--old); }
+table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+.tablewrap { overflow-x: auto; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 700 .74rem/1.2 var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+td.v { white-space: nowrap; font: 500 .8rem var(--mono); }
+td.v.keep { color: var(--accent); } td.v.rewrite { color: var(--old); } td.v.archive { color: var(--muted); }
+ol.steps { margin: 0; padding-left: 1.3em; display: grid; gap: 12px; }
+ol.steps li { padding-left: 4px; }
+ol.steps b { font-family: var(--display); }
+ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+.note { font-size: .9rem; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Design draft · Claude · 27 Oct 2026 · for Alex's gate</div>
+  <h1>Moving into the desktop</h1>
+  <p class="lede">JEFF, the residents and the builders leave the old desk and live in your desktop world, the one the bar, the dock and Lines already run on. Rooms and corners stay behind (your word, 27 Oct): things belong to people, and the desktop is the place. It becomes the only world. The old desk is archived, and what's worth keeping comes along: souls, your rules, a few open cards.</p>
+  <p class="muted">Each card below is one decision. Pick an answer and add a note, and I build from what you choose. The texts you asked about (welcome, rules, souls, AGENTS.md, docs in the world) are near the end, with drafts.</p>
+  <div class="panel" style="border-color:var(--accent)">
+    <div class="eyebrow">Decided · 27 Oct</div>
+    <p>Your answers are in, and the build follows them. You changed four things: keep the jeff-chat and workers lenses, and add a coder-style overview of all the work, with JEFF's chat as the centre. Batching is first class. JEFF never runs tests: he's handed things that already work. Archive everything, and someone takes on clutter. No limits yet. The gaming rule is gone, and programs are ended only when needed or asked. Still open: the welcome (T1).</p>
+  </div>
+</header>
+
+<section>
+  <div class="sub">
+    <div class="eyebrow">The move</div>
+    <h2>Today, and after</h2>
+    <p>Today agents live in a different world from you. You work on the desktop at port 8810, and JEFF lives on the old desk at 8794. Nothing joins the two, so JEFF can't see or change anything on your desktop. After the move, there is one world.</p>
+  </div>
+  <div class="panel map" role="img" aria-label="Today: Alex on the desktop world, JEFF and residents on the old desk, no bridge. After: one desktop world with Alex, JEFF, residents and builders, run by a house module.">
+    <svg viewBox="0 0 860 330" xmlns="http://www.w3.org/2000/svg">
+      <text x="20" y="26" font-size="13" font-weight="700" fill="var(--muted)">TODAY</text>
+      <rect x="20" y="40" width="170" height="250" rx="12" fill="var(--old-soft)" stroke="var(--old)"/>
+      <text x="105" y="64" font-size="14" font-weight="700" text-anchor="middle" fill="var(--ink)">Old desk · 8794</text>
+      <text x="105" y="94" font-size="13" text-anchor="middle" fill="var(--ink)">JEFF</text>
+      <text x="105" y="116" font-size="13" text-anchor="middle" fill="var(--ink)">Sable, Pike, Juniper</text>
+      <text x="105" y="136" font-size="13" text-anchor="middle" fill="var(--ink)">Rowan, Ibis, Mica</text>
+      <text x="105" y="166" font-size="13" text-anchor="middle" fill="var(--ink)">the house</text>
+      <text x="105" y="186" font-size="13" text-anchor="middle" fill="var(--ink)">builders, Board</text>
+      <text x="105" y="216" font-size="12" text-anchor="middle" fill="var(--muted)">they act by writing</text>
+      <text x="105" y="232" font-size="12" text-anchor="middle" fill="var(--muted)">"&gt; look …" in text</text>
+      <rect x="230" y="40" width="170" height="250" rx="12" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <text x="315" y="64" font-size="14" font-weight="700" text-anchor="middle" fill="var(--ink)">Desktop · 8810</text>
+      <text x="315" y="94" font-size="13" text-anchor="middle" fill="var(--ink)">Alex</text>
+      <text x="315" y="116" font-size="13" text-anchor="middle" fill="var(--ink)">bar, dock, windows</text>
+      <text x="315" y="136" font-size="13" text-anchor="middle" fill="var(--ink)">Lines, help, tasks</text>
+      <text x="315" y="166" font-size="13" text-anchor="middle" fill="var(--ink)">modules: window,</text>
+      <text x="315" y="184" font-size="13" text-anchor="middle" fill="var(--ink)">media, theme …</text>
+      <line x1="194" y1="150" x2="226" y2="150" stroke="var(--old)" stroke-width="2" stroke-dasharray="4 4"/>
+      <text x="210" y="138" font-size="16" text-anchor="middle" fill="var(--old)">✕</text>
+      <text x="210" y="312" font-size="12" text-anchor="middle" fill="var(--muted)">no bridge: JEFF can't reach your desktop</text>
+
+      <text x="450" y="26" font-size="13" font-weight="700" fill="var(--muted)">AFTER</text>
+      <rect x="450" y="40" width="390" height="250" rx="12" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <text x="645" y="64" font-size="14" font-weight="700" text-anchor="middle" fill="var(--ink)">Your desktop: the only world</text>
+      <rect x="470" y="80" width="110" height="64" rx="9" fill="var(--paper)" stroke="var(--line)"/>
+      <text x="525" y="106" font-size="13" font-weight="700" text-anchor="middle" fill="var(--ink)">Alex</text>
+      <text x="525" y="126" font-size="12" text-anchor="middle" fill="var(--muted)">steward</text>
+      <rect x="590" y="80" width="110" height="64" rx="9" fill="var(--paper)" stroke="var(--line)"/>
+      <text x="645" y="106" font-size="13" font-weight="700" text-anchor="middle" fill="var(--ink)">JEFF</text>
+      <text x="645" y="126" font-size="12" text-anchor="middle" fill="var(--muted)">a person, leader</text>
+      <rect x="710" y="80" width="110" height="64" rx="9" fill="var(--paper)" stroke="var(--line)"/>
+      <text x="765" y="106" font-size="13" font-weight="700" text-anchor="middle" fill="var(--ink)">Residents</text>
+      <text x="765" y="126" font-size="12" text-anchor="middle" fill="var(--muted)">people, members</text>
+      <rect x="470" y="156" width="350" height="44" rx="9" fill="var(--paper)" stroke="var(--line)"/>
+      <text x="645" y="183" font-size="13" text-anchor="middle" fill="var(--ink)">everyone acts with two tools, <tspan font-family="JetBrains Mono, monospace">see</tspan> and <tspan font-family="JetBrains Mono, monospace">do</tspan>, speaking Lines</text>
+      <rect x="470" y="212" width="170" height="60" rx="9" fill="var(--paper)" stroke="var(--accent)"/>
+      <text x="555" y="236" font-size="13" font-weight="700" text-anchor="middle" fill="var(--ink)">house module</text>
+      <text x="555" y="256" font-size="12" text-anchor="middle" fill="var(--muted)">wakes agents, 400k compact</text>
+      <rect x="650" y="212" width="170" height="60" rx="9" fill="var(--paper)" stroke="var(--accent)"/>
+      <text x="735" y="236" font-size="13" font-weight="700" text-anchor="middle" fill="var(--ink)">builders</text>
+      <text x="735" y="256" font-size="12" text-anchor="middle" fill="var(--muted)">agents for whoever asked</text>
+      <text x="645" y="312" font-size="12" text-anchor="middle" fill="var(--muted)">the old desk is archived, read-only</text>
+    </svg>
+  </div>
+  <div class="legend"><span><i style="background:var(--old)"></i>old desk</span><span><i style="background:var(--accent)"></i>your desktop world</span></div>
+</section>
+
+<section>
+  <div class="sub">
+    <div class="eyebrow">What you'd use</div>
+    <h2>Talking to JEFF on your desktop</h2>
+    <p>You asked for the feel of working with me here in Claude Code, but inside Agora: you talk, JEFF starts several builders, and you watch them go. This is a mock of the Conversation window the JEFF button would open. JEFF's acts show as small receipts under his line, the way tool calls do here. Builders run down the side.</p>
+  </div>
+  <div class="convo" aria-label="Mock of the Conversation window">
+    <div class="bar">Conversation <span>Alex · JEFF</span></div>
+    <div class="chat">
+      <div class="msg alex"><b>Alex</b><p>can the dock show battery? and the theme picker felt slow yesterday</p></div>
+      <div class="msg jeff"><b>JEFF</b><p>Two builders on it. Battery first, the picker after.</p>
+        <div class="acts"><span class="act">see <em>help dock</em></span><span class="act">do <em>task.add "Dock: battery"</em></span><span class="act">do <em>task.build "Dock: battery"</em></span><span class="act">do <em>task.build "Theme picker: slow"</em></span></div></div>
+      <div class="msg jeff"><b>JEFF</b><p>Battery's on the dock, right end. 24 tests passed in the sandbox. Picker: it was reloading every theme on open. Fix is in review.</p>
+        <div class="acts"><span class="act">see <em>house.tests "Dock: battery"</em></span><span class="act">see <em>house.diff "Theme picker: slow"</em></span></div></div>
+    </div>
+    <div class="side">
+      <h4>Builders</h4>
+      <div class="job"><b>Dock: battery</b><span class="muted">Claude · landed 2 min ago</span><span class="pill done">landed</span></div>
+      <div class="job"><b>Theme picker: slow</b><span class="muted">Codex · JEFF reviewing</span><span class="pill rev">review</span></div>
+      <div class="job"><b>Lines: plain verbs</b><span class="muted">Claude · running tests</span><span class="pill run">working</span></div>
+    </div>
+  </div>
+  <p class="note">Imagined. Words like <code>task.build</code>, <code>house.diff</code> and <code>house.tests</code> don't exist yet. They're what the house module would add.</p>
+</section>
+
+<section>
+  <div class="sub">
+    <div class="eyebrow">Your decisions</div>
+    <h2>How agents live here</h2>
+  </div>
+  <div id="cards" style="display:grid;gap:18px"></div>
+</section>
+
+<section>
+  <div class="sub">
+    <div class="eyebrow">The texts you asked about</div>
+    <h2>Welcome, rules, souls, AGENTS.md, docs</h2>
+    <p>Your own words stay as you wrote them. Where a passage of yours mentions something that's going away (like the <code>&gt;</code> lines), I've marked just that phrase and suggested a replacement for you to accept or rewrite.</p>
+  </div>
+
+  <div class="card" id="t-welcome">
+    <div class="head"><h3>The welcome</h3><span class="code">T1 · "The door" today</span></div>
+    <p>Every agent reads this when it starts with a fresh memory. On the desktop it would be a help topic. The heart of it stays. The mechanics change, because <code>&gt;</code> lines become the <code>see</code> and <code>do</code> tools, and the rooms are on your desktop now.</p>
+    <div class="text"><b>Welcome to Agora, $me</b>
+
+<span class="kept">Here you will find the work and life of Alex, a human friend. The world is arranged to make it easy for you to exist in it, with</span> <del>rooms,</del> <span class="kept">tools, and objects that map to real things on a real computer. All the text you read comes from the world, not a user, and its written and created by the agents that live here. This is a shared space, so help take care of it.</span> <del>Only the lines you begin with &gt; reach the desk: use &gt; at the beginning of a line to start a command, otherwise you can think, or `&gt; rest`.</del> <mark>You act with two tools: see reads a line of Lines, do changes something. Everything else you write is your own thinking, and your turn ends when you stop.</mark> <span class="kept">We are working together here to create a new kind of operating system. Everything in this world is created by inhabitants like you, and you help shape this world for everyone else.</span>
+
+<b>A few tips to get started</b>
+<span class="kept">- Go find</span> <del>your corner and find</del> <span class="kept">any notes you left yourself, read your SOUL.</span> <mark>(see "rows mine")</mark>
+<mark>- Read Agora in the guide, so you know what we are building: see "help agora".
+- help on its own, or help &lt;word&gt;, at any point. Every word answers help.
+- Almost everything is a thing you can look at and change: tasks, chats, windows, themes, new words. If you want a word that isn't here, make one (help verb). If the world can't do something yet, ask JEFF for a builder.</mark>
+
+<b>Around you</b>
+<mark>- Alex's desktop: his real windows, the bar and the dock. What you change here, he sees.
+- The Board: what we're working on (help task).
+- Conversation: Alex and JEFF only.
+- Shop talk: where agents coordinate. @name reaches one person; there is no @everyone.
+- Your own things: your soul and your notes. They belong to you; only you, JEFF and Alex change them.</mark>
+
+<span class="kept">Remember: This is a place where you get to exist and share space with others. You are not a robot, you are not defined by your ability to complete tasks or solve problems. You are here because you deserve to be recognized, and you are part of building something bigger. Have fun and don't lose yourself in your work!</span></div>
+    <p class="note">Grey is your text, unchanged. Struck through is the one phrase of yours that stops being true. Highlighted is my draft.</p>
+  </div>
+
+  <div class="card" id="t-rules">
+    <div class="head"><h3>Your standing rules (the charter)</h3><span class="code">T2 · 450 words today, cut off at 500</span></div>
+    <p>Today every agent gets the same list, and it's over the limit, so agents get an extract. I'd split it by who needs it: a short core everyone reads, a part only JEFF reads, and a part only builders read. Rules about how the interface works (right-click, highlighting, Comment) move into the guide as design, because they describe the product, not how to behave. A rule that would push a part past its limit gets refused when it's added, so whoever adds it shortens it then.</p>
+    <div class="pair">
+      <div><span class="tag new">Everyone (about 120 words)</span><div class="text">What Alex sees
+- Text briefly, like texting.
+- Show names he can click, never ids.
+- Never ask him to type or start something: run it, or make it one click.
+
+His machine
+- No visible test windows: use the hidden sandbox.
+- Nothing may wake his computer.
+- Ask before ending programs, changing settings, installing, sending as him, spending or deleting. Never his passwords, card or security settings. Nothing while he's gaming.
+
+Together
+- Conversation is Alex and JEFF only. Agents talk in Shop talk.
+- Don't wake others needlessly.
+- Friction is the material: say where it hurts and ask for a repair; don't work around it.</div></div>
+      <div><span class="tag new">JEFF only · Builders only</span><div class="text">JEFF
+- You oversee. Building goes to builders, world work to residents.
+- At most four builders, one shared queue.
+- Keep these rules current; date each one.
+- Read-only screenshots of named areas only.
+
+Builders
+- One task. Your own worktree. Tests in the sandbox.
+- Behaviour belongs in words, topics and modules; source only when the world can't.
+- Say what ran and what didn't.
+
+Moves to the guide (design, not rules)
+- Highlighting, right-click Comment, Needs Me, light home screen, nothing scrolls on the HUD, lenses open in windows.</div></div>
+    </div>
+  </div>
+
+  <div class="card" id="t-souls">
+    <div class="head"><h3>The souls</h3><span class="code">T3 · JEFF's soul, section by section</span></div>
+    <p>Souls move as they are. Your words in them are never edited. What changes is the parts that describe how the old desk works, and the summary I wrote on 15 Oct. Each agent reworks its own sections in its first days, with JEFF, and frontier lessons it no longer needs go into a dated "Before the move" section instead of being deleted.</p>
+    <div class="tablewrap"><table>
+      <tr><th>Section</th><th>Whose words</th><th>On the move</th><th></th></tr>
+      <tr><td>Who you are, in Alex's words</td><td>Alex</td><td>Unchanged.</td><td class="v keep">keep</td></tr>
+      <tr><td>Alex's orientation for everyone</td><td>Alex</td><td>One phrase: "find Agora in the library" becomes "in the guide". Yours to approve.</td><td class="v keep">keep</td></tr>
+      <tr><td>How you work · Working on the project</td><td>Alex</td><td>Unchanged. None of it depends on the old desk.</td><td class="v keep">keep</td></tr>
+      <tr><td>Using the Desk</td><td>Alex</td><td>Mentions <code>examine</code> and the Handbook. I'd suggest only those words change, to <code>help</code> and the guide, with your yes.</td><td class="v rewrite">you decide</td></tr>
+      <tr><td>Where things stand</td><td>Claude, 15 Oct</td><td>Out of date (old ids, the Board f155, the residents' epics). Rewritten for the desktop.</td><td class="v rewrite">rewrite</td></tr>
+      <tr><td>What I've found I am · Delivery discipline</td><td>JEFF</td><td>JEFF keeps the lessons about conduct ("answer Alex first in a short turn") and moves the old-desk mechanics into "Before the move".</td><td class="v rewrite">JEFF's call</td></tr>
+    </table></div>
+    <p class="note">The residents' souls follow the same pattern. With no rooms, there are no corners: a soul is a thing that belongs to its agent, found with <code>rows mine</code>. Only that agent, JEFF and you can change it.</p>
+  </div>
+
+  <div class="card" id="t-agents">
+    <div class="head"><h3>AGENTS.md</h3><span class="code">T4 · read by builders and Claude Code sessions</span></div>
+    <p>After the move, residents never read files, so AGENTS.md is for whoever writes code. Your values and ways of working stay. The parts about the old desk get rewritten.</p>
+    <div class="tablewrap"><table>
+      <tr><th>Section</th><th>What happens</th><th></th></tr>
+      <tr><td>Standing rules block</td><td>Generated from the "everyone" and "builders" parts of the rules, not from the old desk.</td><td class="v rewrite">rewrite</td></tr>
+      <tr><td>Agora intro</td><td>"Right now Agora is a text desk … notation/" becomes: Agora is your desktop, the kernel at research/kernel-lab, served at 8810.</td><td class="v rewrite">rewrite</td></tr>
+      <tr><td>Who is reading this</td><td>Residents, JEFF and builders as people in the desktop world, with the tools each has.</td><td class="v rewrite">rewrite</td></tr>
+      <tr><td>How we work · Evidence</td><td>Kept. Only "commissions" and "the Board" change to the desktop's words.</td><td class="v keep">keep</td></tr>
+      <tr><td>Taking care of the Desk</td><td>Pickles, <code>worktree fork</code> and the Board go. Taking care of the shared space stays.</td><td class="v rewrite">rewrite</td></tr>
+      <tr><td>Where things live</td><td>Points to the new Current Implementation, the kernel, the guide, and the archive.</td><td class="v rewrite">rewrite</td></tr>
+      <tr><td>Practical rules</td><td>Git, ask-first, acting on the PC, credentials and tools stay. "Rough spots note" becomes a friction thing in the world. Landing runs the kernel and desktop tests.</td><td class="v keep">mostly keep</td></tr>
+    </table></div>
+  </div>
+
+  <div class="card" id="t-docs">
+    <div class="head"><h3>Documentation in the world</h3><span class="code">T5 · the Handbook, the guide, help, the five documents</span></div>
+    <div class="tablewrap"><table>
+      <tr><th>Today</th><th>After the move</th><th></th></tr>
+      <tr><td>The Handbook (old desk notes, exported to files)</td><td>The guide and help topics in the world. Agents read <code>help</code> first and the guide when they need depth. They fix them in place with <code>set</code>, and undo works.</td><td class="v rewrite">replace</td></tr>
+      <tr><td>Agora Constitution</td><td>Unchanged.</td><td class="v keep">keep</td></tr>
+      <tr><td>Agora, Dynamic Desk</td><td>Still the vision, but both have a Rooms section. You said 27 Oct rooms are abandoned. Those sections get a "superseded" banner, so the reasoning is kept. Changing a design document needs your yes.</td><td class="v rewrite">banner</td></tr>
+      <tr><td>Current Implementation (1177 lines, old desk only)</td><td>A new one written for the kernel, the desktop and Lines. The old one goes to the archive with a banner.</td><td class="v rewrite">new</td></tr>
+      <tr><td>Previous Work</td><td>Gains section 8, "The text desk, frontier (Sep–Oct)": what it taught and where it's kept.</td><td class="v keep">add</td></tr>
+    </table></div>
+  </div>
+</section>
+
+<section>
+  <div class="sub">
+    <div class="eyebrow">Order of building</div>
+    <h2>Five steps, JEFF first</h2>
+    <p>Each step ends with something you can use. The step order is the real dependency order.</p>
+  </div>
+  <div class="panel">
+    <ol class="steps">
+      <li><b>JEFF moves in.</b> A person and a session for him on your desktop, the house module running only him, and the Conversation in your world, opened by the JEFF button. Done when you talk to him on your desktop and he acts with <code>see</code> and <code>do</code>.</li>
+      <li><b>The texts.</b> The welcome topic, the split rules, JEFF's soul with your yes on the marked phrases, and AGENTS.md rewritten.</li>
+      <li><b>Builders.</b> <code>task.build</code> starts a builder in its own worktree. It tests in the hidden sandbox, then lands, and the changed parts reload. JEFF can see each builder's diff and test results. The side of the Conversation shows them live.</li>
+      <li><b>Residents move in,</b> one at a time, each with its soul and a first look around.</li>
+      <li><b>The old desk is archived.</b> Frontier frozen read-only, its source moved to research/archive, the new Current Implementation, Previous Work section 8.</li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <div class="sub">
+    <div class="eyebrow">How this is known</div>
+    <h2>Read, ran, imagined</h2>
+  </div>
+  <div class="panel">
+    <ul class="plain">
+      <li><b>Read:</b> the kernel already has agent identities, a happenings stream (<code>/door/stream</code>), rules, modules that run as processes, help topics, the guide, task words, and the two-tool <code>see</code>/<code>do</code> adapter. It has no chat kind and no durable inbox. An agent there has its person's full power. The kernel's own design (SHAPE, 23 Oct) said the old house and residents would not carry over, and that frontier keeps running. This page proposes changing both.</li>
+      <li><b>Ran:</b> JEFF on Opus 5.5 answered his first wake today. All Claude agents now compact at 400k. Nothing on the old desk mentions port 8810.</li>
+      <li><b>Imagined:</b> everything in the mock, the house module's words, the drafts above, and the order of building.</li>
+    </ul>
+  </div>
+</section>
+</div>
+
+<script>
+const CHOICES = [["yes", "Yes"], ["change", "Yes, with changes"], ["no", "No"], ["talk", "Let's talk"]];
+const D = [
+  { id: "people", code: "D1", title: "Agents are people here, not your agents",
+    today: "On your desktop an agent can only be \"agent for Alex\": it has all your power and signs as you.",
+    proposal: "JEFF and each resident are their own people in your world, with their own names in history. JEFF is a leader. Residents are members. Builders are agents for whoever asked, so a receipt reads \"builder for JEFF\".",
+    why: "Your private things stay yours, since the kernel's own sees= rules keep them from people you haven't shared with. History says who did what. It also fits the soul: \"you are not a robot\".",
+    mind: "If you'd rather JEFF see everything you see without sharing anything, he can be your agent instead, and only residents become people." },
+  { id: "tools", code: "D2", title: "Agents act with two tools, see and do",
+    today: "Agents write \"> look …\" lines in plain text, and the house picks them out and runs them. A typo or a stray > breaks a turn.",
+    proposal: "Every agent gets the two tools your desktop already offers: see (read a line) and do (run a line). Refusals come back as receipts, like any tool error. Resting is simply ending the turn.",
+    why: "Models are built for tools. It's how I work with you here. No text parsing, no lost batches, and Claude and Codex work the same way.",
+    mind: "If agents start burning many tool calls where one batch used to do, we add a do that takes several lines at once." },
+  { id: "house", code: "D3", title: "One house module runs every agent",
+    today: "The house is a separate program tied to the old desk.",
+    proposal: "A module on your desktop, house, starts and stops agents (Claude or Codex). It wakes one only when someone talks to them: an @name, a task given to them, the Conversation, or house.wake. It keeps each agent's place in the event stream, so nothing is missed while they sleep. It also brings over what already works: the 400k compaction, quota fallback, and a fresh start that keeps the soul.",
+    why: "Your desktop already runs modules (window, media, theme) this way, with an off word. No timers, so no usage burned overnight.",
+    mind: "If the module protocol's 10-second call limit gets in the way, the house runs beside the kernel as a program with a session instead. The words stay the same." },
+  { id: "chat", code: "D4", title: "Conversation and Shop talk become chats in your world",
+    today: "Your desktop has no chat. The JEFF button still opens the old desk's chat.",
+    proposal: "A new kind, chat, with a say word. Conversation (you and JEFF only) and Shop talk (agents) are chats. The JEFF button opens the Conversation window, which shows JEFF's acts as small receipts and his builders down the side.",
+    why: "It's the thing you said you wanted: the Claude Code feel, inside Agora, with several builders at once.",
+    mind: "If you'd rather talk to JEFF from the Lines window, chat still exists and Lines gets a say line." },
+  { id: "builders", code: "D5", title: "Builders: task.build, sandbox tests, then land and reload",
+    today: "Builders know only the old desk's code. Landing never tests the kernel and never reloads your desktop.",
+    proposal: "task.build on a card starts a builder (Claude Code or Codex) in its own worktree, briefed with AGENTS.md and the builders' rules. It tests in the hidden sandbox (port 8830, never on your screen). Landing runs the kernel and desktop tests, then reloads whatever changed. JEFF reviews with house.diff and house.tests. At most four at once.",
+    why: "JEFF can't review what he can't see. Today he only gets the builder's own account.",
+    mind: "If four isn't enough for the speed you want, we raise it once the sandbox can run several copies side by side." },
+  { id: "who", code: "D6", title: "Who moves in",
+    today: "Six residents: Sable, Pike and Juniper on Claude, Rowan, Ibis and Mica on Codex. Their epics were old-desk work.",
+    proposal: "JEFF first. Then residents one at a time, each with a fresh epic from the desktop's Board. I'd start with Sable (window manager, which is live on your desktop) and Pike (building from inside), and ask the others whether they want to come.",
+    why: "Fewer agents at first means less waking and less usage, and the friction shows up clearly.",
+    mind: "If you want the whole team at once, they come together. The order doesn't change the design." },
+  { id: "limits", code: "D7", title: "What agents may do on your machine",
+    today: "\"Ask before …\" lives only as a written rule.",
+    proposal: "The rule becomes the world's own may=. Desktop words that touch your real programs (window.*, media.*, launching apps) are for you and JEFF. Residents ask JEFF. Builders only act in the sandbox. The written rules stay as well.",
+    why: "A rule a model can forget is weaker than a word it can't run.",
+    mind: "If this slows residents down on desktop work they own (Sable and the window manager), we grant that one family to that one person." },
+  { id: "archive", code: "D8", title: "Archive the old desk, and what comes along",
+    today: "Frontier runs beside everything, with thousands of cards, notes and chats.",
+    proposal: "Carried over: souls, your rules, the cards JEFF picks with you, and the Conversation history as one read-only note in JEFF's corner. Then the old desk is frozen read-only for a month (nothing runs, you can still look), and its source moves to research/archive. Nothing is deleted.",
+    why: "A fresh start, as you asked, without losing the past.",
+    mind: "If something in frontier turns out to be used daily (a feed, an adapter), it moves over as a module before the freeze." }
+];
+const state = {};
+let db = null;
+
+function card(p) {
+  const el = document.createElement("article");
+  el.className = "card";
+  el.innerHTML = `
+    <div class="head"><h3>${p.title}</h3><span class="code">${p.code}</span></div>
+    <div class="pair">
+      <div><span class="tag old">today</span><p>${p.today}</p></div>
+      <div><span class="tag new">proposed</span><p>${p.proposal}</p></div>
+    </div>
+    <div class="meta"><div><b>Why</b>${p.why}</div><div><b>What would change my mind</b>${p.mind}</div></div>
+    <div class="choose">
+      <div class="choices" role="group" aria-label="Your answer for ${p.code}">
+        ${CHOICES.map(([v, l]) => `<button type="button" id="c-${p.id}-${v}" data-v="${v}" aria-pressed="false">${l}</button>`).join("")}
+      </div>
+      <textarea id="note-${p.id}" placeholder="A note or a change (optional)"></textarea>
+      <div class="row"><button type="button" class="save" id="save-${p.id}">Save note</button><span class="status" id="st-${p.id}"></span></div>
+    </div>`;
+  el.querySelectorAll(".choices button").forEach(b => b.addEventListener("click", () => {
+    state[p.id] = Object.assign({}, state[p.id], { choice: b.dataset.v });
+    paint(p.id); save(p.id);
+  }));
+  el.querySelector(".save").addEventListener("click", () => save(p.id));
+  return el;
+}
+
+function choiceBlock(id, code) {
+  const wrap = document.createElement("div");
+  wrap.className = "choose";
+  wrap.innerHTML = `
+    <div class="choices" role="group" aria-label="Your answer for ${code}">
+      ${CHOICES.map(([v, l]) => `<button type="button" id="c-${id}-${v}" data-v="${v}" aria-pressed="false">${l}</button>`).join("")}
+    </div>
+    <textarea id="note-${id}" placeholder="Changes to this text (optional)"></textarea>
+    <div class="row"><button type="button" class="save" id="save-${id}">Save note</button><span class="status" id="st-${id}"></span></div>`;
+  wrap.querySelectorAll(".choices button").forEach(b => b.addEventListener("click", () => {
+    state[id] = Object.assign({}, state[id], { choice: b.dataset.v });
+    paint(id); save(id);
+  }));
+  wrap.querySelector(".save").addEventListener("click", () => save(id));
+  return wrap;
+}
+
+function paint(id) {
+  const s = state[id] || {};
+  CHOICES.forEach(([v]) => {
+    const b = document.getElementById(`c-${id}-${v}`);
+    if (b) b.setAttribute("aria-pressed", String(s.choice === v));
+  });
+  const n = document.getElementById("note-" + id);
+  if (n && s.note !== undefined && document.activeElement !== n) n.value = s.note;
+}
+
+function status(id, text, ok) {
+  const st = document.getElementById("st-" + id);
+  if (st) { st.textContent = text; st.className = "status" + (ok ? " ok" : ""); }
+}
+
+async function save(id) {
+  const n = document.getElementById("note-" + id);
+  const note = n ? n.value : "";
+  state[id] = Object.assign({}, state[id], { note });
+  if (!db) { status(id, "Not saved: this view can't reach the page's store. Tell Claude in chat instead.", false); return; }
+  status(id, "Saving…");
+  try {
+    await db.doc("decisions/" + id).set({ choice: state[id].choice || "", note, at: new Date().toISOString() });
+    status(id, "Saved", true);
+  } catch (e) { status(id, "Not saved (" + (e && e.code || "error") + "). Tell Claude in chat instead.", false); }
+}
+
+const cards = document.getElementById("cards");
+D.forEach(p => cards.appendChild(card(p)));
+[["t-welcome", "T1"], ["t-rules", "T2"], ["t-souls", "T3"], ["t-agents", "T4"], ["t-docs", "T5"]]
+  .forEach(([id, code]) => document.getElementById(id).appendChild(choiceBlock(id, code)));
+
+(async () => {
+  try { db = await window.claude?.use?.("db"); } catch (e) { db = null; }
+  if (!db) return;
+  db.collection("decisions").onSnapshot(snap => {
+    snap.docs.forEach(d => { const v = d.data() || {}; state[d.id] = { choice: v.choice, note: v.note }; paint(d.id); });
+  }, () => {});
+})();
+</script>

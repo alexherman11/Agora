@@ -114,7 +114,7 @@ let checks=0;function check(label,fn){fn();checks++;console.log('PASS '+label)}
   let finishSummary;
   summaryApi.fire=async(event)=>{summaryApi.calls.push(event);if(event==='snapshot')return {made:['private-fixture']};await new Promise(r=>finishSummary=r);return {text:'Stub summary: meet at the park.'}};
   root=board.mount(summaryApi,{previewCount:3});await tick();
-  const summarise=button(root,'Summarise'),summarising=summarise.click();await tick();await summarise.click();
+  const summarise=button(root,'Summarize'),summarising=summarise.click();await tick();await summarise.click();
   check('summary shows pending state and issues one stubbed model request',()=>{assert.match(root.textContent,/Preparing a summary/);assert.equal(summaryApi.calls.filter(e=>e==='summarize').length,1)});
   finishSummary();await summarising;
   check('summary displays the explicit result in the current channel',()=>{assert.match(summaryApi.view().summary,/Stub summary/);assert.match(root.textContent,/Summary ready/)});
@@ -123,8 +123,8 @@ let checks=0;function check(label,fn){fn();checks++;console.log('PASS '+label)}
   check('summary refusal is visible and retry stays available',()=>{assert.match(root.textContent,/Summary not available.*fixture model offline/);assert.equal(summarise.disabled,false)});
   for(const offlineRead of [async()=>[{up:false}],async()=>{throw Error('status refused')}]){
     const offline=api('board-catchup',{children:[{facts:{id:'post'}}],read:async line=>line==='model.status'?offlineRead():[]});
-    const offlineRoot=board.mount(offline,{});await tick();await button(offlineRoot,'Summarise').click();
-    check('offline or refused model status keeps a disabled labelled action and reason',()=>{assert.equal(button(offlineRoot,'Summarise').disabled,true);assert.match(offlineRoot.textContent,/Summary not available/);assert.equal(offline.calls.length,0)});
+    const offlineRoot=board.mount(offline,{});await tick();await button(offlineRoot,'Summarize').click();
+    check('offline or refused model status keeps a disabled labelled action and reason',()=>{assert.equal(button(offlineRoot,'Summarize').disabled,true);assert.match(offlineRoot.textContent,/Summary not available/);assert.equal(offline.calls.length,0)});
   }
   summaryApi.fire=async event=>event==='snapshot'?{made:['private-fixture']}:{text:''};
   await summarise.click();

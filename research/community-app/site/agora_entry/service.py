@@ -12,9 +12,12 @@ import json
 import re
 import secrets
 import time
+import unicodedata
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from datetime import time as clock_time
 
-from .config import Config
+from .config import Config, local_zone
 from .db import Store
 from .questions import Questions
 
@@ -24,6 +27,14 @@ CODE_ATTEMPTS = 5
 FLOW_SECONDS = 600
 INVITE_EXPIRY_DAYS = (1, 7, 30, 90, 365)
 CHANNEL_MAX = 60
+GUEST_NAME_MAX = 60
+
+
+def clean_guest_name(raw: str) -> str | None:
+    """1-60 characters, spaces collapsed, control characters dropped. None if unusable."""
+    text = "".join(" " if unicodedata.category(ch) == "Cc" else ch for ch in str(raw or ""))
+    name = " ".join(text.split())
+    return name if 1 <= len(name) <= GUEST_NAME_MAX else None
 
 
 def sha256(text: str) -> str:
@@ -158,7 +169,7 @@ class Service:
         return InviteState(inv, "open")
 
     def make_invite(self, maker_id: str, channel: str, kind: str, max_uses: int | None,
-                    expires_days: int) -> dict:
+                    expires_days: int, guest_ok: bool = False) -> dict:
         channel = " ".join((channel or "").split())
         if not channel or len(channel) > CHANNEL_MAX:
             raise ValueError(f"Give the channel a name of up to {CHANNEL_MAX} characters.")
@@ -172,17 +183,29 @@ class Service:
         invite = {"id": new_id("inv_"), "code": new_invite_code(), "maker_id": maker_id,
                   "channel": channel, "kind": kind, "max_uses": max_uses, "uses": 0,
                   "expires_at": now + expires_days * 86400, "frozen_at": None,
-                  "frozen_by": None, "created_at": now}
+                  "frozen_by": None, "created_at": now, "guest_ok": int(bool(guest_ok))}
         with self.store.connect() as conn:
             conn.execute(
                 "INSERT INTO invites(id, code, maker_id, channel, kind, max_uses, uses, expires_at,"
-                " created_at) VALUES (?,?,?,?,?,?,0,?,?)",
+                " created_at, guest_ok) VALUES (?,?,?,?,?,?,0,?,?,?)",
                 (invite["id"], invite["code"], maker_id, channel, kind, max_uses,
-                 invite["expires_at"], now))
+                 invite["expires_at"], now, invite["guest_ok"]))
             self.store.event(conn, now, "invite.made", maker_id, invite_id=invite["id"],
                              channel=channel, kind=kind, max_uses=max_uses,
-                             expires_at=invite["expires_at"])
+                             expires_at=invite["expires_at"], guest_ok=bool(guest_ok))
         return invite
+
+    def set_guest_ok(self, invite_id: str, by: str, on: bool) -> bool:
+        """Let people in with just a name through this invite, or stop it. Guests already
+        in keep their pass; freezing the invite is what ends their sessions."""
+        now = self.now()
+        with self.store.connect() as conn:
+            n = conn.execute("UPDATE invites SET guest_ok=? WHERE id=? AND guest_ok!=?",
+                             (int(on), invite_id, int(on))).rowcount
+            if n:
+                self.store.event(conn, now, "invite.guests_on" if on else "invite.guests_off", by,
+                                 invite_id=invite_id)
+        return bool(n)
 
     def set_frozen(self, invite_id: str, by: str, frozen: bool) -> bool:
         now = self.now()
@@ -193,6 +216,13 @@ class Service:
             else:
                 n = conn.execute("UPDATE invites SET frozen_at=NULL, frozen_by=NULL WHERE id=?"
                                  " AND frozen_at IS NOT NULL", (invite_id,)).rowcount
+            if n and frozen:
+                # Guests who came in through it are out at once (session_account also checks the
+                # freeze), and stay out if it is unfrozen: they can make an account to come back.
+                conn.execute(
+                    "UPDATE sessions SET revoked_at=? WHERE revoked_at IS NULL AND account_id IN"
+                    " (SELECT id FROM accounts WHERE invite_id=? AND guest_until IS NOT NULL)",
+                    (now, invite_id))
             if n:
                 self.store.event(conn, now, "invite.frozen" if frozen else "invite.unfrozen",
                                  by, invite_id=invite_id)
@@ -256,8 +286,92 @@ class Service:
         raise SignInRefused("You'll need an invite link to join. Ask a neighbour who's already in.",
                             "no_invite")
 
+    # -- guest passes ------------------------------------------------------
+    def guest_until(self, now: int | None = None) -> int:
+        """23:59:59 on the day after `now`, in the site's time zone (SITE_TIMEZONE)."""
+        zone = local_zone(self.cfg.timezone)
+        today = datetime.fromtimestamp(self.now() if now is None else now, zone).date()
+        end = datetime.combine(today + timedelta(days=1), clock_time(23, 59, 59), tzinfo=zone)
+        return int(end.timestamp())
+
+    def create_guest(self, invite_code: str, raw_name: str, agent: str = "") -> tuple[str, str, dict]:
+        """A guest pass: an account with a name and no email, through an invite a leader
+        marked guest_ok. -> (session token, guest claim token, account).
+
+        The invite's use is counted with the account, as for every other way in.
+        """
+        name = clean_guest_name(raw_name)
+        if name is None:
+            raise SignInRefused(f"Please give a name of 1 to {GUEST_NAME_MAX} characters.", "bad_name")
+        state = self.invite_by_code(invite_code)
+        if not state.open:
+            raise SignInRefused("This invite link has closed. Ask whoever shared it for a new one.",
+                                "invite_closed")
+        if not state.invite["guest_ok"]:
+            raise SignInRefused("This invite doesn't take guests. Make an account instead.", "no_guests")
+        now = self.now()
+        until = self.guest_until(now)
+        claim = secrets.token_urlsafe(32)
+        with self.store.connect() as conn:
+            invite = self._consume_invite(conn, state.invite["id"])
+            if invite is None or not invite["guest_ok"]:
+                raise SignInRefused("This invite link has closed. Ask whoever shared it for a new one.",
+                                    "invite_closed")
+            account_id = new_id("acct_")
+            conn.execute(
+                "INSERT INTO accounts(id, email, email_verified, display_name, invite_id, created_at,"
+                " updated_at, onboarded_at, guest_until, guest_claim_hash) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (account_id, None, 0, name, invite["id"], now, now, now, until, sha256(claim)))
+            conn.execute("INSERT INTO invite_uses(invite_id, account_id, at) VALUES (?,?,?)",
+                         (invite["id"], account_id, now))
+            conn.execute("INSERT INTO answers(account_id, key, value, questions_version, answered_at)"
+                         " VALUES (?,?,?,?,?)", (account_id, "display_name", json.dumps(name),
+                                                 self.questions.version, now))
+            self.store.event(conn, now, "invite.used", account_id, invite_id=invite["id"],
+                             channel=invite["channel"])
+            self.store.event(conn, now, "account.created", account_id, method="guest",
+                             invite_id=invite["id"], guest_until=until)
+            self.store.event(conn, now, "account.onboarded", account_id, display_name=name,
+                             keys=["display_name"], questions_version=self.questions.version)
+            session = self._open_session(conn, account_id, "guest", agent, expires_at=until)
+        return session, claim, self.account(account_id)
+
+    def guest_by_claim(self, claim: str | None) -> dict | None:
+        """The guest account this browser's claim cookie names, while it may still be kept:
+        until `guest_claim_days` after the pass ended, and not if its invite was frozen."""
+        if not claim or len(claim) > 100:
+            return None
+        row = self.store.one(
+            "SELECT a.*, i.frozen_at AS invite_frozen_at FROM accounts a LEFT JOIN invites i"
+            " ON i.id=a.invite_id WHERE a.guest_claim_hash=?", (sha256(claim),))
+        if (row is None or row["guest_until"] is None or row["disabled_at"] is not None
+                or row["invite_frozen_at"] is not None
+                or row["guest_until"] + self.cfg.guest_claim_days * 86400 <= self.now()):
+            return None
+        account = dict(row)
+        account.pop("invite_frozen_at")
+        return account
+
+    def _upgrade(self, conn, guest: dict, email: str, method: str, google_sub: str | None = None) -> str:
+        """The guest keeps their account id (so the kernel person and their messages stay), and
+        gains an email (and Google). Their guest sessions end; the caller opens a new one."""
+        now = self.now()
+        n = conn.execute(
+            "UPDATE accounts SET email=?, email_verified=1, google_sub=COALESCE(?, google_sub),"
+            " guest_until=NULL, guest_claim_hash=NULL, updated_at=? WHERE id=? AND guest_until IS NOT NULL"
+            " AND disabled_at IS NULL", (email, google_sub, now, guest["id"])).rowcount
+        if n != 1:
+            raise SignInRefused("Your guest pass couldn't be kept. Sign in again.", "guest_gone")
+        conn.execute("UPDATE sessions SET revoked_at=? WHERE account_id=? AND revoked_at IS NULL",
+                     (now, guest["id"]))
+        self.store.event(conn, now, "account.upgraded", guest["id"], method=method)
+        if email in self.cfg.leaders:
+            self._grant(conn, guest["id"], "leader", "config")
+        return guest["id"]
+
     # -- email sign-in -------------------------------------------------------
-    def request_email_signin(self, email: str, invite_code: str | None) -> tuple[str, dict]:
+    def request_email_signin(self, email: str, invite_code: str | None,
+                             guest_claim: str | None = None) -> tuple[str, dict]:
         """Make a sign-in request. Returns (request id, what to send).
 
         The page says the same thing whatever happens, so it never tells a
@@ -266,8 +380,11 @@ class Service:
         now = self.now()
         account = self.account_by_email(email)
         invite_state = self.invite_by_code(invite_code) if invite_code else None
+        # A guest in this browser may add a new address to their account (`guest`).
+        guest = self.guest_by_claim(guest_claim) if account is None else None
         may = (account is not None and account["disabled_at"] is None) or \
-              (account is None and ((invite_state and invite_state.open) or email in self.cfg.leaders))
+              (account is None and ((invite_state and invite_state.open) or email in self.cfg.leaders
+                                    or guest is not None))
         request_id = new_id("req_")
         token = code = None
         if may:
@@ -278,11 +395,11 @@ class Service:
                          (now, email))
             conn.execute(
                 "INSERT INTO email_requests(id, email, token_hash, code_hash, invite_id, created_at,"
-                " expires_at) VALUES (?,?,?,?,?,?,?)",
+                " expires_at, guest_id) VALUES (?,?,?,?,?,?,?,?)",
                 (request_id, email, sha256(token) if token else None,
                  self._mac("code", f"{request_id}:{code}") if code else None,
                  invite_state.invite["id"] if (may and invite_state and invite_state.open) else None,
-                 now, now + self.cfg.link_minutes * 60))
+                 now, now + self.cfg.link_minutes * 60, guest["id"] if (may and guest) else None))
         if not may:
             if account is not None:
                 return request_id, {"kind": "none"}
@@ -291,6 +408,31 @@ class Service:
             return request_id, {"kind": "no_invite"}
         return request_id, {"kind": "link", "token": token, "code": code,
                             "new": account is None}
+
+    def mint_signin_link(self, raw_email: str) -> str:
+        """A one-time sign-in link for a leader or an existing member, printed by the CLI
+        (`python -m agora_entry signin-link <email>`) for when there is no SMTP yet.
+        Same rules as an emailed link: 15 minutes, once, and it cancels older ones.
+        Raises ValueError for anyone else."""
+        email = normalize_email(raw_email)
+        if email is None:
+            raise ValueError("that doesn't look like an email address")
+        account = self.account_by_email(email)
+        if account is not None and account["disabled_at"] is not None:
+            raise ValueError("that account is switched off")
+        if account is None and email not in self.cfg.leaders:
+            raise ValueError("no account has that address, and it isn't in SITE_LEADERS")
+        now, request_id, token = self.now(), new_id("req_"), secrets.token_urlsafe(32)
+        with self.store.connect() as conn:
+            conn.execute("UPDATE email_requests SET used_at=? WHERE email=? AND used_at IS NULL",
+                         (now, email))
+            conn.execute(  # no code: nobody is waiting in a browser to type one
+                "INSERT INTO email_requests(id, email, token_hash, code_hash, invite_id, created_at,"
+                " expires_at) VALUES (?,?,?,NULL,NULL,?,?)",
+                (request_id, email, sha256(token), now, now + self.cfg.link_minutes * 60))
+            self.store.event(conn, now, "signin.link_made", account["id"] if account else None,
+                             via="cli")
+        return f"{self.cfg.base_url}/signin/link?t={token}"
 
     def pending_request(self, request_id: str) -> dict | None:
         row = self.store.one("SELECT * FROM email_requests WHERE id=?", (request_id,))
@@ -304,13 +446,14 @@ class Service:
             return None
         return dict(row)
 
-    def redeem_token(self, token: str, agent: str = "") -> tuple[str, dict]:
+    def redeem_token(self, token: str, agent: str = "", guest_claim: str | None = None) -> tuple[str, dict]:
         req = self.request_for_token(token)
         if req is None:
             raise SignInRefused("This sign-in link has expired or was already used.", "link_spent")
-        return self._finish_email(req, agent)
+        return self._finish_email(req, agent, guest_claim)
 
-    def redeem_code(self, request_id: str, code: str, agent: str = "") -> tuple[str, dict]:
+    def redeem_code(self, request_id: str, code: str, agent: str = "",
+                    guest_claim: str | None = None) -> tuple[str, dict]:
         code = re.sub(r"\D", "", code or "")
         with self.store.connect() as conn:
             row = conn.execute("SELECT * FROM email_requests WHERE id=?", (request_id,)).fetchone()
@@ -325,10 +468,12 @@ class Service:
             left = CODE_ATTEMPTS - row["attempts"] - 1
             raise SignInRefused(f"That code didn't match. {left} tries left." if left > 0 else
                                 "That code didn't match. Ask for a new one.", "code_wrong")
-        return self._finish_email(dict(row), agent)
+        return self._finish_email(dict(row), agent, guest_claim)
 
-    def _finish_email(self, req: dict, agent: str) -> tuple[str, dict]:
+    def _finish_email(self, req: dict, agent: str, guest_claim: str | None = None) -> tuple[str, dict]:
         now = self.now()
+        guest = self.guest_by_claim(guest_claim)
+        upgraded = False
         with self.store.connect() as conn:
             n = conn.execute("UPDATE email_requests SET used_at=? WHERE id=? AND used_at IS NULL"
                              " AND expires_at>?", (now, req["id"], now)).rowcount
@@ -337,7 +482,13 @@ class Service:
             conn.execute("UPDATE email_requests SET used_at=? WHERE email=? AND used_at IS NULL",
                          (now, req["email"]))
             row = conn.execute("SELECT * FROM accounts WHERE email=?", (req["email"],)).fetchone()
-            if row is None:
+            if row is None and guest is not None:
+                # Only the browser holding the guest's claim cookie keeps the guest's account.
+                account_id, upgraded = self._upgrade(conn, guest, req["email"], "email"), True
+            elif row is None and req.get("guest_id") and not req["invite_id"]:
+                raise SignInRefused("Open this link in the browser where you joined as a guest, or "
+                                    "type the code from the email there.", "guest_elsewhere")
+            elif row is None:
                 invite = self._admit(conn, req["email"], req["invite_id"])
                 account_id = self._create_account(conn, req["email"], invite, method="email")
             else:
@@ -347,7 +498,9 @@ class Service:
                 if req["email"] in self.cfg.leaders:
                     self._grant(conn, account_id, "leader", "config")
             session = self._open_session(conn, account_id, "email", agent)
-        return session, self.account(account_id)
+        account = self.account(account_id)
+        account["upgraded"] = upgraded
+        return session, account
 
     # -- Google ----------------------------------------------------------
     def start_flow(self, invite_code: str | None) -> dict:
@@ -376,13 +529,16 @@ class Service:
             conn.execute("UPDATE oidc_flows SET used_at=? WHERE id=?", (now, row["id"]))
         return dict(row)
 
-    def finish_google(self, claims: dict, invite_id: str | None, agent: str = "") -> tuple[str, dict]:
+    def finish_google(self, claims: dict, invite_id: str | None, agent: str = "",
+                      guest_claim: str | None = None) -> tuple[str, dict]:
         email = normalize_email(claims["email"])
         if email is None:
             raise SignInRefused("Google gave an email address we can't use.", "bad_email")
         sub = claims["sub"]
         name = " ".join(str(claims.get("name", "")).split())[:60] or None
         now = self.now()
+        guest = self.guest_by_claim(guest_claim)
+        upgraded = False
         with self.store.connect() as conn:
             row = conn.execute("SELECT * FROM accounts WHERE google_sub=?", (sub,)).fetchone()
             if row is None:
@@ -394,7 +550,10 @@ class Service:
                     conn.execute("UPDATE accounts SET google_sub=?, updated_at=? WHERE id=?",
                                  (sub, now, row["id"]))
                     self.store.event(conn, now, "account.linked", row["id"], method="google")
-            if row is None:
+            if row is None and guest is not None:
+                account_id = self._upgrade(conn, guest, email, "google", google_sub=sub)
+                upgraded = True
+            elif row is None:
                 invite = self._admit(conn, email, invite_id)
                 account_id = self._create_account(conn, email, invite, google_sub=sub,
                                                   suggested_name=name, method="google")
@@ -405,15 +564,19 @@ class Service:
                 if email in self.cfg.leaders:
                     self._grant(conn, account_id, "leader", "config")
             session = self._open_session(conn, account_id, "google", agent)
-        return session, self.account(account_id)
+        account = self.account(account_id)
+        account["upgraded"] = upgraded
+        return session, account
 
     # -- sessions --------------------------------------------------------
-    def _open_session(self, conn, account_id: str, method: str, agent: str) -> str:
+    def _open_session(self, conn, account_id: str, method: str, agent: str,
+                      expires_at: int | None = None) -> str:
         token, now = secrets.token_urlsafe(32), self.now()
         conn.execute(
             "INSERT INTO sessions(id_hash, account_id, method, created_at, last_seen, expires_at,"
             " user_agent) VALUES (?,?,?,?,?,?,?)",
-            (sha256(token), account_id, method, now, now, now + self.cfg.session_days * 86400,
+            (sha256(token), account_id, method, now, now,
+             expires_at if expires_at is not None else now + self.cfg.session_days * 86400,
              (agent or "")[:120]))
         self.store.event(conn, now, "account.signed_in", account_id, method=method)
         return token
@@ -423,16 +586,21 @@ class Service:
             return None
         now = self.now()
         row = self.store.one(
-            "SELECT s.id_hash, s.last_seen, s.expires_at, s.revoked_at, a.* FROM sessions s"
-            " JOIN accounts a ON a.id=s.account_id WHERE s.id_hash=?", (sha256(token),))
+            "SELECT s.id_hash, s.last_seen, s.expires_at, s.revoked_at, i.frozen_at AS invite_frozen_at,"
+            " a.* FROM sessions s JOIN accounts a ON a.id=s.account_id"
+            " LEFT JOIN invites i ON i.id=a.invite_id WHERE s.id_hash=?", (sha256(token),))
         if (row is None or row["revoked_at"] is not None or row["expires_at"] <= now
                 or row["last_seen"] + self.cfg.session_idle_days * 86400 <= now
                 or row["disabled_at"] is not None):
             return None
+        # A guest pass ends at its time, and at once when a leader freezes the invite it came through.
+        if row["guest_until"] is not None and (row["guest_until"] <= now
+                                               or row["invite_frozen_at"] is not None):
+            return None
         if now - row["last_seen"] > 3600:
             self.store.run("UPDATE sessions SET last_seen=? WHERE id_hash=?", (now, row["id_hash"]))
         account = dict(row)
-        for k in ("id_hash", "last_seen", "expires_at", "revoked_at"):
+        for k in ("id_hash", "last_seen", "expires_at", "revoked_at", "invite_frozen_at"):
             account.pop(k)
         return account
 

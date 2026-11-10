@@ -1,0 +1,64 @@
+{
+  "scenarios": [
+    {
+      "manual_override": false,
+      "before": [
+        16,
+        16,
+        600,
+        400
+      ],
+      "displaced_minimised": true,
+      "displaced_rect": [
+        9,
+        1995,
+        219,
+        39
+      ],
+      "after_close_minimised": false,
+      "after_close_rect": [
+        16,
+        16,
+        600,
+        400
+      ],
+      "measured_minimum": [
+        482,
+        341
+      ],
+      "native_nonoverlap": true,
+      "closed_opener_removed": true
+    },
+    {
+      "manual_override": true,
+      "before": [
+        16,
+        16,
+        950,
+        700
+      ],
+      "displaced_minimised": false,
+      "displaced_rect": [
+        16,
+        16,
+        665,
+        490
+      ],
+      "after_close_minimised": true,
+      "after_close_rect": [
+        9,
+        1995,
+        219,
+        39
+      ],
+      "measured_minimum": [
+        482,
+        341
+      ],
+      "native_nonoverlap": true,
+      "closed_opener_removed": true
+    }
+  ],
+  "input_desktop_unchanged": true,
+  "fixture_never_foreground": true
+}

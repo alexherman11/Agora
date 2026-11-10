@@ -22,6 +22,8 @@ Neither stores the other's secrets. Emails stay in the entry store and never ent
 ```json
 {
   "account_id": "acct_k3m9…",
+  "guest": false,
+  "guest_until": null,
   "email": "maya@example.com",
   "email_verified": true,
   "display_name": "Maya R.",
@@ -42,6 +44,7 @@ Neither stores the other's secrets. Emails stay in the entry store and never ent
 - `answers` are keyed by question key. Values are strings or lists of option values. `questions_version` says which wording they answered.
 - `invited_through` is null for leaders who came in through `SITE_LEADERS`.
 - `methods` lists the ways this account can sign in. An emailed link always works.
+- *Claude, 5 Nov:* `guest` and `guest_until`. A guest came in through a meeting's invite with only a name: `"guest": true`, `"guest_until": <epoch seconds>` (23:59:59 on the day after they joined, in the site's zone), `"email": null`, `"email_verified": false`, `"methods": ["guest"]`, and `session/check` answers `"method": "guest"`. After `guest_until`, or once their invite is frozen, `session/check` answers null for them. If they later sign in with an email or Google in the same browser, the same `account_id` becomes a full member (`"guest": false`, `"guest_until": null`), and `/keep/account` is called again for it, so the kernel's join must stay idempotent per account. Everyone else's record has `"guest": false, "guest_until": null`.
 - There are no roles in the record. What someone may do is the kernel's to say (**ran**: a test asserts `roles` is absent).
 
 ## 3. How the kernel trusts it (built)
@@ -99,14 +102,15 @@ The kernel proposes `/auth/*` to the entry service and everything else to the ke
 
 | Path | Goes to |
 |---|---|
-| `/`, `/privacy`, `/join`, `/join/*` | entry service |
+| `/about`, `/privacy`, `/join`, `/join/*` | entry service (Claude, 5 Nov: the mission page moved from `/` to `/about`) |
 | `/signin`, `/signin/*`, `/auth/*`, `/signout` | entry service |
 | `/welcome`, `/account`, `/leader/invites*` | entry service |
 | `/entry-static/*`, `/favicon.ico` | entry service |
 | `/internal/*` | nobody from outside |
+| `/` | kernel: the board is the landing page (Claude, 5 Nov) |
 | everything else | kernel |
 
-After the questions, the entry service sends people to `/home`, a placeholder that says the feed is coming. When the kernel serves the feed, the kernel takes `/home` (or names another path, and I point the redirect there).
+*Claude, 5 Nov:* after joining (questions or guest pass) or signing in, the entry service sends people to `SITE_HOME`, default `/`, the board. `/home` stays as the entry service's own placeholder page.
 
 ## 9. Questions for the kernel builder (answered in their notes below)
 

@@ -290,6 +290,12 @@ class Kernel:
         tx.set(steward, "name", g["steward"]["name"])
         tx.set(place, f"member:{steward}", "leader")
         self.accounts[g["steward"]["account"]] = steward
+        if g.get("visitors"):
+            # a world read by people who have not signed in (`visitors on` says the same later): its visitor person
+            vid = tx.mint()
+            for k2, v in (("kind", "person"), ("name", g.get("visitor_name", "Visitor")), ("visitor", "yes")):
+                tx.set(vid, k2, v)
+            tx.set("world", "visitor", vid)
         from .words import KERNEL_ENTRIES
         for e in KERNEL_ENTRIES:
             eid = tx.mint()
@@ -383,7 +389,7 @@ class Kernel:
         return any(self.state.get(g, f"member:{person}") == "leader" for g in self.up(group))
 
     def is_member(self, person, group):
-        if self.state.get(person, "kind") != "person":
+        if self.state.get(person, "kind") != "person" or self.is_visitor(person):
             return False
         if group == self.place or self.state.get(group, "open"):
             return True                                     # every person who joined is a member of the place, and of
@@ -393,6 +399,33 @@ class Kernel:
 
     def is_steward(self, person):
         return self.is_leader(person, self.place)
+
+    # ------------------------------------------------------------------ visitors and guests
+    def is_visitor(self, person):
+        """A person thing marked visitor=yes: whoever reads without signing in. It sees only what is shown to
+        `everyone`, and never acts."""
+        return bool(person) and self.state.get(person, "visitor") == "yes"
+
+    def visitor(self):
+        """The person signed-out readers read as, or None when the world has no visitors (`visitors on|off`)."""
+        v = self.state.get("world", "visitor")
+        if v and self.is_visitor(v) and not self.state.get(v, "forgotten"):
+            return v
+        return None
+
+    def is_guest(self, person):
+        """A person the entry service admitted as a guest (a name only; SEAM.md): a full member, who shares no files."""
+        return bool(person) and self.state.get(person, "guest") == "yes"
+
+    def guest_ended(self, person):
+        """A guest whose pass (guest_until, epoch seconds) has run out: they read, and act again once signed in."""
+        until = self.state.get(person, "guest_until")
+        if not self.is_guest(person) or until in (None, ""):
+            return False
+        try:
+            return self.now().timestamp() >= float(until)
+        except (TypeError, ValueError):
+            return True                                 # an unreadable pass fails closed
 
     # ------------------------------------------------------------------ who sees
     def used(self, person, eid, target):
@@ -460,10 +493,14 @@ class Kernel:
             p = self.state.get(reader, "for")
             if p:
                 return self._sees(p, rule, thing)
-            return any(tok.strip() in ("public", "place") for tok in str(rule).split("|"))
+            return any(tok.strip() in ("public", "place", "everyone") for tok in str(rule).split("|"))
+        if self.is_visitor(reader):
+            # a signed-out reader: only what is shown to everyone, or to the visitor by name. `public` and `place`
+            # mean the people in the place, as they did before visitors existed
+            return any(tok.strip() in ("everyone", f"person:{reader}") for tok in str(rule).split("|"))
         for tok in str(rule).split("|"):
             tok = tok.strip()
-            if tok == "public":
+            if tok in ("public", "everyone"):
                 return True
             if tok == "place" and reader and self.state.get(reader, "kind") == "person":
                 return True
@@ -476,13 +513,23 @@ class Kernel:
                 return True
         return False
 
+    def rule_of(self, t, a, reader=None):
+        """Who sees a thing: its own `sees`, else the place. For a visitor, a thing with no `sees` of its own follows
+        a group it is placed in that is shown to everyone (`seen-by <group> everyone`): a leader opens a group's
+        readings to signed-out readers at once, while its narrowed things stay narrowed."""
+        rule = a.get("sees")
+        if rule is None and self.is_visitor(reader) and any(
+                self.state.get(g, "sees") == "everyone" for g in self.groups_of(t)):
+            return "everyone"
+        return "place" if rule is None else rule
+
     def shown(self, reader, t):
         """The thing as `reader` (a person id) may see it, or None. Every read passes here (SHAPE section 7). Sealed
         likes are shown only as a count."""
         a = dict(self.state.things.get(t) or {})
         if not a or not a.get('kind') or t == "world" or a.get("forgotten"):
             return None                 # a forgotten thing is out of every view; undo of the forget brings it back
-        if not self._sees(reader, a.get("sees", "place"), t):
+        if not self._sees(reader, self.rule_of(t, a, reader), t):
             return None
         if a.get("sees_when") and not self.predicate(reader, a["sees_when"], t):
             return None
@@ -494,7 +541,7 @@ class Kernel:
                 return None
             visited.add(parent)
             pa = self.state.things.get(parent)
-            if not pa or pa.get('forgotten') or not self._sees(reader, pa.get('sees', 'place'), parent):
+            if not pa or pa.get('forgotten') or not self._sees(reader, self.rule_of(parent, pa, reader), parent):
                 return None
             if pa.get('sees_when') and not self.predicate(reader, pa['sees_when'], parent):
                 return None
@@ -1075,7 +1122,7 @@ class Kernel:
     # ------------------------------------------------------------------ what may go to an outside service
     @staticmethod
     def _place_rule(rule):
-        return any(tok.strip() in ("public", "place") for tok in str(rule).split("|"))
+        return any(tok.strip() in ("public", "place", "everyone") for tok in str(rule).split("|"))
 
     def place_sees(self, t, aspect=None):
         """Whether everyone in the place sees this thing (and everything its visibility follows), and, given an aspect,
@@ -1411,6 +1458,11 @@ class Kernel:
                 raise Refused(f"nothing answers to '{st.word}' here; " + suggest(self, actor, st.word, group))
             entry = self.entry(eid)
             st.word = entry['word']
+            if entry.get("word_kind") != "see":
+                if self.is_visitor(actor.person):
+                    raise Refused(f"sign in to send: {st.word} is an act, and you are reading as a visitor")
+                if self.guest_ended(actor.person):
+                    raise Refused(f"your guest pass has ended; sign in to keep talking ({st.word} was not done)")
             if mode == "see" and entry.get("word_kind") != "see":
                 raise Refused(f"{st.word} is an act; /see runs only readings; send it through /do")
             text = L.re.sub(r'^\S+', st.word, text, count=1)
@@ -2199,9 +2251,11 @@ class Kernel:
         return offered is not None and (self.state.get(e, "bound") or self.state.get(e, "word")) not in offered
 
     # ------------------------------------------------------------------ persons
-    def join(self, account, name, invite=None, answers=None, agent=None):
+    def join(self, account, name, invite=None, answers=None, agent=None, guest=None, guest_until=None):
         """The seam with sign-in (SHAPE section 3): an account the entry service has verified -> its person.
-        A new account needs a live invite; its first act is `join`, and its answers are its first facts."""
+        A new account needs a live invite; its first act is `join`, and its answers are its first facts.
+        guest=True (with guest_until, epoch seconds) keeps guest=yes on the person; a later call with guest=False
+        (the guest made an account) takes both away. guest=None leaves them as they are."""
         if not account or not isinstance(account, str):
             raise Refused("no account: the entry service must say which account this is")
         with self.lock:
@@ -2234,14 +2288,40 @@ class Kernel:
                 for k, v in (answers or {}).items():
                     tx.set(pid, f"answer:{k}", v)
                     tx.set(pid, f"sees.answer:{k}", f"person:{pid}|leaders")   # decided 23 Oct
+                self._guest_facts(tx, pid, guest, guest_until)
                 self._commit(tx, by=pid, words="join", via="sign-in")
                 self.accounts[account] = pid
                 self._keep_write("accounts.json", self.accounts)
                 new = True
             else:
                 new = False
+                tx = Tx(self)
+                tx.part("join", pid, "guest" if guest else "join")
+                # the entry service holds the person's display name; a rejoin with a new one keeps the world current
+                if name and str(self.state.get(pid, "name", "")) != str(name):
+                    tx.set(pid, "name", name)
+                self._guest_facts(tx, pid, guest, guest_until)
+                if not tx.empty:
+                    self._commit(tx, by=pid, words="guest" if guest else "no longer a guest", via="sign-in")
             actor = self.actor_for(pid, agent)
-        return {"person": pid, "new": new, "actor": actor.id}
+        return {"person": pid, "new": new, "actor": actor.id, "guest": self.is_guest(pid)}
+
+    def _guest_facts(self, tx, pid, guest, until):
+        if guest is None:
+            return
+        if guest:
+            try:
+                until = int(float(until)) if until not in (None, "") else None
+            except (TypeError, ValueError):
+                raise Refused("guest_until must be epoch seconds")
+            if self.state.get(pid, "guest") != "yes":
+                tx.set(pid, "guest", "yes")
+            if until is not None and self.state.get(pid, "guest_until") != until:
+                tx.set(pid, "guest_until", until)
+        else:
+            for a in ("guest", "guest_until"):
+                if self.state.get(pid, a) is not None:
+                    tx.set(pid, a)
 
     def actor_for(self, pid, agent=None):
         """The actor for a session: the person, or (for an agent's session) that person's agent of that name."""

@@ -1,0 +1,27 @@
+# Plan quota windows beside the composer. Context tokens and cache hits are different readings.
+usage : row
+  role urings
+  of prop:role=home-view,prop:actor=$me as v
+  each windows
+windows : row
+  role urings
+  of prop:role=usage-window,prop:usage_visible=yes as u
+  each gauge
+gauge : column
+  role uring
+  let tone = "#B53030" when $u.percent >= 90
+  let tone = "var(--t-warm)" when $u.percent >= 70
+  let tone = "var(--t-accent)" otherwise
+  let label = "5h" when $u.window = "5 hours"
+  let label = "7d" when $u.window = "7 days"
+  let label = "?" otherwise
+  known : text "<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'><title>$u.usage_label · $u.window</title><circle cx='16' cy='16' r='12' fill='none' stroke='currentColor' opacity='.15' stroke-width='2.5'/><circle cx='16' cy='16' r='12' fill='none' stroke='$(tone)' stroke-width='2.5' pathLength='100' stroke-dasharray='$u.percent 100' transform='rotate(-90 16 16)'/><text x='16' y='19' text-anchor='middle' font-size='9' fill='currentColor'>$(label)</text></svg>"
+    picture
+    only when $u.usage_available = "yes"
+    tip "$u.title" "$u.usage_detail"
+    on click do read $v; do prop $v viewing=$u back="$v.viewing" with=plan-usage-reader find=""
+  unknown : text "<svg viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'><title>$u.provider usage unavailable</title><circle cx='16' cy='16' r='12' fill='none' stroke='currentColor' opacity='.3' stroke-width='2.5' stroke-dasharray='2 3'/><text x='16' y='20' text-anchor='middle' font-size='12' fill='currentColor'>?</text></svg>"
+    picture
+    only when $u.usage_available != "yes"
+    tip "$u.title" "$u.usage_detail"
+    on click do read $v; do prop $v viewing=$u back="$v.viewing" with=plan-usage-reader find=""

@@ -32,11 +32,14 @@ from .service import INVITE_EXPIRY_DAYS, Service, SignInRefused, normalize_email
 STATIC = Path(__file__).resolve().parent.parent / "static"
 MAX_BODY = 64 * 1024
 
-# (limit, window seconds)
+# (limit, window seconds). Defaults: each is a setting, SITE_LIMIT_<KIND>=<count>, and
+# SITE_IP_LIMITS=off switches off every kind ending in _ip (config.py).
 LIMITS = {
     "email_ip": (60, 3600), "email_addr": (5, 3600), "email_noinvite": (1, 86400),
     "code_ip": (30, 3600), "link_ip": (60, 3600), "google_ip": (30, 600),
-    "join_ip": (120, 3600), "invite_make": (100, 86400), "page_ip": (600, 60),
+    "join_ip": (300, 3600), "invite_make": (100, 86400), "page_ip": (600, 60),
+    # guest passes: a meeting's whole room shares one wifi address; one invite takes ~300 a day
+    "guest_ip": (80, 3600), "guest_invite": (300, 86400),
 }
 
 
@@ -132,8 +135,14 @@ class App:
         self.content = json.loads((cfg.content_dir / "site.json").read_text(encoding="utf-8"))
         self.privacy = json.loads((cfg.content_dir / "privacy.json").read_text(encoding="utf-8"))
         self.service = Service(cfg, self.store, self.questions, clock)
+        unknown = set(cfg.limit_overrides) - set(LIMITS)
+        if unknown:
+            raise ValueError(f"unknown SITE_LIMIT_ settings: {', '.join(sorted(unknown))}")
+        self.limits = {k: (cfg.limit_overrides.get(k, n), w) for k, (n, w) in LIMITS.items()}
         if mailer is not None:
             self.mailer = mailer
+        elif cfg.email_mode == "off":
+            self.mailer = None  # live mode before SMTP is set up: email sign-in says so
         elif cfg.email_mode == "file":
             self.mailer = FileMailer(cfg.data_dir / "outbox", cfg.email_from)
         else:
@@ -144,11 +153,13 @@ class App:
         self.seam = Seam(self)
         self.pages = pages.Pages(self)
         prefix = "__Host-" if cfg.secure_cookies else ""
-        self.cookie = {k: prefix + "entry_" + k for k in ("csrf", "pending", "flow")}
+        self.cookie = {k: prefix + "entry_" + k for k in ("csrf", "pending", "flow", "guest")}
         self.cookie["sid"] = prefix + "agora_session"  # the kernel reads this one too (SEAM.md)
         self.routes = [
-            ("GET", r"/", self.public),
+            ("GET", r"/", self.root),
+            ("GET", r"/about", self.public),
             ("GET", r"/join/(?P<code>[A-Za-z0-9]{1,40})", self.join),
+            ("POST", r"/join/(?P<code>[A-Za-z0-9]{1,40})/guest", self.join_guest),
             ("GET", r"/join", self.join_public),
             ("GET", r"/privacy", lambda req: self.pages.privacy(req)),
             ("GET", r"/signin", self.signin),
@@ -169,7 +180,8 @@ class App:
             ("POST", r"/leader/invites", self.leader_make_invite),
             ("GET", r"/leader/invites/(?P<invite_id>inv_[a-z0-9]{20})", self.leader_invite),
             ("GET", r"/leader/invites/(?P<invite_id>inv_[a-z0-9]{20})/qr", self.leader_invite_qr),
-            ("POST", r"/leader/invites/(?P<invite_id>inv_[a-z0-9]{20})/(?P<act>freeze|unfreeze|public|unpublic)",
+            ("POST", r"/leader/invites/(?P<invite_id>inv_[a-z0-9]{20})/"
+                     r"(?P<act>freeze|unfreeze|public|unpublic|guests_on|guests_off)",
              self.leader_invite_act),
             ("GET", r"/entry-static/(?P<name>[a-z0-9_-]{1,40}\.(?:css|svg|js|png))", self.static),
             ("GET", r"/favicon\.ico", lambda req: self.static(req, "icon.svg")),
@@ -279,14 +291,27 @@ class App:
         return hmac.compare_digest(expected, req.get("csrf"))
 
     def allow(self, kind: str, who: str) -> bool:
-        limit, window = LIMITS[kind]
+        if kind.endswith("_ip") and not self.cfg.ip_limits:
+            return True
+        limit, window = self.limits[kind]
         return self.service.allow(f"{kind}:{sha256(who)[:32]}", limit, window)
 
     def start_session(self, req: Request, token: str, account: dict) -> Response:
         self.set_cookie(req, "sid", token, self.cfg.session_days * 86400)
         self.clear_cookie(req, "pending")
         self.clear_cookie(req, "flow")
-        return Response.redirect("/home" if account["onboarded_at"] else "/welcome")
+        if req.cookies.get(self.cookie["guest"]):
+            self.clear_cookie(req, "guest")  # kept as this account now, or another account chosen
+        if account.get("upgraded"):
+            # Same account id, so the kernel's person stays; tell it about the new standing.
+            self.service.kernel_join(account["id"])
+        return Response.redirect(self.cfg.home_path if account["onboarded_at"] else "/welcome")
+
+    def guest_claim(self, req: Request) -> str | None:
+        return req.cookies.get(self.cookie["guest"]) or None
+
+    def is_guest(self, account: dict | None) -> bool:
+        return bool(account and account.get("guest_until") is not None)
 
     def need_account(self, req: Request) -> Response | None:
         if req.account is None:
@@ -294,6 +319,13 @@ class App:
         return None
 
     # -- public pages ---------------------------------------------------------
+    def root(self, req: Request) -> Response:
+        # The board (the kernel) is the landing page at /; the proxy sends / there. Run alone,
+        # this service points / at the mission page, or home for someone signed in.
+        if self.cfg.home_path != "/" and req.account:
+            return Response.redirect(self.cfg.home_path)
+        return Response.redirect("/home" if req.account else "/about")
+
     def public(self, req: Request) -> Response:
         if not self.allow("page_ip", req.ip):
             return self.pages.too_many(req)
@@ -311,15 +343,43 @@ class App:
             return self.pages.too_many(req)
         state = self.service.invite_by_code(code)
         if req.account:
-            return Response.redirect("/home")
+            return Response.redirect(self.cfg.home_path)
         if not state.open:
             return self.pages.invite_closed(req, state)
         maker = self.service.account(state.invite["maker_id"])
+        if state.invite["guest_ok"] and req.query.get("account") != "1":
+            return self.pages.join_guest(req, state.invite, maker)
         return self.pages.join(req, state.invite, maker)
 
-    def signin(self, req: Request) -> Response:
+    def join_guest(self, req: Request, code: str) -> Response:
         if req.account:
-            return Response.redirect("/home")
+            return Response.redirect(self.cfg.home_path)
+        state = self.service.invite_by_code(code)
+        if not state.open:
+            return self.pages.invite_closed(req, state)
+        if not state.invite["guest_ok"]:
+            return Response.redirect(f"/join/{state.invite['code']}?account=1")
+        maker = self.service.account(state.invite["maker_id"])
+        name = req.get("name")
+        if not self.allow("guest_ip", req.ip) or not self.allow("guest_invite", state.invite["id"]):
+            return self.pages.too_many(req)
+        try:
+            token, claim, account = self.service.create_guest(code, name, req.agent)
+        except SignInRefused as refused:
+            if refused.kind == "bad_name":
+                return self.pages.join_guest(req, state.invite, maker, name=name, error=refused.reason)
+            return self.pages.refused(req, refused)
+        now = self.service.now()
+        self.set_cookie(req, "sid", token, max(60, account["guest_until"] - now))
+        # A separate, longer-lived claim: this browser may later keep this account with an email.
+        self.set_cookie(req, "guest", claim,
+                        max(60, account["guest_until"] + self.cfg.guest_claim_days * 86400 - now))
+        self.service.kernel_join(account["id"])
+        return Response.redirect(self.cfg.home_path)
+
+    def signin(self, req: Request) -> Response:
+        if req.account and not self.is_guest(req.account):
+            return Response.redirect(self.cfg.home_path)
         return self.pages.signin(req)
 
     def signin_email(self, req: Request) -> Response:
@@ -328,9 +388,11 @@ class App:
         if email is None:
             return self.pages.signin(req, invite_code=invite_code, email=req.get("email"),
                                      error="That doesn't look like an email address. Check it and try again.")
+        if self.mailer is None:
+            return self.pages.no_email(req)
         if not self.allow("email_ip", req.ip) or not self.allow("email_addr", email):
             return self.pages.too_many(req)
-        request_id, send = self.service.request_email_signin(email, invite_code)
+        request_id, send = self.service.request_email_signin(email, invite_code, self.guest_claim(req))
         self.send_signin_email(email, send)
         self.set_cookie(req, "pending", request_id, self.cfg.link_minutes * 60 + 300)
         return Response.redirect("/signin/check")
@@ -358,7 +420,8 @@ class App:
         if not self.allow("code_ip", req.ip):
             return self.pages.too_many(req)
         try:
-            token, account = self.service.redeem_code(request_id, req.get("code"), req.agent)
+            token, account = self.service.redeem_code(request_id, req.get("code"), req.agent,
+                                                      self.guest_claim(req))
         except SignInRefused as refused:
             if refused.kind == "code_wrong":
                 return self.pages.check(req, pending["email"], error=refused.reason)
@@ -374,14 +437,15 @@ class App:
             return self.pages.refused(req, SignInRefused(
                 "This sign-in link has expired or was already used.", "link_spent"))
         # A button, not an automatic sign-in: mail scanners open links too.
-        elsewhere = req.cookies.get(self.cookie["pending"]) != found["id"]
+        # A link with no code (minted by the CLI) has no waiting tab to warn about.
+        elsewhere = found["code_hash"] is not None and req.cookies.get(self.cookie["pending"]) != found["id"]
         return self.pages.link_confirm(req, token, found["email"], elsewhere)
 
     def signin_link_post(self, req: Request) -> Response:
         if not self.allow("link_ip", req.ip):
             return self.pages.too_many(req)
         try:
-            token, account = self.service.redeem_token(req.get("t"), req.agent)
+            token, account = self.service.redeem_token(req.get("t"), req.agent, self.guest_claim(req))
         except SignInRefused as refused:
             return self.pages.refused(req, refused)
         return self.start_session(req, token, account)
@@ -423,7 +487,8 @@ class App:
                                       "email instead.", back=("/signin", "Back to sign in"),
                                       status="502 Bad Gateway")
         try:
-            token, account = self.service.finish_google(claims, flow["invite_id"], req.agent)
+            token, account = self.service.finish_google(claims, flow["invite_id"], req.agent,
+                                                        self.guest_claim(req))
         except SignInRefused as refused:
             return self.pages.refused(req, refused)
         return self.start_session(req, token, account)
@@ -433,7 +498,7 @@ class App:
         if (r := self.need_account(req)) is not None:
             return r
         if req.account["onboarded_at"]:
-            return Response.redirect("/home")
+            return Response.redirect(self.cfg.home_path)
         return self.pages.welcome(req)
 
     def read_answers(self, req: Request) -> tuple[dict, dict, str]:
@@ -454,7 +519,7 @@ class App:
             return self.pages.welcome(req, values=values, errors=errors)
         self.service.save_answers(req.account["id"], values, name)
         self.service.kernel_join(req.account["id"])
-        return Response.redirect("/home")
+        return Response.redirect(self.cfg.home_path)
 
     def home(self, req: Request) -> Response:
         if (r := self.need_account(req)) is not None:
@@ -484,6 +549,8 @@ class App:
         if req.session_token:
             self.service.sign_out(req.session_token, everywhere=req.get("everywhere") == "1")
         self.clear_cookie(req, "sid")
+        if req.cookies.get(self.cookie["guest"]):
+            self.clear_cookie(req, "guest")  # a shared phone: the next person can't keep this pass
         return Response.redirect("/")
 
     # -- leaders --------------------------------------------------------------
@@ -512,7 +579,7 @@ class App:
             max_uses = int(raw_uses) if raw_uses else None
             days = int(req.get("expires_days") or (1 if kind == "event" else 30))
             invite = self.service.make_invite(req.account["id"], req.get("channel"), kind,
-                                              max_uses, days)
+                                              max_uses, days, guest_ok=req.get("guest_ok") == "1")
         except ValueError as exc:
             message = str(exc) if "invalid literal" not in str(exc) else "Uses must be a whole number."
             return self.pages.leader_invites(req, error=message, form=req.form())
@@ -536,13 +603,15 @@ class App:
         return self.pages.invite_qr(req, state)
 
     def leader_invite_act(self, req: Request, invite_id: str, act: str) -> Response:
-        word = "invite.freeze" if act in ("freeze", "unfreeze") else "site.public_invite"
+        word = "site.public_invite" if act in ("public", "unpublic") else "invite.freeze"
         if (r := self.need_word(req, word)) is not None:
             return r
         if self.service.invite_by_id(invite_id).invite is None:
             return Response.redirect("/leader/invites")
         if act in ("freeze", "unfreeze"):
             self.service.set_frozen(invite_id, req.account["id"], act == "freeze")
+        elif act in ("guests_on", "guests_off"):
+            self.service.set_guest_ok(invite_id, req.account["id"], act == "guests_on")
         else:
             self.service.set_public_invite(invite_id if act == "public" else None, req.account["id"])
         return Response.redirect(f"/leader/invites/{invite_id}")

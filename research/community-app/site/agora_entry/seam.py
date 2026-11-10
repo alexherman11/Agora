@@ -27,9 +27,15 @@ def account_record(app, account: dict) -> dict:
     """The verified account, in the shape the kernel receives (SEAM.md)."""
     svc = app.service
     invite = svc.invite_by_id(account["invite_id"]).invite if account["invite_id"] else None
-    methods = ["email"] + (["google"] if account["google_sub"] else [])
+    guest = account.get("guest_until") is not None
+    if guest:
+        methods = ["guest"]  # a name only, through a meeting's invite, until guest_until (5 Nov)
+    else:
+        methods = ["email"] + (["google"] if account["google_sub"] else [])
     return {
         "account_id": account["id"],
+        "guest": guest,
+        "guest_until": account.get("guest_until"),
         "email": account["email"],
         "email_verified": bool(account["email_verified"]),
         "display_name": account["display_name"],

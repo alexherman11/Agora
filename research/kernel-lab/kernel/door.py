@@ -12,6 +12,12 @@ The door: lines in, receipts and rows out, over HTTP on loopback (SHAPE section 
     POST /keep/account {account, name, invite?, answers?, agent?}   the entry service's call (SHAPE section 3)
     GET  /health
 
+Visitors: with no session, or one that has ended, a world that has a visitor (`visitors on`, or genesis
+`"visitors": true`) reads as that person: readings, scenes, files and the stream answer with what is shown to
+`everyone`; every act is refused "sign in to send", and answers carry `"visitor": true`. A world with no visitor
+answers 401, as before. Guests: /keep/account may carry `guest` (true|false) and `guest_until` (epoch seconds), at the
+top of the body or in its `record`; the person keeps guest=yes and guest_until until a call says guest false.
+
 Who acts comes only from the session: the entry service's `agora_session` cookie (or `Authorization: Bearer <token>`, for
 programs), which the kernel asks the entry service about (`POST <entry>/internal/session/check`, cached at most 30 s;
 research/community-app/site/SEAM.md). An `as` in the body is ignored.
@@ -116,10 +122,10 @@ def make_handler(kernel, entry, secret):
                 if k in SESSION_COOKIES and v:
                     token = token or v
             if not token:
-                return None, "sign in first"
+                return self._visitor("sign in first")
             who = entry.check(token)
             if not who or not who.get("account"):
-                return None, "this session is not signed in (or has ended); sign in again"
+                return self._visitor("this session is not signed in (or has ended); sign in again")
             pid = kernel.accounts.get(who["account"])
             if pid is None:
                 return None, "this account has not joined the place yet"
@@ -127,6 +133,22 @@ def make_handler(kernel, entry, secret):
             # as= names last for this sign-in (dk1368): keyed by a digest, so the token itself is never kept
             actor.session = hashlib.sha256(token.encode()).hexdigest()[:16]
             return actor, None
+
+        def _visitor(self, why):
+            """No one is signed in: the world's visitor, if it has one, reads; else the door refuses."""
+            vid = kernel.visitor()
+            if vid is None:
+                return None, why
+            actor = kernel.actor_for(vid)
+            actor.visitor = True
+            return actor, None
+
+        def _signed_in(self):
+            """An actor that may act (upload, arrange): a visitor is refused as no one."""
+            actor, why = self._actor()
+            if actor is not None and getattr(actor, "visitor", False):
+                return None, "sign in to send"
+            return actor, why
 
         def _raw(self, code, data, ctype, extra=()):
             self.send_response(code)
@@ -236,7 +258,7 @@ def make_handler(kernel, entry, secret):
             if self._cross_site():
                 return self._send(403, {"error": "the door answers only its own pages"})
             if self.path == '/api/tiling':
-                actor, why = self._actor()
+                actor, why = self._signed_in()
                 if actor is None:
                     return self._send(401, {'error': why})
                 if int(self.headers.get('Content-Length') or 0) > 40000:
@@ -247,7 +269,7 @@ def make_handler(kernel, entry, secret):
                 except (ValueError, KeyError, TypeError) as exc:
                     return self._send(400, {'error': str(exc)})
             if self.path.split('?')[0] == '/upload':
-                actor, why = self._actor()
+                actor, why = self._signed_in()
                 if actor is None:
                     return self._send(401, {'error': why})
                 from .blobs import cap, receive
@@ -272,9 +294,13 @@ def make_handler(kernel, entry, secret):
                 given = (self.headers.get("X-Kernel-Secret") or "").encode()
                 if not secret or self.client_address[0] not in ("127.0.0.1", "::1") or not hmac.compare_digest(given, secret.encode()):
                     return self._send(403, {"error": "only the entry service may call this"})
+                rec = body.get("record") if isinstance(body.get("record"), dict) else {}
+                guest = body["guest"] if "guest" in body else rec.get("guest")
+                until = body["guest_until"] if "guest_until" in body else rec.get("guest_until")
                 try:
                     out = kernel.join(body.get("account"), body.get("name"), body.get("invite"),
-                                      body.get("answers"), body.get("agent"))
+                                      body.get("answers"), body.get("agent"),
+                                      guest=None if guest is None else bool(guest), guest_until=until)
                 except Refused as exc:
                     return self._send(403, {"refused": str(exc)})
                 return self._send(200, out)
@@ -288,6 +314,10 @@ def make_handler(kernel, entry, secret):
                 out = kernel.run(actor, line, press=body.get("press"), saw=body.get("saw"),
                                  mode="see" if self.path == "/see" else "do")
                 out["as"] = kernel.name(actor.id)
+                if getattr(actor, "visitor", False):
+                    out["visitor"] = True
+                elif kernel.is_guest(actor.person):
+                    out["guest"] = True
                 return self._send(200, out)
             if self.path in ("/api/do", "/api/observe", "/api/selection"):
                 actor, why = self._actor()

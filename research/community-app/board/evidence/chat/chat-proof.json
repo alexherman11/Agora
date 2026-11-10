@@ -1,0 +1,182 @@
+{
+  "checks": [
+    {
+      "check": "The list: Announcements, Calendar, Map, Documents, then Chats",
+      "ok": true,
+      "detail": [
+        "Announcements",
+        "Calendar",
+        "Map",
+        "Documents",
+        "Chats",
+        "# Legal",
+        "# Media",
+        "# Buyout",
+        "# Website",
+        "# Wishes",
+        "# Bugs"
+      ]
+    },
+    {
+      "check": "Legal opens a chat in the centre, no feed or toolbar",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Enter sent it, the box is empty, bold and link formatted",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Consecutive lines group under one name",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Bea reacts 🎉 from the picker; hers shows pressed",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Alex sees Bea's reaction with her name",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Alex sees the reply's excerpt of his line",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "HTML in a message is shown as text",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "A line naming Alex is highlighted for him",
+      "ok": true,
+      "detail": "nb-msg nb-msg-mention"
+    },
+    {
+      "check": "No horizontal overflow chat-desktop 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow chat-bea 1440",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Edit inline: Enter saves and the line says (edited)",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Phone: the list is folded away and a menu button shows",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow chat-phone 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow chat-phone-menu 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Choosing a chat from the phone menu opens it and folds the list",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Phone: a long press shows the line’s actions",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Phone: message tools, Send and menu are at least 44px tall",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "check": "No horizontal overflow chat-phone-actions 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Phone: the chat and its composer fit the screen height",
+      "ok": true,
+      "detail": [
+        798,
+        798
+      ]
+    },
+    {
+      "check": "No horizontal overflow phone-announcements 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow phone-calendar 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Phone: Map opens the map part in the centre (map components are not installed in this disposable world)",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No horizontal overflow phone-map 390",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "Reading a chat moves the reader’s own seen marker (one per chat)",
+      "ok": true,
+      "detail": [
+        {
+          "kind": "board-seen",
+          "group": "bd160",
+          "at": "2026-10-22T12:00:00Z",
+          "made_by": "bd264",
+          "for": "bd2",
+          "made": "2026-10-22T12:00:00Z",
+          "changed": "2026-10-22T12:00:00Z",
+          "groups": [
+            "bd1"
+          ],
+          "by": "seabright-board",
+          "id": "bd273",
+          "rev": 286
+        }
+      ]
+    },
+    {
+      "check": "No refusal notice on screen after all of this",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "No uncaught script errors in either browser",
+      "ok": true,
+      "detail": "[]"
+    }
+  ],
+  "screenshots": [
+    "evidence\\chat\\chat-desktop-1440.png",
+    "evidence\\chat\\chat-bea-1440.png",
+    "evidence\\chat\\chat-phone-390.png",
+    "evidence\\chat\\chat-phone-menu-390.png",
+    "evidence\\chat\\chat-phone-actions-390.png",
+    "evidence\\chat\\phone-announcements-390.png",
+    "evidence\\chat\\phone-calendar-390.png",
+    "evidence\\chat\\phone-map-390.png"
+  ],
+  "hidden": true,
+  "live_touched": false
+}

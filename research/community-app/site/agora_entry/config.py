@@ -11,6 +11,7 @@ import ipaddress
 import os
 import secrets
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, tzinfo
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -51,6 +52,56 @@ def is_loopback_host(host: str) -> bool:
         return False
 
 
+class _USZone(tzinfo):
+    """US time-zone rules (DST from the second Sunday of March to the first Sunday of
+    November, at 2 am), for a Python that has no tz database (Windows without the tzdata
+    package). The server's Python uses the system's database through zoneinfo instead."""
+
+    def __init__(self, hours: int, name: str):
+        self.std, self.name = timedelta(hours=hours), name
+
+    def _dst_on(self, dt: datetime) -> bool:
+        def sunday(month: int, nth: int) -> datetime:
+            first = datetime(dt.year, month, 1)
+            return first + timedelta(days=(6 - first.weekday()) % 7 + 7 * (nth - 1), hours=2)
+        naive = dt.replace(tzinfo=None)
+        return sunday(3, 2) <= naive < sunday(11, 1) - timedelta(hours=1)
+
+    def utcoffset(self, dt):
+        return self.std + self.dst(dt)
+
+    def dst(self, dt):
+        return timedelta(hours=1) if dt is not None and self._dst_on(dt) else timedelta(0)
+
+    def tzname(self, dt):
+        return self.name
+
+    def fromutc(self, dt):
+        standard = dt + self.std
+        summer = standard + timedelta(hours=1)
+        return summer if self._dst_on(summer.replace(tzinfo=None)) else standard
+
+
+_US_ZONES = {"America/Los_Angeles": -8, "America/Denver": -7, "America/Chicago": -6,
+             "America/New_York": -5}
+
+
+def local_zone(name: str) -> tzinfo:
+    """The zone called `name`: from zoneinfo when the system has a tz database, else the US
+    rules above for the four main US zones. Raises ValueError for anything else."""
+    try:
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+        try:
+            return ZoneInfo(name)
+        except (ZoneInfoNotFoundError, ValueError):
+            pass
+    except ImportError:
+        pass
+    if name in _US_ZONES:
+        return _USZone(_US_ZONES[name], name)
+    raise ValueError(f"unknown SITE_TIMEZONE {name!r}")
+
+
 @dataclass
 class Config:
     mode: str  # "test" or "live"
@@ -70,7 +121,7 @@ class Config:
     google_issuers: tuple[str, ...] = GOOGLE_ISSUERS
     fake_google_port: int = 0
 
-    email_mode: str = "file"  # "file" or "smtp"
+    email_mode: str = "file"  # "file" (test outbox), "smtp", or "off" (live without SMTP yet)
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_user: str = ""
@@ -85,6 +136,20 @@ class Config:
     session_days: int = 90
     session_idle_days: int = 30
     link_minutes: int = 15
+
+    # Where people land after joining or signing in: the board, served by the kernel at / (5 Nov).
+    home_path: str = "/"
+    # Guest passes (5 Nov): a guest's session ends at 23:59:59 on the day after they joined, here.
+    timezone: str = "America/Los_Angeles"
+    guest_claim_days: int = 14  # how long after that a guest can still sign up and keep their account
+
+    # Rate limits, (count, window seconds) by kind; web.LIMITS holds the defaults and every
+    # one can be set as SITE_LIMIT_<KIND>=<count>, e.g. SITE_LIMIT_EMAIL_IP=60.
+    limit_overrides: dict[str, int] = field(default_factory=dict)
+    # SITE_IP_LIMITS=off turns every per-IP limit (kinds ending _ip) off, for a server where all
+    # clients arrive from one address (a local proxy). Per-address, per-invite and per-account
+    # limits stay on.
+    ip_limits: bool = True
 
     @property
     def secure_cookies(self) -> bool:
@@ -105,6 +170,9 @@ class Config:
             raise ValueError("SITE_MODE must be 'test' or 'live'")
         if len(self.secret_key) < 32:
             raise ValueError("secret key is missing or too short")
+        if not self.home_path.startswith("/") or self.home_path.startswith("//") or "\\" in self.home_path:
+            raise ValueError("SITE_HOME must be a path on this site, like /")
+        local_zone(self.timezone)  # raises ValueError for an unknown SITE_TIMEZONE
         if self.mode == "test":
             if not is_loopback_host(self.host):
                 raise ValueError("test mode only listens on loopback")
@@ -115,8 +183,12 @@ class Config:
                 raise ValueError("live mode needs an https SITE_BASE_URL")
             if self.google_mode == "fake":
                 raise ValueError("the Google stand-in only runs in test mode")
-            if self.email_mode != "smtp" or not (self.smtp_host and self.email_from):
-                raise ValueError("live mode needs EMAIL_SMTP_HOST and EMAIL_FROM")
+            # Live mode may start before SMTP is set up (email sign-in then says so), but never
+            # writes mail to a local outbox, where nobody would read it.
+            if self.email_mode not in ("smtp", "off"):
+                raise ValueError("live mode sends email by SMTP or not at all, never to the outbox")
+            if self.email_mode == "smtp" and not (self.smtp_host and self.email_from):
+                raise ValueError("live mode email needs EMAIL_SMTP_HOST and EMAIL_FROM")
 
 
 def _secret_from_file(data_dir: Path) -> bytes:
@@ -162,8 +234,8 @@ def from_env(env: dict[str, str] | None = None, dotenv: Path | None = None) -> C
         cfg.google_issuers = (stand_in,)
 
     if mode == "live":
-        cfg.email_mode = "smtp"
         cfg.smtp_host = get("EMAIL_SMTP_HOST")
+        cfg.email_mode = "smtp" if cfg.smtp_host else "off"
         cfg.smtp_port = int(get("EMAIL_SMTP_PORT", "587"))
         cfg.smtp_user = get("EMAIL_SMTP_USER")
         cfg.smtp_password = get("EMAIL_SMTP_PASSWORD")
@@ -179,5 +251,15 @@ def from_env(env: dict[str, str] | None = None, dotenv: Path | None = None) -> C
     cfg.proxy_ip_header = get("SITE_PROXY_IP_HEADER")
     cfg.kernel_secret = get("KERNEL_SHARED_SECRET")
     cfg.kernel_url = get("KERNEL_URL").rstrip("/")
+    cfg.home_path = get("SITE_HOME", "/") or "/"
+    cfg.timezone = get("SITE_TIMEZONE", "America/Los_Angeles") or "America/Los_Angeles"
+    cfg.guest_claim_days = int(get("SITE_GUEST_CLAIM_DAYS", "14"))
+    for key, value in merged.items():
+        if key.startswith("SITE_LIMIT_") and value.strip():
+            cfg.limit_overrides[key[len("SITE_LIMIT_"):].lower()] = int(value.strip())
+    ip_switch = get("SITE_IP_LIMITS", "on").lower()
+    if ip_switch not in ("on", "off"):
+        raise ValueError("SITE_IP_LIMITS must be 'on' or 'off'")
+    cfg.ip_limits = ip_switch == "on"
     cfg.check()
     return cfg

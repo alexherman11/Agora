@@ -1,0 +1,45 @@
+22 October 2026, canonical checkout C:/Projects/Agora4
+
+Final executions (pinned interpreter, -B):
+test_data_graphics.py: Ran 19 tests in 0.066s; OK
+test_preview.py: Ran 6 tests in 0.261s; OK
+preview.py --check:
+  observatory 53412 bytes compiled
+  studio 22512 bytes compiled
+Scene output byte counts vary with the live read-only data snapshot.
+
+Existing test_scene.py passed its first 32 tests, then failed
+test_freshness_words_are_host_reads, line 845:
+  AssertionError: Suite  / e7 comment [separator] 2026-10-22 12:20 / jeff
+Running that one test with charts removed from scene.SOURCES and
+scene.SOURCE_FILES in memory failed identically at line 845 at 12:21.
+The pre-existing freshness behavior was not modified by this task.
+
+Browser: hidden in-app browser; existing Agora lens.html/lens.js/style engine.
+Observed 1280px wide dashboard; picture/words and Jeff evidence fold worked.
+Observed automatic updates: task selection, percentages and queue changed.
+680px viewport: paint scrollWidth=665, clientWidth=665.
+380px viewport: paint scrollWidth=365, clientWidth=365.
+Studio: segmented parts, legends, uneven dates, missing-sample line gap,
+zero readiness, unknown readiness and empty feedback visibly rendered.
+Pulse computed animation name r-pulse; 2.5s keyframes present only in
+prefers-reduced-motion:no-preference stylesheet media block.
+Actual reduced-motion preference emulation is not exposed by browser tool;
+not claimed tested. No native Windows launch or held-action fence test.
+host window navigation click produced no observed second IAB tab; direct
+verified URLs are provided instead. No popup or native host code changed.
+
+Six JPEG viewport captures saved in evidence and confirmed in Library.
+library-manifest.json has exact Library/file IDs, versions and byte counts.
+Windows original screenshot files carry user.library-file-version ADS metadata.
+Wide Observatory was refreshed after final labeling; compact captures are the
+same layout before the last provenance-label wording adjustment.
+
+Board completion: a10926 / e28022 (auto-moved to Done by existing rule e28023).
+Rough spots missing-word record: a10929 / e28024.
+Both records read back and verified. Owner dashboard-builder is recorded as a
+word, not an existing resident; no resident identity was created.
+
+Current preview execution session at delivery: 98703; Ctrl+C stops only it.
+No commit, push, runtime reload, provider/queue/home-chat edits, live lens
+installation, paid model trial or software installation.

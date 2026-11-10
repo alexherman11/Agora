@@ -1,0 +1,47 @@
+# home-chat: a chat, open in the home base's viewer (home-viewer, a5398). Its last lines, newest at the foot, a run by
+# one writer under one name; Alex's own at the right. Replies use this chat's native audience.
+chat : column
+  share 1
+  of prop:role=home-view,prop:actor=$me as v
+  each one
+one : column
+  share 1
+  of $v.viewing as r
+  each body
+body : column
+  share 1
+  only when $kind = "chat"
+  feed : column
+    share 1
+    scroll end
+    role feed
+    of sayings in:$item as s
+    clamp last 80
+    run name
+    each said
+  compose : column
+    role dock
+    audience : text "Reply in $r.title"
+      role meta
+    say : text ""
+      role input
+      hint "Write a reply. Use @name to address someone."
+      lines 1..4
+      commit explicit
+      on edit do append $r.item line="$value"
+said : column
+  role said
+  role said.mine when $s.name = "alex"
+  head : row
+    role saidhead
+    only when $run = 1
+    who : text "$s.by"
+      role who
+    at : text "$s.at"
+      role meta
+  bubble : column
+    role bubble
+    role bubble.mine when $s.name = "alex"
+    words : text "$s.said"
+      role words
+      marks

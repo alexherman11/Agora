@@ -1,0 +1,23 @@
+[Unit]
+Description=Seabright kernel door (public host, loopback 8810)
+After=network.target seabright-entry.service
+
+[Service]
+User=seabright
+Group=seabright
+EnvironmentFile=/etc/seabright/env
+# modules started from the world run /usr/bin/python3.11 (load_genesis resolved the venv symlink): same version, so the
+# venv's packages (Pillow, pypdf) reach them this way
+Environment=PYTHONPATH=/srv/seabright/venv/lib/python3.11/site-packages
+WorkingDirectory=/srv/seabright/app
+ExecStart=/srv/seabright/venv/bin/python research/community-app/deploy/public_door.py --world /srv/seabright/world --port 8810 --entry http://127.0.0.1:8817 --origin https://seabright.example.org --home-widget seabright-board --board-path /board --public /signin
+Restart=always
+RestartSec=2
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+ReadWritePaths=/srv/seabright/world
+
+[Install]
+WantedBy=multi-user.target

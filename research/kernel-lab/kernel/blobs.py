@@ -126,6 +126,7 @@ def receive(k, actor, data, name='Upload', group=None):
         line += ' in=' + shlex.quote(group)
     # Check authority before storing bytes. Rechecked under the ordinary act lock.
     with k.lock:
+        no_files(k, actor)
         eid = k.find_entry('upload', group)
         if not eid or not k.may(actor, k.entry(eid), None, group or k.place):
             raise Refused('you have no grant to upload here')
@@ -141,7 +142,17 @@ def receive(k, actor, data, name='Upload', group=None):
         k._local.upload_bytes = previous
 
 
+GUESTS_SHARE_NO_FILES = "guests can't share files; make an account to upload and attach them"
+
+
+def no_files(k, actor):
+    # a guest (a name only, from a meeting's code) is a member in every other way (SEAM.md; kernel.is_guest)
+    if k.is_guest(actor.person):
+        raise Refused(GUESTS_SHARE_NO_FILES)
+
+
 def upload(k, actor, st, entry, tx, group, saw=None):
+    no_files(k, actor)
     data = getattr(k._local, 'upload_bytes', None)
     if data is None and st.kv.get('digest') and actor.kind == 'module':
         # A module hands its caller a file it made (a picture, an export): it put the bytes in this world's blob
@@ -167,6 +178,7 @@ def upload(k, actor, st, entry, tx, group, saw=None):
 
 
 def attach(k, actor, st, entry, tx, group, saw=None):
+    no_files(k, actor)
     t, parent = st.target, st.kv.get('to')
     a = k.shown(actor.person, parent)
     if k.state.get(t, 'kind') != 'file' or a is None or parent == t:

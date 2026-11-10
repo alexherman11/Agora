@@ -9,10 +9,22 @@ root : board-shell, title "Seabright"
   channels : board-navigation
     watch reading:"rows board-seen"
     watch reading:"board.queue"
+    watch reading:"rows said"
   centre : column, role nb-centre
-    action-result : action-notice, scopeKeys "channel opens thread search queue asksThread documentsFolder documentsOpen"
+    action-result : action-notice, scopeKeys "channel chat opens thread search queue asksThread documentsFolder documentsOpen"
       on undo do undo $value
     tools : board-toolbar
+      only when $view.opens != chat and $view.opens != map
+    chat : board-chat
+      only when $view.opens = chat and $view.chat != "" and $view.search = "" and $view.queue != yes
+      on send do say $view.chat $fields
+      on edit do set $target text=$value
+      on remove do forget $target
+      on react do react $target emoji=$value
+      on pin do pin $target
+      on unpin do pin $target off=yes
+      on seen do make kind=board-seen group=$view.chat at=$value sees=me
+      on reseen do set $target at=$value
     calendar : calendar, of reading:"board.events in=$view.channel around=$view.calendarDate" as e, limit 100, each calendar-event, openKey "thread replyTo", label "Calendar"
       only when $view.opens = calendar and $view.search = "" and $view.queue != yes
       on add do board.post post_kind=event in=$view.channel $fields
@@ -25,7 +37,7 @@ root : board-shell, title "Seabright"
       only when $view.channel != "" and $view.search = "" and $view.queue != yes
       on seen do board.seen in=$view.channel
       on snapshot do make kind=board-catch-up sees=me title="Catch-up summary context" text=$value
-      on summarize do model.ask "Summarise this neighbourhood catch-up in two short sentences." about=$target
+      on summarize do model.ask "Summarize this neighborhood catch-up in two short sentences." about=$target
     notices : column, of reading:"forgotten" as n, each notice
     feed : board-feed, of reading:"board.feed order=$view.order in=$view.channel" as p, limit 12, offset $view.offset, each post
       only when $view.search = "" and $view.queue != yes and $view.opens = ""
@@ -33,7 +45,8 @@ root : board-shell, title "Seabright"
       only when $view.search != ""
     queue : board-search, of reading:"board.queue in=$view.channel" as r, each catchup-item
       only when $view.queue = yes
-  map : map-panel, map Seabright, board yes, height 520px
+  map : map-panel, map Seabright, board yes, height 520px, collapsed yes
+    only when $view.opens = map and $view.search = "" and $view.queue != yes
   conversation : board-thread
     only when $view.thread != ""
     on reply do board.reply $target $fields

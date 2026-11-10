@@ -115,7 +115,7 @@ def test_selection_refusal_is_a_lens_refusal(case):
 
 
 def test_unexpected_row_source_bug_still_propagates(case, monkeypatch):
-    def broken(*args):
+    def broken(*args, **kwargs):
         raise RuntimeError("unexpected row source bug")
 
     monkeypatch.setattr(scene, "rows", broken)

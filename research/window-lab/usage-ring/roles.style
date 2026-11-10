@@ -1,0 +1,4 @@
+# Compact quota controls shared by the chat and the standalone usage lens.
+role urfooter : between gap, pad top gap /2
+role urings : between gap /2
+role uring : width gap x4, height gap x4, corner gap x2, soft, hover wash

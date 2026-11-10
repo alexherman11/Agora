@@ -5,7 +5,7 @@
   "questions": [
     {
       "key": "display_name",
-      "label": "Your name, as neighbours will see it",
+      "label": "Your name, as neighbors will see it",
       "help": "We use real names in chat, so people know who they're talking to. First name and last initial is fine.",
       "type": "text",
       "required": true,
@@ -21,7 +21,7 @@
       "required": false,
       "options": [
         {"value": "meetings", "label": "Come to meetings"},
-        {"value": "neighbours", "label": "Talk with neighbours"},
+        {"value": "neighbours", "label": "Talk with neighbors"},
         {"value": "research", "label": "Research and reading"},
         {"value": "online", "label": "Spread the word online"},
         {"value": "skills", "label": "Design, writing or tech"},
@@ -30,7 +30,7 @@
     },
     {
       "key": "neighbourhood",
-      "label": "Your neighbourhood (optional)",
+      "label": "Your neighborhood (optional)",
       "help": "Just the area, like Seabright or Live Oak, so we can connect you with people nearby.",
       "type": "text",
       "required": false,

@@ -14,7 +14,7 @@ from conftest import LEADER, Client, make_config, make_invite
 
 def test_cookies_are_httponly_lax_and_secure_on_https(tmp_path, clock):
     app = App(make_config(tmp_path), clock=clock)
-    assert Client(app).get("/").cookies_set() == []  # the front page sets nothing
+    assert Client(app).get("/about").cookies_set() == []  # the front page sets nothing
     r = Client(app).get("/signin")
     cookie = r.cookies_set()[0]
     assert "HttpOnly" in cookie and "SameSite=Lax" in cookie and "Secure" not in cookie
@@ -32,7 +32,7 @@ def test_cookies_are_httponly_lax_and_secure_on_https(tmp_path, clock):
 
 
 def test_every_response_has_safety_headers(app, leader):
-    for path in ("/", "/signin", "/nope", "/home", "/leader/invites", "/entry-static/site.css"):
+    for path in ("/", "/about", "/signin", "/nope", "/home", "/leader/invites", "/entry-static/site.css"):
         r = leader.get(path)
         assert r.header("X-Content-Type-Options") == "nosniff", path
         assert r.header("Referrer-Policy") == "no-referrer", path
@@ -195,7 +195,14 @@ def test_settings_refuse_unsafe_combinations(tmp_path):
     with pytest.raises(ValueError, match="stand-in"):
         Config(mode="live", google_mode="fake", email_mode="smtp", smtp_host="h", email_from="f", **live).check()
     with pytest.raises(ValueError, match="EMAIL_SMTP_HOST"):
-        Config(mode="live", **live).check()
+        Config(mode="live", email_mode="smtp", **live).check()
+    with pytest.raises(ValueError, match="never to the outbox"):
+        Config(mode="live", email_mode="file", **live).check()  # live mode writes no mail anywhere
+    Config(mode="live", email_mode="off", **live).check()  # no SMTP yet is allowed (5 Nov)
+    with pytest.raises(ValueError, match="SITE_HOME"):
+        Config(mode="test", home_path="//evil.example", **good).check()
+    with pytest.raises(ValueError, match="SITE_TIMEZONE"):
+        Config(mode="test", timezone="Mars/Olympus", **good).check()
     with pytest.raises(ValueError, match="secret"):
         Config(mode="test", base_url="http://127.0.0.1:1", data_dir=tmp_path, secret_key=b"").check()
 
@@ -246,10 +253,10 @@ def test_tokens_stay_out_of_the_store(app, leader):
 def test_other_host_names_are_sent_to_the_one_address(app):
     r = Client(app).get("/join/abc?x=1", headers={"Host": "localhost:8817"})
     assert r.status == 308 and r.location == "http://127.0.0.1:8817/join/abc?x=1"
-    assert Client(app).get("/", headers={"Host": "127.0.0.1:8817"}).status == 200
+    assert Client(app).get("/about", headers={"Host": "127.0.0.1:8817"}).status == 200
 
 
 def test_privacy_page_is_there_for_googles_consent_screen(app):
     r = Client(app).get("/privacy")
     assert r.status == 200 and "What we never keep" in r.text
-    assert 'href="/privacy"' in Client(app).get("/").text
+    assert 'href="/privacy"' in Client(app).get("/about").text

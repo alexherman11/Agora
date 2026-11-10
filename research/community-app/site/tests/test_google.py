@@ -75,7 +75,7 @@ def test_newcomer_continues_with_google(google):
     c.onboard("Maya R.")
     c.post("/signout")
     r = google_signin(app, stand_in, c, "maya@example.com")  # back again, no invite needed
-    assert r.location == "/home"
+    assert r.location == app.cfg.home_path
 
 
 def test_google_without_invite_is_refused(google):

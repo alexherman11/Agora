@@ -1,0 +1,161 @@
+{
+  "label": "SYNTHETIC EDGE CASES",
+  "observed_at": 1792699500,
+  "stamp": "synthetic snapshot",
+  "beat": "synthetic old heartbeat",
+  "stale": true,
+  "queued": "0",
+  "house": {
+    "beat": 1792699320,
+    "residents": {
+      "jeff": {
+        "actor": "jeff",
+        "doing": "working",
+        "status": "awake",
+        "alive": true,
+        "model": "gpt-6-astra",
+        "reasoning": "low"
+      },
+      "rowan": {
+        "actor": "rowan",
+        "doing": "resting",
+        "model": "gpt-6-astra"
+      },
+      "ibis": {
+        "actor": "ibis",
+        "doing": "resting",
+        "model": "gpt-6-astra"
+      },
+      "mica": {
+        "actor": "mica",
+        "doing": "working",
+        "model": "gpt-6-astra"
+      },
+      "sable": {
+        "actor": "sable",
+        "doing": "stopped",
+        "status": "paused"
+      },
+      "pike": {
+        "actor": "pike",
+        "doing": "stopped",
+        "status": "paused"
+      },
+      "juniper": {
+        "actor": "juniper",
+        "doing": "stopped",
+        "status": "paused"
+      }
+    },
+    "workers": {
+      "one": {
+        "doing": "working",
+        "builder": "codex-builder-1"
+      },
+      "two": {
+        "doing": "working",
+        "builder": "codex-builder-2"
+      },
+      "three": {
+        "doing": "working",
+        "builder": "builder-1"
+      },
+      "four": {
+        "doing": "working",
+        "builder": "builder-2"
+      },
+      "old": {
+        "doing": "stopped",
+        "builder": "builder-1"
+      }
+    }
+  },
+  "names": {
+    "one": "A very long active task: compare the boundary conditions across many independent data sources without claiming unavailable context as zero",
+    "two": "Unknown context must remain unknown",
+    "three": "Measured zero consumption at the latest observation",
+    "four": "The context is full; investigate before continuing",
+    "old": "Completed work retained for inspection"
+  },
+  "usage": {
+    "rows": [
+      {
+        "kind": "agent",
+        "actor": "jeff",
+        "corner": "jeff",
+        "tokens": 0,
+        "window": 1000
+      },
+      {
+        "kind": "agent",
+        "actor": "rowan",
+        "corner": "rowan",
+        "tokens": 1000,
+        "window": 1000
+      },
+      {
+        "kind": "agent",
+        "actor": "ibis",
+        "corner": "ibis",
+        "tokens": 850,
+        "window": 1000
+      },
+      {
+        "kind": "agent",
+        "actor": "mica",
+        "corner": "mica",
+        "tokens": 340,
+        "window": 1000
+      },
+      {
+        "kind": "agent",
+        "actor": "worker-one",
+        "corner": "one",
+        "tokens": 355,
+        "window": 1000
+      },
+      {
+        "kind": "agent",
+        "actor": "worker-three",
+        "corner": "three",
+        "tokens": 0,
+        "window": 1000
+      },
+      {
+        "kind": "agent",
+        "actor": "worker-four",
+        "corner": "four",
+        "tokens": 1000,
+        "window": 1000
+      }
+    ]
+  },
+  "plans": {
+    "windows": {
+      "full": {
+        "provider": "Sample A",
+        "label": "5 hours",
+        "percent": 100,
+        "asof": 1792699440,
+        "resets": 1792703100,
+        "source": "synthetic fixture"
+      },
+      "zero": {
+        "provider": "Sample B",
+        "label": "7 days",
+        "percent": 0,
+        "asof": 1792699480,
+        "resets": 1792703100,
+        "source": "synthetic fixture"
+      },
+      "expired": {
+        "provider": "Sample C",
+        "label": "5 hours",
+        "percent": 99,
+        "asof": 1792695900,
+        "resets": 1792699499,
+        "source": "synthetic fixture"
+      }
+    }
+  }
+}

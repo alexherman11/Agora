@@ -1,0 +1,184 @@
+<title>One Home for Agent Words</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column, wide tables to 1100px. Same family as the Agent Wake Map. Colour = which home. */
+:root{
+  --bg:#f6f7f3; --panel:#ffffff; --fg:#1d2721; --muted:#5f6c64; --line:#dfe4dc; --soft:#eef1ea;
+  --book:#4f9a72; --book-soft:#dcefe3; --help:#4a7cc0; --help-soft:#dde8f6; --set:#d0812f; --set-soft:#f8e6d1;
+  --log:#9890b8; --log-soft:#e9e6f3; --warn:#c2475f; --warn-soft:#f8e0e5; --accent:#2c7a6a; --accent-soft:#d6efe9;
+  --f-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --f-body:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141a17; --panel:#1b231f; --fg:#e4ebe6; --muted:#9aa89f; --line:#2e3a34; --soft:#212b26;
+  --book:#6fbf93; --book-soft:#22382c; --help:#7aa5e0; --help-soft:#1f2d40; --set:#e59b52; --set-soft:#3d2c1b;
+  --log:#b1aad3; --log-soft:#2b283b; --warn:#e87a8f; --warn-soft:#3d2228; --accent:#5cc0aa; --accent-soft:#1d3833; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141a17; --panel:#1b231f; --fg:#e4ebe6; --muted:#9aa89f; --line:#2e3a34; --soft:#212b26;
+  --book:#6fbf93; --book-soft:#22382c; --help:#7aa5e0; --help-soft:#1f2d40; --set:#e59b52; --set-soft:#3d2c1b;
+  --log:#b1aad3; --log-soft:#2b283b; --warn:#e87a8f; --warn-soft:#3d2228; --accent:#5cc0aa; --accent-soft:#1d3833; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:16px/1.55 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 80px}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:52px}
+.prose{max-width:68ch}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(30px,5vw,44px);font-weight:700;letter-spacing:-.01em}
+h2{font-size:26px} h3{font-size:17px}
+p{margin:0}
+ul,ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.eyebrow{font:600 12px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.sec{display:flex;flex-direction:column;gap:16px}
+.lede{font-size:18px}
+.muted{color:var(--muted)}
+code,.mono{font-family:var(--f-mono);font-size:.86em}
+.label{display:inline-block;font:600 11px/1 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;padding:4px 7px;border-radius:5px;vertical-align:2px}
+.l-read{background:var(--soft);color:var(--muted)} .l-imag{background:var(--log-soft);color:var(--log)}
+.who{display:flex;flex-wrap:wrap;gap:8px;font-size:14px}
+.who span{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 12px}
+/* four homes */
+.homes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:900px){.homes{grid-template-columns:1fr 1fr}}
+@media (max-width:480px){.homes{grid-template-columns:1fr}}
+.home{border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);background:var(--panel);border-top:5px solid}
+.home.book{border-top-color:var(--book)} .home.help{border-top-color:var(--help)} .home.set{border-top-color:var(--set)} .home.log{border-top-color:var(--log)}
+.home .q{font:600 12px var(--f-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.home h3{font-size:19px}
+.home p,.home li{font-size:14px}
+.rule{background:var(--accent-soft);border-radius:12px;padding:14px 18px;font-family:var(--f-display);font-size:17px;font-weight:500}
+/* table */
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:14px}
+th,td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+thead th{font:600 12px var(--f-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);background:var(--soft)}
+td:first-child{font-weight:700}
+.chip{display:inline-block;padding:2px 8px;border-radius:6px;font-size:12.5px;white-space:nowrap}
+.c-book{background:var(--book-soft)} .c-help{background:var(--help-soft)} .c-set{background:var(--set-soft)} .c-log{background:var(--log-soft)}
+.c-gone{background:var(--warn-soft)} .c-stay{background:var(--soft)}
+/* brief */
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:820px){.two{grid-template-columns:1fr}}
+.box{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.brief{font:13px/1.6 var(--f-mono);background:var(--book-soft);border-radius:10px;padding:14px;white-space:pre-wrap;margin:0}
+.src{font:600 11px var(--f-mono);color:var(--muted)}
+.checks li{font-size:14.5px}
+.checks b{font-family:var(--f-display)}
+/* order */
+.order{list-style:none;padding:0;gap:0;border-top:1px solid var(--line);counter-reset:o}
+.order li{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:2px 12px;padding:13px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.order li::before{counter-increment:o;content:counter(o);font:700 15px var(--f-mono);color:var(--accent)}
+.order b{font-family:var(--f-display);font-size:16px}
+.order .by{font:600 12px var(--f-mono);color:var(--muted);text-align:right}
+.order p{grid-column:2/-1;font-size:14.5px;color:var(--muted)}
+.qs{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.qq{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;font-size:14.5px;display:flex;flex-direction:column;gap:6px}
+.qq b{font-family:var(--f-display);font-size:15.5px}
+.qq .lean{color:var(--accent);font-size:13.5px}
+.mind{background:var(--soft);border-radius:12px;padding:16px;font-size:15px}
+</style>
+
+<div class="wrap">
+
+<header class="sec prose" style="gap:14px">
+  <div class="eyebrow">Harness workshop · 4 Nov 2026 · plan by Claude for Alex <span class="label l-imag">imagined</span></div>
+  <h1>One home for every word an agent gets</h1>
+  <p class="lede">Three sessions' views merged into one plan: this one (the harnesses), the kinds session, and the source-edits audit session. None of them is building any of it yet. It waits on your calls at the end.</p>
+  <div class="who"><span>Harness workshop: the House, the Book, the brief</span><span>Kinds: help for kinds, a loose-facts check</span><span>Source edits: the landing checks, the settings list</span></div>
+</header>
+
+<section class="sec">
+  <div class="prose sec" style="gap:8px"><div class="eyebrow">1 · The shape</div><h2>Four kinds of information, four homes</h2>
+  <p>Today, agents get their words from 20 texts in four kinds of place, and three of those texts are rule books that disagree. Most of the mess comes from mixing four different kinds of information. Give each kind one home, and the homes stop overlapping.</p></div>
+  <div class="homes">
+    <div class="home book"><span class="q">How agents behave</span><h3>The Agent Book</h3><p>One document in Writing, read by heading every time a message is built. You edit it like any page, and an edit counts on the next wake. Holds JEFF's soul, the one soul all residents share, the roles, the worker brief and every wake message.</p></div>
+    <div class="home help"><span class="q">What words do</span><h3>Help and the dictionary</h3><p>Already in the world, and written from the code, so they can't drift. Adds a dated "new since your base" list, generated from commit lines and never written by hand, so a worker knows what changed in the kernel.</p></div>
+    <div class="home set"><span class="q">Numbers and names</span><h3>House settings</h3><p>A world settings thing the House reads each time: worker models and reasoning, pool sizes, tools, checks, compaction, who unowned work goes to. Workers have no turn or time limit unless one is set.</p></div>
+    <div class="home log"><span class="q">What happened</span><h3>Commit lines and logs</h3><p>Every source commit says <code>Source:</code> and <code>Missing-word:</code>, and its body is the worker's own summary. Each worker keeps its log. These feed the "new since" list.</p></div>
+  </div>
+  <div class="rule">Each home links to the others and never copies them. Fill-ins use one form across Agora: <code>$.card</code> for the thing a message is about, <code>$[[House settings]].codex_model</code> for another thing. The code keeps one neutral fallback line per message, never a second copy of the text.</div>
+</section>
+
+<section class="sec">
+  <div class="prose sec" style="gap:8px"><div class="eyebrow">2 · Moving in <span class="label l-read">read</span> for where things are now</div><h2>Where each of today's texts goes</h2></div>
+  <div class="scroll"><table>
+    <thead><tr><th>Text today</th><th>Lives in</th><th>Goes to</th></tr></thead>
+    <tbody>
+      <tr><td>Your standing rules</td><td>dk838</td><td><span class="chip c-stay">stays</span> The Book's Rules heading points to it. Everyone reads it, workers too.</td></tr>
+      <tr><td>Three old rule copies</td><td>dk1151 · dk1279 · dk1193</td><td><span class="chip c-gone">retired</span> Superseded banner, not deleted.</td></tr>
+      <tr><td>How work flows</td><td>dk1833, and its copy dk1832</td><td><span class="chip c-book">Book</span> Its own heading. The copy is retired.</td></tr>
+      <tr><td>JEFF's system prompt</td><td>dk2061 (you are writing it)</td><td><span class="chip c-book">Book</span> The General manager role page, if you want it there (your call).</td></tr>
+      <tr><td>Four souls</td><td>dk837 · 1150 · 1278 · 1192</td><td><span class="chip c-book">Book</span> Two souls, written by you: JEFF's, and one that every resident shares. Today's four are in the Book as material.</td></tr>
+      <tr><td>Welcome</td><td>house.py</td><td><span class="chip c-book">Book</span> Messages: welcome.</td></tr>
+      <tr><td>"Receipt is not review…" header</td><td>next_steps.py</td><td><span class="chip c-book">Book</span> One line, in the voice that says finish, not hold.</td></tr>
+      <tr><td>Worker brief</td><td>builders.py</td><td><span class="chip c-book">Book</span> The Worker brief, with blanks for the task.</td></tr>
+      <tr><td>Nine owner messages, Rowan's receipt</td><td>builders.py · manager.py</td><td><span class="chip c-book">Book</span> Messages, one line each.</td></tr>
+      <tr><td>"Read AGENTS.md first"</td><td>the brief</td><td><span class="chip c-book">Book</span> The Worker role page replaces it. AGENTS.md stays for builders working with you; the Book links its "Source edits go down over time" section by name.</td></tr>
+      <tr><td>Models, reasoning, tools, checks, pool sizes, caps, compaction, the "JEFF" literals</td><td>builders.py · house.py</td><td><span class="chip c-set">settings</span> The House settings thing. Done 4 Nov for worker models and limits: Codex workers on gpt-6-astra, high; no turn or time limit.</td></tr>
+      <tr><td>What the kernel's words do, and what changed</td><td>Current Implementation (42,000 words, by hand), or guesswork</td><td><span class="chip c-help">help</span> help, kinds, aspects, the dictionary, and the "new since your base" list.</td></tr>
+      <tr><td>Builders' guide, SHAPE contracts</td><td>repo</td><td><span class="chip c-stay">stay</span> For builders. The Book links them and doesn't copy.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="sec">
+  <div class="prose sec" style="gap:8px"><div class="eyebrow">3 · Fewer source edits</div><h2>The worker brief says it, landing checks it</h2>
+  <p>The audit session's finding: text alone didn't hold. One worker's card told it to add to the kernel "only if a rule cannot say it", and it wrote JEFF's name into the kernel anyway. So the brief says it, and the House checks it before landing. A failed check goes back to the worker as its next turn, never as a block on its owner.</p></div>
+  <div class="two">
+    <div class="box"><h3>The Worker brief (draft for the Book)</h3>
+<pre class="brief">Finish in this turn: build it, test it, fix what the tests
+show. When unclear, make the sensible choice and say so.
+
+First read "new since your base": what changed in the
+kernel since you started.
+Before making a kind or a word: run help kinds and
+aspects suggest.
+Before editing a file in kernel/, kernel-desktop,
+agora-wm, modules or painter: read its header. It says
+what may go there.
+If your kernel change would name an app, person, kind or
+field: stop. File the missing general word as a card,
+and do the task as a marked bridge naming that card.
+
+End with BUILD-RESULT.md. Your summary becomes the
+commit's message.</pre>
+      <span class="src">From: this session (finish), kinds session (help kinds), audit session (headers, kernel rule)</span></div>
+    <div class="box"><h3>What landing checks</h3>
+      <ul class="checks">
+        <li><b>Commit lines.</b> A commit that touches source ends with <code>Source: word|fix|seam|bridge</code> and <code>Missing-word: …</code>. If either is missing, it goes back to the worker with a one-line reason.</li>
+        <li><b>The worker's own summary</b> becomes the commit body. Today it's a card title cut short, so history can't be read from git.</li>
+        <li><b>New hard-coded names</b> in those folders: people, dk ids, model names, English message text, app kinds inside the kernel. Each one found goes back to the worker.</li>
+        <li><b>New loose facts</b> (aspects before and after), named for the owner. The kinds session hands over the check.</li>
+        <li><b>Commits name their files.</b> Landing commits only its own files, so it never sweeps up another session's staged work. That happened twice today.</li>
+      </ul>
+      <span class="src">From: audit session (spec), kinds session (loose facts)</span></div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="prose sec" style="gap:8px"><div class="eyebrow">4 · Order</div><h2>How it gets built, and by whom</h2></div>
+  <ol class="order">
+    <li><b>House settings, and a Book reader</b><span class="by">this session</span><p>The House reads the numbers from settings and the texts from the Book's headings each time it uses them, with one neutral fallback line in code. <code>house.preview &lt;agent&gt; &lt;moment&gt;</code> prints exactly what an agent would be sent.</p></li>
+    <li><b>Fill the Book</b><span class="by">done 4 Nov; now yours to edit down</span><p>Every text in section 2 is in the Agent Book in Writing, with today's souls as material for the two you'll write. The House switches to it once you've edited it. Old copies get superseded banners.</p></li>
+    <li><b>Landing checks</b><span class="by">this session, with the kinds session's check</span><p>Commit lines, the worker's summary as the commit body, commits that name their files, the hard-coded-names check, the loose-facts check.</p></li>
+    <li><b>"New since your base"</b><span class="by">this session</span><p>A reading generated from the <code>Source:</code> and <code>Missing-word:</code> lines since a worker's base commit. The brief points to it.</p></li>
+    <li><b>Help for kinds</b><span class="by">kinds session, with you now</span><p>A new "Kinds and parts" help topic, and one sentence in <code>help kinds</code>.</p></li>
+    <li><b>AGENTS.md</b><span class="by">this session, small changes shown to you first</span><p>Its worker-facing parts give way to a pointer to the Book. "Source edits go down over time" keeps its name, because 97 file headers cite it.</p></li>
+    <li><b>Then the governor</b><span class="by">separate design</span><p>Once the Book has the messages, the governor's one-line nudges come from it too.</p></li>
+  </ol>
+</section>
+
+<section class="sec">
+  <div class="prose sec" style="gap:8px"><div class="eyebrow">5 · Your calls</div><h2>What I need from you</h2></div>
+  <div class="qs">
+    <div class="qq"><b>The four homes, and the Book</b><span>One Writing document for how agents behave; help, settings and commit lines for the rest.</span><span class="lean">I lean: yes. All three sessions agree.</span></div>
+    <div class="qq"><b>Is your JEFF prompt the manager page?</b><span>You're writing dk2061. It could be the Book's General manager page, or stay JEFF's own beside the Book.</span><span class="lean">I lean: it is the manager page. One place, and it's yours.</span></div>
+    <div class="qq"><b>Do landing checks refuse, or only warn?</b><span>Refusing sends the worker back with the reason as its next turn. Warning lands it and tells the owner.</span><span class="lean">I lean: refuse. Warnings in a brief didn't hold.</span></div>
+    <div class="qq"><b>Rowan joins the same flow?</b><span>Rowan still runs the older house.manage path, with its own charter and messages.</span><span class="lean">I lean: yes. Retire both.</span></div>
+  </div>
+  <p class="mind"><b>What would change my mind:</b> one bad edit to the Book reaches every agent at once. If that bites, the House should read the last version that previewed cleanly, rather than every keystroke. And if reading headings at every wake turns out slow, it should cache by the Book's revision.</p>
+</section>
+
+</div>

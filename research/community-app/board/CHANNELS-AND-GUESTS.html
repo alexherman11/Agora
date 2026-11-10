@@ -1,0 +1,330 @@
+<title>Seabright Channels Plan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column of plan, with a full-width working mock of the app near the top. */
+:root{
+  --paper:#f6f7f2; --card:#ffffff; --ink:#1f2a24; --muted:#5d6b62; --line:#dde3da;
+  --accent:#2f6b4f; --accent-soft:#e3efe7; --guest:#9a5b12; --guest-soft:#fbefdc; --locked:#8a948d;
+  --rail:#e9eee6; --rail-ink:#33433a; --mention:#fff4cf;
+  --display:"Fraunces",Georgia,serif; --body:"Atkinson Hyperlegible",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#151a17; --card:#1d2420; --ink:#e4ebe5; --muted:#9aa89f; --line:#2f3a33;
+  --accent:#7cc39f; --accent-soft:#233b2e; --guest:#e7b46a; --guest-soft:#3a2c17; --locked:#6c7870;
+  --rail:#19201c; --rail-ink:#c9d5cd; --mention:#3a3417; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#151a17; --card:#1d2420; --ink:#e4ebe5; --muted:#9aa89f; --line:#2f3a33;
+  --accent:#7cc39f; --accent-soft:#233b2e; --guest:#e7b46a; --guest-soft:#3a2c17; --locked:#6c7870;
+  --rail:#19201c; --rail-ink:#c9d5cd; --mention:#3a3417; color-scheme:dark}
+body{background:var(--paper);color:var(--ink);font:16px/1.55 var(--body)}
+.wrap{max-width:980px;margin:0 auto;padding-block:32px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:40px}
+h1,h2{font-family:var(--display);font-weight:600;text-wrap:balance;margin:0;letter-spacing:-.01em}
+h1{font-size:clamp(28px,5vw,40px);line-height:1.1}
+h2{font-size:24px;line-height:1.2}
+h3{font-size:16px;margin:0}
+p{margin:0;max-width:66ch}
+.lede{color:var(--muted);font-size:18px}
+.eyebrow{font:500 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+section{display:grid;gap:14px}
+.draft{font:12px var(--mono);color:var(--muted)}
+
+/* the mock */
+.views{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.views span{font-size:14px;color:var(--muted);margin-right:4px}
+.views button{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:6px 14px;border-radius:999px;cursor:pointer}
+.views button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--card)}
+.views button:focus-visible,.side button:focus-visible,.mock button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mock{display:grid;grid-template-columns:220px minmax(0,1fr);border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card);min-height:470px}
+.side{background:var(--rail);color:var(--rail-ink);padding:14px 10px;display:flex;flex-direction:column;gap:2px;font-size:15px}
+.side .place{font-family:var(--display);font-size:18px;padding:2px 8px 10px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.side .group{font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:12px 8px 4px;display:flex;justify-content:space-between;align-items:center}
+.side .group b{font:600 16px var(--body);color:var(--accent);cursor:pointer}
+.side button.ch{all:unset;box-sizing:border-box;display:flex;gap:6px;align-items:center;padding:5px 8px;border-radius:6px;cursor:pointer;color:var(--rail-ink)}
+.side button.ch:hover{background:var(--accent-soft)}
+.side button.ch.on{background:var(--accent-soft);color:var(--accent);font-weight:700}
+.side button.ch.unread{font-weight:700;color:var(--ink)}
+.side button.ch .hash{color:var(--muted);font-family:var(--mono);width:14px}
+.side button.ch.lock{color:var(--locked)}
+.side button.ch .pill{margin-left:auto;background:var(--accent);color:var(--card);font-size:11px;border-radius:999px;padding:0 6px}
+.side .me{margin-top:auto;border-top:1px solid var(--line);padding:10px 8px 0;font-size:13px;color:var(--muted)}
+.side .me strong{color:var(--ink)}
+.main{display:flex;flex-direction:column;min-width:0}
+.top{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--line)}
+.top .t{font-weight:700}
+.top .d{color:var(--muted);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msgs{flex:1;padding:12px 18px;display:flex;flex-direction:column;gap:2px;overflow:auto}
+.m{display:grid;grid-template-columns:40px minmax(0,1fr);gap:10px;padding:6px 6px;border-radius:6px;position:relative}
+.m:hover{background:var(--paper)}
+.m.cont{padding-top:0}
+.m.cont .av{visibility:hidden;height:0}
+.av{width:36px;height:36px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700;font-size:13px}
+.av.g{background:var(--guest-soft);color:var(--guest)}
+.who{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.who strong{font-size:15px}
+.who time{font-size:12px;color:var(--muted)}
+.tag{font:500 11px var(--mono);padding:1px 6px;border-radius:4px;background:var(--accent-soft);color:var(--accent)}
+.tag.g{background:var(--guest-soft);color:var(--guest)}
+.reply{font-size:13px;color:var(--muted);border-left:2px solid var(--line);padding-left:8px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rx{display:flex;gap:6px;margin-top:4px}
+.rx span{font-size:13px;border:1px solid var(--line);border-radius:999px;padding:0 8px;background:var(--card)}
+.rx span.mine{border-color:var(--accent);background:var(--accent-soft)}
+.at{background:var(--mention);border-radius:3px;padding:0 2px;font-weight:700}
+.newline{display:flex;align-items:center;gap:8px;color:#c0392b;font:500 11px var(--mono);margin:8px 0}
+.newline::before,.newline::after{content:"";flex:1;height:1px;background:#c0392b;opacity:.5}
+.hover{position:absolute;right:8px;top:-12px;display:none;gap:2px;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:2px 4px;font-size:13px;color:var(--muted)}
+.m:hover .hover{display:flex}
+.ann{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:12px 14px;display:grid;gap:4px;margin-bottom:10px}
+.ann .meta{font-size:13px;color:var(--muted)}
+.cal{display:grid;gap:8px}
+.ev{display:grid;grid-template-columns:62px minmax(0,1fr);gap:12px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;align-items:center}
+.ev .day{text-align:center;font-family:var(--mono);font-size:12px;color:var(--muted);line-height:1.2}
+.ev .day b{display:block;font:600 22px var(--display);color:var(--accent)}
+.ev .meta{font-size:13px;color:var(--muted)}
+.box{margin:10px 18px 16px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--muted);font-size:15px;display:flex;gap:10px;align-items:center;background:var(--paper)}
+.box.cta{background:var(--accent-soft);color:var(--accent);border-color:transparent;justify-content:space-between;flex-wrap:wrap}
+.box.cta b{color:var(--ink)}
+.box .btn{font:inherit;font-size:14px;background:var(--accent);color:var(--card);border:0;border-radius:6px;padding:6px 12px}
+.box.guest{background:var(--guest-soft);color:var(--guest);border-color:transparent}
+.locked{padding:40px 18px;text-align:center;color:var(--muted);display:grid;gap:10px;justify-items:center}
+.locked .btn{font:inherit;background:var(--accent);color:var(--card);border:0;border-radius:6px;padding:8px 16px}
+.describe{margin:10px 18px 16px;border:1px dashed var(--accent);border-radius:8px;padding:12px;display:grid;gap:8px;font-size:15px}
+.describe .ask{font-style:italic}
+.describe .plan{font:13px var(--mono);background:var(--paper);border-radius:6px;padding:8px 10px;white-space:pre-wrap;color:var(--ink)}
+.describe .row{display:flex;gap:8px}
+.describe .row span{font-size:14px;border-radius:6px;padding:4px 12px;background:var(--accent);color:var(--card)}
+.describe .row span.no{background:transparent;color:var(--muted);border:1px solid var(--line)}
+.caption{font-size:14px;color:var(--muted)}
+
+/* tables and lists */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:620px;font-size:15px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:500 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--paper)}
+tr:last-child td{border-bottom:0}
+td.y{color:var(--accent);font-weight:700} td.n{color:var(--locked)} td.g{color:var(--guest);font-weight:700}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:6px;align-content:start}
+.step .n{font:500 12px var(--mono);color:var(--guest)}
+.step p{font-size:15px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.cols>div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:8px;align-content:start}
+ul{margin:0;padding-left:20px;display:grid;gap:4px}
+li{max-width:62ch}
+.q{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:6px}
+.q .rec{font-size:15px;color:var(--accent)}
+.q .rec::before{content:"I'd pick: ";font-weight:700}
+.qs{display:grid;gap:12px}
+@media (max-width:640px){
+  .mock{grid-template-columns:1fr}
+  .side{flex-direction:row;flex-wrap:wrap;gap:4px;padding:10px}
+  .side .place{width:100%;padding-bottom:6px}
+  .side .group{width:100%;padding:6px 4px 0}
+  .side .me{width:100%;margin-top:6px}
+  .hover{display:none!important}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:12px">
+    <div class="eyebrow">Seabright board · plan for Alex</div>
+    <h1>Channels, chats, and signing in at the meeting</h1>
+    <p class="lede">What you asked for, as one page: who can see and send what, how the meeting QR code works, and the few choices that are yours. Try the mock below as each kind of person.</p>
+    <p class="draft">Draft by Claude, 5 Nov 2026, from Alex's message. Nothing is built yet.</p>
+  </header>
+
+  <section>
+    <div class="views" role="group" aria-label="View the board as">
+      <span>View as</span>
+      <button type="button" data-as="visitor" aria-pressed="false">Visitor, not signed in</button>
+      <button type="button" data-as="guest" aria-pressed="true">Guest from the QR code</button>
+      <button type="button" data-as="member" aria-pressed="false">Member</button>
+      <button type="button" data-as="leader" aria-pressed="false">You, leader</button>
+    </div>
+    <div class="mock" id="mock">
+      <nav class="side" id="side" aria-label="Channels"></nav>
+      <div class="main" id="main"></div>
+    </div>
+    <p class="caption" id="caption"></p>
+  </section>
+
+  <section>
+    <h2>Who can do what</h2>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Visitor</th><th>Guest (QR)</th><th>Member</th><th>Leader</th></tr></thead>
+      <tbody>
+        <tr><td>Read Announcements and Calendar</td><td class="y">yes</td><td class="y">yes</td><td class="y">yes</td><td class="y">yes</td></tr>
+        <tr><td>Read the chats</td><td class="n">no, a sign-in prompt</td><td class="g">open chats</td><td class="y">yes</td><td class="y">yes</td></tr>
+        <tr><td>Send messages, react, reply</td><td class="n">no</td><td class="g">until it runs out</td><td class="y">yes</td><td class="y">yes</td></tr>
+        <tr><td>RSVP to events</td><td class="n">no</td><td class="g">yes</td><td class="y">yes</td><td class="y">yes</td></tr>
+        <tr><td>Upload files and photos</td><td class="n">no</td><td class="n">no</td><td class="y">yes</td><td class="y">yes</td></tr>
+        <tr><td>Post announcements, pin, remove messages</td><td class="n">no</td><td class="n">no</td><td class="n">no</td><td class="y">yes</td></tr>
+        <tr><td>Make channels by describing them</td><td class="n">no</td><td class="n">no</td><td class="n">no</td><td class="y">yes</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>The meeting QR code</h2>
+    <p>You print one code per meeting from the Invites page you already have. It lets people talk straight away, and asks for an account only when they come back.</p>
+    <div class="steps">
+      <div class="step"><span class="n">At the meeting</span><h3>Scan, type a name</h3><p>The phone opens the board with one box: "Your name". No email, no password. They can read and send in the open chats.</p></div>
+      <div class="step"><span class="n">Their messages</span><h3>Marked as guest</h3><p>Their name shows with a small "guest" tag, so everyone knows it is not a checked account.</p></div>
+      <div class="step"><span class="n">After</span><h3>It runs out</h3><p>The guest pass lasts until the end of the day after the meeting. Then the board is read-only for them, with "Sign in to keep talking".</p></div>
+      <div class="step"><span class="n">When they return</span><h3>Make an account, keep their words</h3><p>If they sign up on the same phone, their guest messages move onto the new account. Otherwise the messages stay, tagged guest.</p></div>
+    </div>
+    <p class="caption">If someone misuses a code, you freeze it and every guest from it goes quiet at once, the way the invite links already work. Guests get a slower send limit than members, so one phone can't flood a chat.</p>
+  </section>
+
+  <section>
+    <h2>Chats that feel like Discord</h2>
+    <div class="cols">
+      <div><h3>In the first version</h3><ul>
+        <li>Messages grouped by person, names and times, live as they arrive</li>
+        <li>Reply to a message (shows the quoted line; click jumps to it)</li>
+        <li>Emoji reactions, edit and delete your own, "(edited)"</li>
+        <li>@mentions, highlighted, and they notify the person</li>
+        <li>Unread: bold channels, a count, a red "New" line where you left off</li>
+        <li>Paste or drag images and files in (members)</li>
+        <li>Basic formatting: bold, italic, code, links</li>
+        <li>Pinned messages per channel; leaders remove messages</li>
+        <li>On a phone, the channel list slides in from the left</li>
+      </ul></div>
+      <div><h3>Later, if people want them</h3><ul>
+        <li>Threads off a message</li>
+        <li>"Someone is typing"</li>
+        <li>Direct messages between two people</li>
+        <li>Search inside a chat (the board's search already covers posts)</li>
+        <li>Slowmode per channel (the rule already exists underneath, it just needs a switch)</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Making channels by describing them</h2>
+    <p>Signed in as a leader, you get a box at the bottom of the channel list. You write what you want, like "a private chat for the legal team: me, Maya and Sam". Your agent turns that into the steps, shows them to you as one card with Make and Cancel, and runs them when you press Make. Every one can be undone. It works for more than channels: renaming, reordering, who can post, a new kind of post.</p>
+    <p class="caption">It uses your AI subscription. Members and guests never need AI for anything.</p>
+  </section>
+
+  <section>
+    <h2>What changes from today's board</h2>
+    <ul>
+      <li>Today the board is a feed of posts with threads, like Reddit. Chats become Discord-style streams. Announcements and Calendar stay as they are, readable by anyone.</li>
+      <li>Today nobody outside your PC can reach the board. For the QR code to work at a meeting it has to be on the internet, at seabright.example.org.</li>
+      <li>Underneath, the kernel needs three general pieces, each usable by any community: a <em>read by anyone</em> setting for things (so visitors can see announcements), a <em>guest</em> person who lasts until a set time, and chat messages that can be edited, reacted to and removed. The chat word itself already exists.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Your calls</h2>
+    <div class="qs">
+      <div class="q"><h3>1. Which chats are open to guests and every member?</h3><p>Legal and Buyout sound like they could hold strategy you would not want a stranger from a public meeting reading.</p><p class="rec">Media, Website, Wishes and Bugs open to all; Legal and Buyout members only, which you can change any time.</p></div>
+      <div class="q"><h3>2. What happens to today's channels?</h3><p>Meetings &amp; events, Research &amp; documents, Asks &amp; offers, Neighbours, Off-topic, and the Map.</p><p class="rec">Keep Calendar, Documents and Map as items at the top of the list. Turn Neighbours into a General chat. Retire Asks &amp; offers and Off-topic (kept, just hidden).</p></div>
+      <div class="q"><h3>3. Where does it run?</h3><p>It needs to be on the internet for the meeting.</p><p class="rec">Its own Seabright world on your Hetzner box, separate from your desktop world. Your private desk is never exposed, and it stays up when your PC is off or you're gaming.</p></div>
+      <div class="q"><h3>4. How long does a guest pass last?</h3><p class="rec">Until the end of the day after the meeting.</p></div>
+      <div class="q"><h3>5. When is the next meeting?</h3><p>That sets the order: guests, chats and going online first; describing channels after.</p></div>
+    </div>
+    <p class="caption">For people to make real accounts, the sign-in service still needs a Google sign-in client or an email sender from you. Guests and you work without either.</p>
+  </section>
+</div>
+
+<script>
+const CH = {
+  info:[["announce","Announcements","📣"],["calendar","Calendar","📅"]],
+  chats:[["legal","legal"],["media","media"],["buyout","buyout"],["website","website"],["wishes","wishes"],["bugs","bugs"]]
+};
+const MEMBERS_ONLY = new Set(["legal","buyout"]);
+const ROLE = {
+  visitor:{who:null,label:"Not signed in",caption:"A visitor sees Announcements and Calendar. Chats show a lock and ask them to sign in."},
+  guest:{who:"Rosa P.",tag:"guest",label:"Guest until tomorrow night",caption:"A guest from the QR code reads and sends in the open chats. Legal and Buyout stay locked (if you pick that). Their messages carry a guest tag."},
+  member:{who:"Maya R.",label:"Member",caption:"A member sees every chat, uploads files, and gets the red New line where they left off."},
+  leader:{who:"Alex H.",tag:"leader",label:"Leader",caption:"You see everything, post announcements, and get the box at the bottom of the list for making channels by describing them."}
+};
+let as = "guest", ch = "media";
+try{ const s = localStorage.getItem("sb-plan-as"); if(s && ROLE[s]) as = s; }catch(e){}
+
+const msgs = {
+  media:[
+    {n:"Maya R.",i:"MR",t:"7:42 PM",x:"Photos from tonight are going in Documents. Anyone get the slide with the unit count?"},
+    {n:"Maya R.",i:"MR",t:"7:42 PM",x:"It was 412 I think",cont:true},
+    {n:"Sam K.",i:"SK",t:"7:44 PM",x:"412, yes. Santa Cruz Sentinel wants a quote by Friday.",rx:[["👍",4,true],["📰",2]]},
+    {nl:true},
+    {n:"Rosa P.",i:"RP",t:"7:51 PM",g:true,x:"Hi, I'm new tonight. I can take photos at the next one.",reply:"Sam K.: 412, yes. Santa Cruz Sentinel wants a quote by Friday."},
+    {n:"Alex H.",i:"AH",t:"7:52 PM",lead:true,x:"<span class=\"at\">@Rosa P.</span> welcome, thank you! I'll add you to the photo list.",rx:[["❤️",3]]}
+  ]
+};
+function msgHTML(m){
+  if(m.nl) return '<div class="newline">New</div>';
+  const tag = m.g ? '<span class="tag g">guest</span>' : (m.lead ? '<span class="tag">leader</span>' : '');
+  const rx = m.rx ? '<div class="rx">'+m.rx.map(r=>`<span class="${r[2]?'mine':''}">${r[0]} ${r[1]}</span>`).join("")+'</div>' : '';
+  const rep = m.reply ? `<div class="reply">↱ ${m.reply}</div>` : '';
+  return `<div class="m${m.cont?' cont':''}"><div class="av${m.g?' g':''}" aria-hidden="true">${m.i}</div><div>${rep}${m.cont?'':`<div class="who"><strong>${m.n}</strong>${tag}<time>${m.t}</time></div>`}<div>${m.x}</div>${rx}</div><div class="hover" aria-hidden="true">😀 ↩ ⋯</div></div>`;
+}
+function canRead(id){
+  if(id==="announce"||id==="calendar") return true;
+  if(as==="visitor") return false;
+  if(as==="guest" && MEMBERS_ONLY.has(id)) return false;
+  return true;
+}
+function side(){
+  const r = ROLE[as];
+  let h = '<div class="place">Seabright</div><div class="group">Info</div>';
+  for(const [id,name,icon] of CH.info) h += `<button type="button" class="ch${ch===id?' on':''}" data-ch="${id}"><span class="hash">${icon}</span>${name}</button>`;
+  h += `<div class="group">Chats${as==="leader"?'<b title="Make a channel">+</b>':''}</div>`;
+  for(const [id,name] of CH.chats){
+    const ok = canRead(id), unread = ok && as!=="visitor" && (id==="legal"||id==="bugs") && ch!==id;
+    h += `<button type="button" class="ch${ch===id?' on':''}${ok?'':' lock'}${unread?' unread':''}" data-ch="${id}"><span class="hash">${ok?'#':'🔒'}</span>${name}${unread?'<span class="pill">'+(id==="legal"?3:1)+'</span>':''}</button>`;
+  }
+  h += `<div class="me">${r.who?`<strong>${r.who}</strong> · ${r.label}`:'<strong>Sign in</strong> · or scan a meeting code'}</div>`;
+  return h;
+}
+function main(){
+  const r = ROLE[as];
+  if(ch==="announce"){
+    let h = '<div class="top"><span class="t">📣 Announcements</span><span class="d">From the leaders. Everyone can read.</span></div><div class="msgs">';
+    h += '<div class="ann"><strong>Council vote moved to 18 Nov</strong><div>Planning Commission pushed the Seabright item two weeks. Public comment is still open until the 14th.</div><div class="meta">Alex H. · leader · today</div></div>';
+    h += '<div class="ann"><strong>Thanks for coming tonight</strong><div>Notes and the slides are in Documents. Next meeting is at Galt Elementary.</div><div class="meta">Alex H. · leader · today</div></div></div>';
+    h += as==="leader" ? '<div class="box">Write an announcement…</div>' : (as==="visitor" ? '<div class="box cta"><span><b>Want to join in?</b> Sign in, or scan the code at a meeting.</span><button class="btn" type="button">Sign in</button></div>' : '<div class="box">Only leaders post here. Reply in a chat.</div>');
+    return h;
+  }
+  if(ch==="calendar"){
+    let h = '<div class="top"><span class="t">📅 Calendar</span><span class="d">Meetings, hearings, deadlines.</span></div><div class="msgs"><div class="cal">';
+    h += `<div class="ev"><div class="day">NOV<b>14</b></div><div><strong>Public comment closes</strong><div class="meta">Online · 5:00 PM</div></div></div>`;
+    h += `<div class="ev"><div class="day">NOV<b>18</b></div><div><strong>Planning Commission hearing</strong><div class="meta">City Hall · 7:00 PM · 23 going${as==="visitor"?'':' · <b style="color:var(--accent)">RSVP</b>'}</div></div></div>`;
+    h += `<div class="ev"><div class="day">NOV<b>20</b></div><div><strong>Neighbours meeting</strong><div class="meta">Galt Elementary · 6:30 PM</div></div></div>`;
+    h += '</div></div>';
+    if(as==="visitor") h += '<div class="box cta"><span><b>Going?</b> Sign in to RSVP.</span><button class="btn" type="button">Sign in</button></div>';
+    return h;
+  }
+  const name = CH.chats.find(c=>c[0]===ch)[1];
+  let h = `<div class="top"><span class="t"># ${name}</span><span class="d">${ch==="media"?'Press, photos, flyers, social posts.':(ch==="bugs"?'Something broken on the site? Say here.':'')}</span></div>`;
+  if(!canRead(ch)){
+    const why = as==="visitor" ? "Chats are for neighbours who've signed in." : "This chat is for members. Make an account to join it.";
+    return h + `<div class="locked"><div style="font-size:28px" aria-hidden="true">🔒</div><div>${why}</div><button class="btn" type="button">${as==="visitor"?'Sign in':'Make an account'}</button></div>`;
+  }
+  h += '<div class="msgs">' + (msgs[ch]||[{n:"Sam K.",i:"SK",t:"6:10 PM",x:"Nothing here yet tonight. This is a quiet one."}]).map(msgHTML).join("") + '</div>';
+  if(as==="guest") h += `<div class="box guest">Message #${name} as Rosa P. (guest until tomorrow night)</div>`;
+  else h += `<div class="box">Message #${name}</div>`;
+  if(as==="leader") h += '<div class="describe"><div class="ask">"Make a private chat for the legal team: me, Maya and Sam. Put it under Chats, after legal."</div><div class="plan">Make chat "legal-team", private to Alex H., Maya R., Sam K.\nPlace it after #legal</div><div class="row"><span>Make</span><span class="no">Cancel</span></div></div>';
+  return h;
+}
+function draw(){
+  document.getElementById("side").innerHTML = side();
+  document.getElementById("main").innerHTML = main();
+  document.getElementById("caption").textContent = ROLE[as].caption;
+  document.querySelectorAll(".views button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.as===as)));
+}
+document.querySelector(".views").addEventListener("click",e=>{
+  const b = e.target.closest("button[data-as]"); if(!b) return;
+  as = b.dataset.as; if(as==="visitor" && !canRead(ch)) ch = "announce";
+  try{ localStorage.setItem("sb-plan-as", as); }catch(err){}
+  draw();
+});
+document.getElementById("side").addEventListener("click",e=>{
+  const b = e.target.closest("button[data-ch]"); if(!b) return; ch = b.dataset.ch; draw();
+});
+if(as==="visitor") ch = "announce";
+draw();
+</script>

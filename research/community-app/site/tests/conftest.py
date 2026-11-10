@@ -125,7 +125,7 @@ class Client:
     def onboard(self, name: str = "Maya R.", help_: list[str] | None = None) -> Resp:
         r = self.post("/welcome", {"q_display_name": name, "q_help": help_ or ["meetings"],
                                    "q_neighbourhood": "Seabright"})
-        assert r.status == 303 and r.location == "/home", r.text
+        assert r.status == 303 and r.location == self.app.cfg.home_path, r.text
         return r
 
 

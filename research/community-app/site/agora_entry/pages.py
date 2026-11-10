@@ -29,7 +29,7 @@ def when(ts: int) -> str:
 
 def first_name(account: dict) -> str:
     name = account.get("display_name") or account.get("suggested_name") or ""
-    return name.split(" ")[0] if name else "neighbour"
+    return name.split(" ")[0] if name else "neighbor"
 
 
 def error_bits(message: str | None, field_id: str) -> dict:
@@ -42,6 +42,7 @@ def error_bits(message: str | None, field_id: str) -> dict:
 
 STATUS_LABEL = {"open": "Open", "frozen": "Frozen", "expired": "Expired", "full": "Used up",
                 "missing": "Gone"}
+NO_EMAIL = "Email sign-in isn’t set up yet — ask a leader."
 
 
 class Pages:
@@ -57,7 +58,7 @@ class Pages:
         if req.account and not req.account["onboarded_at"]:
             return Safe("")  # nothing to wander off to before the questions
         if req.account:
-            links = []
+            links = [tag("a", "Board", href=self.app.cfg.home_path)]
             if "leader" in self.app.service.roles(req.account["id"]):
                 links.append(tag("a", "Invites", href="/leader/invites"))
             links.append(tag("a", "You", href="/account"))
@@ -95,7 +96,7 @@ class Pages:
     def public(self, req):
         c = self.content
         if req.account:
-            primary = tag("a", "Go to the place", href="/home", class_="btn primary")
+            primary = tag("a", "Go to the board", href=self.app.cfg.home_path, class_="btn primary")
             secondary = Safe("")
         else:
             public = self.app.service.public_invite()
@@ -130,6 +131,8 @@ class Pages:
     # -- ways in ----------------------------------------------------------------
     def ways_in(self, req, invite_code: str = "", email: str = "", error: str | None = None,
                 fine: str = "") -> Safe:
+        if self.app.mailer is None and self.app.google is None:
+            return Safe(f'<div class="ways"><p class="note">{esc(NO_EMAIL)}</p></div>')
         google = Safe("")
         if self.app.google is not None:
             href = "/auth/google/start" + (f"?invite={invite_code}" if invite_code else "")
@@ -137,6 +140,8 @@ class Pages:
             note = Safe('<span class="stand-in">test stand-in</span>') if self.app.cfg.google_mode == "fake" else ""
             google = Safe(f'<a class="btn google" href="{esc(href)}">{_ICON_G}<span>{esc(label)}</span>{note}</a>'
                           '<div class="or" role="separator"><span>or</span></div>')
+        if self.app.mailer is None:
+            return Safe(f'<div class="ways">{google}<p class="note">{esc(NO_EMAIL)}</p></div>')
         return fill("ways_in.html", google=google, csrf=self.app.csrf_token(req), invite=invite_code,
                     email=email, fine=fine,
                     email_button_class="secondary" if self.app.google is not None else "primary",
@@ -156,15 +161,52 @@ class Pages:
             f'</section>')
         return self.page(req, "Join", body)
 
+    def join_guest(self, req, invite: dict, maker: dict | None, name: str = "", error: str | None = None):
+        """The meeting's QR code: one field, your name, and you're in until the end of tomorrow."""
+        c = self.content
+        who = (maker or {}).get("display_name")
+        heading = f"{who} invited you to join" if who else "You're invited to join"
+        until = when(self.app.service.guest_until())
+        err = error_bits(error, "name")
+        body = Safe(
+            f'<section class="panel">'
+            f'<p class="kicker">{esc(heading)}</p>'
+            f'<h1>{esc(c["community_name"])}</h1>'
+            f'<form method="post" action="/join/{esc(invite["code"])}/guest" class="stack" novalidate>'
+            f'<input type="hidden" name="csrf" value="{esc(self.app.csrf_token(req))}">'
+            f'<label class="field-label" for="name">Your name</label>'
+            f'<input class="input{err["error_class"]}" id="name" name="name" maxlength="60" required '
+            f'autocomplete="name" value="{esc(name)}"{err["error_attrs"]}>{err["error"]}'
+            f'<button class="btn primary" type="submit">Join</button>'
+            f'</form>'
+            f'<p class="fine">This is shown to neighbors in chat. You’re in as a guest until '
+            f'{esc(until)}; make an account any time to stay.</p>'
+            f'<p class="fine"><a href="/signin">Have an account? Sign in</a> · '
+            f'<a href="/join/{esc(invite["code"])}?account=1">Make an account instead</a></p>'
+            f'</section>')
+        return self.page(req, "Join", body, status="400 Bad Request" if error else "200 OK")
+
+    def no_email(self, req):
+        return self.message(req, "Email sign-in isn't set up yet", NO_EMAIL, back=("/signin", "Back"),
+                            status="503 Service Unavailable")
+
+    def guest_note(self, req) -> Safe:
+        account = req.account
+        if not self.app.is_guest(account):
+            return Safe("")
+        return Safe(f'<p class="note">You’re here as a guest, {esc(account.get("display_name") or "")}, until '
+                    f'{esc(when(account["guest_until"]))}. Sign in or make an account below to stay: '
+                    f'you keep your name and everything you’ve posted.</p>')
+
     def signin(self, req, invite_code: str | None = None, email: str = "", error: str | None = None):
         c = self.content
         body = Safe(
             f'<section class="panel">'
             f'<h1>Sign in</h1>'
-            f'<p class="lead">Welcome back to {esc(c["community_name"])}.</p>'
+            f'<p class="lead">Welcome back to {esc(c["community_name"])}.</p>{self.guest_note(req)}'
             f'{self.ways_in(req, invite_code=invite_code or "", email=email, error=error)}'
-            f'<p class="fine">New here? You join through an invite link from a neighbour. '
-            f'<a href="/#join">How to join</a></p>'
+            f'<p class="fine">New here? You join through an invite link from a neighbor. '
+            f'<a href="/about#join">How to join</a></p>'
             f'</section>')
         status = "400 Bad Request" if error else "200 OK"
         return self.page(req, "Sign in", body, status=status)
@@ -280,7 +322,7 @@ class Pages:
             f'<section class="panel">'
             f'<p class="kicker">You\'re in</p>'
             f'<h1>Hi, {esc(first_name(account))}</h1>'
-            f'<p class="lead">The feed will live here: announcements at the top, then what neighbours post. '
+            f'<p class="lead">The feed will live here: announcements at the top, then what neighbors post. '
             f'It is being built now.</p>{refused}'
             f'</section>'
             f'<div class="cards two">{lead_card}'
@@ -294,6 +336,11 @@ class Pages:
             values = self.app.service.answers(account["id"])
             values["display_name"] = account.get("display_name") or ""
         via = "Google or an emailed link" if account.get("google_sub") else "an emailed link"
+        if self.app.is_guest(account):
+            signing = Safe(f'<p>You’re a guest until {esc(when(account["guest_until"]))}. '
+                           f'<a href="/signin">Make an account or sign in</a> to stay.</p>')
+        else:
+            signing = Safe(f'<p>{esc(account["email"])}. You sign in with {esc(via)}.</p>')
         csrf = esc(self.app.csrf_token(req))
         note = Safe('<p class="saved" role="status">Saved.</p>') if saved else Safe("")
         body = Safe(
@@ -307,7 +354,7 @@ class Pages:
             f'</section>'
             f'<section class="panel quiet">'
             f'<h2>Signing in</h2>'
-            f'<p>{esc(account["email"])}. You sign in with {esc(via)}.</p>'
+            f'{signing}'
             f'<div class="row">'
             f'<form method="post" action="/signout"><input type="hidden" name="csrf" value="{csrf}">'
             f'<button class="btn ghost" type="submit">Sign out</button></form>'
@@ -322,12 +369,16 @@ class Pages:
         form = form or {}
         pick = lambda k, d="": (form.get(k) or [d])[0]  # noqa: E731
         kind = pick("kind", "link")
+        # Redisplayed after an error: as sent. Fresh: invite_form.js ticks it when "event" is picked.
+        guest_checked = pick("guest_ok") == "1" if form else False
         public = self.app.service.public_invite()
         public_id = public.invite["id"] if public and public.invite else None
         rows = []
         for inv in self.app.service.invites():
             uses = f'{inv["uses"]} joined' + (f' of {inv["max_uses"]}' if inv["max_uses"] else "")
-            flag = Safe(' <span class="chip-s public">On the site</span>') if inv["id"] == public_id else ""
+            flag = Safe(' <span class="chip-s public">On the site</span>') if inv["id"] == public_id else Safe("")
+            if inv.get("guest_ok"):
+                flag = Safe(flag + ' <span class="chip-s public">Guests</span>')
             rows.append(Safe(
                 f'<li><a class="invite-row" href="/leader/invites/{esc(inv["id"])}">'
                 f'<div><strong>{esc(inv["channel"])}</strong>{flag}'
@@ -356,6 +407,10 @@ class Pages:
             f'<span>Link to share</span></label>'
             f'<label class="chip"><input type="radio" name="kind" value="event"{" checked" if kind == "event" else ""}>'
             f'<span>QR code for an event</span></label></div></fieldset>'
+            f'<div class="field"><label class="chip"><input type="checkbox" id="guest_ok" name="guest_ok" value="1"'
+            f'{" checked" if guest_checked else ""}><span>Guests can join with just their name</span></label>'
+            f'<p class="field-help">For a meeting\'s QR code: no email needed, in until the end of the next day. '
+            f'On by default for event QR codes.</p></div>'
             f'<div class="two-fields">'
             f'<div class="field"><label class="field-label" for="max_uses">Most people</label>'
             f'<input class="input" id="max_uses" name="max_uses" inputmode="numeric" placeholder="No limit" '
@@ -367,7 +422,8 @@ class Pages:
             f'</form></section>')
         listed = Safe(f'<section class="panel"><h1>Invites</h1><ul class="invite-list">{listing}</ul></section>')
         body = Safe(make + listed) if error else Safe(listed + make)
-        return self.page(req, "Invites", body, status="400 Bad Request" if error else "200 OK")
+        return self.page(req, "Invites", body, status="400 Bad Request" if error else "200 OK",
+                         head_extra='<script src="/entry-static/invite_form.js" defer></script>')
 
     def leader_invite(self, req, state):
         inv = state.invite
@@ -390,6 +446,9 @@ class Pages:
             frozen_note = Safe(f'<p class="note warn">Frozen {esc(when(inv["frozen_at"]))} by '
                                f'{esc(by.get("display_name") or by.get("email") or "a leader")}. '
                                f'Nobody new can join through it.</p>')
+        guests = ("guests_off", "Stop guest passes", "ghost") if inv["guest_ok"] else \
+            ("guests_on", "Let guests join with a name", "ghost")
+        guest_fact = "Yes, name only, until the end of the next day" if inv["guest_ok"] else "No"
         limit = f'{inv["uses"]} of {inv["max_uses"]}' if inv["max_uses"] else f'{inv["uses"]} (no limit)'
         body = Safe(
             f'<p class="crumb"><a href="/leader/invites">← All invites</a></p>'
@@ -405,6 +464,7 @@ class Pages:
             f'<div><dt>Made</dt><dd>{esc(day(inv["created_at"]))}</dd></div>'
             f'<div><dt>Open until</dt><dd>{esc(when(inv["expires_at"]))}</dd></div>'
             f'<div><dt>Joined</dt><dd>{esc(limit)}</dd></div>'
+            f'<div><dt>Guests</dt><dd>{esc(guest_fact)}</dd></div>'
             f'</dl>'
             f'<div class="qr-preview">{self.app.qr_svg(inv)}</div>'
             f'<div class="row">'
@@ -415,6 +475,9 @@ class Pages:
             f'<form method="post" action="/leader/invites/{esc(inv["id"])}/{site_btn[0]}">'
             f'<input type="hidden" name="csrf" value="{csrf}">'
             f'<button class="btn {site_btn[2]}" type="submit">{esc(site_btn[1])}</button></form>'
+            f'<form method="post" action="/leader/invites/{esc(inv["id"])}/{guests[0]}">'
+            f'<input type="hidden" name="csrf" value="{csrf}">'
+            f'<button class="btn {guests[2]}" type="submit">{esc(guests[1])}</button></form>'
             f'</div></section>'
             f'<section class="panel quiet"><h2>Who came through it</h2><ul class="people">{plist}</ul></section>')
         return self.page(req, inv["channel"], body,
@@ -500,7 +563,7 @@ def signin_email(app, send: dict) -> tuple[str, str, str | None, list[str]]:
         why = "this address isn't a member yet, and joining is by invite"
     subject = f"About signing in to {name}"
     text = (f"Hi,\n\nSomeone, hopefully you, asked to sign in to {name} with this address, but {why}.\n\n"
-            f"Ask a neighbour who's already in for an invite link, or come to the next meeting.\n\n"
+            f"Ask a neighbor who's already in for an invite link, or come to the next meeting.\n\n"
             f"If you didn't ask, you can ignore this email.\n")
     return subject, text, None, []
 
