@@ -61,3 +61,7 @@ research/window-lab/.tmp-*/
 /pytest-cache-files-vc77xj4l/
 # a11327: exact pytest cache scratch retained after denied cache creation; no deletion.
 /pytest-cache-files-pgxvchi0/
+
+# Never public: old desk worlds and world dumps
+research/text-desk-lab/notation/sessions/
+desk-export*.txt
