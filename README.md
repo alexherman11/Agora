@@ -10,23 +10,23 @@
 
 Today's information economy turns people into the product. The software we use every day has millions of users but barely changes: thousands never get the features they want, and thousands more build fixes that never reach anyone else.
 
-Agora answers with **malleable software** and **conviviality**: tools that serve their users, not shareholders. It trusts people to shape the technology around them and gives non-programmers the means, through accessible AI and a simple language, so jobs, clubs, knitting groups and communities can build the software they need. It stays inspectable, forkable, governable by its users, and a little weird, in the spirit of 90s counterculture computing.
+Agora tries to answer the concept of malleable software. It trusts people to shape the technology around them and gives non-programmers the means, through accessible AI and a simple interfaces, to build the software they need. It will always stay inspectable, forkable, governable by its users, and a little weird, in the spirit of 90s counterculture computing.
 
 Full vision: [docs/Agora.md](docs/Agora.md) and [docs/Agora Constitution.md](<docs/Agora Constitution.md>).
 
 ## Where it stands
 
-Agora is a working research prototype. What runs today is the first stage, the Dynamic Desk: a desktop, AI interface and application system built all out of the same substrate. It might only look like a regular modern desktop interface, however, what seems simple is actually the foundation of an entire ecosystem. This system is still very much in development but I believe it has lots of potential.
+Agora is a working research prototype. What runs today is the first stage, the Dynamic Desk: a desktop, AI interface and application system built all out of the same substrate. It might only look like a regular modern desktop interface, however, what seems simple is actually the foundation of an entire ecosystem. It is currently being tested in the wild as the coordinating fabric for the Save Seabright Plaza group where our internal communications and research can be held. This system is still in development but I believe it could serve as a general pattern that could extend well beyond our group into social networks around the world.
 
-## The big idea: take applications apart
+## The big idea: take applications apart and change who owns them
 
-Every app welds three things together: it **keeps the data**, **draws the interface** and **owns the window**. Every seam between programs is that weld. Separate them and there are no applications left, only things that hold data, views that show them, and places that host them, each possibly from a different author.
+Every app welds three things together: it **keeps the data**, **draws the interface** and **owns the window**. It is also owned by a company that most likely profits off your data and is more indebted to shareholders than its users. When you break the bonds that hold applications together, you unlock the potential for communities and organizations to host their own applications, build the tools that they need, and everything talks to everything else because a new application is just a new view on the same objects. You don't have to build connectors and bridges, things just talk the same language. The world gets even bigger when you imagine a world where programming has shareable structure, so code that works on my phone still controls applications on my PC, your code for a messaging service can improve my organizing application because they share the same foundation.
 
 A game already accepts any gamepad because USB gave gamepads a shared vocabulary. Shared theming works across coding editors because they agreed on things like comment, string and keyword. What is important for collaboration is simple shared primitives that everything speaks: words like view, table and tab. In Agora they are treated as kinds, where kinds can be made of kinds and so on. Because of the risk of schema-hell, agents can create versioned objects that translate between schemas. This allows Agora-speaking software to be developed around the world and still understand each other when it meets.
 
 Underneath, an append-only log accumulates a history for people and places, enabling a whole host of features like universal undo, rollback, sync, audit and “why did this happen”.
 
-This shared language, the **Agora Protocol**, is being designed now, out of the working prototype below.
+This shared language, the **Agora Protocol**, is in development but will formalize the ways that we create and document words, write to a log, and enforce security principles.
 
 ## The text desk
 
