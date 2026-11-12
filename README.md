@@ -2,10 +2,6 @@
 
 > “You never change things by fighting the existing reality. To change something, build a new model that makes the existing model obsolete.” — Buckminster Fuller
 
-**A space for work and life that grows around the individual as well as the collective: an operating system you can reshape while you use it, shared with a resident AI.**
-
-![The Agora desktop: a terminal, a community board and a task board under one shell](src/desktop/kernel-desktop/evidence/shell/full-real-dusk.png)
-
 ## Why
 
 Today's information economy turns people into the product. The software we use every day has millions of users but barely changes: thousands never get the features they want, and thousands more build fixes that never reach anyone else.
