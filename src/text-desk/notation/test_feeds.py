@@ -42,7 +42,7 @@ SECRETS = {
     "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA1234\n-----END RSA PRIVATE KEY-----": "MIIEpAIBAAKCAQEA",
     "the key is Q2hhcmxpZTEyMzQ1Njc4OTBhYmNkZWZnaGlqa2xtbm9w and more": "Q2hhcmxpZTEyMzQ1Njc4",
     "slack xoxb-123456789012-abcdefghijkl": "xoxb-1234",
-    "AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY": "AIzaSyD",
+    "AIza" + "FAKE" * 9: "AIzaFAK",
     "hex key 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08": "9f86d081884c7d659a2f",
 }
 for raw, secret in SECRETS.items():
